@@ -388,9 +388,10 @@ func handlePublish(ctx *service.RequestContext, store *Store, locator ServiceLoc
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
-	// Deliver to SQS subscriptions (SNS → SQS fan-out).
+	// Deliver to subscriptions (SNS → SQS fan-out, SNS → Lambda).
 	if locator != nil {
 		deliverToSQSSubscriptions(store, locator, topicArn, msgID, message, subject)
+		deliverToLambdaSubscriptions(store, locator, topicArn, msgID, message, subject)
 	}
 
 	resp := &xmlPublishResponse{
@@ -487,6 +488,73 @@ func enqueueSNSToSQS(locator ServiceLocator, queueName, messageBody string) {
 	}
 	if enqueuer, ok := svc.(SQSEnqueuer); ok {
 		enqueuer.EnqueueDirect(queueName, messageBody)
+	}
+}
+
+// LambdaInvoker is an interface for invoking Lambda functions directly.
+type LambdaInvoker interface {
+	InvokeDirect(functionName string, event []byte) ([]byte, error)
+}
+
+// deliverToLambdaSubscriptions iterates SNS subscriptions with protocol "lambda"
+// and invokes the target Lambda function with an SNS event payload.
+func deliverToLambdaSubscriptions(store *Store, locator ServiceLocator, topicArn, msgID, message, subject string) {
+	subs, ok := store.ListSubscriptionsByTopic(topicArn)
+	if !ok {
+		return
+	}
+
+	for _, sub := range subs {
+		if sub.Protocol != "lambda" {
+			continue
+		}
+
+		// The endpoint is the Lambda function ARN. Extract the function name.
+		funcName := extractFunctionNameFromARN(sub.Endpoint)
+		if funcName == "" {
+			continue
+		}
+
+		// Build the SNS event payload matching AWS format.
+		payload := buildSNSLambdaEvent(topicArn, msgID, message, subject, sub.ARN)
+
+		// Find the Lambda service and invoke.
+		invokeSNSToLambda(locator, funcName, []byte(payload))
+	}
+}
+
+// extractFunctionNameFromARN extracts the function name from a Lambda ARN like
+// "arn:aws:lambda:us-east-1:123456789012:function:my-func" → "my-func"
+func extractFunctionNameFromARN(arn string) string {
+	parts := splitARN(arn)
+	if len(parts) < 6 {
+		return ""
+	}
+	// Lambda ARN resource part is "function:name" — the splitARN only splits on 5 colons,
+	// so parts[5] = "function:my-func". Extract after "function:".
+	resource := parts[5]
+	const prefix = "function:"
+	if len(resource) > len(prefix) && resource[:len(prefix)] == prefix {
+		return resource[len(prefix):]
+	}
+	return resource
+}
+
+// buildSNSLambdaEvent creates the SNS event payload for Lambda invocation,
+// matching the AWS format.
+func buildSNSLambdaEvent(topicArn, messageID, message, subject, subscriptionArn string) string {
+	return fmt.Sprintf(`{"Records":[{"EventSource":"aws:sns","EventVersion":"1.0","EventSubscriptionArn":"%s","Sns":{"Type":"Notification","MessageId":"%s","TopicArn":"%s","Subject":"%s","Message":%s,"Timestamp":"%s"}}]}`,
+		subscriptionArn, messageID, topicArn, subject, jsonEscape(message), newUUID())
+}
+
+// invokeSNSToLambda finds the Lambda service via the locator and invokes the function.
+func invokeSNSToLambda(locator ServiceLocator, functionName string, payload []byte) {
+	svc, err := locator.Lookup("lambda")
+	if err != nil {
+		return
+	}
+	if invoker, ok := svc.(LambdaInvoker); ok {
+		invoker.InvokeDirect(functionName, payload)
 	}
 }
 

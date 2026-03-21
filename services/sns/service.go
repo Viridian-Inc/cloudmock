@@ -74,9 +74,10 @@ func (s *SNSService) PublishDirect(topicName, message, subject string) bool {
 		return false
 	}
 
-	// Also deliver to SQS subscriptions if we have a locator.
+	// Also deliver to subscriptions if we have a locator.
 	if s.locator != nil {
 		deliverToSQSSubscriptions(s.store, s.locator, topicArn, msgID, message, subject)
+		deliverToLambdaSubscriptions(s.store, s.locator, topicArn, msgID, message, subject)
 	}
 	return true
 }

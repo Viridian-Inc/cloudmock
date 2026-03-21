@@ -131,7 +131,18 @@ func main() {
 
 	_ = registerOrDefer("dynamodb", func() service.Service { return dynamodbsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("logs", func() service.Service { return logssvc.New(cfg.AccountID, cfg.Region) })
-	_ = registerOrDefer("cloudwatch", func() service.Service { return cwsvc.New(cfg.AccountID, cfg.Region) })
+	// CloudWatch — needs a locator for alarm → SNS delivery; wire after registration.
+	var cwService *cwsvc.CloudWatchService
+	if eagerAll || minimalSet["cloudwatch"] {
+		cwService = cwsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(cwService)
+	} else {
+		registry.RegisterLazy("monitoring", func() service.Service {
+			svc := cwsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
 	_ = registerOrDefer("firehose", func() service.Service { return firehosesvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("kinesis", func() service.Service { return kinesissvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("route53", func() service.Service { return r53svc.New(cfg.AccountID, cfg.Region) })
@@ -183,6 +194,9 @@ func main() {
 	}
 	if lambdaService != nil {
 		lambdaService.SetLocator(registry)
+	}
+	if cwService != nil {
+		cwService.SetLocator(registry)
 	}
 
 	// Wire cross-service integrations via event bus

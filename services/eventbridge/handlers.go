@@ -599,6 +599,11 @@ type SNSPublisher interface {
 	PublishDirect(topicName, message, subject string) bool
 }
 
+// LambdaInvoker is an interface for invoking Lambda functions directly.
+type LambdaInvoker interface {
+	InvokeDirect(functionName string, event []byte) ([]byte, error)
+}
+
 // deliverToRuleTargets checks rules on the event bus for a matching event and
 // delivers to each target (SQS queue or SNS topic).
 func deliverToRuleTargets(store *Store, locator ServiceLocator, event *PutEvent) {
@@ -722,6 +727,29 @@ func deliverToTarget(locator ServiceLocator, event *PutEvent, target *Target) {
 		}
 		if publisher, ok := svc.(SNSPublisher); ok {
 			publisher.PublishDirect(topicName, messageBody, "EventBridge Notification")
+		}
+
+	case "lambda":
+		// Lambda target: ARN resource is "function:name"
+		if len(parts) < 6 {
+			return
+		}
+		resource := parts[5]
+		funcName := resource
+		const funcPrefix = "function:"
+		if len(resource) > len(funcPrefix) && resource[:len(funcPrefix)] == funcPrefix {
+			funcName = resource[len(funcPrefix):]
+		}
+		// Build EventBridge event payload for Lambda.
+		payload := fmt.Sprintf(`{"version":"0","id":"%s","source":"%s","detail-type":"%s","time":"%s","region":"","resources":[],"detail":%s}`,
+			event.EventId, event.Source, event.DetailType,
+			event.Time.Format(time.RFC3339), messageBody)
+		svc, err := locator.Lookup("lambda")
+		if err != nil {
+			return
+		}
+		if invoker, ok := svc.(LambdaInvoker); ok {
+			invoker.InvokeDirect(funcName, []byte(payload))
 		}
 	}
 }

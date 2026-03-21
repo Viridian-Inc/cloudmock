@@ -7,9 +7,15 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// ServiceLocator provides access to other services for cross-service communication.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
+
 // CloudWatchService is the cloudmock implementation of the AWS CloudWatch Metrics API.
 type CloudWatchService struct {
-	store *Store
+	store   *Store
+	locator ServiceLocator
 }
 
 // New returns a new CloudWatchService for the given AWS account ID and region.
@@ -17,6 +23,11 @@ func New(accountID, region string) *CloudWatchService {
 	return &CloudWatchService{
 		store: NewStore(accountID, region),
 	}
+}
+
+// SetLocator sets the service locator for cross-service delivery (alarm → SNS).
+func (s *CloudWatchService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
 }
 
 // Name returns the AWS service name used for routing.
@@ -66,7 +77,7 @@ func (s *CloudWatchService) HandleRequest(ctx *service.RequestContext) (*service
 	case "DeleteAlarms":
 		return handleDeleteAlarms(ctx, s.store)
 	case "SetAlarmState":
-		return handleSetAlarmState(ctx, s.store)
+		return handleSetAlarmState(ctx, s.store, s.locator)
 	case "DescribeAlarmsForMetric":
 		return handleDescribeAlarmsForMetric(ctx, s.store)
 	case "TagResource":

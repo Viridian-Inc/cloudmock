@@ -1,6 +1,7 @@
 package lambda
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ type LambdaService struct {
 	store    *FunctionStore
 	executor *Executor
 	locator  ServiceLocator
+	esmStore *EventSourceMappingStore
 }
 
 // New returns a new LambdaService for the given AWS account ID and region.
@@ -24,6 +26,7 @@ func New(accountID, region string) *LambdaService {
 	return &LambdaService{
 		store:    NewStore(accountID, region),
 		executor: NewExecutor(),
+		esmStore: NewEventSourceMappingStore(),
 	}
 }
 
@@ -47,6 +50,10 @@ func (s *LambdaService) Actions() []service.Action {
 		{Name: "Invoke", Method: http.MethodPost, IAMAction: "lambda:InvokeFunction"},
 		{Name: "GetFunctionConfiguration", Method: http.MethodGet, IAMAction: "lambda:GetFunctionConfiguration"},
 		{Name: "UpdateFunctionConfiguration", Method: http.MethodPut, IAMAction: "lambda:UpdateFunctionConfiguration"},
+		{Name: "CreateEventSourceMapping", Method: http.MethodPost, IAMAction: "lambda:CreateEventSourceMapping"},
+		{Name: "ListEventSourceMappings", Method: http.MethodGet, IAMAction: "lambda:ListEventSourceMappings"},
+		{Name: "GetEventSourceMapping", Method: http.MethodGet, IAMAction: "lambda:GetEventSourceMapping"},
+		{Name: "DeleteEventSourceMapping", Method: http.MethodDelete, IAMAction: "lambda:DeleteEventSourceMapping"},
 	}
 }
 
@@ -56,6 +63,22 @@ func (s *LambdaService) HealthCheck() error { return nil }
 // Logs returns the Lambda execution log buffer.
 func (s *LambdaService) Logs() *LogBuffer {
 	return s.executor.Logs()
+}
+
+// InvokeDirect invokes a Lambda function by name with the given event payload.
+// This is used for cross-service delivery (SNS → Lambda, EventBridge → Lambda,
+// SQS → Lambda event source mappings). Returns the result bytes, or an error.
+func (s *LambdaService) InvokeDirect(functionName string, event []byte) ([]byte, error) {
+	fn, ok := s.store.Get(functionName)
+	if !ok {
+		return nil, fmt.Errorf("function not found: %s", functionName)
+	}
+	return s.executor.Invoke(fn, event)
+}
+
+// Store returns the function store (used by event source mapping pollers).
+func (s *LambdaService) Store() *FunctionStore {
+	return s.store
 }
 
 // HandleRequest routes an incoming Lambda request to the appropriate handler.
@@ -75,6 +98,12 @@ func (s *LambdaService) HandleRequest(ctx *service.RequestContext) (*service.Res
 	r := ctx.RawRequest
 	method := r.Method
 	path := strings.TrimRight(r.URL.Path, "/")
+
+	// Event source mapping routes: /2015-03-31/event-source-mappings
+	const esmPrefix = "/2015-03-31/event-source-mappings"
+	if strings.HasPrefix(path, esmPrefix) {
+		return s.handleESMRequest(ctx, method, path, esmPrefix)
+	}
 
 	const basePrefix = "/2015-03-31/functions"
 
@@ -136,6 +165,34 @@ func (s *LambdaService) HandleRequest(ctx *service.RequestContext) (*service.Res
 		}
 	}
 
+	return lambdaNotImplemented()
+}
+
+// handleESMRequest routes event source mapping requests.
+func (s *LambdaService) handleESMRequest(ctx *service.RequestContext, method, path, prefix string) (*service.Response, error) {
+	rest := path[len(prefix):]
+
+	// POST /2015-03-31/event-source-mappings -> CreateEventSourceMapping
+	// GET  /2015-03-31/event-source-mappings -> ListEventSourceMappings
+	if rest == "" {
+		switch method {
+		case http.MethodPost:
+			return handleCreateEventSourceMapping(ctx, s)
+		case http.MethodGet:
+			return handleListEventSourceMappings(ctx, s)
+		}
+		return lambdaNotImplemented()
+	}
+
+	// GET    /2015-03-31/event-source-mappings/{uuid} -> GetEventSourceMapping
+	// DELETE /2015-03-31/event-source-mappings/{uuid} -> DeleteEventSourceMapping
+	uuid := strings.TrimPrefix(rest, "/")
+	switch method {
+	case http.MethodGet:
+		return handleGetEventSourceMapping(ctx, s, uuid)
+	case http.MethodDelete:
+		return handleDeleteEventSourceMapping(ctx, s, uuid)
+	}
 	return lambdaNotImplemented()
 }
 

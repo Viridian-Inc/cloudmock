@@ -57,6 +57,36 @@ func (s *SQSService) EnqueueDirect(queueName, messageBody string) bool {
 	return true
 }
 
+// PollMessages receives messages from a named queue without going through
+// the HTTP path. Used for event source mapping (SQS → Lambda).
+// Returns parallel slices of message IDs, bodies, and receipt handles.
+func (s *SQSService) PollMessages(queueName string, maxCount, visibilityTimeout int) (messageIDs, bodies, receiptHandles []string, ok bool) {
+	q, qOK := s.store.GetByName(queueName)
+	if !qOK {
+		return nil, nil, nil, false
+	}
+	msgs := q.ReceiveMessages(maxCount, visibilityTimeout)
+	ids := make([]string, 0, len(msgs))
+	bds := make([]string, 0, len(msgs))
+	rhs := make([]string, 0, len(msgs))
+	for _, m := range msgs {
+		ids = append(ids, m.MessageId)
+		bds = append(bds, m.Body)
+		rhs = append(rhs, m.ReceiptHandle)
+	}
+	return ids, bds, rhs, true
+}
+
+// AckMessage deletes a message from a named queue by receipt handle.
+// Used for event source mapping (SQS → Lambda) after successful processing.
+func (s *SQSService) AckMessage(queueName, receiptHandle string) bool {
+	q, ok := s.store.GetByName(queueName)
+	if !ok {
+		return false
+	}
+	return q.DeleteMessage(receiptHandle)
+}
+
 // HandleRequest routes an incoming SQS request to the appropriate handler.
 // It supports both query/form-encoded (XML) and JSON protocol formats.
 // JSON protocol is detected via Content-Type: application/x-amz-json-* or

@@ -431,7 +431,12 @@ type xmlSetAlarmStateResponse struct {
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
-func handleSetAlarmState(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+// SNSPublisher is an interface for directly publishing messages to SNS topics.
+type SNSPublisher interface {
+	PublishDirect(topicName, message, subject string) bool
+}
+
+func handleSetAlarmState(ctx *service.RequestContext, store *Store, locator ServiceLocator) (*service.Response, error) {
 	form := parseForm(ctx)
 	alarmName := form.Get("AlarmName")
 	stateValue := form.Get("StateValue")
@@ -444,16 +449,89 @@ func handleSetAlarmState(ctx *service.RequestContext, store *Store) (*service.Re
 		return xmlErr(service.ErrValidation("StateValue is required."))
 	}
 
+	// Get alarm actions before updating state.
+	alarms := store.DescribeAlarms([]string{alarmName})
+	var alarmActions []string
+	var alarmArn string
+	if len(alarms) > 0 {
+		alarmActions = alarms[0].AlarmActions
+		alarmArn = alarms[0].AlarmArn
+	}
+
 	if !store.SetAlarmState(alarmName, stateValue, stateReason) {
 		return xmlErr(service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Alarm %s does not exist.", alarmName),
 			http.StatusNotFound))
 	}
 
+	// If transitioning to ALARM state and there are alarm actions, fire them.
+	if stateValue == "ALARM" && locator != nil && len(alarmActions) > 0 {
+		deliverAlarmActions(locator, alarmName, alarmArn, stateValue, stateReason, alarmActions)
+	}
+
 	return xmlOK(&xmlSetAlarmStateResponse{
 		Xmlns: cwXmlns,
 		Meta:  xmlResponseMetadata{RequestID: newUUID()},
 	})
+}
+
+// deliverAlarmActions publishes alarm notifications to SNS topics listed in alarm actions.
+func deliverAlarmActions(locator ServiceLocator, alarmName, alarmArn, stateValue, stateReason string, actions []string) {
+	svc, err := locator.Lookup("sns")
+	if err != nil {
+		return
+	}
+	publisher, ok := svc.(SNSPublisher)
+	if !ok {
+		return
+	}
+
+	// Build alarm notification message matching AWS format.
+	message := fmt.Sprintf(
+		`{"AlarmName":"%s","AlarmArn":"%s","NewStateValue":"%s","NewStateReason":"%s","StateChangeTime":"%s"}`,
+		alarmName, alarmArn, stateValue, stateReason, time.Now().UTC().Format(time.RFC3339))
+
+	for _, actionArn := range actions {
+		// Extract topic name from SNS ARN: arn:aws:sns:region:account:topic-name
+		topicName := extractTopicNameFromARN(actionArn)
+		if topicName == "" {
+			continue
+		}
+		publisher.PublishDirect(topicName, message, fmt.Sprintf("ALARM: %q in ALARM", alarmName))
+	}
+}
+
+// extractTopicNameFromARN extracts the topic name from an SNS ARN.
+func extractTopicNameFromARN(arn string) string {
+	// arn:aws:sns:region:account:topic-name
+	parts := splitARN(arn)
+	if len(parts) < 6 {
+		return ""
+	}
+	return parts[5]
+}
+
+// splitARN splits an ARN into its components.
+func splitARN(arn string) []string {
+	result := make([]string, 0, 6)
+	s := arn
+	for i := 0; i < 5; i++ {
+		idx := -1
+		for j := 0; j < len(s); j++ {
+			if s[j] == ':' {
+				idx = j
+				break
+			}
+		}
+		if idx < 0 {
+			result = append(result, s)
+			return result
+		}
+		result = append(result, s[:idx])
+		s = s[idx+1:]
+	}
+	result = append(result, s)
+	return result
 }
 
 // ---- DescribeAlarmsForMetric ----

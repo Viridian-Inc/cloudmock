@@ -458,7 +458,8 @@ type AuthResult struct {
 }
 
 // InitiateAuth authenticates a user and returns tokens.
-func (s *Store) InitiateAuth(clientID, username, password string) (*AuthResult, *service.AWSError) {
+// The KeyStore is required to sign JWTs; pass nil to skip token generation (test only).
+func (s *Store) InitiateAuth(clientID, username, password string, keys *KeyStore) (*AuthResult, *service.AWSError) {
 	pool, awsErr := s.findPoolByClientID(clientID)
 	if awsErr != nil {
 		return nil, awsErr
@@ -489,30 +490,52 @@ func (s *Store) InitiateAuth(clientID, username, password string) (*AuthResult, 
 	now := time.Now().UTC()
 	iss := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", s.region, poolID)
 
-	accessToken := buildToken(map[string]interface{}{
-		"sub":        user.Sub,
-		"iss":        iss,
-		"token_use":  "access",
-		"username":   user.Username,
-		"iat":        now.Unix(),
-		"exp":        now.Add(time.Hour).Unix(),
-	})
-	idToken := buildToken(map[string]interface{}{
-		"sub":        user.Sub,
-		"iss":        iss,
-		"token_use":  "id",
-		"cognito:username": user.Username,
-		"email":      user.Attributes["email"],
-		"iat":        now.Unix(),
-		"exp":        now.Add(time.Hour).Unix(),
-	})
-	refreshToken := buildToken(map[string]interface{}{
+	accessClaims := map[string]interface{}{
+		"sub":       user.Sub,
+		"iss":       iss,
+		"client_id": clientID,
+		"token_use": "access",
+		"scope":     "openid email profile",
+		"auth_time": now.Unix(),
+		"username":  user.Username,
+		"iat":       now.Unix(),
+		"exp":       now.Add(time.Hour).Unix(),
+	}
+	idClaims := map[string]interface{}{
+		"sub":               user.Sub,
+		"iss":               iss,
+		"aud":               clientID,
+		"token_use":         "id",
+		"auth_time":         now.Unix(),
+		"cognito:username":  user.Username,
+		"email":             user.Attributes["email"],
+		"email_verified":    true,
+		"iat":               now.Unix(),
+		"exp":               now.Add(time.Hour).Unix(),
+	}
+	refreshClaims := map[string]interface{}{
 		"sub":       user.Sub,
 		"iss":       iss,
 		"token_use": "refresh",
 		"iat":       now.Unix(),
 		"exp":       now.Add(30 * 24 * time.Hour).Unix(),
-	})
+	}
+
+	accessToken, err := signJWT(keys, accessClaims)
+	if err != nil {
+		return nil, service.NewAWSError("InternalErrorException",
+			"Failed to sign access token.", http.StatusInternalServerError)
+	}
+	idToken, err := signJWT(keys, idClaims)
+	if err != nil {
+		return nil, service.NewAWSError("InternalErrorException",
+			"Failed to sign id token.", http.StatusInternalServerError)
+	}
+	refreshToken, err := signJWT(keys, refreshClaims)
+	if err != nil {
+		return nil, service.NewAWSError("InternalErrorException",
+			"Failed to sign refresh token.", http.StatusInternalServerError)
+	}
 
 	return &AuthResult{
 		AccessToken:  accessToken,

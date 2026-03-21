@@ -2,19 +2,28 @@ package cognito
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // CognitoService is the cloudmock implementation of the AWS Cognito User Pools API.
 type CognitoService struct {
-	store *Store
+	store     *Store
+	keys      *KeyStore
+	authCodes *authCodeStore
 }
 
 // New returns a new CognitoService for the given AWS account ID and region.
 func New(accountID, region string) *CognitoService {
+	keys, err := NewKeyStore()
+	if err != nil {
+		panic("cognito: failed to generate RSA key pair: " + err.Error())
+	}
 	return &CognitoService{
-		store: NewStore(accountID, region),
+		store:     NewStore(accountID, region),
+		keys:      keys,
+		authCodes: newAuthCodeStore(),
 	}
 }
 
@@ -46,9 +55,17 @@ func (s *CognitoService) Actions() []service.Action {
 func (s *CognitoService) HealthCheck() error { return nil }
 
 // HandleRequest routes an incoming Cognito User Pools request to the appropriate handler.
-// Cognito uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway
-// and placed in ctx.Action (e.g. "CreateUserPool").
+// It first checks for OAuth/OIDC REST-style paths, then falls back to the JSON protocol
+// where the action is parsed from X-Amz-Target by the gateway and placed in ctx.Action.
 func (s *CognitoService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
+	path := ctx.RawRequest.URL.Path
+
+	// OAuth/OIDC REST endpoints — route by path.
+	if strings.Contains(path, "/.well-known/") || strings.HasPrefix(path, "/oauth2/") || path == "/login" {
+		return s.handleOAuth(ctx)
+	}
+
+	// Existing JSON protocol — route by action.
 	switch ctx.Action {
 	case "CreateUserPool":
 		return handleCreateUserPool(ctx, s.store)
@@ -75,7 +92,7 @@ func (s *CognitoService) HandleRequest(ctx *service.RequestContext) (*service.Re
 	case "SignUp":
 		return handleSignUp(ctx, s.store)
 	case "InitiateAuth":
-		return handleInitiateAuth(ctx, s.store)
+		return handleInitiateAuth(ctx, s.store, s.keys)
 	case "AdminConfirmSignUp":
 		return handleAdminConfirmSignUp(ctx, s.store)
 	default:

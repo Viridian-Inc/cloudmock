@@ -489,7 +489,7 @@ func handleSignUp(ctx *service.RequestContext, store *Store) (*service.Response,
 	})
 }
 
-func handleInitiateAuth(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handleInitiateAuth(ctx *service.RequestContext, store *Store, keys *KeyStore) (*service.Response, error) {
 	var req initiateAuthRequest
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
@@ -510,7 +510,7 @@ func handleInitiateAuth(ctx *service.RequestContext, store *Store) (*service.Res
 			"AuthParameters must include USERNAME and PASSWORD.", http.StatusBadRequest))
 	}
 
-	result, awsErr := store.InitiateAuth(req.ClientId, username, password)
+	result, awsErr := store.InitiateAuth(req.ClientId, username, password, keys)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}

@@ -16,6 +16,13 @@ function Icon(props: IconProps & { children: preact.ComponentChildren }) {
   return <svg {...defaultProps} {...rest}>{children}</svg>;
 }
 
+export function HomeIcon(p: IconProps) {
+  return <Icon {...p}>
+    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+    <polyline points="9 22 9 12 15 12 15 22" />
+  </Icon>;
+}
+
 export function CloudIcon(p: IconProps) {
   return <Icon {...p}><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z" /></Icon>;
 }
@@ -199,6 +206,7 @@ export function UsersIcon(p: IconProps) {
 }
 
 export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
+  home: HomeIcon,
   cloud: CloudIcon,
   services: ServicesIcon,
   requests: RequestsIcon,

@@ -6,6 +6,7 @@ import { Header } from './components/Header';
 import { Sidebar, NavItem } from './components/Sidebar';
 import { CommandPalette } from './components/CommandPalette';
 import { Toast } from './components/Toast';
+import { HomePage } from './pages/Home';
 import { ServicesPage } from './pages/Services';
 import { RequestsPage } from './pages/Requests';
 import { RequestDetailPage } from './pages/RequestDetail';
@@ -65,7 +66,8 @@ export function App() {
   }, []);
 
   const navItems: NavItem[] = [
-    { id: '/', label: 'Services', icon: 'services' },
+    { id: '/', label: 'Home', icon: 'home' },
+    { id: '/services', label: 'Services', icon: 'services' },
     { id: '/requests', label: 'Requests', icon: 'requests' },
     { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
     { id: '/s3', label: 'S3', icon: 'bucket' },
@@ -83,6 +85,7 @@ export function App() {
       return <RequestDetailPage id={segments[1]} showToast={showToast} />;
     }
     switch (activePath) {
+      case '/services': return <ServicesPage services={services} stats={stats} health={health} />;
       case '/requests': return <RequestsPage sse={sse} showToast={showToast} />;
       case '/dynamodb': return <DynamoDBPage showToast={showToast} />;
       case '/s3': return <S3BrowserPage showToast={showToast} />;
@@ -93,7 +96,7 @@ export function App() {
       case '/iam': return <IAMPage showToast={showToast} />;
       case '/mail': return <MailPage />;
       case '/topology': return <TopologyPage sse={sse} />;
-      default: return <ServicesPage services={services} stats={stats} health={health} />;
+      default: return <HomePage sse={sse} showToast={showToast} />;
     }
   }
 

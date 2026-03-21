@@ -23,4 +23,13 @@ export async function ddbRequest(action: string, body: Record<string, any> = {})
   return res.json();
 }
 
+export async function getHomeData() {
+  const [services, stats, health] = await Promise.all([
+    api('/api/services'),
+    api('/api/stats'),
+    api('/api/health'),
+  ]);
+  return { services, stats, health };
+}
+
 export { ADMIN_BASE, GW_BASE };

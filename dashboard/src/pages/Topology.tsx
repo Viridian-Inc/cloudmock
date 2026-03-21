@@ -82,32 +82,37 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 // Map service names to their category and layer
 const SERVICE_DEFS: Record<string, { category: string; layer: number }> = {
-  'Client Apps':       { category: 'Client',     layer: 0 },
-  'API Gateway':       { category: 'API',        layer: 1 },
-  'Cognito':           { category: 'Auth',       layer: 1 },
-  'Lambda':            { category: 'Compute',    layer: 2 },
-  'IAM':               { category: 'Auth',       layer: 2 },
-  'STS':               { category: 'Auth',       layer: 2 },
-  'DynamoDB':          { category: 'Database',   layer: 3 },
-  'SQS':               { category: 'Messaging',  layer: 3 },
-  'SNS':               { category: 'Messaging',  layer: 3 },
-  'EventBridge':       { category: 'Messaging',  layer: 3 },
-  'S3':                { category: 'Storage',    layer: 3 },
-  'SES':               { category: 'Email',      layer: 4 },
-  'Secrets Manager':   { category: 'Config',     layer: 4 },
-  'KMS':               { category: 'Config',     layer: 4 },
-  'SSM':               { category: 'Config',     layer: 4 },
-  'CloudWatch':        { category: 'Monitoring', layer: 4 },
-  'CloudWatch Logs':   { category: 'Monitoring', layer: 4 },
-  'RDS':               { category: 'Database',   layer: 3 },
-  'VPC (EC2)':         { category: 'Network',    layer: 4 },
-  'Route 53':          { category: 'Network',    layer: 4 },
-  'CloudFormation':    { category: 'Infra',      layer: 4 },
-  'ECS':               { category: 'Infra',      layer: 4 },
-  'ECR':               { category: 'Infra',      layer: 4 },
-  'Kinesis':           { category: 'Streaming',  layer: 4 },
-  'Firehose':          { category: 'Streaming',  layer: 4 },
-  'Step Functions':    { category: 'Other',      layer: 4 },
+  // External services (autotend local dev stack)
+  'Expo App':          { category: 'Client',     layer: 0 },
+  'BFF Service':       { category: 'Compute',    layer: 1 },
+  'GraphQL Server':    { category: 'API',        layer: 1 },
+  'Calendar Service':  { category: 'Compute',    layer: 1 },
+  // AWS services
+  'API Gateway':       { category: 'API',        layer: 2 },
+  'Cognito':           { category: 'Auth',       layer: 2 },
+  'Lambda':            { category: 'Compute',    layer: 3 },
+  'IAM':               { category: 'Auth',       layer: 3 },
+  'STS':               { category: 'Auth',       layer: 3 },
+  'DynamoDB':          { category: 'Database',   layer: 4 },
+  'SQS':               { category: 'Messaging',  layer: 4 },
+  'SNS':               { category: 'Messaging',  layer: 4 },
+  'EventBridge':       { category: 'Messaging',  layer: 4 },
+  'S3':                { category: 'Storage',    layer: 4 },
+  'SES':               { category: 'Email',      layer: 5 },
+  'Secrets Manager':   { category: 'Config',     layer: 5 },
+  'KMS':               { category: 'Config',     layer: 5 },
+  'SSM':               { category: 'Config',     layer: 5 },
+  'CloudWatch':        { category: 'Monitoring', layer: 5 },
+  'CloudWatch Logs':   { category: 'Monitoring', layer: 5 },
+  'RDS':               { category: 'Database',   layer: 4 },
+  'VPC (EC2)':         { category: 'Network',    layer: 5 },
+  'Route 53':          { category: 'Network',    layer: 5 },
+  'CloudFormation':    { category: 'Infra',      layer: 5 },
+  'ECS':               { category: 'Infra',      layer: 5 },
+  'ECR':               { category: 'Infra',      layer: 5 },
+  'Kinesis':           { category: 'Streaming',  layer: 5 },
+  'Firehose':          { category: 'Streaming',  layer: 5 },
+  'Step Functions':    { category: 'Other',      layer: 5 },
 };
 
 // Canonical name mapping: API service name -> topology display name
@@ -147,16 +152,29 @@ const NAME_MAP: Record<string, string> = {
 };
 
 const KNOWN_EDGES: { from: string; to: string; label: string }[] = [
-  { from: 'Client Apps',   to: 'API Gateway',      label: 'REST API' },
-  { from: 'API Gateway',   to: 'Lambda',            label: 'proxy' },
-  { from: 'API Gateway',   to: 'Cognito',           label: 'authorizer' },
-  { from: 'Lambda',        to: 'DynamoDB',          label: 'read/write' },
-  { from: 'Lambda',        to: 'SQS',               label: 'send messages' },
-  { from: 'Lambda',        to: 'SNS',               label: 'publish' },
-  { from: 'Lambda',        to: 'SES',               label: 'send email' },
-  { from: 'Lambda',        to: 'Secrets Manager',   label: 'get secrets' },
-  { from: 'Lambda',        to: 'KMS',               label: 'encrypt/decrypt' },
-  { from: 'Lambda',        to: 'S3',                label: 'read/write' },
+  // Local services → AWS services
+  { from: 'Expo App',       to: 'BFF Service',       label: 'HTTP :3202' },
+  { from: 'Expo App',       to: 'GraphQL Server',    label: 'WS :4000' },
+  { from: 'Expo App',       to: 'Cognito',           label: 'auth' },
+  { from: 'BFF Service',    to: 'DynamoDB',          label: 'read/write' },
+  { from: 'BFF Service',    to: 'SQS',               label: 'send events' },
+  { from: 'BFF Service',    to: 'SNS',               label: 'notifications' },
+  { from: 'BFF Service',    to: 'S3',                label: 'file storage' },
+  { from: 'BFF Service',    to: 'Secrets Manager',   label: 'credentials' },
+  { from: 'BFF Service',    to: 'Cognito',           label: 'verify tokens' },
+  { from: 'GraphQL Server', to: 'DynamoDB',          label: 'resolvers' },
+  { from: 'Calendar Service', to: 'RDS',             label: 'calendar DB' },
+  { from: 'Calendar Service', to: 'DynamoDB',        label: 'events' },
+  // AWS service → AWS service
+  { from: 'API Gateway',    to: 'Lambda',            label: 'proxy' },
+  { from: 'API Gateway',    to: 'Cognito',           label: 'authorizer' },
+  { from: 'Lambda',         to: 'DynamoDB',          label: 'read/write' },
+  { from: 'Lambda',         to: 'SQS',               label: 'send messages' },
+  { from: 'Lambda',         to: 'SNS',               label: 'publish' },
+  { from: 'Lambda',         to: 'SES',               label: 'send email' },
+  { from: 'Lambda',         to: 'Secrets Manager',   label: 'get secrets' },
+  { from: 'Lambda',         to: 'KMS',               label: 'encrypt/decrypt' },
+  { from: 'Lambda',         to: 'S3',                label: 'read/write' },
   { from: 'Lambda',        to: 'EventBridge',       label: 'put events' },
   { from: 'Lambda',        to: 'IAM',               label: 'assume role' },
   { from: 'DynamoDB',      to: 'Lambda',            label: 'streams trigger' },
@@ -544,7 +562,7 @@ function ServiceIcon({ service, x, y, color }: { service: string; x: number; y: 
 
 // --- Layout ---
 
-const LAYER_X = [80, 280, 480, 720, 960];
+const LAYER_X = [60, 250, 440, 650, 880, 1100];
 const NODE_W = 160;
 const NODE_H = 48;
 const NODE_RX = 10;
@@ -571,8 +589,8 @@ function buildLayout(
     edgeServices.add(e.to);
   }
 
-  // Always include Client Apps as entry point
-  const included = new Set<string>(['Client Apps']);
+  // Always include external services (autotend local dev stack)
+  const included = new Set<string>(['Expo App', 'BFF Service', 'GraphQL Server', 'Calendar Service']);
 
   // Determine which services to include
   for (const [name] of Object.entries(SERVICE_DEFS)) {
@@ -610,11 +628,12 @@ function buildLayout(
 
   // Sort nodes within each layer for consistent ordering
   const layerOrder: Record<number, string[]> = {
-    0: ['Client Apps'],
-    1: ['API Gateway', 'Cognito'],
-    2: ['Lambda', 'IAM', 'STS'],
-    3: ['DynamoDB', 'SQS', 'SNS', 'EventBridge', 'S3', 'RDS'],
-    4: ['SES', 'Secrets Manager', 'KMS', 'SSM', 'CloudWatch', 'CloudWatch Logs', 'VPC (EC2)', 'Route 53', 'CloudFormation', 'ECS', 'ECR', 'Kinesis', 'Firehose', 'Step Functions'],
+    0: ['Expo App'],
+    1: ['BFF Service', 'GraphQL Server', 'Calendar Service'],
+    2: ['API Gateway', 'Cognito'],
+    3: ['Lambda', 'IAM', 'STS'],
+    4: ['DynamoDB', 'SQS', 'SNS', 'EventBridge', 'S3', 'RDS'],
+    5: ['SES', 'Secrets Manager', 'KMS', 'SSM', 'CloudWatch', 'CloudWatch Logs', 'VPC (EC2)', 'Route 53', 'CloudFormation', 'ECS', 'ECR', 'Kinesis', 'Firehose', 'Step Functions'],
   };
 
   const nodes: TopoNode[] = [];
@@ -905,7 +924,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   }, [expandedLayout]);
 
   // SVG dimensions
-  const svgW = 1200;
+  const svgW = 1400;
   const maxNodeBottom = useMemo(() => {
     let max = 0;
     if (viewMode === 'expanded' && expandedLayout) {

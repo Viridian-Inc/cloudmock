@@ -1,0 +1,61 @@
+# cloudmock configuration
+# All values shown are defaults. Uncomment and modify as needed.
+
+# AWS region to emulate
+region: us-east-1
+
+# AWS account ID to emulate
+account_id: "000000000000"
+
+# Service profile: minimal | standard | full | custom
+# - minimal:  iam, sts, s3, dynamodb, sqs, sns, lambda, cloudwatch-logs
+# - standard: all minimal services + rds, cloudformation, ec2, ecr, ecs,
+#             secretsmanager, ssm, kinesis, firehose, events, stepfunctions, apigateway
+# - full:     all supported services
+# - custom:   only services listed under the `services` key below
+profile: minimal
+
+iam:
+  # IAM enforcement mode: enforce | authenticate | none
+  # - enforce:     full IAM policy evaluation (default)
+  # - authenticate: verify credentials only, skip policy checks
+  # - none:         skip all auth checks (development only)
+  mode: enforce
+  root_access_key: test
+  root_secret_key: test
+  # seed_file: /path/to/iam-seed.json
+
+persistence:
+  # Set to true to persist state across restarts
+  enabled: false
+  # path: /var/lib/cloudmock/data
+
+gateway:
+  # Main AWS API endpoint port (matches LocalStack default)
+  port: 4566
+
+dashboard:
+  # Web dashboard for inspecting state
+  enabled: true
+  port: 4500
+
+admin:
+  # Admin/control-plane API port
+  port: 4599
+
+logging:
+  # Log level: debug | info | warn | error
+  level: info
+  # Log format: text | json
+  format: text
+
+# Per-service overrides (used when profile: custom, or to override defaults)
+# services:
+#   s3:
+#     enabled: true
+#     port: 4572
+#   lambda:
+#     enabled: true
+#     runtimes:
+#       - nodejs20.x
+#       - python3.12

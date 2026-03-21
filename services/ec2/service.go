@@ -31,6 +31,13 @@ func (s *EC2Service) Actions() []service.Action {
 		{Name: "CreateSubnet", Method: http.MethodPost, IAMAction: "ec2:CreateSubnet"},
 		{Name: "DescribeSubnets", Method: http.MethodPost, IAMAction: "ec2:DescribeSubnets"},
 		{Name: "DeleteSubnet", Method: http.MethodPost, IAMAction: "ec2:DeleteSubnet"},
+		{Name: "CreateSecurityGroup", Method: http.MethodPost, IAMAction: "ec2:CreateSecurityGroup"},
+		{Name: "DescribeSecurityGroups", Method: http.MethodPost, IAMAction: "ec2:DescribeSecurityGroups"},
+		{Name: "DeleteSecurityGroup", Method: http.MethodPost, IAMAction: "ec2:DeleteSecurityGroup"},
+		{Name: "AuthorizeSecurityGroupIngress", Method: http.MethodPost, IAMAction: "ec2:AuthorizeSecurityGroupIngress"},
+		{Name: "AuthorizeSecurityGroupEgress", Method: http.MethodPost, IAMAction: "ec2:AuthorizeSecurityGroupEgress"},
+		{Name: "RevokeSecurityGroupIngress", Method: http.MethodPost, IAMAction: "ec2:RevokeSecurityGroupIngress"},
+		{Name: "RevokeSecurityGroupEgress", Method: http.MethodPost, IAMAction: "ec2:RevokeSecurityGroupEgress"},
 	}
 }
 
@@ -62,6 +69,20 @@ func (s *EC2Service) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDescribeSubnets(ctx, s.store)
 	case "DeleteSubnet":
 		return handleDeleteSubnet(ctx, s.store)
+	case "CreateSecurityGroup":
+		return handleCreateSecurityGroup(ctx, s.store)
+	case "DescribeSecurityGroups":
+		return handleDescribeSecurityGroups(ctx, s.store)
+	case "DeleteSecurityGroup":
+		return handleDeleteSecurityGroup(ctx, s.store)
+	case "AuthorizeSecurityGroupIngress":
+		return handleAuthorizeSecurityGroupIngress(ctx, s.store)
+	case "AuthorizeSecurityGroupEgress":
+		return handleAuthorizeSecurityGroupEgress(ctx, s.store)
+	case "RevokeSecurityGroupIngress":
+		return handleRevokeSecurityGroupIngress(ctx, s.store)
+	case "RevokeSecurityGroupEgress":
+		return handleRevokeSecurityGroupEgress(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

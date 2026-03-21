@@ -39,12 +39,24 @@ type RouteTable struct {
 	IsMain       bool
 }
 
+// SGRule represents a single inbound or outbound security group rule.
+type SGRule struct {
+	IpProtocol string   // tcp, udp, icmp, -1 (all)
+	FromPort   int
+	ToPort     int
+	CidrBlocks []string // CIDR ranges (e.g. "0.0.0.0/0")
+	GroupIds   []string // referenced security group IDs
+}
+
 // SecurityGroup represents a VPC security group (auto-created with VPC).
 type SecurityGroup struct {
-	GroupId     string
-	GroupName   string
-	Description string
-	VpcId       string
+	GroupId      string
+	GroupName    string
+	Description  string
+	VpcId        string
+	IngressRules []SGRule
+	EgressRules  []SGRule
+	Tags         map[string]string
 }
 
 // NetworkACL represents a VPC network ACL (auto-created with VPC).
@@ -114,12 +126,17 @@ func (s *Store) CreateVPC(cidrBlock string, enableDnsSupport, enableDnsHostnames
 	}
 	s.routeTables[rt.RouteTableId] = rt
 
-	// Auto-create default security group.
+	// Auto-create default security group with default egress rule.
 	sg := &SecurityGroup{
 		GroupId:     genID("sg-"),
 		GroupName:   "default",
 		Description: "default VPC security group",
 		VpcId:       vpc.VpcId,
+		IngressRules: []SGRule{},
+		EgressRules: []SGRule{
+			{IpProtocol: "-1", FromPort: 0, ToPort: 0, CidrBlocks: []string{"0.0.0.0/0"}},
+		},
+		Tags: make(map[string]string),
 	}
 	s.securityGroups[sg.GroupId] = sg
 
@@ -322,6 +339,231 @@ func (s *Store) DeleteSubnet(subnetId string) bool {
 	}
 	delete(s.subnets, subnetId)
 	return true
+}
+
+// ---- SecurityGroup operations ----
+
+// CreateSecurityGroup creates a new security group in the given VPC. Returns the
+// new group and an error code string (empty on success).
+func (s *Store) CreateSecurityGroup(groupName, description, vpcId string) (*SecurityGroup, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcs[vpcId]; !ok {
+		return nil, "vpc_not_found"
+	}
+
+	// Ensure unique name within VPC.
+	for _, sg := range s.securityGroups {
+		if sg.VpcId == vpcId && sg.GroupName == groupName {
+			return nil, "duplicate_name"
+		}
+	}
+
+	sg := &SecurityGroup{
+		GroupId:     genID("sg-"),
+		GroupName:   groupName,
+		Description: description,
+		VpcId:       vpcId,
+		IngressRules: []SGRule{},
+		EgressRules: []SGRule{
+			{IpProtocol: "-1", FromPort: 0, ToPort: 0, CidrBlocks: []string{"0.0.0.0/0"}},
+		},
+		Tags: make(map[string]string),
+	}
+	s.securityGroups[sg.GroupId] = sg
+	return sg, ""
+}
+
+// GetSecurityGroup returns a security group by ID.
+func (s *Store) GetSecurityGroup(groupId string) (*SecurityGroup, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sg, ok := s.securityGroups[groupId]
+	return sg, ok
+}
+
+// ListSecurityGroups returns security groups filtered by IDs, VPC ID, and/or
+// group name. Any filter that is empty / nil is ignored.
+func (s *Store) ListSecurityGroups(ids []string, vpcId, groupName string) []*SecurityGroup {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*SecurityGroup, 0)
+	for _, sg := range s.securityGroups {
+		if idSet != nil {
+			if _, ok := idSet[sg.GroupId]; !ok {
+				continue
+			}
+		}
+		if vpcId != "" && sg.VpcId != vpcId {
+			continue
+		}
+		if groupName != "" && sg.GroupName != groupName {
+			continue
+		}
+		result = append(result, sg)
+	}
+	return result
+}
+
+// DeleteSecurityGroup removes a security group. Returns an error code string or
+// empty on success.  Fails if any other security group references this one.
+func (s *Store) DeleteSecurityGroup(groupId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.securityGroups[groupId]; !ok {
+		return "not_found"
+	}
+
+	// Check whether any SG references this one.
+	for id, sg := range s.securityGroups {
+		if id == groupId {
+			continue
+		}
+		for _, rule := range sg.IngressRules {
+			for _, gid := range rule.GroupIds {
+				if gid == groupId {
+					return "dependency"
+				}
+			}
+		}
+		for _, rule := range sg.EgressRules {
+			for _, gid := range rule.GroupIds {
+				if gid == groupId {
+					return "dependency"
+				}
+			}
+		}
+	}
+
+	delete(s.securityGroups, groupId)
+	return ""
+}
+
+// AuthorizeSecurityGroupIngress adds ingress rules to a security group.
+func (s *Store) AuthorizeSecurityGroupIngress(groupId string, rules []SGRule) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sg, ok := s.securityGroups[groupId]
+	if !ok {
+		return "not_found"
+	}
+	sg.IngressRules = append(sg.IngressRules, rules...)
+	return ""
+}
+
+// AuthorizeSecurityGroupEgress adds egress rules to a security group.
+func (s *Store) AuthorizeSecurityGroupEgress(groupId string, rules []SGRule) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sg, ok := s.securityGroups[groupId]
+	if !ok {
+		return "not_found"
+	}
+	sg.EgressRules = append(sg.EgressRules, rules...)
+	return ""
+}
+
+// ruleMatches returns true when candidate matches the target rule.
+func ruleMatches(target, candidate SGRule) bool {
+	if target.IpProtocol != candidate.IpProtocol {
+		return false
+	}
+	if target.FromPort != candidate.FromPort || target.ToPort != candidate.ToPort {
+		return false
+	}
+	if len(target.CidrBlocks) != len(candidate.CidrBlocks) {
+		return false
+	}
+	cidrSet := make(map[string]struct{}, len(target.CidrBlocks))
+	for _, c := range target.CidrBlocks {
+		cidrSet[c] = struct{}{}
+	}
+	for _, c := range candidate.CidrBlocks {
+		if _, ok := cidrSet[c]; !ok {
+			return false
+		}
+	}
+	if len(target.GroupIds) != len(candidate.GroupIds) {
+		return false
+	}
+	gidSet := make(map[string]struct{}, len(target.GroupIds))
+	for _, g := range target.GroupIds {
+		gidSet[g] = struct{}{}
+	}
+	for _, g := range candidate.GroupIds {
+		if _, ok := gidSet[g]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
+// removeRules removes rules from slice that match any rule in toRemove.
+func removeRules(existing []SGRule, toRemove []SGRule) ([]SGRule, bool) {
+	removed := false
+	result := existing[:0:0]
+	for _, rule := range existing {
+		matched := false
+		for _, rem := range toRemove {
+			if ruleMatches(rem, rule) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			removed = true
+		} else {
+			result = append(result, rule)
+		}
+	}
+	return result, removed
+}
+
+// RevokeSecurityGroupIngress removes matching ingress rules.
+func (s *Store) RevokeSecurityGroupIngress(groupId string, rules []SGRule) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sg, ok := s.securityGroups[groupId]
+	if !ok {
+		return "not_found"
+	}
+	updated, removed := removeRules(sg.IngressRules, rules)
+	if !removed {
+		return "rule_not_found"
+	}
+	sg.IngressRules = updated
+	return ""
+}
+
+// RevokeSecurityGroupEgress removes matching egress rules.
+func (s *Store) RevokeSecurityGroupEgress(groupId string, rules []SGRule) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sg, ok := s.securityGroups[groupId]
+	if !ok {
+		return "not_found"
+	}
+	updated, removed := removeRules(sg.EgressRules, rules)
+	if !removed {
+		return "rule_not_found"
+	}
+	sg.EgressRules = updated
+	return ""
 }
 
 // ---- helpers ----

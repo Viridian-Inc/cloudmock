@@ -465,6 +465,364 @@ func TestEC2_ModifyVpcAttribute(t *testing.T) {
 	}
 }
 
+// ---- Security Group helpers ----
+
+// mustCreateSG creates a security group and returns its GroupId.
+func mustCreateSG(t *testing.T, handler http.Handler, vpcId, name, desc string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "CreateSecurityGroup", url.Values{
+		"VpcId":            {vpcId},
+		"GroupName":        {name},
+		"GroupDescription": {desc},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateSecurityGroup %s: expected 200, got %d\nbody: %s", name, w.Code, w.Body.String())
+	}
+	var resp struct {
+		GroupId string `xml:"groupId"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("CreateSecurityGroup: unmarshal: %v\nbody: %s", err, w.Body.String())
+	}
+	if resp.GroupId == "" {
+		t.Fatalf("CreateSecurityGroup: groupId is empty\nbody: %s", w.Body.String())
+	}
+	return resp.GroupId
+}
+
+// describeOneSG calls DescribeSecurityGroups for a single group and returns the body.
+func describeOneSG(t *testing.T, handler http.Handler, groupId string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "DescribeSecurityGroups", url.Values{
+		"GroupId.1": {groupId},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeSecurityGroups %s: expected 200, got %d\nbody: %s", groupId, w.Code, w.Body.String())
+	}
+	return w.Body.String()
+}
+
+// ---- Test 8: CreateSecurityGroup + DescribeSecurityGroups (default egress) ----
+
+func TestEC2_SecurityGroup_CreateAndDescribe(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	sgId := mustCreateSG(t, handler, vpcId, "web-sg", "Web tier security group")
+
+	if !strings.HasPrefix(sgId, "sg-") {
+		t.Errorf("CreateSecurityGroup: expected sg- prefix, got %s", sgId)
+	}
+
+	body := describeOneSG(t, handler, sgId)
+
+	if !strings.Contains(body, sgId) {
+		t.Errorf("DescribeSecurityGroups: expected groupId %s\nbody: %s", sgId, body)
+	}
+	if !strings.Contains(body, "<groupName>web-sg</groupName>") {
+		t.Errorf("DescribeSecurityGroups: expected groupName\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<groupDescription>Web tier security group</groupDescription>") {
+		t.Errorf("DescribeSecurityGroups: expected groupDescription\nbody: %s", body)
+	}
+	if !strings.Contains(body, vpcId) {
+		t.Errorf("DescribeSecurityGroups: expected vpcId\nbody: %s", body)
+	}
+	// Default egress rule: protocol -1, CIDR 0.0.0.0/0.
+	if !strings.Contains(body, "<ipProtocol>-1</ipProtocol>") {
+		t.Errorf("DescribeSecurityGroups: expected default egress rule with protocol -1\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<cidrIp>0.0.0.0/0</cidrIp>") {
+		t.Errorf("DescribeSecurityGroups: expected default egress CIDR 0.0.0.0/0\nbody: %s", body)
+	}
+
+	// Filter by vpc-id.
+	wv := httptest.NewRecorder()
+	handler.ServeHTTP(wv, ec2Req(t, "DescribeSecurityGroups", url.Values{
+		"Filter.1.Name":    {"vpc-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wv.Code != http.StatusOK {
+		t.Fatalf("DescribeSecurityGroups vpc filter: expected 200, got %d", wv.Code)
+	}
+	if !strings.Contains(wv.Body.String(), sgId) {
+		t.Errorf("DescribeSecurityGroups vpc filter: expected %s\nbody: %s", sgId, wv.Body.String())
+	}
+
+	// Filter by group-name.
+	wn := httptest.NewRecorder()
+	handler.ServeHTTP(wn, ec2Req(t, "DescribeSecurityGroups", url.Values{
+		"Filter.1.Name":    {"group-name"},
+		"Filter.1.Value.1": {"web-sg"},
+	}))
+	if wn.Code != http.StatusOK {
+		t.Fatalf("DescribeSecurityGroups name filter: expected 200, got %d", wn.Code)
+	}
+	if !strings.Contains(wn.Body.String(), sgId) {
+		t.Errorf("DescribeSecurityGroups name filter: expected %s\nbody: %s", sgId, wn.Body.String())
+	}
+
+	// Duplicate name in same VPC should fail.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "CreateSecurityGroup", url.Values{
+		"VpcId":            {vpcId},
+		"GroupName":        {"web-sg"},
+		"GroupDescription": {"duplicate"},
+	}))
+	if wd.Code == http.StatusOK {
+		t.Error("CreateSecurityGroup duplicate name: expected error, got 200")
+	}
+	if !strings.Contains(wd.Body.String(), "InvalidGroup.Duplicate") {
+		t.Errorf("CreateSecurityGroup duplicate: expected InvalidGroup.Duplicate\nbody: %s", wd.Body.String())
+	}
+}
+
+// ---- Test 9: AuthorizeSecurityGroupIngress + verify in Describe ----
+
+func TestEC2_SecurityGroup_AuthorizeIngress(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	sgId := mustCreateSG(t, handler, vpcId, "app-sg", "App security group")
+
+	// Authorize HTTPS ingress from 0.0.0.0/0.
+	wa := httptest.NewRecorder()
+	handler.ServeHTTP(wa, ec2Req(t, "AuthorizeSecurityGroupIngress", url.Values{
+		"GroupId":                        {sgId},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"443"},
+		"IpPermissions.1.ToPort":         {"443"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+	}))
+	if wa.Code != http.StatusOK {
+		t.Fatalf("AuthorizeSecurityGroupIngress: expected 200, got %d\nbody: %s", wa.Code, wa.Body.String())
+	}
+	if !strings.Contains(wa.Body.String(), "<return>true</return>") {
+		t.Errorf("AuthorizeSecurityGroupIngress: expected return=true\nbody: %s", wa.Body.String())
+	}
+
+	// Verify via Describe.
+	body := describeOneSG(t, handler, sgId)
+	if !strings.Contains(body, "<ipProtocol>tcp</ipProtocol>") {
+		t.Errorf("after authorize: expected tcp protocol in ipPermissions\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<fromPort>443</fromPort>") {
+		t.Errorf("after authorize: expected fromPort 443\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<toPort>443</toPort>") {
+		t.Errorf("after authorize: expected toPort 443\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<cidrIp>0.0.0.0/0</cidrIp>") {
+		t.Errorf("after authorize: expected cidrIp 0.0.0.0/0\nbody: %s", body)
+	}
+
+	// Authorize on non-existent SG should fail.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, ec2Req(t, "AuthorizeSecurityGroupIngress", url.Values{
+		"GroupId":                        {"sg-nonexistent12345678"},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"80"},
+		"IpPermissions.1.ToPort":         {"80"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Error("AuthorizeSecurityGroupIngress non-existent: expected error, got 200")
+	}
+	if !strings.Contains(wne.Body.String(), "InvalidGroup.NotFound") {
+		t.Errorf("AuthorizeSecurityGroupIngress non-existent: expected InvalidGroup.NotFound\nbody: %s", wne.Body.String())
+	}
+}
+
+// ---- Test 10: RevokeSecurityGroupIngress + verify removed ----
+
+func TestEC2_SecurityGroup_RevokeIngress(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	sgId := mustCreateSG(t, handler, vpcId, "revoke-sg", "Revoke test")
+
+	// Add two ingress rules.
+	handler.ServeHTTP(httptest.NewRecorder(), ec2Req(t, "AuthorizeSecurityGroupIngress", url.Values{
+		"GroupId":                        {sgId},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"80"},
+		"IpPermissions.1.ToPort":         {"80"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+		"IpPermissions.2.IpProtocol":     {"tcp"},
+		"IpPermissions.2.FromPort":       {"443"},
+		"IpPermissions.2.ToPort":         {"443"},
+		"IpPermissions.2.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+	}))
+
+	// Revoke port-80 rule.
+	wr := httptest.NewRecorder()
+	handler.ServeHTTP(wr, ec2Req(t, "RevokeSecurityGroupIngress", url.Values{
+		"GroupId":                        {sgId},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"80"},
+		"IpPermissions.1.ToPort":         {"80"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+	}))
+	if wr.Code != http.StatusOK {
+		t.Fatalf("RevokeSecurityGroupIngress: expected 200, got %d\nbody: %s", wr.Code, wr.Body.String())
+	}
+
+	// Verify port 80 is gone but port 443 remains.
+	body := describeOneSG(t, handler, sgId)
+	if strings.Contains(body, "<fromPort>80</fromPort>") {
+		t.Errorf("after revoke: port 80 should be gone\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<fromPort>443</fromPort>") {
+		t.Errorf("after revoke: port 443 should still be present\nbody: %s", body)
+	}
+
+	// Revoking a rule that doesn't exist should fail.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, ec2Req(t, "RevokeSecurityGroupIngress", url.Values{
+		"GroupId":                        {sgId},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"8080"},
+		"IpPermissions.1.ToPort":         {"8080"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"0.0.0.0/0"},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Error("RevokeSecurityGroupIngress non-existent rule: expected error, got 200")
+	}
+	if !strings.Contains(wne.Body.String(), "InvalidPermission.NotFound") {
+		t.Errorf("RevokeSecurityGroupIngress non-existent rule: expected InvalidPermission.NotFound\nbody: %s", wne.Body.String())
+	}
+}
+
+// ---- Test 11: Cross-SG reference (authorize ingress from another SG) ----
+
+func TestEC2_SecurityGroup_CrossSGReference(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	srcSgId := mustCreateSG(t, handler, vpcId, "source-sg", "Source SG")
+	dstSgId := mustCreateSG(t, handler, vpcId, "dest-sg", "Destination SG")
+
+	// Allow ingress from srcSg to dstSg on port 3306.
+	wa := httptest.NewRecorder()
+	handler.ServeHTTP(wa, ec2Req(t, "AuthorizeSecurityGroupIngress", url.Values{
+		"GroupId":                                   {dstSgId},
+		"IpPermissions.1.IpProtocol":                {"tcp"},
+		"IpPermissions.1.FromPort":                  {"3306"},
+		"IpPermissions.1.ToPort":                    {"3306"},
+		"IpPermissions.1.UserIdGroupPairs.1.GroupId": {srcSgId},
+	}))
+	if wa.Code != http.StatusOK {
+		t.Fatalf("AuthorizeSecurityGroupIngress cross-SG: expected 200, got %d\nbody: %s", wa.Code, wa.Body.String())
+	}
+
+	// Verify the group reference appears in the Describe output.
+	body := describeOneSG(t, handler, dstSgId)
+	if !strings.Contains(body, srcSgId) {
+		t.Errorf("cross-SG reference: expected srcSgId %s in ipPermissions\nbody: %s", srcSgId, body)
+	}
+	if !strings.Contains(body, "<fromPort>3306</fromPort>") {
+		t.Errorf("cross-SG reference: expected fromPort 3306\nbody: %s", body)
+	}
+
+	// Deleting srcSg while dstSg references it should fail.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DeleteSecurityGroup", url.Values{
+		"GroupId": {srcSgId},
+	}))
+	if wd.Code == http.StatusOK {
+		t.Error("DeleteSecurityGroup referenced: expected DependencyViolation, got 200")
+	}
+	if !strings.Contains(wd.Body.String(), "DependencyViolation") {
+		t.Errorf("DeleteSecurityGroup referenced: expected DependencyViolation\nbody: %s", wd.Body.String())
+	}
+}
+
+// ---- Test 12: DeleteSecurityGroup ----
+
+func TestEC2_SecurityGroup_Delete(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	sgId := mustCreateSG(t, handler, vpcId, "delete-me", "To be deleted")
+
+	// Delete the group.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DeleteSecurityGroup", url.Values{
+		"GroupId": {sgId},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteSecurityGroup: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), "<return>true</return>") {
+		t.Errorf("DeleteSecurityGroup: expected return=true\nbody: %s", wd.Body.String())
+	}
+
+	// Verify it no longer appears in Describe.
+	wdesc := httptest.NewRecorder()
+	handler.ServeHTTP(wdesc, ec2Req(t, "DescribeSecurityGroups", url.Values{
+		"GroupId.1": {sgId},
+	}))
+	if wdesc.Code != http.StatusOK {
+		t.Fatalf("DescribeSecurityGroups after delete: expected 200, got %d", wdesc.Code)
+	}
+	if strings.Contains(wdesc.Body.String(), sgId) {
+		t.Errorf("DescribeSecurityGroups after delete: SG should be gone\nbody: %s", wdesc.Body.String())
+	}
+
+	// Delete non-existent SG should fail.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, ec2Req(t, "DeleteSecurityGroup", url.Values{
+		"GroupId": {sgId},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Error("DeleteSecurityGroup already deleted: expected error, got 200")
+	}
+	if !strings.Contains(wne.Body.String(), "InvalidGroup.NotFound") {
+		t.Errorf("DeleteSecurityGroup not found: expected InvalidGroup.NotFound\nbody: %s", wne.Body.String())
+	}
+
+	// Test AuthorizeSecurityGroupEgress and RevokeSecurityGroupEgress.
+	sgId2 := mustCreateSG(t, handler, vpcId, "egress-test", "Egress test SG")
+
+	// Add a custom egress rule.
+	wae := httptest.NewRecorder()
+	handler.ServeHTTP(wae, ec2Req(t, "AuthorizeSecurityGroupEgress", url.Values{
+		"GroupId":                        {sgId2},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"5432"},
+		"IpPermissions.1.ToPort":         {"5432"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"10.0.0.0/8"},
+	}))
+	if wae.Code != http.StatusOK {
+		t.Fatalf("AuthorizeSecurityGroupEgress: expected 200, got %d\nbody: %s", wae.Code, wae.Body.String())
+	}
+
+	egressBody := describeOneSG(t, handler, sgId2)
+	if !strings.Contains(egressBody, "<fromPort>5432</fromPort>") {
+		t.Errorf("AuthorizeSecurityGroupEgress: expected port 5432\nbody: %s", egressBody)
+	}
+	if !strings.Contains(egressBody, "<cidrIp>10.0.0.0/8</cidrIp>") {
+		t.Errorf("AuthorizeSecurityGroupEgress: expected cidr 10.0.0.0/8\nbody: %s", egressBody)
+	}
+
+	// Revoke the custom egress rule.
+	wre := httptest.NewRecorder()
+	handler.ServeHTTP(wre, ec2Req(t, "RevokeSecurityGroupEgress", url.Values{
+		"GroupId":                        {sgId2},
+		"IpPermissions.1.IpProtocol":     {"tcp"},
+		"IpPermissions.1.FromPort":       {"5432"},
+		"IpPermissions.1.ToPort":         {"5432"},
+		"IpPermissions.1.IpRanges.1.CidrIp": {"10.0.0.0/8"},
+	}))
+	if wre.Code != http.StatusOK {
+		t.Fatalf("RevokeSecurityGroupEgress: expected 200, got %d\nbody: %s", wre.Code, wre.Body.String())
+	}
+
+	afterRevokeBody := describeOneSG(t, handler, sgId2)
+	if strings.Contains(afterRevokeBody, "<fromPort>5432</fromPort>") {
+		t.Errorf("RevokeSecurityGroupEgress: port 5432 should be gone\nbody: %s", afterRevokeBody)
+	}
+}
+
 // ---- Test 7: Unknown action ----
 
 func TestEC2_UnknownAction(t *testing.T) {

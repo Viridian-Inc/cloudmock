@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useMemo, useContext } from 'preact/hooks';
 import { DDBItem, TableDescription, FilterCondition, QueryHistoryEntry } from './types';
-import { extractValue, getType, typeBadgeColor, collectColumns, buildAttributeValue } from './utils';
+import { extractValue, getType, typeBadgeColor, collectColumns } from './utils';
 import { ddbRequest } from '../../api';
 import { PlayIcon, TrashIcon } from '../../components/Icons';
 import { JsonView } from '../../components/JsonView';
 import { CodeGenerator } from './CodeGenerator';
+import { DDBContext } from './store';
 
 interface QueryBuilderProps {
   tableName: string;
@@ -13,26 +14,37 @@ interface QueryBuilderProps {
   onEditItem: (item: DDBItem) => void;
   initialIndexName?: string;
   initialPkValue?: string;
+  tabIndex: number;
 }
 
 const SORT_OPS = ['=', '<', '>', '<=', '>=', 'begins_with', 'between'];
 
-export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, initialIndexName, initialPkValue }: QueryBuilderProps) {
-  const [mode, setMode] = useState<'query' | 'scan'>('query');
-  const [pkValue, setPkValue] = useState(initialPkValue || '');
-  const [skOp, setSkOp] = useState('=');
-  const [skValue, setSkValue] = useState('');
+export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, initialIndexName, initialPkValue, tabIndex }: QueryBuilderProps) {
+  const { state, dispatch } = useContext(DDBContext);
+  const tab = state.tabs[tabIndex];
+
+  // Derive persisted state from store; fall back to defaults for first render
+  const mode = tab?.queryMode ?? 'query';
+  const pkValue = tab?.queryPK ?? (initialPkValue || '');
+  const skOp = tab?.querySKOp ?? '=';
+  const skValue = tab?.querySK ?? '';
+  const indexName = tab?.queryIndex ?? (initialIndexName || '');
+  const scanForward = tab?.queryScanForward ?? true;
+  const limit = tab?.queryLimit ?? '';
+  const results = tab?.queryResults ?? null;
+  const scannedCount = tab?.queryScannedCount ?? 0;
+  const filters = tab?.queryFilters ?? [];
+
+  // Local UI-only state (not worth persisting)
   const [skValue2, setSkValue2] = useState('');
-  const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [indexName, setIndexName] = useState(initialIndexName || '');
-  const [scanForward, setScanForward] = useState(true);
-  const [limit, setLimit] = useState('');
-  const [results, setResults] = useState<DDBItem[] | null>(null);
-  const [scannedCount, setScannedCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showCodeGen, setShowCodeGen] = useState(false);
   const [optimizerHint, setOptimizerHint] = useState<{ indexName: string; pkAttr: string; pkValue: string } | null>(null);
+
+  function patch(p: Partial<import('./store').TabState>) {
+    dispatch({ type: 'UPDATE_TAB', index: tabIndex, patch: p });
+  }
 
   const tablePkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'HASH')?.AttributeName || '';
   const tableSkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'RANGE')?.AttributeName || '';
@@ -66,7 +78,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
   const activePkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.pk)?.AttributeType || 'S';
   const activeSkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.sk)?.AttributeType || 'S';
 
-  // Query optimizer: detect if scan filters match a PK
+  // Query optimizer hint
   useMemo(() => {
     if (mode !== 'scan') { setOptimizerHint(null); return; }
     const validFilters = filters.filter(f => f.attribute && f.value && f.operator === '=');
@@ -82,15 +94,15 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
   }, [mode, filters, indexes]);
 
   function addFilter() {
-    setFilters(prev => [...prev, { attribute: '', operator: '=', value: '', value2: '', connector: 'AND' }]);
+    patch({ queryFilters: [...filters, { attribute: '', operator: '=', value: '', value2: '', connector: 'AND' }] });
   }
 
-  function updateFilter(idx: number, patch: Partial<FilterCondition>) {
-    setFilters(prev => prev.map((f, i) => i === idx ? { ...f, ...patch } : f));
+  function updateFilter(idx: number, p: Partial<FilterCondition>) {
+    patch({ queryFilters: filters.map((f, i) => i === idx ? { ...f, ...p } : f) });
   }
 
   function removeFilter(idx: number) {
-    setFilters(prev => prev.filter((_, i) => i !== idx));
+    patch({ queryFilters: filters.filter((_, i) => i !== idx) });
   }
 
   function buildFilterExpression(): { expr: string; values: Record<string, any>; names: Record<string, string> } | null {
@@ -103,7 +115,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
       const nameKey = `#fa${i}`;
       const valKey = `:fv${i}`;
       names[nameKey] = f.attribute;
-      values[valKey] = { S: f.value }; // default to string
+      values[valKey] = { S: f.value };
       if (i > 0) parts.push(f.connector);
       if (f.operator === 'between') {
         const valKey2 = `:fv${i}b`;
@@ -129,7 +141,6 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
       if (limit) params.Limit = Number(limit);
 
       if (mode === 'query') {
-        // Build key condition
         const exprNames: Record<string, string> = {};
         const exprValues: Record<string, any> = {};
 
@@ -155,10 +166,8 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
         params.ExpressionAttributeNames = exprNames;
         params.ExpressionAttributeValues = exprValues;
         params.ScanIndexForward = scanForward;
-
         if (indexName) params.IndexName = indexName;
 
-        // Add filter
         const filter = buildFilterExpression();
         if (filter) {
           params.FilterExpression = filter.expr;
@@ -167,11 +176,9 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
         }
 
         const r = await ddbRequest('Query', params);
-        setResults(r.Items || []);
-        setScannedCount(r.ScannedCount || r.Count || 0);
+        dispatch({ type: 'SET_QUERY_RESULTS', index: tabIndex, results: r.Items || [], scannedCount: r.ScannedCount || r.Count || 0 });
         saveHistory('query', r.Items?.length || 0);
       } else {
-        // Scan
         const filter = buildFilterExpression();
         if (filter) {
           params.FilterExpression = filter.expr;
@@ -179,8 +186,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
           params.ExpressionAttributeValues = filter.values;
         }
         const r = await ddbRequest('Scan', params);
-        setResults(r.Items || []);
-        setScannedCount(r.ScannedCount || r.Count || 0);
+        dispatch({ type: 'SET_QUERY_RESULTS', index: tabIndex, results: r.Items || [], scannedCount: r.ScannedCount || r.Count || 0 });
         saveHistory('scan', r.Items?.length || 0);
       }
     } catch (e: any) {
@@ -218,11 +224,13 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
   }
 
   function applyHistory(entry: QueryHistoryEntry) {
-    setMode(entry.type);
-    setPkValue(entry.partitionValue);
-    setSkOp(entry.sortCondition);
-    setSkValue(entry.sortValue);
-    setIndexName(entry.indexName);
+    patch({
+      queryMode: entry.type,
+      queryPK: entry.partitionValue,
+      querySKOp: entry.sortCondition,
+      querySK: entry.sortValue,
+      queryIndex: entry.indexName,
+    });
     setShowHistory(false);
   }
 
@@ -241,11 +249,11 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
             <div class="flex gap-2">
               <button
                 class={`btn btn-sm ${mode === 'query' ? 'btn-secondary' : 'btn-ghost'}`}
-                onClick={() => setMode('query')}
+                onClick={() => patch({ queryMode: 'query' })}
               >Query</button>
               <button
                 class={`btn btn-sm ${mode === 'scan' ? 'btn-secondary' : 'btn-ghost'}`}
-                onClick={() => setMode('scan')}
+                onClick={() => patch({ queryMode: 'scan' })}
               >Scan</button>
             </div>
             <button class="btn btn-ghost btn-sm" onClick={() => setShowHistory(!showHistory)}>
@@ -271,17 +279,13 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
 
           {mode === 'query' && (
             <>
-              {/* Index selector — always show so users can switch between table/GSI/LSI */}
               <div class="mb-4">
                 <div class="label">Index</div>
                 <select
                   class="select w-full"
                   value={indexName}
                   onChange={(e) => {
-                    const val = (e.target as HTMLSelectElement).value;
-                    setIndexName(val);
-                    setPkValue('');
-                    setSkValue('');
+                    patch({ queryIndex: (e.target as HTMLSelectElement).value, queryPK: '', querySK: '' });
                     setSkValue2('');
                   }}
                 >
@@ -298,18 +302,16 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
                 </select>
               </div>
 
-              {/* Partition key */}
               <div class="mb-4">
                 <div class="label">Partition Key ({activeIndex.pk})</div>
                 <input
                   class="input w-full"
                   placeholder={`Enter ${activeIndex.pk} value...`}
                   value={pkValue}
-                  onInput={(e) => setPkValue((e.target as HTMLInputElement).value)}
+                  onInput={(e) => patch({ queryPK: (e.target as HTMLInputElement).value })}
                 />
               </div>
 
-              {/* Sort key */}
               {activeIndex.sk && (
                 <div class="mb-4">
                   <div class="label">Sort Key ({activeIndex.sk})</div>
@@ -318,7 +320,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
                       class="select"
                       style="width:160px"
                       value={skOp}
-                      onChange={(e) => setSkOp((e.target as HTMLSelectElement).value)}
+                      onChange={(e) => patch({ querySKOp: (e.target as HTMLSelectElement).value })}
                     >
                       {SORT_OPS.map(op => <option key={op} value={op}>{op}</option>)}
                     </select>
@@ -327,7 +329,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
                       style="flex:1"
                       placeholder="Value..."
                       value={skValue}
-                      onInput={(e) => setSkValue((e.target as HTMLInputElement).value)}
+                      onInput={(e) => patch({ querySK: (e.target as HTMLInputElement).value })}
                     />
                     {skOp === 'between' && (
                       <input
@@ -342,13 +344,12 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
                 </div>
               )}
 
-              {/* Sort direction */}
               <div class="mb-4">
                 <label class="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={scanForward}
-                    onChange={() => setScanForward(!scanForward)}
+                    onChange={() => patch({ queryScanForward: !scanForward })}
                   />
                   <span class="text-sm">Ascending order (ScanIndexForward)</span>
                 </label>
@@ -424,7 +425,6 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
             ))}
           </div>
 
-          {/* Limit */}
           <div class="mb-4">
             <div class="label">Limit</div>
             <input
@@ -433,11 +433,10 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
               style="width:120px"
               placeholder="No limit"
               value={limit}
-              onInput={(e) => setLimit((e.target as HTMLInputElement).value)}
+              onInput={(e) => patch({ queryLimit: (e.target as HTMLInputElement).value })}
             />
           </div>
 
-          {/* Query Optimizer Banner */}
           {mode === 'scan' && optimizerHint && (
             <div class="ddb-optimizer-banner mb-4">
               <div class="ddb-optimizer-text">
@@ -447,11 +446,12 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
               <button
                 class="btn btn-secondary btn-sm"
                 onClick={() => {
-                  setMode('query');
-                  setIndexName(optimizerHint.indexName);
-                  setPkValue(optimizerHint.pkValue);
-                  // Remove the filter that matches the PK
-                  setFilters(prev => prev.filter(f => f.attribute !== optimizerHint.pkAttr));
+                  patch({
+                    queryMode: 'query',
+                    queryIndex: optimizerHint.indexName,
+                    queryPK: optimizerHint.pkValue,
+                    queryFilters: filters.filter(f => f.attribute !== optimizerHint.pkAttr),
+                  });
                   setOptimizerHint(null);
                 }}
               >
@@ -460,7 +460,6 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
             </div>
           )}
 
-          {/* Run */}
           <div class="flex items-center gap-2">
             <button
               class="btn btn-primary btn-sm"
@@ -478,8 +477,6 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
         </div>
       </div>
 
-      {/* Results */}
-      {/* Code Generator Modal */}
       {showCodeGen && (
         <CodeGenerator
           tableName={tableName}

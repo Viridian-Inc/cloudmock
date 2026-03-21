@@ -1,14 +1,16 @@
-import { useState, useMemo, useCallback } from 'preact/hooks';
+import { useState, useMemo, useContext } from 'preact/hooks';
 import { DDBItem, TableDescription } from './types';
 import { extractValue, getType, typeBadgeColor, collectColumns } from './utils';
 import { ddbRequest } from '../../api';
 import { PlayIcon } from '../../components/Icons';
+import { DDBContext } from './store';
 
 interface PartiQLProps {
   tableName: string;
   tableDesc: TableDescription;
   showToast: (msg: string) => void;
   onEditItem: (item: DDBItem) => void;
+  tabIndex: number;
 }
 
 const SQL_EXAMPLES = [
@@ -29,17 +31,11 @@ function highlightSQL(sql: string): string {
 function parseSQL(sql: string, tableDesc: TableDescription): { action: string; params: any } | null {
   const trimmed = sql.trim().replace(/;$/, '');
   const upper = trimmed.toUpperCase();
-
-  // SELECT
-  if (upper.startsWith('SELECT')) {
-    return parseSelect(trimmed, tableDesc);
-  }
-
+  if (upper.startsWith('SELECT')) return parseSelect(trimmed, tableDesc);
   return null;
 }
 
 function parseSelect(sql: string, tableDesc: TableDescription): { action: string; params: any } | null {
-  // SELECT [cols] FROM "table" [WHERE conditions]
   const match = sql.match(/^SELECT\s+(.+?)\s+FROM\s+"?([^"]+)"?\s*(WHERE\s+(.+))?$/i);
   if (!match) return null;
 
@@ -54,7 +50,6 @@ function parseSelect(sql: string, tableDesc: TableDescription): { action: string
 
   const params: any = { TableName: tableName };
 
-  // Projection
   if (columns !== '*') {
     const cols = columns.split(',').map(c => c.trim());
     const exprNames: Record<string, string> = {};
@@ -68,32 +63,23 @@ function parseSelect(sql: string, tableDesc: TableDescription): { action: string
     params.ExpressionAttributeNames = { ...(params.ExpressionAttributeNames || {}), ...exprNames };
   }
 
-  if (!whereClause) {
-    return { action: 'Scan', params };
-  }
+  if (!whereClause) return { action: 'Scan', params };
 
-  // Parse WHERE clause
   const conditions = parseWhereConditions(whereClause);
-  if (!conditions || conditions.length === 0) {
-    return { action: 'Scan', params };
-  }
+  if (!conditions || conditions.length === 0) return { action: 'Scan', params };
 
-  // Check if PK is present -> use Query
   const pkCondition = conditions.find(c => c.attr === pkAttr && c.op === '=');
 
   if (pkCondition) {
-    // Build Query
     const exprNames: Record<string, string> = { ...(params.ExpressionAttributeNames || {}), '#pk': pkAttr };
     const exprValues: Record<string, any> = { ':pkv': pkType === 'N' ? { N: pkCondition.value } : { S: pkCondition.value } };
     let keyExpr = '#pk = :pkv';
 
-    // Check for SK condition
     const skCondition = conditions.find(c => c.attr === skAttr);
     if (skCondition && skAttr) {
       exprNames['#sk'] = skAttr;
       const skTyped = skType === 'N' ? { N: skCondition.value } : { S: skCondition.value };
       exprValues[':skv'] = skTyped;
-
       if (skCondition.op === 'begins_with') {
         keyExpr += ' AND begins_with(#sk, :skv)';
       } else if (skCondition.op === 'between' && skCondition.value2) {
@@ -104,7 +90,6 @@ function parseSelect(sql: string, tableDesc: TableDescription): { action: string
       }
     }
 
-    // Remaining conditions as FilterExpression
     const filterConditions = conditions.filter(c => c.attr !== pkAttr && c.attr !== skAttr);
     if (filterConditions.length > 0) {
       const { expr, names, values } = buildFilterFromConditions(filterConditions);
@@ -116,16 +101,13 @@ function parseSelect(sql: string, tableDesc: TableDescription): { action: string
     params.KeyConditionExpression = keyExpr;
     params.ExpressionAttributeNames = exprNames;
     params.ExpressionAttributeValues = exprValues;
-
     return { action: 'Query', params };
   }
 
-  // No PK -> Scan with filter
   const { expr, names, values } = buildFilterFromConditions(conditions);
   params.FilterExpression = expr;
   params.ExpressionAttributeNames = { ...(params.ExpressionAttributeNames || {}), ...names };
   params.ExpressionAttributeValues = values;
-
   return { action: 'Scan', params };
 }
 
@@ -138,32 +120,19 @@ interface ParsedCondition {
 
 function parseWhereConditions(where: string): ParsedCondition[] {
   const conditions: ParsedCondition[] = [];
-  // Split by AND (simple)
   const parts = where.split(/\s+AND\s+/i);
 
   for (const part of parts) {
     const trimmed = part.trim();
 
-    // begins_with(attr, 'value')
     const bwMatch = trimmed.match(/^begins_with\s*\(\s*(\w+)\s*,\s*'([^']*)'\s*\)$/i);
-    if (bwMatch) {
-      conditions.push({ attr: bwMatch[1], op: 'begins_with', value: bwMatch[2] });
-      continue;
-    }
+    if (bwMatch) { conditions.push({ attr: bwMatch[1], op: 'begins_with', value: bwMatch[2] }); continue; }
 
-    // attr BETWEEN 'v1' AND 'v2'
     const betweenMatch = trimmed.match(/^(\w+)\s+BETWEEN\s+'([^']*)'\s+AND\s+'([^']*)'/i);
-    if (betweenMatch) {
-      conditions.push({ attr: betweenMatch[1], op: 'between', value: betweenMatch[2], value2: betweenMatch[3] });
-      continue;
-    }
+    if (betweenMatch) { conditions.push({ attr: betweenMatch[1], op: 'between', value: betweenMatch[2], value2: betweenMatch[3] }); continue; }
 
-    // attr op 'value' or attr op value
     const opMatch = trimmed.match(/^(\w+)\s*(=|!=|<>|<=|>=|<|>)\s*'?([^']*?)'?$/);
-    if (opMatch) {
-      conditions.push({ attr: opMatch[1], op: opMatch[2], value: opMatch[3] });
-      continue;
-    }
+    if (opMatch) { conditions.push({ attr: opMatch[1], op: opMatch[2], value: opMatch[3] }); continue; }
   }
 
   return conditions;
@@ -194,12 +163,18 @@ function buildFilterFromConditions(conditions: ParsedCondition[]): { expr: strin
   return { expr: parts.join(' '), names, values };
 }
 
-export function PartiQL({ tableName, tableDesc, showToast, onEditItem }: PartiQLProps) {
+export function PartiQL({ tableName, tableDesc, showToast, onEditItem, tabIndex }: PartiQLProps) {
+  const { state, dispatch } = useContext(DDBContext);
+  const tab = state.tabs[tabIndex];
+
   const pkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'HASH')?.AttributeName || '';
   const skAttr = tableDesc.KeySchema.find(k => k.KeyType === 'RANGE')?.AttributeName || '';
 
-  const [sql, setSQL] = useState(`SELECT * FROM "${tableName}"`);
-  const [results, setResults] = useState<DDBItem[] | null>(null);
+  // Persisted in store
+  const sql = tab?.sqlQuery ?? `SELECT * FROM "${tableName}"`;
+  const results = tab?.sqlResults ?? null;
+
+  // Local UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showExamples, setShowExamples] = useState(false);
@@ -212,6 +187,10 @@ export function PartiQL({ tableName, tableDesc, showToast, onEditItem }: PartiQL
     return collectColumns(results, keyAttrs);
   }, [results, tableDesc]);
 
+  function setSQL(value: string) {
+    dispatch({ type: 'UPDATE_TAB', index: tabIndex, patch: { sqlQuery: value } });
+  }
+
   async function runSQL() {
     setLoading(true);
     setError('');
@@ -222,7 +201,7 @@ export function PartiQL({ tableName, tableDesc, showToast, onEditItem }: PartiQL
         return;
       }
       const r = await ddbRequest(parsed.action, parsed.params);
-      setResults(r.Items || []);
+      dispatch({ type: 'SET_SQL_RESULTS', index: tabIndex, results: r.Items || [] });
       showToast(`${parsed.action}: ${(r.Items || []).length} results`);
     } catch (e: any) {
       setError(e.message || 'Query execution failed');
@@ -295,7 +274,6 @@ export function PartiQL({ tableName, tableDesc, showToast, onEditItem }: PartiQL
         </div>
       </div>
 
-      {/* Results */}
       {results && (
         <div class="card">
           <div class="card-header">

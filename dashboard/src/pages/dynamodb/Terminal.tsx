@@ -1,10 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
+import { useState, useRef, useEffect, useCallback, useContext } from 'preact/hooks';
 import { ddbRequest } from '../../api';
 import { DDBItem } from './types';
+import { DDBContext } from './store';
 
 interface TerminalProps {
   tableName: string;
   showToast: (msg: string) => void;
+  tabIndex: number;
 }
 
 interface TerminalLine {
@@ -12,37 +14,37 @@ interface TerminalLine {
   text: string;
 }
 
-export function Terminal({ tableName, showToast }: TerminalProps) {
-  const [lines, setLines] = useState<TerminalLine[]>([
+export function Terminal({ tableName, showToast, tabIndex }: TerminalProps) {
+  const { state, dispatch } = useContext(DDBContext);
+  const tab = state.tabs[tabIndex];
+
+  // Lines and command history live in the store so they survive tab switches
+  const lines: TerminalLine[] = tab?.terminalLines ?? [
     { type: 'output', text: `CloudMock DynamoDB REPL - Table: ${tableName}` },
     { type: 'output', text: `Commands: scan(table), query(table, {pk: val}), put(table, item), del(table, key), tables(), clear` },
     { type: 'output', text: `Type JavaScript expressions. Results are pretty-printed.\n` },
-  ]);
+  ];
+  const cmdHistory: string[] = tab?.terminalHistory ?? [];
+
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
   const [historyIdx, setHistoryIdx] = useState(-1);
   const [running, setRunning] = useState(false);
   const termRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (termRef.current) {
-      termRef.current.scrollTop = termRef.current.scrollHeight;
-    }
+    if (termRef.current) termRef.current.scrollTop = termRef.current.scrollHeight;
   }, [lines]);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
+  useEffect(() => { inputRef.current?.focus(); }, []);
 
-  const addLine = useCallback((type: TerminalLine['type'], text: string) => {
-    setLines(prev => [...prev, { type, text }]);
-  }, []);
+  function addLine(type: TerminalLine['type'], text: string) {
+    dispatch({ type: 'APPEND_TERMINAL_LINE', index: tabIndex, line: { type, text } });
+  }
 
   // Helper functions available in the REPL
   async function execScan(table: string, opts?: any): Promise<DDBItem[]> {
-    const params: any = { TableName: table, ...(opts || {}) };
-    const r = await ddbRequest('Scan', params);
+    const r = await ddbRequest('Scan', { TableName: table, ...(opts || {}) });
     return r.Items || [];
   }
 
@@ -52,28 +54,19 @@ export function Terminal({ tableName, showToast }: TerminalProps) {
     const keyParts: string[] = [];
     let i = 0;
     for (const [attr, val] of Object.entries(keyConditions)) {
-      const nk = `#k${i}`;
-      const vk = `:v${i}`;
+      const nk = `#k${i}`, vk = `:v${i}`;
       exprNames[nk] = attr;
-      // Auto-detect type
-      if (typeof val === 'number') {
-        exprValues[vk] = { N: String(val) };
-      } else if (typeof val === 'object' && val !== null) {
-        exprValues[vk] = val; // Already typed
-      } else {
-        exprValues[vk] = { S: String(val) };
-      }
+      exprValues[vk] = typeof val === 'number' ? { N: String(val) } : (typeof val === 'object' && val !== null ? val : { S: String(val) });
       keyParts.push(`${nk} = ${vk}`);
       i++;
     }
-    const params: any = {
+    const r = await ddbRequest('Query', {
       TableName: table,
       KeyConditionExpression: keyParts.join(' AND '),
       ExpressionAttributeNames: exprNames,
       ExpressionAttributeValues: exprValues,
       ...(opts || {}),
-    };
-    const r = await ddbRequest('Query', params);
+    });
     return r.Items || [];
   }
 
@@ -98,7 +91,7 @@ export function Terminal({ tableName, showToast }: TerminalProps) {
 
     try {
       if (cmd.trim() === 'clear') {
-        setLines([]);
+        dispatch({ type: 'CLEAR_TERMINAL', index: tabIndex });
         setRunning(false);
         return;
       }
@@ -119,24 +112,20 @@ export function Terminal({ tableName, showToast }: TerminalProps) {
         return;
       }
 
-      // Build a scope with the helper functions
       const scan = execScan;
       const query = execQuery;
       const put = execPut;
       const del = execDel;
       const tables = execTables;
 
-      // Use AsyncFunction to allow await in expressions
       const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
       const fn = new AsyncFunction('scan', 'query', 'put', 'del', 'tables', `return (${cmd})`);
-      let result = await fn(scan, query, put, del, tables);
+      const result = await fn(scan, query, put, del, tables);
 
-      // If the result has a .filter or .map, it's already applied
       if (result === undefined) {
         addLine('output', 'undefined');
       } else {
-        const formatted = typeof result === 'string' ? result : JSON.stringify(result, null, 2);
-        addLine('output', formatted);
+        addLine('output', typeof result === 'string' ? result : JSON.stringify(result, null, 2));
       }
     } catch (e: any) {
       addLine('error', `Error: ${e.message || String(e)}`);
@@ -149,23 +138,28 @@ export function Terminal({ tableName, showToast }: TerminalProps) {
     if (e.key === 'Enter' && !running && input.trim()) {
       e.preventDefault();
       const cmd = input.trim();
-      setHistory(prev => [cmd, ...prev].slice(0, 50));
+      // Append to history in store
+      dispatch({
+        type: 'UPDATE_TAB',
+        index: tabIndex,
+        patch: { terminalHistory: [cmd, ...cmdHistory].slice(0, 50) },
+      });
       setHistoryIdx(-1);
       setInput('');
       executeCommand(cmd);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (history.length > 0) {
-        const newIdx = Math.min(historyIdx + 1, history.length - 1);
+      if (cmdHistory.length > 0) {
+        const newIdx = Math.min(historyIdx + 1, cmdHistory.length - 1);
         setHistoryIdx(newIdx);
-        setInput(history[newIdx]);
+        setInput(cmdHistory[newIdx]);
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
       if (historyIdx > 0) {
         const newIdx = historyIdx - 1;
         setHistoryIdx(newIdx);
-        setInput(history[newIdx]);
+        setInput(cmdHistory[newIdx]);
       } else {
         setHistoryIdx(-1);
         setInput('');

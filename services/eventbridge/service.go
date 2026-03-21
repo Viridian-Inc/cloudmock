@@ -6,9 +6,15 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// ServiceLocator provides access to other services for cross-service communication.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
+
 // EventBridgeService is the cloudmock implementation of the AWS EventBridge API.
 type EventBridgeService struct {
-	store *Store
+	store   *Store
+	locator ServiceLocator
 }
 
 // New returns a new EventBridgeService for the given AWS account ID and region.
@@ -16,6 +22,19 @@ func New(accountID, region string) *EventBridgeService {
 	return &EventBridgeService{
 		store: NewStore(accountID, region),
 	}
+}
+
+// NewWithLocator returns an EventBridgeService that can deliver events to targets.
+func NewWithLocator(accountID, region string, locator ServiceLocator) *EventBridgeService {
+	return &EventBridgeService{
+		store:   NewStore(accountID, region),
+		locator: locator,
+	}
+}
+
+// SetLocator sets the service locator for cross-service delivery.
+func (s *EventBridgeService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
 }
 
 // Name returns the AWS service name used for routing.
@@ -76,7 +95,7 @@ func (s *EventBridgeService) HandleRequest(ctx *service.RequestContext) (*servic
 	case "ListTargetsByRule":
 		return handleListTargetsByRule(ctx, s.store)
 	case "PutEvents":
-		return handlePutEvents(ctx, s.store)
+		return handlePutEvents(ctx, s.store, s.locator)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

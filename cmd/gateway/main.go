@@ -9,8 +9,10 @@ import (
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
 	cfnsvc "github.com/neureaux/cloudmock/services/cloudformation"
@@ -60,16 +62,26 @@ func main() {
 	store.InitRoot(cfg.IAM.RootAccessKey, cfg.IAM.RootSecretKey)
 	engine := iampkg.NewEngine()
 
+	// Event bus for cross-service communication
+	bus := eventbus.NewBus()
+
 	// Service registry
 	registry := routing.NewRegistry()
-	registry.Register(s3svc.New())
+
+	// Register S3 with event bus support
+	registry.Register(s3svc.NewWithBus(bus))
+
 	registry.Register(stssvc.New(cfg.AccountID))
 	registry.Register(kmssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(secretssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ssmsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(sqssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(sessvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(snssvc.New(cfg.AccountID, cfg.Region))
+
+	// Register SNS with service locator for SNS → SQS fan-out
+	snsService := snssvc.New(cfg.AccountID, cfg.Region)
+	registry.Register(snsService)
+
 	registry.Register(dynamodbsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(logssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cwsvc.New(cfg.AccountID, cfg.Region))
@@ -79,11 +91,24 @@ func main() {
 	registry.Register(ecrsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ecssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cognitosvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(ebsvc.New(cfg.AccountID, cfg.Region))
+
+	// Register EventBridge with service locator for target delivery
+	ebService := ebsvc.New(cfg.AccountID, cfg.Region)
+	registry.Register(ebService)
+
 	registry.Register(sfnsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(rdssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(apigwsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cfnsvc.New(cfg.AccountID, cfg.Region))
+
+	// Set service locators now that all services are registered.
+	// (This breaks the circular dependency: services need the registry,
+	// but the registry needs the services.)
+	snsService.SetLocator(registry)
+	ebService.SetLocator(registry)
+
+	// Wire cross-service integrations via event bus
+	integration.WireIntegrations(bus, registry, cfg.AccountID, cfg.Region)
 
 	// Tier 2 stub services
 	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)

@@ -537,7 +537,7 @@ type putEventsResponse struct {
 	Entries          []putEventResultEntry `json:"Entries"`
 }
 
-func handlePutEvents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handlePutEvents(ctx *service.RequestContext, store *Store, locator ServiceLocator) (*service.Response, error) {
 	var req putEventsRequest
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
@@ -570,6 +570,14 @@ func handlePutEvents(ctx *service.RequestContext, store *Store) (*service.Respon
 
 	ids := store.PutEvents(storeEntries)
 
+	// Deliver events to matching rule targets.
+	if locator != nil {
+		for i, entry := range storeEntries {
+			entry.EventId = ids[i]
+			deliverToRuleTargets(store, locator, &entry)
+		}
+	}
+
 	resultEntries := make([]putEventResultEntry, 0, len(ids))
 	for _, id := range ids {
 		resultEntries = append(resultEntries, putEventResultEntry{EventId: id})
@@ -579,6 +587,166 @@ func handlePutEvents(ctx *service.RequestContext, store *Store) (*service.Respon
 		FailedEntryCount: 0,
 		Entries:          resultEntries,
 	})
+}
+
+// SQSEnqueuer is an interface for directly enqueuing messages into SQS queues.
+type SQSEnqueuer interface {
+	EnqueueDirect(queueName, messageBody string) bool
+}
+
+// SNSPublisher is an interface for directly publishing messages to SNS topics.
+type SNSPublisher interface {
+	PublishDirect(topicName, message, subject string) bool
+}
+
+// deliverToRuleTargets checks rules on the event bus for a matching event and
+// delivers to each target (SQS queue or SNS topic).
+func deliverToRuleTargets(store *Store, locator ServiceLocator, event *PutEvent) {
+	rules, ok := store.ListRules(event.EventBusName, "")
+	if !ok {
+		return
+	}
+
+	for _, rule := range rules {
+		if rule.State != "ENABLED" {
+			continue
+		}
+
+		if !matchesEventPattern(rule.EventPattern, event) {
+			continue
+		}
+
+		for _, target := range rule.Targets {
+			deliverToTarget(locator, event, &target)
+		}
+	}
+}
+
+// matchesEventPattern checks if a PutEvent matches a rule's event pattern.
+// The event pattern is a JSON object with field-level filtering.
+// For simplicity, we match on the "source" field.
+func matchesEventPattern(pattern string, event *PutEvent) bool {
+	if pattern == "" {
+		return true
+	}
+
+	// Parse the pattern as JSON.
+	var patternMap map[string]interface{}
+	if err := json.Unmarshal([]byte(pattern), &patternMap); err != nil {
+		return false
+	}
+
+	// Check "source" filter — AWS EventBridge matches if the event source
+	// is in the pattern's source list.
+	if sourceFilter, ok := patternMap["source"]; ok {
+		sourceList, ok := sourceFilter.([]interface{})
+		if !ok {
+			return false
+		}
+		found := false
+		for _, s := range sourceList {
+			if str, ok := s.(string); ok && str == event.Source {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	// Check "detail-type" filter.
+	if dtFilter, ok := patternMap["detail-type"]; ok {
+		dtList, ok := dtFilter.([]interface{})
+		if !ok {
+			return false
+		}
+		found := false
+		for _, dt := range dtList {
+			if str, ok := dt.(string); ok && str == event.DetailType {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return false
+		}
+	}
+
+	return true
+}
+
+// deliverToTarget routes an event to a single target based on its ARN.
+func deliverToTarget(locator ServiceLocator, event *PutEvent, target *Target) {
+	arn := target.Arn
+
+	// Determine message body: use target's Input override if set, otherwise the event detail.
+	messageBody := event.Detail
+	if target.Input != "" {
+		messageBody = target.Input
+	}
+
+	// Determine target type from ARN.
+	parts := splitARN(arn)
+	if len(parts) < 3 {
+		return
+	}
+	svcName := parts[2] // e.g., "sqs", "sns"
+
+	switch svcName {
+	case "sqs":
+		if len(parts) < 6 {
+			return
+		}
+		queueName := parts[5]
+		svc, err := locator.Lookup("sqs")
+		if err != nil {
+			return
+		}
+		if enqueuer, ok := svc.(SQSEnqueuer); ok {
+			// Wrap in EventBridge envelope.
+			envelope := fmt.Sprintf(`{"version":"0","id":"%s","source":"%s","detail-type":"%s","time":"%s","region":"","resources":[],"detail":%s}`,
+				event.EventId, event.Source, event.DetailType,
+				event.Time.Format(time.RFC3339), messageBody)
+			enqueuer.EnqueueDirect(queueName, envelope)
+		}
+
+	case "sns":
+		if len(parts) < 6 {
+			return
+		}
+		topicName := parts[5]
+		svc, err := locator.Lookup("sns")
+		if err != nil {
+			return
+		}
+		if publisher, ok := svc.(SNSPublisher); ok {
+			publisher.PublishDirect(topicName, messageBody, "EventBridge Notification")
+		}
+	}
+}
+
+// splitARN splits an ARN into its components.
+func splitARN(arn string) []string {
+	result := make([]string, 0, 6)
+	s := arn
+	for i := 0; i < 5; i++ {
+		idx := -1
+		for j := 0; j < len(s); j++ {
+			if s[j] == ':' {
+				idx = j
+				break
+			}
+		}
+		if idx < 0 {
+			result = append(result, s)
+			return result
+		}
+		result = append(result, s[:idx])
+		s = s[idx+1:]
+	}
+	result = append(result, s)
+	return result
 }
 
 // ---- TagResource ----

@@ -362,7 +362,7 @@ type xmlPublishResult struct {
 	MessageId string `xml:"MessageId"`
 }
 
-func handlePublish(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handlePublish(ctx *service.RequestContext, store *Store, locator ServiceLocator) (*service.Response, error) {
 	form := parseForm(ctx)
 
 	// TopicArn or TargetArn may be used.
@@ -388,12 +388,130 @@ func handlePublish(ctx *service.RequestContext, store *Store) (*service.Response
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
+	// Deliver to SQS subscriptions (SNS → SQS fan-out).
+	if locator != nil {
+		deliverToSQSSubscriptions(store, locator, topicArn, msgID, message, subject)
+	}
+
 	resp := &xmlPublishResponse{
 		Xmlns:  snsXmlns,
 		Result: xmlPublishResult{MessageId: msgID},
 		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	}
 	return xmlOK(resp)
+}
+
+// deliverToSQSSubscriptions iterates SNS subscriptions with protocol "sqs"
+// and enqueues an SNS notification wrapper message into the target SQS queue.
+func deliverToSQSSubscriptions(store *Store, locator ServiceLocator, topicArn, msgID, message, subject string) {
+	subs, ok := store.ListSubscriptionsByTopic(topicArn)
+	if !ok {
+		return
+	}
+
+	for _, sub := range subs {
+		if sub.Protocol != "sqs" {
+			continue
+		}
+
+		// The endpoint is the SQS queue ARN. Extract the queue name from it.
+		queueName := extractQueueNameFromARN(sub.Endpoint)
+		if queueName == "" {
+			continue
+		}
+
+		// Build the SNS notification JSON envelope that mirrors real AWS behavior.
+		notification := buildSNSNotification(topicArn, msgID, message, subject, sub.ARN)
+
+		// Find the SQS service and enqueue directly.
+		enqueueSNSToSQS(locator, queueName, notification)
+	}
+}
+
+// extractQueueNameFromARN extracts the queue name from an SQS ARN like
+// "arn:aws:sqs:us-east-1:123456789012:my-queue" → "my-queue"
+func extractQueueNameFromARN(arn string) string {
+	parts := splitARN(arn)
+	if len(parts) < 6 {
+		return ""
+	}
+	return parts[5]
+}
+
+// splitARN splits an ARN into its components.
+func splitARN(arn string) []string {
+	// arn:aws:service:region:account:resource
+	result := make([]string, 0, 6)
+	s := arn
+	for i := 0; i < 5; i++ {
+		idx := indexOf(s, ':')
+		if idx < 0 {
+			result = append(result, s)
+			return result
+		}
+		result = append(result, s[:idx])
+		s = s[idx+1:]
+	}
+	result = append(result, s)
+	return result
+}
+
+func indexOf(s string, c byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == c {
+			return i
+		}
+	}
+	return -1
+}
+
+// buildSNSNotification creates the JSON envelope that SNS puts around messages
+// when delivering to SQS, matching the AWS format.
+func buildSNSNotification(topicArn, messageID, message, subject, subscriptionArn string) string {
+	// Simplified SNS notification envelope matching AWS format.
+	return fmt.Sprintf(`{"Type":"Notification","MessageId":"%s","TopicArn":"%s","Subject":"%s","Message":%s,"SubscribeURL":"","UnsubscribeURL":"","Timestamp":"%s"}`,
+		messageID, topicArn, subject, jsonEscape(message), newUUID())
+}
+
+// SQSEnqueuer is an interface for directly enqueuing messages into SQS queues.
+// This avoids a hard dependency on the sqs package.
+type SQSEnqueuer interface {
+	EnqueueDirect(queueName, messageBody string) bool
+}
+
+// enqueueSNSToSQS finds the SQS service via the locator and enqueues the message.
+func enqueueSNSToSQS(locator ServiceLocator, queueName, messageBody string) {
+	svc, err := locator.Lookup("sqs")
+	if err != nil {
+		return
+	}
+	if enqueuer, ok := svc.(SQSEnqueuer); ok {
+		enqueuer.EnqueueDirect(queueName, messageBody)
+	}
+}
+
+// jsonEscape wraps a string in JSON quotes, escaping as needed.
+func jsonEscape(s string) string {
+	// Simple JSON string encoding.
+	result := `"`
+	for _, c := range s {
+		switch c {
+		case '"':
+			result += `\"`
+		case '\\':
+			result += `\\`
+		case '\n':
+			result += `\n`
+		case '\r':
+			result += `\r`
+		case '\t':
+			result += `\t`
+		default:
+			result += string(c)
+		}
+	}
+	result += `"`
+	return result
 }
 
 // ---- TagResource ----

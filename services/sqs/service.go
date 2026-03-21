@@ -43,6 +43,19 @@ func (s *SQSService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *SQSService) HealthCheck() error { return nil }
 
+// EnqueueDirect adds a message to the named queue without going through
+// the HTTP/form-parsing path. This is used for cross-service delivery
+// (e.g., SNS → SQS, EventBridge → SQS, S3 notifications → SQS).
+// Returns true if the message was enqueued.
+func (s *SQSService) EnqueueDirect(queueName, messageBody string) bool {
+	q, ok := s.store.GetByName(queueName)
+	if !ok {
+		return false
+	}
+	q.SendMessage(messageBody, 0, nil, "", "")
+	return true
+}
+
 // HandleRequest routes an incoming SQS request to the appropriate handler.
 // SQS uses form-encoded bodies; the Action may appear in the query string
 // (already parsed into ctx.Params) or in the form-encoded body.

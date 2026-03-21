@@ -3,19 +3,30 @@ package s3
 import (
 	"net/http"
 	"strings"
+	"time"
 
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // S3Service is the cloudmock implementation of the Amazon S3 API.
 type S3Service struct {
 	store *Store
+	bus   *eventbus.Bus
 }
 
 // New returns a new S3Service with an empty bucket store.
 func New() *S3Service {
 	return &S3Service{
 		store: NewStore(),
+	}
+}
+
+// NewWithBus returns a new S3Service that publishes events to the given bus.
+func NewWithBus(bus *eventbus.Bus) *S3Service {
+	return &S3Service{
+		store: NewStore(),
+		bus:   bus,
 	}
 }
 
@@ -77,7 +88,11 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 				return handleCopyObject(s.store, ctx)
 			}
 			// PUT /bucket/key → PutObject
-			return handlePutObject(s.store, ctx)
+			resp, err := handlePutObject(s.store, ctx)
+			if err == nil && s.bus != nil {
+				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:Put")
+			}
+			return resp, err
 		}
 		if isBucketPath {
 			// PUT /bucket → CreateBucket
@@ -87,7 +102,11 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 	case http.MethodDelete:
 		if isBucketPath && isObjectPath {
 			// DELETE /bucket/key → DeleteObject
-			return handleDeleteObject(s.store, ctx)
+			resp, err := handleDeleteObject(s.store, ctx)
+			if err == nil && s.bus != nil {
+				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectRemoved:Delete")
+			}
+			return resp, err
 		}
 		if isBucketPath {
 			// DELETE /bucket → DeleteBucket
@@ -112,4 +131,39 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		http.StatusNotImplemented,
 	)
 	return &service.Response{Format: service.FormatXML}, awsErr
+}
+
+// publishObjectEvent sends an S3 object event to the event bus.
+func (s *S3Service) publishObjectEvent(ctx *service.RequestContext, bucket, key, eventType string) {
+	// Look up object metadata for the event detail.
+	detail := map[string]interface{}{
+		"bucket": bucket,
+		"key":    key,
+	}
+
+	// Try to include size and etag from the object store.
+	if objs, err := s.store.bucketObjects(bucket); err == nil {
+		if obj, err := objs.GetObject(key); err == nil {
+			detail["size"] = obj.Size
+			detail["etag"] = obj.ETag
+		}
+	}
+
+	accountID := ctx.AccountID
+	if accountID == "" {
+		accountID = "000000000000"
+	}
+	region := ctx.Region
+	if region == "" {
+		region = "us-east-1"
+	}
+
+	s.bus.Publish(&eventbus.Event{
+		Source:    "s3",
+		Type:      eventType,
+		Detail:    detail,
+		Time:      time.Now().UTC(),
+		Region:    region,
+		AccountID: accountID,
+	})
 }

@@ -135,12 +135,16 @@ func main() {
 	}
 	loggedGW := gateway.LoggingMiddleware(handler, requestLog, requestStats)
 
-	// Admin API
+	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
+	var adminHandler http.Handler = adminAPI
+	if corsEnabled != "false" && corsEnabled != "0" {
+		adminHandler = gateway.CORSMiddleware(adminHandler)
+	}
 	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
 	go func() {
 		log.Printf("cloudmock admin API starting on %s", adminAddr)
-		if err := http.ListenAndServe(adminAddr, adminAPI); err != nil {
+		if err := http.ListenAndServe(adminAddr, adminHandler); err != nil {
 			log.Printf("admin API exited: %v", err)
 		}
 	}()

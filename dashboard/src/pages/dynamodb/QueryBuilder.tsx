@@ -4,30 +4,35 @@ import { extractValue, getType, typeBadgeColor, collectColumns, buildAttributeVa
 import { ddbRequest } from '../../api';
 import { PlayIcon, TrashIcon } from '../../components/Icons';
 import { JsonView } from '../../components/JsonView';
+import { CodeGenerator } from './CodeGenerator';
 
 interface QueryBuilderProps {
   tableName: string;
   tableDesc: TableDescription;
   showToast: (msg: string) => void;
   onEditItem: (item: DDBItem) => void;
+  initialIndexName?: string;
+  initialPkValue?: string;
 }
 
 const SORT_OPS = ['=', '<', '>', '<=', '>=', 'begins_with', 'between'];
 
-export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: QueryBuilderProps) {
+export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, initialIndexName, initialPkValue }: QueryBuilderProps) {
   const [mode, setMode] = useState<'query' | 'scan'>('query');
-  const [pkValue, setPkValue] = useState('');
+  const [pkValue, setPkValue] = useState(initialPkValue || '');
   const [skOp, setSkOp] = useState('=');
   const [skValue, setSkValue] = useState('');
   const [skValue2, setSkValue2] = useState('');
   const [filters, setFilters] = useState<FilterCondition[]>([]);
-  const [indexName, setIndexName] = useState('');
+  const [indexName, setIndexName] = useState(initialIndexName || '');
   const [scanForward, setScanForward] = useState(true);
   const [limit, setLimit] = useState('');
   const [results, setResults] = useState<DDBItem[] | null>(null);
   const [scannedCount, setScannedCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showCodeGen, setShowCodeGen] = useState(false);
+  const [optimizerHint, setOptimizerHint] = useState<{ indexName: string; pkAttr: string; pkValue: string } | null>(null);
 
   const tablePkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'HASH')?.AttributeName || '';
   const tableSkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'RANGE')?.AttributeName || '';
@@ -60,6 +65,21 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
   const activeIndex = indexes.find(i => i.name === indexName) || indexes[0];
   const activePkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.pk)?.AttributeType || 'S';
   const activeSkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.sk)?.AttributeType || 'S';
+
+  // Query optimizer: detect if scan filters match a PK
+  useMemo(() => {
+    if (mode !== 'scan') { setOptimizerHint(null); return; }
+    const validFilters = filters.filter(f => f.attribute && f.value && f.operator === '=');
+    if (validFilters.length === 0) { setOptimizerHint(null); return; }
+    for (const idx of indexes) {
+      const matchingFilter = validFilters.find(f => f.attribute === idx.pk);
+      if (matchingFilter) {
+        setOptimizerHint({ indexName: idx.name, pkAttr: idx.pk, pkValue: matchingFilter.value });
+        return;
+      }
+    }
+    setOptimizerHint(null);
+  }, [mode, filters, indexes]);
 
   function addFilter() {
     setFilters(prev => [...prev, { attribute: '', operator: '=', value: '', value2: '', connector: 'AND' }]);
@@ -417,18 +437,66 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
             />
           </div>
 
+          {/* Query Optimizer Banner */}
+          {mode === 'scan' && optimizerHint && (
+            <div class="ddb-optimizer-banner mb-4">
+              <div class="ddb-optimizer-text">
+                This scan can be optimized to a <strong>Query</strong> using{' '}
+                <strong>{optimizerHint.indexName || 'the table primary key'}</strong>
+              </div>
+              <button
+                class="btn btn-secondary btn-sm"
+                onClick={() => {
+                  setMode('query');
+                  setIndexName(optimizerHint.indexName);
+                  setPkValue(optimizerHint.pkValue);
+                  // Remove the filter that matches the PK
+                  setFilters(prev => prev.filter(f => f.attribute !== optimizerHint.pkAttr));
+                  setOptimizerHint(null);
+                }}
+              >
+                Optimize
+              </button>
+            </div>
+          )}
+
           {/* Run */}
-          <button
-            class="btn btn-primary btn-sm"
-            onClick={runQuery}
-            disabled={loading || (mode === 'query' && !pkValue)}
-          >
-            <PlayIcon /> {loading ? 'Running...' : `Run ${mode === 'query' ? 'Query' : 'Scan'}`}
-          </button>
+          <div class="flex items-center gap-2">
+            <button
+              class="btn btn-primary btn-sm"
+              onClick={runQuery}
+              disabled={loading || (mode === 'query' && !pkValue)}
+            >
+              <PlayIcon /> {loading ? 'Running...' : `Run ${mode === 'query' ? 'Query' : 'Scan'}`}
+            </button>
+            {results && results.length > 0 && (
+              <button class="btn btn-ghost btn-sm" onClick={() => setShowCodeGen(true)} title="Generate Code (Ctrl+G)">
+                Generate Code
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Results */}
+      {/* Code Generator Modal */}
+      {showCodeGen && (
+        <CodeGenerator
+          tableName={tableName}
+          tableDesc={tableDesc}
+          mode={mode}
+          pkValue={pkValue}
+          skOp={skOp}
+          skValue={skValue}
+          skValue2={skValue2}
+          indexName={indexName}
+          filters={filters}
+          limit={limit}
+          onClose={() => setShowCodeGen(false)}
+          showToast={showToast}
+        />
+      )}
+
       {results && (
         <div class="card">
           <div class="card-header">

@@ -253,7 +253,11 @@ export function ItemBrowser({
                   >
                     <div class="ddb-th-inner">
                       <span>{c}</span>
-                      {keyAttrs.includes(c) && <span class="ddb-key-indicator">{tableDesc.KeySchema.find(k => k.AttributeName === c)?.KeyType === 'HASH' ? 'PK' : 'SK'}</span>}
+                      {keyAttrs.includes(c) && (
+                        <span class={`ddb-key-badge ${tableDesc.KeySchema.find(k => k.AttributeName === c)?.KeyType === 'HASH' ? 'ddb-key-badge-pk' : 'ddb-key-badge-sk'}`}>
+                          {tableDesc.KeySchema.find(k => k.AttributeName === c)?.KeyType === 'HASH' ? 'PK' : 'SK'}
+                        </span>
+                      )}
                       {sortCol === c && <span class="ddb-sort-arrow">{sortDir === 'asc' ? '\u25B2' : '\u25BC'}</span>}
                       <div
                         class="ddb-resize-handle"
@@ -302,7 +306,7 @@ export function ItemBrowser({
                           ) : (
                             <div class="ddb-cell-content">
                               {val && typeBadge(val)}
-                              <span class="ddb-cell-value truncate">{display}</span>
+                              <span class={`ddb-cell-value truncate${keyAttrs.includes(c) ? ' ddb-key-value' : ''}`}>{display}</span>
                             </div>
                           )}
                         </td>

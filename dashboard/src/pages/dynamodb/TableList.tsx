@@ -11,12 +11,13 @@ interface TableListProps {
   onRefresh: () => void;
   onDeleteTable: (name: string) => void;
   onDescribeTable: (name: string) => void;
+  onTruncateTable: (name: string) => void;
   showToast: (msg: string) => void;
 }
 
 export function TableList({
   tables, tableCounts, selectedTable, onSelect,
-  onCreateTable, onRefresh, onDeleteTable, onDescribeTable, showToast,
+  onCreateTable, onRefresh, onDeleteTable, onDescribeTable, onTruncateTable, showToast,
 }: TableListProps) {
   const [search, setSearch] = useState('');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; table: string } | null>(null);
@@ -108,6 +109,9 @@ export function TableList({
             Copy ARN
           </div>
           <div class="ddb-context-sep" />
+          <div class="ddb-context-item ddb-context-warning" onClick={() => { onTruncateTable(contextMenu.table); setContextMenu(null); }}>
+            Truncate Table
+          </div>
           <div class="ddb-context-item ddb-context-danger" onClick={() => { onDeleteTable(contextMenu.table); setContextMenu(null); }}>
             Delete Table
           </div>

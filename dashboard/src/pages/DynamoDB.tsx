@@ -12,6 +12,9 @@ import { CreateTable } from './dynamodb/CreateTable';
 import { ExportMenu } from './dynamodb/ExportMenu';
 import { ImportMenu } from './dynamodb/ImportMenu';
 import { BatchWrite } from './dynamodb/BatchWrite';
+import { AccessPatterns } from './dynamodb/AccessPatterns';
+import { PartiQL } from './dynamodb/PartiQL';
+import { Terminal } from './dynamodb/Terminal';
 
 interface DynamoDBPageProps {
   showToast: (msg: string) => void;
@@ -23,7 +26,9 @@ interface OpenTab {
   items: DDBItem[];
   page: number;
   lastKeys: any[];
-  activeTab: 'items' | 'query' | 'scan' | 'info';
+  activeTab: 'items' | 'query' | 'scan' | 'info' | 'sql' | 'terminal';
+  queryInitialIndex?: string;
+  queryInitialPk?: string;
 }
 
 export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
@@ -38,6 +43,8 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
   const [showCreateTable, setShowCreateTable] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteItemsConfirm, setDeleteItemsConfirm] = useState<DDBItem[] | null>(null);
+  const [truncateConfirm, setTruncateConfirm] = useState<string | null>(null);
+  const [truncateProgress, setTruncateProgress] = useState<{ done: number; total: number } | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const currentTab = activeTabIndex >= 0 && activeTabIndex < openTabs.length ? openTabs[activeTabIndex] : null;
@@ -130,7 +137,7 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     }
   }
 
-  function setContentTab(tab: 'items' | 'query' | 'scan' | 'info') {
+  function setContentTab(tab: OpenTab['activeTab']) {
     if (activeTabIndex >= 0) updateTab(activeTabIndex, { activeTab: tab });
   }
 
@@ -242,6 +249,75 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     }).catch(() => showToast('Delete table failed'));
   }
 
+  // Truncate table
+  async function truncateTable(name: string) {
+    try {
+      const desc = await ddbRequest('DescribeTable', { TableName: name });
+      const keySchema = desc.Table?.KeySchema || [];
+
+      // Scan all items
+      let allItems: DDBItem[] = [];
+      let lastKey: any = undefined;
+      do {
+        const params: any = { TableName: name };
+        if (lastKey) params.ExclusiveStartKey = lastKey;
+        // Only fetch keys to minimize data transfer
+        params.ProjectionExpression = keySchema.map((_: any, i: number) => `#k${i}`).join(', ');
+        params.ExpressionAttributeNames = {};
+        keySchema.forEach((k: any, i: number) => {
+          params.ExpressionAttributeNames[`#k${i}`] = k.AttributeName;
+        });
+        const r = await ddbRequest('Scan', params);
+        allItems = allItems.concat(r.Items || []);
+        lastKey = r.LastEvaluatedKey;
+      } while (lastKey);
+
+      setTruncateProgress({ done: 0, total: allItems.length });
+
+      // Delete in batches of 25
+      let done = 0;
+      for (let i = 0; i < allItems.length; i += 25) {
+        const batch = allItems.slice(i, i + 25);
+        const deleteRequests = batch.map(item => {
+          const key: any = {};
+          keySchema.forEach((k: any) => {
+            key[k.AttributeName] = item[k.AttributeName];
+          });
+          return { DeleteRequest: { Key: key } };
+        });
+        try {
+          await ddbRequest('BatchWriteItem', {
+            RequestItems: { [name]: deleteRequests },
+          });
+        } catch {
+          // Fallback: individual deletes
+          for (const req of deleteRequests) {
+            try {
+              await ddbRequest('DeleteItem', { TableName: name, Key: req.DeleteRequest.Key });
+            } catch { /* skip */ }
+          }
+        }
+        done += batch.length;
+        setTruncateProgress({ done, total: allItems.length });
+      }
+
+      showToast(`Truncated ${allItems.length} items from ${name}`);
+      setTruncateConfirm(null);
+      setTruncateProgress(null);
+      loadTables();
+      // Refresh the tab if open
+      const tabIdx = openTabs.findIndex(t => t.name === name);
+      if (tabIdx >= 0) {
+        updateTab(tabIdx, { page: 0, lastKeys: [] });
+        scanItems(name, null, tabIdx);
+      }
+    } catch (e: any) {
+      showToast('Truncate failed: ' + (e.message || 'unknown error'));
+      setTruncateConfirm(null);
+      setTruncateProgress(null);
+    }
+  }
+
   function handleEditItem(item: DDBItem) {
     setEditItem(item);
     setShowEditModal(true);
@@ -264,10 +340,37 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     }, 50);
   }
 
+  function handleQueryIndex(indexName: string, pkAttr: string) {
+    if (activeTabIndex >= 0) {
+      updateTab(activeTabIndex, {
+        activeTab: 'query',
+        queryInitialIndex: indexName,
+        queryInitialPk: '',
+      });
+    }
+  }
+
+  // Content tab labels and order
+  const contentTabs: { key: OpenTab['activeTab']; label: string; shortcut?: string }[] = [
+    { key: 'items', label: 'Items' },
+    { key: 'query', label: 'Query' },
+    { key: 'scan', label: 'Scan' },
+    { key: 'sql', label: 'SQL' },
+    { key: 'terminal', label: 'Terminal', shortcut: 'Ctrl+T' },
+    { key: 'info', label: 'Table Info' },
+  ];
+
   // Keyboard shortcuts
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) {
+        // Allow Ctrl+Enter even in text inputs
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          // Ctrl+Enter is handled by individual components (QueryBuilder, PartiQL)
+          return;
+        }
+        return;
+      }
       if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
         e.preventDefault();
         if (selectedTable && tableDesc) setShowCreateItem(true);
@@ -280,6 +383,22 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
         e.preventDefault();
         refresh();
       }
+      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        // Save is handled by ItemEditor when open
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'd') {
+        e.preventDefault();
+        // Duplicate current item - handled when editing
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 't') {
+        e.preventDefault();
+        if (selectedTable) setContentTab('terminal');
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'g') {
+        e.preventDefault();
+        // Code gen is handled by QueryBuilder
+      }
       if (e.key === 'Escape') {
         setShowEditModal(false);
         setShowCreateItem(false);
@@ -290,10 +409,17 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
       if ((e.key === 'Delete' || e.key === 'Backspace') && deleteItemsConfirm) {
         confirmDeleteItems();
       }
+      // Tab key to cycle content tabs
+      if (e.key === 'Tab' && !e.ctrlKey && !e.metaKey && !e.shiftKey && selectedTable) {
+        e.preventDefault();
+        const currentIdx = contentTabs.findIndex(t => t.key === activeTab);
+        const nextIdx = (currentIdx + 1) % contentTabs.length;
+        setContentTab(contentTabs[nextIdx].key);
+      }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedTable, tableDesc, deleteItemsConfirm, activeTabIndex]);
+  }, [selectedTable, tableDesc, deleteItemsConfirm, activeTabIndex, activeTab]);
 
   return (
     <div class="ddb-layout">
@@ -306,6 +432,7 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
         onRefresh={loadTables}
         onDeleteTable={(name) => setDeleteConfirm(name)}
         onDescribeTable={handleDescribeTable}
+        onTruncateTable={(name) => setTruncateConfirm(name)}
         showToast={showToast}
       />
 
@@ -343,29 +470,26 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
               <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+F</kbd> Search
               &nbsp;&middot;&nbsp;
               <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+R</kbd> Refresh
+              &nbsp;&middot;&nbsp;
+              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+T</kbd> Terminal
+              &nbsp;&middot;&nbsp;
+              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Tab</kbd> Switch Tabs
             </div>
           </div>
         ) : (
           <div>
+            {/* Access Patterns Summary Bar */}
+            {tableDesc && (
+              <AccessPatterns
+                tableDesc={tableDesc}
+                onQueryIndex={handleQueryIndex}
+              />
+            )}
+
             {/* Header */}
             <div class="ddb-header">
               <div>
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">{selectedTable}</h2>
-                {tableDesc && (
-                  <div class="ddb-key-schema">
-                    {tableDesc.KeySchema.map(k => {
-                      const attrDef = tableDesc.AttributeDefinitions.find(a => a.AttributeName === k.AttributeName);
-                      return (
-                        <span key={k.AttributeName}>
-                          {k.AttributeName}
-                          <span style="opacity:0.6;margin-left:4px">{k.KeyType === 'HASH' ? 'PK' : 'SK'}</span>
-                          {attrDef && <span style="opacity:0.5;margin-left:2px">({attrDef.AttributeType})</span>}
-                        </span>
-                      );
-                    })}
-                    <span style="color:var(--n400)">{tableDesc.ItemCount ?? 0} items</span>
-                  </div>
-                )}
               </div>
               <div class="flex gap-2">
                 {activeTab === 'items' && (
@@ -388,10 +512,10 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
                     />
                   </>
                 )}
-                <button class="btn btn-primary btn-sm" onClick={() => setShowCreateItem(true)}>
+                <button class="btn btn-primary btn-sm" onClick={() => setShowCreateItem(true)} title="New Item (Ctrl+N)">
                   <PlusIcon /> New Item
                 </button>
-                <button class="btn btn-ghost btn-sm" onClick={refresh}>
+                <button class="btn btn-ghost btn-sm" onClick={refresh} title="Refresh (Ctrl+R)">
                   <RefreshIcon /> Refresh
                 </button>
                 <button class="btn btn-danger btn-sm" onClick={() => setDeleteConfirm(selectedTable)}>
@@ -402,10 +526,16 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
 
             {/* Content Tabs */}
             <div class="tabs">
-              <button class={`tab ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setContentTab('items')}>Items</button>
-              <button class={`tab ${activeTab === 'query' ? 'active' : ''}`} onClick={() => setContentTab('query')}>Query</button>
-              <button class={`tab ${activeTab === 'scan' ? 'active' : ''}`} onClick={() => setContentTab('scan')}>Scan</button>
-              <button class={`tab ${activeTab === 'info' ? 'active' : ''}`} onClick={() => setContentTab('info')}>Table Info</button>
+              {contentTabs.map(ct => (
+                <button
+                  key={ct.key}
+                  class={`tab ${activeTab === ct.key ? 'active' : ''}`}
+                  onClick={() => setContentTab(ct.key)}
+                  title={ct.shortcut || undefined}
+                >
+                  {ct.label}
+                </button>
+              ))}
             </div>
 
             {/* Tab content */}
@@ -433,6 +563,24 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
                 tableDesc={tableDesc}
                 showToast={showToast}
                 onEditItem={handleEditItem}
+                initialIndexName={currentTab?.queryInitialIndex}
+                initialPkValue={currentTab?.queryInitialPk}
+              />
+            )}
+
+            {activeTab === 'sql' && tableDesc && (
+              <PartiQL
+                tableName={selectedTable}
+                tableDesc={tableDesc}
+                showToast={showToast}
+                onEditItem={handleEditItem}
+              />
+            )}
+
+            {activeTab === 'terminal' && tableDesc && (
+              <Terminal
+                tableName={selectedTable}
+                showToast={showToast}
               />
             )}
 
@@ -488,6 +636,39 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
           }
         >
           <p>Are you sure you want to delete <strong>{deleteConfirm}</strong>? This action cannot be undone.</p>
+        </Modal>
+      )}
+
+      {/* Truncate table confirmation */}
+      {truncateConfirm && (
+        <Modal
+          title="Truncate Table"
+          size="sm"
+          onClose={() => { if (!truncateProgress) setTruncateConfirm(null); }}
+          footer={
+            truncateProgress ? undefined : (
+              <>
+                <button class="btn btn-ghost btn-sm" onClick={() => setTruncateConfirm(null)}>Cancel</button>
+                <button class="btn btn-danger btn-sm" onClick={() => truncateTable(truncateConfirm)}>
+                  Truncate
+                </button>
+              </>
+            )
+          }
+        >
+          {truncateProgress ? (
+            <div>
+              <p style="margin-bottom:12px">Deleting items from <strong>{truncateConfirm}</strong>...</p>
+              <div style="background:var(--n200);border-radius:4px;height:8px;overflow:hidden">
+                <div style={`background:var(--error);height:100%;width:${truncateProgress.total > 0 ? (truncateProgress.done / truncateProgress.total) * 100 : 0}%;transition:width 0.2s`} />
+              </div>
+              <div style="font-size:12px;color:var(--n500);margin-top:6px">
+                {truncateProgress.done} / {truncateProgress.total} items deleted
+              </div>
+            </div>
+          ) : (
+            <p>Are you sure you want to delete <strong>all {tableCounts[truncateConfirm] ?? '?'} items</strong> from <strong>{truncateConfirm}</strong>? The table structure will be preserved.</p>
+          )}
         </Modal>
       )}
 

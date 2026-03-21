@@ -27,6 +27,36 @@ interface TopoEdge {
   animated: boolean;
 }
 
+// Expanded mode: each resource is its own node
+interface ResourceNode {
+  id: string;           // e.g. "Lambda::attendance-handler"
+  resourceName: string; // e.g. "attendance-handler"
+  service: string;      // e.g. "Lambda"
+  category: string;
+  layer: number;
+  color: string;
+  x: number;
+  y: number;
+}
+
+interface ResourceEdge {
+  from: string;  // ResourceNode id
+  to: string;    // ResourceNode id
+  label?: string;
+}
+
+interface ResourceCluster {
+  service: string;
+  category: string;
+  color: string;
+  layer: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  resourceCount: number;
+}
+
 interface TopologyPageProps {
   sse: SSEState;
 }
@@ -137,6 +167,236 @@ const KNOWN_EDGES: { from: string; to: string; label: string }[] = [
   { from: 'S3',            to: 'SQS',               label: 'event notification' },
   { from: 'CloudWatch',    to: 'SNS',               label: 'alarm actions' },
 ];
+
+// --- Expanded mode constants ---
+const RES_NODE_W = 140;
+const RES_NODE_H = 32;
+const RES_V_GAP = 40;  // vertical gap between resource nodes within a cluster
+const CLUSTER_PAD = 12;
+const CLUSTER_LABEL_H = 18;
+
+// Infer resource-level edges from naming conventions
+function inferResourceEdges(
+  resourcesByService: Record<string, any[]>,
+  serviceEdges: TopoEdge[],
+  activeServices: Set<string>,
+): ResourceEdge[] {
+  const edges: ResourceEdge[] = [];
+  const seen = new Set<string>();
+
+  function addEdge(from: string, to: string, label?: string) {
+    const key = `${from}->${to}`;
+    if (!seen.has(key)) {
+      seen.add(key);
+      edges.push({ from, to, label });
+    }
+  }
+
+  // Build lookup: resource name -> resource node id
+  const resourceLookup = new Map<string, { id: string; service: string }>();
+  for (const [svc, resources] of Object.entries(resourcesByService)) {
+    for (const r of resources) {
+      const name = r.name || r.id || (typeof r === 'string' ? r : '');
+      if (name) {
+        resourceLookup.set(`${svc}::${name}`, { id: `${svc}::${name}`, service: svc });
+      }
+    }
+  }
+
+  // For each service-level edge, try to resolve to resource-level
+  for (const sEdge of serviceEdges) {
+    const fromResources = resourcesByService[sEdge.from] || [];
+    const toResources = resourcesByService[sEdge.to] || [];
+
+    if (fromResources.length === 0 && toResources.length === 0) continue;
+
+    // Lambda -> DynamoDB: match by naming convention (handler prefix -> table name)
+    if (sEdge.from === 'Lambda' && sEdge.to === 'DynamoDB' && fromResources.length > 0 && toResources.length > 0) {
+      let matched = false;
+      for (const fn of fromResources) {
+        const fnName: string = fn.name || fn.id || '';
+        // Extract prefix: "attendance-handler" -> "attendance"
+        const prefix = fnName.replace(/[-_]?(handler|function|fn|processor|worker)$/i, '');
+        for (const table of toResources) {
+          const tableName: string = table.name || table.id || '';
+          if (tableName === prefix || tableName.startsWith(prefix + '-') || prefix.startsWith(tableName)) {
+            addEdge(`Lambda::${fnName}`, `DynamoDB::${tableName}`, 'read/write');
+            matched = true;
+          }
+        }
+      }
+      // If some lambdas had no match, check for shared tables (like "enterprise")
+      if (matched) continue;
+    }
+
+    // DynamoDB -> Lambda (streams): match by naming convention
+    if (sEdge.from === 'DynamoDB' && sEdge.to === 'Lambda' && fromResources.length > 0 && toResources.length > 0) {
+      let matched = false;
+      for (const fn of toResources) {
+        const fnName: string = fn.name || fn.id || '';
+        if (fnName.includes('stream') || fnName.includes('sync')) {
+          // Stream processor connects to all DynamoDB tables
+          for (const table of fromResources) {
+            const tableName: string = table.name || table.id || '';
+            addEdge(`DynamoDB::${tableName}`, `Lambda::${fnName}`, 'stream');
+            matched = true;
+          }
+        }
+      }
+      if (matched) continue;
+    }
+
+    // Lambda -> SQS: match by naming convention
+    if (sEdge.from === 'Lambda' && sEdge.to === 'SQS' && fromResources.length > 0 && toResources.length > 0) {
+      let matched = false;
+      for (const fn of fromResources) {
+        const fnName: string = fn.name || fn.id || '';
+        const prefix = fnName.replace(/[-_]?(handler|function|fn|processor|worker)$/i, '');
+        for (const q of toResources) {
+          const qName: string = q.name || q.id || '';
+          if (qName.includes(prefix) || prefix.includes(qName.replace(/-queue$/i, ''))) {
+            addEdge(`Lambda::${fnName}`, `SQS::${qName}`, 'send');
+            matched = true;
+          }
+        }
+      }
+      if (matched) continue;
+    }
+
+    // S3 -> SQS: connect all S3 buckets to SQS queues (event notifications)
+    if (sEdge.from === 'S3' && sEdge.to === 'SQS') {
+      for (const bucket of fromResources) {
+        const bName: string = bucket.name || bucket.id || '';
+        for (const q of toResources) {
+          const qName: string = q.name || q.id || '';
+          addEdge(`S3::${bName}`, `SQS::${qName}`, 'notification');
+        }
+      }
+      continue;
+    }
+
+    // Fallback: fan out from all source resources to all target resources
+    if (fromResources.length > 0 && toResources.length > 0) {
+      for (const fr of fromResources) {
+        const frName: string = fr.name || fr.id || '';
+        for (const tr of toResources) {
+          const trName: string = tr.name || tr.id || '';
+          addEdge(`${sEdge.from}::${frName}`, `${sEdge.to}::${trName}`, sEdge.label);
+        }
+      }
+    } else if (fromResources.length > 0) {
+      // Target service has no resources, draw from all source resources to the service placeholder
+      for (const fr of fromResources) {
+        const frName: string = fr.name || fr.id || '';
+        addEdge(`${sEdge.from}::${frName}`, `${sEdge.to}::__service__`, sEdge.label);
+      }
+    } else if (toResources.length > 0) {
+      // Source service has no resources, draw from service placeholder to all target resources
+      for (const tr of toResources) {
+        const trName: string = tr.name || tr.id || '';
+        addEdge(`${sEdge.from}::__service__`, `${sEdge.to}::${trName}`, sEdge.label);
+      }
+    }
+  }
+
+  return edges;
+}
+
+// Build expanded layout: each resource becomes its own node
+function buildExpandedLayout(
+  nodes: TopoNode[],
+  edges: TopoEdge[],
+  resourcesByService: Record<string, any[]>,
+): { resourceNodes: ResourceNode[]; resourceEdges: ResourceEdge[]; clusters: ResourceCluster[] } {
+  const resourceNodes: ResourceNode[] = [];
+  const clusters: ResourceCluster[] = [];
+
+  // Group nodes by layer
+  const layerGroups = new Map<number, TopoNode[]>();
+  for (const n of nodes) {
+    const arr = layerGroups.get(n.layer) || [];
+    arr.push(n);
+    layerGroups.set(n.layer, arr);
+  }
+
+  // For each service, create resource nodes
+  for (const [_layer, group] of layerGroups) {
+    const sorted = [...group].sort((a, b) => a.y - b.y);
+    let currentY = sorted[0]?.y ?? 60;
+
+    for (const node of sorted) {
+      const resources = resourcesByService[node.id] || [];
+      const x = nodeX(node.layer);
+
+      if (resources.length === 0) {
+        // Service with no resources: create a single placeholder node
+        resourceNodes.push({
+          id: `${node.id}::__service__`,
+          resourceName: node.label,
+          service: node.id,
+          category: node.category,
+          layer: node.layer,
+          color: node.color,
+          x: x + CLUSTER_PAD,
+          y: currentY + CLUSTER_LABEL_H + CLUSTER_PAD,
+        });
+        const clusterH = CLUSTER_LABEL_H + CLUSTER_PAD * 2 + RES_NODE_H;
+        clusters.push({
+          service: node.id,
+          category: node.category,
+          color: node.color,
+          layer: node.layer,
+          x,
+          y: currentY,
+          width: RES_NODE_W + CLUSTER_PAD * 2,
+          height: clusterH,
+          resourceCount: 0,
+        });
+        currentY += clusterH + 20;
+      } else {
+        const clusterContentH = resources.length * RES_NODE_H + (resources.length - 1) * (RES_V_GAP - RES_NODE_H);
+        const clusterH = CLUSTER_LABEL_H + CLUSTER_PAD * 2 + clusterContentH;
+
+        clusters.push({
+          service: node.id,
+          category: node.category,
+          color: node.color,
+          layer: node.layer,
+          x,
+          y: currentY,
+          width: RES_NODE_W + CLUSTER_PAD * 2,
+          height: clusterH,
+          resourceCount: resources.length,
+        });
+
+        for (let i = 0; i < resources.length; i++) {
+          const r = resources[i];
+          const rName = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
+          resourceNodes.push({
+            id: `${node.id}::${rName}`,
+            resourceName: rName,
+            service: node.id,
+            category: node.category,
+            layer: node.layer,
+            color: node.color,
+            x: x + CLUSTER_PAD,
+            y: currentY + CLUSTER_LABEL_H + CLUSTER_PAD + i * RES_V_GAP,
+          });
+        }
+        currentY += clusterH + 20;
+      }
+    }
+  }
+
+  // Build resource-level edges
+  const resourceEdges = inferResourceEdges(resourcesByService, edges, new Set(nodes.map(n => n.id)));
+
+  // Filter edges: only keep edges where both endpoints exist
+  const nodeIds = new Set(resourceNodes.map(n => n.id));
+  const validEdges = resourceEdges.filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
+
+  return { resourceNodes, resourceEdges: validEdges, clusters };
+}
 
 // --- Service Icons (simple SVG paths centered at 0,0) ---
 
@@ -628,65 +888,41 @@ export function TopologyPage({ sse }: TopologyPageProps) {
     location.hash = `/resources?service=${encodeURIComponent(serviceName)}&resource=${encodeURIComponent(id)}`;
   }
 
-  // In expanded mode, compute per-node expanded heights
-  const expandedNodeHeights = useMemo(() => {
-    const map: Record<string, number> = {};
-    if (viewMode === 'expanded') {
-      for (const node of filteredNodes) {
-        const resources = nodeResources[node.id] || [];
-        const SUB_NODE_H = 22;
-        const PADDING = 16;
-        const HEADER = NODE_H;
-        if (resources.length > 0) {
-          map[node.id] = HEADER + resources.length * SUB_NODE_H + PADDING;
-        } else {
-          map[node.id] = NODE_H;
-        }
-      }
+  // Expanded mode: build resource-level layout
+  const expandedLayout = useMemo(() => {
+    if (viewMode !== 'expanded') return null;
+    return buildExpandedLayout(filteredNodes, filteredEdges, nodeResources);
+  }, [viewMode, filteredNodes, filteredEdges, nodeResources]);
+
+  // Resource node position lookup for expanded mode edges
+  const resNodePos = useMemo(() => {
+    if (!expandedLayout) return {};
+    const map: Record<string, { cx: number; cy: number }> = {};
+    for (const rn of expandedLayout.resourceNodes) {
+      map[rn.id] = { cx: rn.x + RES_NODE_W / 2, cy: rn.y + RES_NODE_H / 2 };
     }
     return map;
-  }, [viewMode, filteredNodes, nodeResources]);
-
-  // In expanded mode, adjust Y positions so nodes don't overlap
-  const adjustedNodes = useMemo(() => {
-    if (viewMode !== 'expanded') return filteredNodes;
-
-    // Group by layer
-    const layerGroups = new Map<number, typeof filteredNodes>();
-    for (const n of filteredNodes) {
-      const arr = layerGroups.get(n.layer) || [];
-      arr.push(n);
-      layerGroups.set(n.layer, arr);
-    }
-
-    const result: typeof filteredNodes = [];
-    for (const [_layer, group] of layerGroups) {
-      // Sort by original Y
-      const sorted = [...group].sort((a, b) => a.y - b.y);
-      let currentY = sorted[0]?.y ?? 60;
-      for (const node of sorted) {
-        const h = expandedNodeHeights[node.id] || NODE_H;
-        result.push({ ...node, y: currentY, expandedHeight: h });
-        currentY += h + 20; // 20px gap
-      }
-    }
-    return result;
-  }, [viewMode, filteredNodes, expandedNodeHeights]);
+  }, [expandedLayout]);
 
   // SVG dimensions
   const svgW = 1200;
   const maxNodeBottom = useMemo(() => {
     let max = 0;
-    for (const n of adjustedNodes) {
-      const h = (viewMode === 'expanded' ? (expandedNodeHeights[n.id] || NODE_H) : NODE_H);
-      max = Math.max(max, n.y + h + 60);
+    if (viewMode === 'expanded' && expandedLayout) {
+      for (const c of expandedLayout.clusters) {
+        max = Math.max(max, c.y + c.height + 60);
+      }
+    } else {
+      for (const n of filteredNodes) {
+        max = Math.max(max, n.y + NODE_H + 60);
+      }
     }
     return max;
-  }, [adjustedNodes, viewMode, expandedNodeHeights]);
+  }, [filteredNodes, viewMode, expandedLayout]);
   const svgH = Math.max(750, maxNodeBottom);
 
-  // Lookup positions (use adjustedNodes in expanded mode)
-  const renderNodes = viewMode === 'expanded' ? adjustedNodes : filteredNodes;
+  // Lookup positions for collapsed mode
+  const renderNodes = filteredNodes;
   const nodePos = useMemo(() => {
     const map: Record<string, { cx: number; cy: number }> = {};
     for (const n of renderNodes) {
@@ -849,8 +1085,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               ) : null;
             })}
 
-            {/* Edges */}
-            {filteredEdges.map((edge, i) => {
+            {/* ===== COLLAPSED MODE: service-level edges and nodes ===== */}
+            {viewMode === 'collapsed' && filteredEdges.map((edge, i) => {
               const from = nodePos[edge.from];
               const to = nodePos[edge.to];
               if (!from || !to) return null;
@@ -858,7 +1094,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const dimmed = hoveredNode && !highlighted;
               const edgeColor = highlighted ? '#3B82F6' : '#CBD5E1';
 
-              // Offset arrow to stop at node border
               const dx = to.cx - from.cx;
               const dy = to.cy - from.cy;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -871,7 +1106,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const midX = (startX + endX) / 2;
               const midY = (startY + endY) / 2 - 10;
 
-              // Estimate label width
               const labelText = edge.label || '';
               const labelW = labelText.length * 5.5 + 8;
               const labelH = 14;
@@ -911,7 +1145,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                       </text>
                     </>
                   )}
-                  {/* Animated dot for pulsing edges */}
                   {(pulsing.has(edge.from) || pulsing.has(edge.to)) && (
                     <circle r="3" fill={CATEGORY_COLORS[filteredNodes.find(n => n.id === edge.from)?.category || 'Other'] || '#3B82F6'}>
                       <animateMotion dur="1s" repeatCount="indefinite" {...{ path } as any} />
@@ -921,8 +1154,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               );
             })}
 
-            {/* Nodes */}
-            {renderNodes.map(node => {
+            {viewMode === 'collapsed' && renderNodes.map(node => {
               const x = nodeX(node.layer);
               const y = node.y;
               const isPulsing = pulsing.has(node.id);
@@ -931,11 +1163,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const isClient = node.id === 'Client Apps';
               const fillOpacity = node.active ? 0.15 : 0.06;
               const borderColor = node.active ? node.color : '#CBD5E1';
-              const isExpanded = viewMode === 'expanded';
-              const resources = isExpanded ? (nodeResources[node.id] || []) : [];
-              const totalH = isExpanded && resources.length > 0
-                ? (expandedNodeHeights[node.id] || NODE_H)
-                : NODE_H;
 
               return (
                 <g
@@ -953,13 +1180,12 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     handleNodeClick(node.id);
                   }}
                 >
-                  {/* Pulse glow */}
                   {isPulsing && (
                     <rect
                       x={x - 4}
                       y={y - 4}
                       width={NODE_W + 8}
-                      height={totalH + 8}
+                      height={NODE_H + 8}
                       rx={NODE_RX + 2}
                       fill={node.color}
                       opacity="0.25"
@@ -969,12 +1195,11 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     </rect>
                   )}
 
-                  {/* Node rect (full height in expanded mode) */}
                   <rect
                     x={x}
                     y={y}
                     width={NODE_W}
-                    height={totalH}
+                    height={NODE_H}
                     rx={NODE_RX}
                     fill={`${node.color}${Math.round(fillOpacity * 255).toString(16).padStart(2, '0')}`}
                     stroke={borderColor}
@@ -982,7 +1207,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     style={{ transition: 'all 0.3s ease' }}
                   />
 
-                  {/* Service icon */}
                   <ServiceIcon
                     service={node.id}
                     x={x + 16}
@@ -990,7 +1214,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     color={node.color}
                   />
 
-                  {/* Label */}
                   <text
                     x={x + 30}
                     y={y + NODE_H / 2 + 1}
@@ -1004,7 +1227,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     {node.label}
                   </text>
 
-                  {/* Request count badge */}
                   {node.requests > 0 && (
                     <>
                       <rect
@@ -1032,83 +1254,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     </>
                   )}
 
-                  {/* Expanded: sub-nodes for each resource */}
-                  {isExpanded && resources.length > 0 && (
-                    <g>
-                      {/* Divider line between header and resources */}
-                      <line
-                        x1={x + 8}
-                        y1={y + NODE_H}
-                        x2={x + NODE_W - 8}
-                        y2={y + NODE_H}
-                        stroke={borderColor}
-                        stroke-width="0.5"
-                        opacity="0.5"
-                      />
-                      {resources.map((r: any, i: number) => {
-                        const rName = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
-                        const subY = y + NODE_H + 4 + i * 22;
-                        const subW = NODE_W - 16;
-                        const subH = 18;
-                        return (
-                          <g
-                            key={i}
-                            onClick={(e: MouseEvent) => {
-                              e.stopPropagation();
-                              navigateToResource(node.id, r);
-                            }}
-                            style={{ cursor: 'pointer' }}
-                          >
-                            <rect
-                              x={x + 8}
-                              y={subY}
-                              width={subW}
-                              height={subH}
-                              rx={4}
-                              fill={`${node.color}10`}
-                              stroke={`${node.color}40`}
-                              stroke-width="0.8"
-                            />
-                            <circle
-                              cx={x + 17}
-                              cy={subY + subH / 2}
-                              r="3"
-                              fill={node.color}
-                              opacity="0.6"
-                            />
-                            <text
-                              x={x + 24}
-                              y={subY + subH / 2 + 1}
-                              dominant-baseline="central"
-                              font-size="9"
-                              font-family="var(--font-mono)"
-                              fill="#475569"
-                              style={{ pointerEvents: 'none' }}
-                            >
-                              {rName.length > 18 ? rName.slice(0, 17) + '\u2026' : rName}
-                            </text>
-                          </g>
-                        );
-                      })}
-                    </g>
-                  )}
-
-                  {/* Loading indicator in expanded mode */}
-                  {isExpanded && loadingResources.has(node.id) && (
-                    <text
-                      x={x + NODE_W / 2}
-                      y={y + NODE_H + 16}
-                      text-anchor="middle"
-                      font-size="9"
-                      font-family="var(--font-sans)"
-                      fill="#94A3B8"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      Loading...
-                    </text>
-                  )}
-
-                  {/* Tooltip on hover */}
                   {isHovered && (
                     <g style={{ pointerEvents: 'none' }}>
                       <rect
@@ -1147,7 +1292,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               );
             })}
 
-            {/* Expanded resource panels (collapsed mode only) */}
+            {/* Collapsed mode: resource panel on click */}
             {viewMode === 'collapsed' && expandedNode && (() => {
               const node = filteredNodes.find(n => n.id === expandedNode);
               if (!node) return null;
@@ -1162,7 +1307,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const listMaxH = 220;
               const listH = Math.min(listMaxH, resources.length * rowH);
               const panelH = isLoading ? headerH + 48 + footerH : headerH + listH + footerH;
-              // Position panel to the right of the node, clamped within SVG
               let panelX = x + NODE_W + 12;
               if (panelX + panelW > 1180) panelX = x - panelW - 12;
               const panelY = Math.max(10, Math.min(y - 20, svgH - panelH - 10));
@@ -1220,6 +1364,170 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                 </foreignObject>
               );
             })()}
+
+            {/* ===== EXPANDED MODE: resource-level nodes and edges ===== */}
+            {viewMode === 'expanded' && expandedLayout && (
+              <g>
+                {/* Cluster group rectangles */}
+                {expandedLayout.clusters.map(cluster => (
+                  <g key={`cluster-${cluster.service}`}>
+                    <rect
+                      x={cluster.x}
+                      y={cluster.y}
+                      width={cluster.width}
+                      height={cluster.height}
+                      rx={12}
+                      fill="none"
+                      stroke={`${cluster.color}4D`}
+                      stroke-width="1.5"
+                      stroke-dasharray="6 3"
+                    />
+                    {/* Service name label above cluster */}
+                    <text
+                      x={cluster.x + 8}
+                      y={cluster.y + 13}
+                      font-size="10"
+                      font-weight="600"
+                      font-family="var(--font-sans)"
+                      fill={cluster.color}
+                      opacity="0.8"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {cluster.service}
+                      {cluster.resourceCount > 0 ? ` (${cluster.resourceCount})` : ''}
+                    </text>
+                  </g>
+                ))}
+
+                {/* Resource-level edges */}
+                {expandedLayout.resourceEdges.map((edge, i) => {
+                  const from = resNodePos[edge.from];
+                  const to = resNodePos[edge.to];
+                  if (!from || !to) return null;
+
+                  const dx = to.cx - from.cx;
+                  const dy = to.cy - from.cy;
+                  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                  const endX = to.cx - (dx / dist) * (RES_NODE_W / 2 + 3);
+                  const endY = to.cy - (dy / dist) * (RES_NODE_H / 2 + 2);
+                  const startX = from.cx + (dx / dist) * (RES_NODE_W / 2 + 3);
+                  const startY = from.cy + (dy / dist) * (RES_NODE_H / 2 + 2);
+
+                  const path = bezierPath(startX, startY, endX, endY);
+
+                  return (
+                    <g key={`re-${i}`} style={{ opacity: 0.6 }}>
+                      <path
+                        d={path}
+                        fill="none"
+                        stroke="#CBD5E1"
+                        stroke-width="1"
+                        marker-end="url(#topo-arrow)"
+                      />
+                    </g>
+                  );
+                })}
+
+                {/* Resource nodes */}
+                {expandedLayout.resourceNodes.map(rn => {
+                  const isPlaceholder = rn.id.endsWith('::__service__');
+                  const isHovered = hoveredNode === rn.id;
+                  const displayName = isPlaceholder ? rn.resourceName : rn.resourceName;
+                  const truncated = displayName.length > 16 ? displayName.slice(0, 15) + '\u2026' : displayName;
+
+                  return (
+                    <g
+                      key={rn.id}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={() => setHoveredNode(rn.id)}
+                      onMouseLeave={() => setHoveredNode(null)}
+                      onClick={(e: MouseEvent) => {
+                        e.stopPropagation();
+                        if (!isPlaceholder) {
+                          navigateToResource(rn.service, { name: rn.resourceName });
+                        }
+                      }}
+                    >
+                      <rect
+                        x={rn.x}
+                        y={rn.y}
+                        width={RES_NODE_W}
+                        height={RES_NODE_H}
+                        rx={6}
+                        fill={`${rn.color}1A`}
+                        stroke={isHovered ? rn.color : `${rn.color}66`}
+                        stroke-width={isHovered ? 2 : 1}
+                        style={{ transition: 'all 0.15s ease' }}
+                      />
+
+                      {/* Small service icon badge in top-left */}
+                      <g transform={`translate(${rn.x + 10}, ${rn.y + RES_NODE_H / 2}) scale(0.6) translate(${-(rn.x + 10)}, ${-(rn.y + RES_NODE_H / 2)})`}>
+                        <ServiceIcon
+                          service={rn.service}
+                          x={rn.x + 10}
+                          y={rn.y + RES_NODE_H / 2}
+                          color={rn.color}
+                        />
+                      </g>
+
+                      {/* Resource name label */}
+                      <text
+                        x={rn.x + 22}
+                        y={rn.y + RES_NODE_H / 2 + 1}
+                        dominant-baseline="central"
+                        font-size="11"
+                        font-family="var(--font-mono)"
+                        fill="#334155"
+                        style={{ pointerEvents: 'none' }}
+                      >
+                        {truncated}
+                      </text>
+
+                      {/* Tooltip on hover showing full name */}
+                      {isHovered && displayName.length > 16 && (
+                        <g style={{ pointerEvents: 'none' }}>
+                          <rect
+                            x={rn.x + RES_NODE_W / 2 - (displayName.length * 3.5 + 8)}
+                            y={rn.y - 24}
+                            width={displayName.length * 7 + 16}
+                            height={20}
+                            rx={4}
+                            fill="#0F172A"
+                            opacity="0.92"
+                          />
+                          <text
+                            x={rn.x + RES_NODE_W / 2}
+                            y={rn.y - 14}
+                            text-anchor="middle"
+                            dominant-baseline="central"
+                            font-size="10"
+                            font-family="var(--font-mono)"
+                            fill="white"
+                          >
+                            {displayName}
+                          </text>
+                        </g>
+                      )}
+                    </g>
+                  );
+                })}
+
+                {/* Loading indicator */}
+                {loadingResources.size > 0 && (
+                  <text
+                    x={svgW / 2}
+                    y={40}
+                    text-anchor="middle"
+                    font-size="11"
+                    font-family="var(--font-sans)"
+                    fill="#94A3B8"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    Loading resources...
+                  </text>
+                )}
+              </g>
+            )}
           </g>
 
           {/* Minimap */}
@@ -1236,25 +1544,35 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             />
             {/* Minimap nodes */}
             <g transform={`scale(${minimapScale})`}>
-              {renderNodes.map(node => {
+              {viewMode === 'collapsed' ? renderNodes.map(node => {
                 const mx = nodeX(node.layer);
                 const my = node.y;
-                const mh = viewMode === 'expanded' ? (expandedNodeHeights[node.id] || NODE_H) : NODE_H;
                 return (
                   <rect
                     key={`mm-${node.id}`}
                     x={mx}
                     y={my}
                     width={NODE_W}
-                    height={mh}
+                    height={NODE_H}
                     rx={2}
                     fill={node.color}
                     opacity={node.active ? 0.7 : 0.3}
                   />
                 );
-              })}
+              }) : expandedLayout ? expandedLayout.resourceNodes.map(rn => (
+                <rect
+                  key={`mm-${rn.id}`}
+                  x={rn.x}
+                  y={rn.y}
+                  width={RES_NODE_W}
+                  height={RES_NODE_H}
+                  rx={1}
+                  fill={rn.color}
+                  opacity={0.6}
+                />
+              )) : null}
               {/* Minimap edges */}
-              {filteredEdges.map((edge, i) => {
+              {viewMode === 'collapsed' ? filteredEdges.map((edge, i) => {
                 const from = nodePos[edge.from];
                 const to = nodePos[edge.to];
                 if (!from || !to) return null;
@@ -1270,7 +1588,23 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     opacity="0.5"
                   />
                 );
-              })}
+              }) : expandedLayout ? expandedLayout.resourceEdges.map((edge, i) => {
+                const from = resNodePos[edge.from];
+                const to = resNodePos[edge.to];
+                if (!from || !to) return null;
+                return (
+                  <line
+                    key={`mme-${i}`}
+                    x1={from.cx}
+                    y1={from.cy}
+                    x2={to.cx}
+                    y2={to.cy}
+                    stroke="#CBD5E1"
+                    stroke-width="1"
+                    opacity="0.4"
+                  />
+                );
+              }) : null}
             </g>
             {/* Viewport indicator */}
             <rect

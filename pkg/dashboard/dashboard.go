@@ -477,11 +477,10 @@ pre, code { font-family: var(--font-mono); }
 <body>
 <div id="app"></div>
 
-<script type="module">
-import { h, render, Fragment } from 'https://esm.sh/preact@10.19.3';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'https://esm.sh/preact@10.19.3/hooks';
-import htm from 'https://esm.sh/htm@3.1.1';
-const html = htm.bind(h);
+<script src="https://unpkg.com/htm@3.1.1/preact/standalone.umd.js"></script>
+<script>
+const { html, render, Component, h, useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext } = htmPreact;
+const Fragment = 'div';
 
 const ADMIN = '%s';
 const GW_ENDPOINT = ADMIN.replace(/:\d+$/, ':4566');

@@ -15,6 +15,9 @@ import { LambdaPage } from './pages/Lambda';
 import { IAMPage } from './pages/IAM';
 import { MailPage } from './pages/Mail';
 import { TopologyPage } from './pages/Topology';
+import { S3BrowserPage } from './pages/S3Browser';
+import { SQSBrowserPage } from './pages/SQSBrowser';
+import { CognitoBrowserPage } from './pages/CognitoBrowser';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -65,6 +68,9 @@ export function App() {
     { id: '/', label: 'Services', icon: 'services' },
     { id: '/requests', label: 'Requests', icon: 'requests' },
     { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
+    { id: '/s3', label: 'S3', icon: 'bucket' },
+    { id: '/sqs', label: 'SQS', icon: 'queue' },
+    { id: '/cognito', label: 'Cognito', icon: 'users' },
     { id: '/resources', label: 'Resources', icon: 'resources' },
     { id: '/lambda', label: 'Lambda', icon: 'lambda' },
     { id: '/iam', label: 'IAM', icon: 'shield' },
@@ -79,6 +85,9 @@ export function App() {
     switch (activePath) {
       case '/requests': return <RequestsPage sse={sse} showToast={showToast} />;
       case '/dynamodb': return <DynamoDBPage showToast={showToast} />;
+      case '/s3': return <S3BrowserPage showToast={showToast} />;
+      case '/sqs': return <SQSBrowserPage showToast={showToast} />;
+      case '/cognito': return <CognitoBrowserPage showToast={showToast} />;
       case '/resources': return <ResourcesPage services={services} />;
       case '/lambda': return <LambdaPage sse={sse} />;
       case '/iam': return <IAMPage showToast={showToast} />;

@@ -160,6 +160,16 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(k, v)
 	}
 
+	// Raw body takes priority — write bytes directly without marshaling.
+	if resp.RawBody != nil {
+		if resp.RawContentType != "" {
+			w.Header().Set("Content-Type", resp.RawContentType)
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(resp.RawBody)
+		return
+	}
+
 	if resp.Body == nil {
 		w.WriteHeader(resp.StatusCode)
 		return

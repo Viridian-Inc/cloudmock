@@ -8,10 +8,11 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
-// Bucket holds metadata for a single S3 bucket.
+// Bucket holds metadata for a single S3 bucket plus its object store.
 type Bucket struct {
 	Name         string
 	CreationDate time.Time
+	Objects      *ObjectStore
 }
 
 // Store is an in-memory store for S3 buckets.
@@ -39,18 +40,24 @@ func (s *Store) CreateBucket(name string) error {
 	s.buckets[name] = &Bucket{
 		Name:         name,
 		CreationDate: time.Now().UTC(),
+		Objects:      NewObjectStore(),
 	}
 	return nil
 }
 
 // DeleteBucket removes the bucket with the given name.
-// Returns an AWSError if the bucket does not exist.
+// Returns an AWSError if the bucket does not exist or is not empty.
 func (s *Store) DeleteBucket(name string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.buckets[name]; !ok {
+	b, ok := s.buckets[name]
+	if !ok {
 		return service.NewAWSError("NoSuchBucket",
 			"The specified bucket does not exist.", http.StatusNotFound)
+	}
+	if b.Objects.Len() > 0 {
+		return service.NewAWSError("BucketNotEmpty",
+			"The bucket you tried to delete is not empty.", http.StatusConflict)
 	}
 	delete(s.buckets, name)
 	return nil
@@ -76,4 +83,17 @@ func (s *Store) ListBuckets() []*Bucket {
 		out = append(out, b)
 	}
 	return out
+}
+
+// bucketObjects returns the ObjectStore for the named bucket, or an AWSError
+// if the bucket does not exist.
+func (s *Store) bucketObjects(name string) (*ObjectStore, error) {
+	s.mu.RLock()
+	b, ok := s.buckets[name]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, service.NewAWSError("NoSuchBucket",
+			"The specified bucket does not exist.", http.StatusNotFound)
+	}
+	return b.Objects, nil
 }

@@ -16,10 +16,12 @@ const (
 
 // Response holds the components of an HTTP response before it is written.
 type Response struct {
-	StatusCode int
-	Body       interface{}
-	Format     ResponseFormat
-	Headers    map[string]string
+	StatusCode     int
+	Body           interface{}
+	Format         ResponseFormat
+	Headers        map[string]string
+	RawBody        []byte // if set, write these bytes directly instead of marshaling Body
+	RawContentType string // Content-Type to use when writing RawBody
 }
 
 // WriteXMLResponse marshals body as XML and writes it with Content-Type text/xml.

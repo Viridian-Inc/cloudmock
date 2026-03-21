@@ -29,6 +29,12 @@ func (s *S3Service) Actions() []service.Action {
 		{Name: "CreateBucket", Method: http.MethodPut, IAMAction: "s3:CreateBucket"},
 		{Name: "DeleteBucket", Method: http.MethodDelete, IAMAction: "s3:DeleteBucket"},
 		{Name: "HeadBucket", Method: http.MethodHead, IAMAction: "s3:ListBucket"},
+		{Name: "PutObject", Method: http.MethodPut, IAMAction: "s3:PutObject"},
+		{Name: "GetObject", Method: http.MethodGet, IAMAction: "s3:GetObject"},
+		{Name: "DeleteObject", Method: http.MethodDelete, IAMAction: "s3:DeleteObject"},
+		{Name: "HeadObject", Method: http.MethodHead, IAMAction: "s3:GetObject"},
+		{Name: "ListObjectsV2", Method: http.MethodGet, IAMAction: "s3:ListBucket"},
+		{Name: "CopyObject", Method: http.MethodPut, IAMAction: "s3:PutObject"},
 	}
 }
 
@@ -45,9 +51,11 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		path = strings.TrimRight(path, "/")
 	}
 
-	// Determine whether this is a bucket-level path (has a non-empty first segment).
+	// Determine path segments to distinguish bucket vs object paths.
 	bucketName := extractBucketName(ctx)
 	isBucketPath := bucketName != ""
+	objectKey := extractObjectKey(ctx)
+	isObjectPath := objectKey != ""
 
 	switch r.Method {
 	case http.MethodGet:
@@ -55,19 +63,44 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 			// GET / → ListBuckets
 			return handleListBuckets(s.store, ctx)
 		}
+		if isObjectPath {
+			// GET /bucket/key → GetObject
+			return handleGetObject(s.store, ctx)
+		}
+		// GET /bucket or GET /bucket?list-type=2 → ListObjectsV2
+		return handleListObjectsV2(s.store, ctx)
+
 	case http.MethodPut:
+		if isBucketPath && isObjectPath {
+			// PUT /bucket/key with copy-source → CopyObject
+			if r.Header.Get("x-amz-copy-source") != "" || r.Header.Get("X-Amz-Copy-Source") != "" {
+				return handleCopyObject(s.store, ctx)
+			}
+			// PUT /bucket/key → PutObject
+			return handlePutObject(s.store, ctx)
+		}
 		if isBucketPath {
-			// PUT /<bucket> → CreateBucket
+			// PUT /bucket → CreateBucket
 			return handleCreateBucket(s.store, ctx)
 		}
+
 	case http.MethodDelete:
+		if isBucketPath && isObjectPath {
+			// DELETE /bucket/key → DeleteObject
+			return handleDeleteObject(s.store, ctx)
+		}
 		if isBucketPath {
-			// DELETE /<bucket> → DeleteBucket
+			// DELETE /bucket → DeleteBucket
 			return handleDeleteBucket(s.store, ctx)
 		}
+
 	case http.MethodHead:
+		if isBucketPath && isObjectPath {
+			// HEAD /bucket/key → HeadObject
+			return handleHeadObject(s.store, ctx)
+		}
 		if isBucketPath {
-			// HEAD /<bucket> → HeadBucket
+			// HEAD /bucket → HeadBucket
 			return handleHeadBucket(s.store, ctx)
 		}
 	}

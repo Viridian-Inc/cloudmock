@@ -19,13 +19,20 @@ import (
 type Executor struct {
 	mu       sync.Mutex
 	tempDirs map[string]string // functionName -> temp dir with extracted code
+	logs     *LogBuffer
 }
 
 // NewExecutor returns a new Executor.
 func NewExecutor() *Executor {
 	return &Executor{
 		tempDirs: make(map[string]string),
+		logs:     NewLogBuffer(500),
 	}
+}
+
+// Logs returns the executor's log buffer.
+func (e *Executor) Logs() *LogBuffer {
+	return e.logs
 }
 
 // Cleanup removes all temporary directories.
@@ -243,10 +250,12 @@ print(json.dumps(result))
 	return e.execProcess(pythonPath, wrapperPath, codeDir, fn, event, timeoutSec)
 }
 
-// execProcess runs the wrapper script and captures stdout.
+// execProcess runs the wrapper script and captures stdout/stderr, emitting log entries.
 func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn *Function, event []byte, timeoutSec int) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
 	defer cancel()
+
+	requestID := generateRequestID()
 
 	cmd := exec.CommandContext(ctx, interpreterPath, wrapperPath)
 	cmd.Dir = codeDir
@@ -261,6 +270,9 @@ func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn 
 		"AWS_LAMBDA_FUNCTION_NAME="+fn.FunctionName,
 		"AWS_LAMBDA_FUNCTION_MEMORY_SIZE="+fmt.Sprintf("%d", fn.MemorySize),
 		"AWS_LAMBDA_FUNCTION_VERSION="+fn.Version,
+		"AWS_LAMBDA_LOG_GROUP_NAME=/aws/lambda/"+fn.FunctionName,
+		"AWS_LAMBDA_LOG_STREAM_NAME=cloudmock",
+		"AWS_REQUEST_ID="+requestID,
 		"AWS_REGION=us-east-1",
 	)
 	if fn.Environment != nil {
@@ -274,8 +286,25 @@ func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn 
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	// Emit START log.
+	e.emitLog(fn.FunctionName, requestID, fmt.Sprintf("START RequestId: %s Version: %s", requestID, fn.Version), "stdout")
+
+	startTime := time.Now()
+	runErr := cmd.Run()
+
+	duration := time.Since(startTime)
+
+	// Emit captured stdout lines as log entries.
+	e.emitOutputLines(fn.FunctionName, requestID, stdout.String(), "stdout")
+	// Emit captured stderr lines as log entries.
+	e.emitOutputLines(fn.FunctionName, requestID, stderr.String(), "stderr")
+
+	if runErr != nil {
 		if ctx.Err() == context.DeadlineExceeded {
+			e.emitLog(fn.FunctionName, requestID,
+				fmt.Sprintf("END RequestId: %s", requestID), "stdout")
+			e.emitLog(fn.FunctionName, requestID,
+				fmt.Sprintf("REPORT RequestId: %s\tDuration: %.2f ms\tTimed Out: true", requestID, float64(duration.Milliseconds())), "stdout")
 			return json.Marshal(map[string]interface{}{
 				"errorMessage": fmt.Sprintf("Task timed out after %d.00 seconds", timeoutSec),
 				"errorType":    "TimeoutError",
@@ -284,19 +313,66 @@ func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn 
 		// Return the error as a Lambda error response.
 		errMsg := stderr.String()
 		if errMsg == "" {
-			errMsg = err.Error()
+			errMsg = runErr.Error()
 		}
+		e.emitLog(fn.FunctionName, requestID,
+			fmt.Sprintf("END RequestId: %s", requestID), "stdout")
+		e.emitLog(fn.FunctionName, requestID,
+			fmt.Sprintf("REPORT RequestId: %s\tDuration: %.2f ms\tError: true", requestID, float64(duration.Milliseconds())), "stdout")
 		return json.Marshal(map[string]interface{}{
 			"errorMessage": errMsg,
 			"errorType":    "RuntimeError",
 		})
 	}
 
+	// Emit END/REPORT log.
+	e.emitLog(fn.FunctionName, requestID,
+		fmt.Sprintf("END RequestId: %s", requestID), "stdout")
+	e.emitLog(fn.FunctionName, requestID,
+		fmt.Sprintf("REPORT RequestId: %s\tDuration: %.2f ms\tMemory Size: %d MB", requestID, float64(duration.Milliseconds()), fn.MemorySize), "stdout")
+
 	result := bytes.TrimSpace(stdout.Bytes())
 	if len(result) == 0 {
 		return []byte("null"), nil
 	}
 	return result, nil
+}
+
+// emitLog adds a single log entry to the buffer.
+func (e *Executor) emitLog(functionName, requestID, message, stream string) {
+	e.logs.Add(LambdaLogEntry{
+		Timestamp:    time.Now(),
+		FunctionName: functionName,
+		RequestID:    requestID,
+		Message:      message,
+		Stream:       stream,
+	})
+}
+
+// emitOutputLines splits output into lines and emits each as a log entry.
+func (e *Executor) emitOutputLines(functionName, requestID, output, stream string) {
+	if output == "" {
+		return
+	}
+	lines := strings.Split(strings.TrimRight(output, "\n"), "\n")
+	for _, line := range lines {
+		if line != "" {
+			e.emitLog(functionName, requestID, line, stream)
+		}
+	}
+}
+
+// generateRequestID produces a UUID-like request ID.
+func generateRequestID() string {
+	b := make([]byte, 16)
+	_, _ = fmt.Fprintf(bytes.NewBuffer(b[:0]), "%016x%016x", time.Now().UnixNano(), time.Now().UnixNano()/7)
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		time.Now().UnixNano()&0xFFFFFFFF,
+		(time.Now().UnixNano()>>32)&0xFFFF,
+		0x4000|((time.Now().UnixNano()>>48)&0x0FFF),
+		0x8000|((time.Now().UnixNano()>>60)&0x3FFF),
+		time.Now().UnixNano()&0xFFFFFFFFFFFF,
+	)
 }
 
 // handlerMethod extracts the method/function name from a handler string.

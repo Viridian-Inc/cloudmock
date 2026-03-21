@@ -126,6 +126,12 @@ func main() {
 	requestLog := gateway.NewRequestLog(1000)
 	requestStats := gateway.NewRequestStats()
 
+	// Admin API (with CORS for dashboard cross-origin access)
+	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
+
+	// Wire Lambda logs to the admin API broadcaster.
+	adminAPI.SetLambdaLogs(lambdaService.Logs())
+
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	var handler http.Handler = gw
 	// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
@@ -133,10 +139,8 @@ func main() {
 	if corsEnabled != "false" && corsEnabled != "0" {
 		handler = gateway.CORSMiddleware(handler)
 	}
-	loggedGW := gateway.LoggingMiddleware(handler, requestLog, requestStats)
+	loggedGW := gateway.LoggingMiddleware(handler, requestLog, requestStats, adminAPI.Broadcaster())
 
-	// Admin API (with CORS for dashboard cross-origin access)
-	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
 	var adminHandler http.Handler = adminAPI
 	if corsEnabled != "false" && corsEnabled != "0" {
 		adminHandler = gateway.CORSMiddleware(adminHandler)

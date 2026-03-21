@@ -53,6 +53,11 @@ func (s *LambdaService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *LambdaService) HealthCheck() error { return nil }
 
+// Logs returns the Lambda execution log buffer.
+func (s *LambdaService) Logs() *LogBuffer {
+	return s.executor.Logs()
+}
+
 // HandleRequest routes an incoming Lambda request to the appropriate handler.
 // Lambda uses REST path-based routing.
 //

@@ -126,8 +126,17 @@ func (rr *responseRecorder) WriteHeader(code int) {
 	rr.ResponseWriter.WriteHeader(code)
 }
 
+// RequestBroadcaster is an optional interface for broadcasting request events.
+type RequestBroadcaster interface {
+	Broadcast(eventType string, data interface{})
+}
+
 // LoggingMiddleware wraps a gateway handler and records request data.
-func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats) http.Handler {
+func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, broadcasters ...RequestBroadcaster) http.Handler {
+	var broadcaster RequestBroadcaster
+	if len(broadcasters) > 0 {
+		broadcaster = broadcasters[0]
+	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
@@ -153,6 +162,11 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats) 
 		log.Add(entry)
 		if svcName != "" {
 			stats.Increment(svcName)
+		}
+
+		// Broadcast request event for SSE clients.
+		if broadcaster != nil {
+			broadcaster.Broadcast("request", entry)
 		}
 	})
 }

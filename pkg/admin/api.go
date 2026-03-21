@@ -2,6 +2,7 @@ package admin
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/neureaux/cloudmock/services/lambda"
 )
 
 // Resettable is an optional interface that services can implement to support state reset.
@@ -25,27 +27,30 @@ type ServiceInfo struct {
 
 // HealthResponse is the response body for the /api/health endpoint.
 type HealthResponse struct {
-	Status   string                 `json:"status"`
-	Services map[string]bool        `json:"services"`
+	Status   string          `json:"status"`
+	Services map[string]bool `json:"services"`
 }
 
 // API is the admin HTTP handler.
 type API struct {
-	cfg      *config.Config
-	registry *routing.Registry
-	log      *gateway.RequestLog
-	stats    *gateway.RequestStats
-	mux      *http.ServeMux
+	cfg         *config.Config
+	registry    *routing.Registry
+	log         *gateway.RequestLog
+	stats       *gateway.RequestStats
+	broadcaster *EventBroadcaster
+	lambdaLogs  *lambda.LogBuffer
+	mux         *http.ServeMux
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
 func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog, stats *gateway.RequestStats) *API {
 	a := &API{
-		cfg:      cfg,
-		registry: registry,
-		log:      log,
-		stats:    stats,
-		mux:      http.NewServeMux(),
+		cfg:         cfg,
+		registry:    registry,
+		log:         log,
+		stats:       stats,
+		broadcaster: NewEventBroadcaster(),
+		mux:         http.NewServeMux(),
 	}
 
 	a.mux.HandleFunc("/api/services", a.handleServices)
@@ -55,8 +60,25 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/config", a.handleConfig)
 	a.mux.HandleFunc("/api/stats", a.handleStats)
 	a.mux.HandleFunc("/api/requests", a.handleRequests)
+	a.mux.HandleFunc("/api/stream", a.handleStream)
+	a.mux.HandleFunc("/api/lambda/logs", a.handleLambdaLogs)
+	a.mux.HandleFunc("/api/lambda/logs/stream", a.handleLambdaLogStream)
 
 	return a
+}
+
+// Broadcaster returns the event broadcaster for use by middleware.
+func (a *API) Broadcaster() *EventBroadcaster {
+	return a.broadcaster
+}
+
+// SetLambdaLogs sets the Lambda log buffer for the admin API to serve.
+func (a *API) SetLambdaLogs(logs *lambda.LogBuffer) {
+	a.lambdaLogs = logs
+	// Wire up the log buffer to broadcast lambda_log events.
+	logs.SetOnEmit(func(entry lambda.LambdaLogEntry) {
+		a.broadcaster.Broadcast("lambda_log", entry)
+	})
 }
 
 // ServeHTTP implements http.Handler.
@@ -221,6 +243,92 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 
 	entries := a.log.Recent(svcFilter, limit)
 	writeJSON(w, http.StatusOK, entries)
+}
+
+// handleStream is the SSE endpoint that pushes real-time events to the dashboard.
+func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	ch := a.broadcaster.Subscribe()
+	defer a.broadcaster.Unsubscribe(ch)
+
+	// Send an initial connected event.
+	fmt.Fprintf(w, "data: {\"type\":\"connected\"}\n\n")
+	flusher.Flush()
+
+	for {
+		select {
+		case msg := <-ch:
+			fmt.Fprintf(w, "data: %s\n\n", msg)
+			flusher.Flush()
+		case <-r.Context().Done():
+			return
+		}
+	}
+}
+
+// handleLambdaLogs returns recent Lambda execution logs.
+func (a *API) handleLambdaLogs(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if a.lambdaLogs == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	functionFilter := r.URL.Query().Get("function")
+	limit := 50
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	entries := a.lambdaLogs.Recent(functionFilter, limit)
+	writeJSON(w, http.StatusOK, entries)
+}
+
+// handleLambdaLogStream is an SSE endpoint dedicated to Lambda logs.
+func (a *API) handleLambdaLogStream(w http.ResponseWriter, r *http.Request) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+
+	ch := a.broadcaster.Subscribe()
+	defer a.broadcaster.Unsubscribe(ch)
+
+	fmt.Fprintf(w, "data: {\"type\":\"connected\"}\n\n")
+	flusher.Flush()
+
+	for {
+		select {
+		case msg := <-ch:
+			// Only forward lambda_log events on this endpoint.
+			if strings.Contains(msg, `"type":"lambda_log"`) {
+				fmt.Fprintf(w, "data: %s\n\n", msg)
+				flusher.Flush()
+			}
+		case <-r.Context().Done():
+			return
+		}
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

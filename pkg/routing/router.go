@@ -8,7 +8,8 @@ import (
 // DetectService determines the AWS service name from the request.
 // It checks the Authorization header credential scope first
 // (Credential=AKID/date/region/SERVICE/aws4_request), then falls back to
-// X-Amz-Target (stripping the version suffix, e.g. "DynamoDB_20120810" → "dynamodb").
+// X-Amz-Target (stripping the version suffix, e.g. "DynamoDB_20120810" → "dynamodb"),
+// then checks for presigned URL query parameters (X-Amz-Credential).
 // Returns lowercase service name, or empty string if not detected.
 func DetectService(r *http.Request) string {
 	// Check Authorization header first.
@@ -23,7 +24,24 @@ func DetectService(r *http.Request) string {
 		return serviceFromTarget(target)
 	}
 
+	// Fall back to presigned URL query parameter (X-Amz-Credential).
+	if cred := r.URL.Query().Get("X-Amz-Credential"); cred != "" {
+		if svc := serviceFromCredential(cred); svc != "" {
+			return svc
+		}
+	}
+
 	return ""
+}
+
+// serviceFromCredential extracts the service name from a presigned URL
+// X-Amz-Credential query parameter value: AKID/date/region/service/aws4_request.
+func serviceFromCredential(cred string) string {
+	parts := strings.Split(cred, "/")
+	if len(parts) < 4 {
+		return ""
+	}
+	return strings.ToLower(parts[3])
 }
 
 // DetectAction determines the AWS API action from the request.

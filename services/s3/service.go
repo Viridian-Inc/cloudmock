@@ -47,6 +47,12 @@ func (s *S3Service) Actions() []service.Action {
 		{Name: "HeadObject", Method: http.MethodHead, IAMAction: "s3:GetObject"},
 		{Name: "ListObjectsV2", Method: http.MethodGet, IAMAction: "s3:ListBucket"},
 		{Name: "CopyObject", Method: http.MethodPut, IAMAction: "s3:PutObject"},
+		{Name: "CreateMultipartUpload", Method: http.MethodPost, IAMAction: "s3:PutObject"},
+		{Name: "UploadPart", Method: http.MethodPut, IAMAction: "s3:PutObject"},
+		{Name: "CompleteMultipartUpload", Method: http.MethodPost, IAMAction: "s3:PutObject"},
+		{Name: "AbortMultipartUpload", Method: http.MethodDelete, IAMAction: "s3:AbortMultipartUpload"},
+		{Name: "ListMultipartUploads", Method: http.MethodGet, IAMAction: "s3:ListBucketMultipartUploads"},
+		{Name: "ListParts", Method: http.MethodGet, IAMAction: "s3:ListMultipartUploadParts"},
 	}
 }
 
@@ -93,8 +99,21 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 	objectKey := extractObjectKey(ctx)
 	isObjectPath := objectKey != ""
 
+	q := r.URL.Query()
+	_, hasUploads := q["uploads"]
+	uploadId := q.Get("uploadId")
+	partNumber := q.Get("partNumber")
+
 	switch r.Method {
 	case http.MethodGet:
+		// GET /bucket?uploads → ListMultipartUploads
+		if isBucketPath && hasUploads {
+			return handleListMultipartUploads(s.store, ctx)
+		}
+		// GET /bucket/key?uploadId=X → ListParts
+		if isObjectPath && uploadId != "" {
+			return handleListParts(s.store, ctx)
+		}
 		if !isBucketPath {
 			// GET / → ListBuckets
 			return handleListBuckets(s.store, ctx)
@@ -106,7 +125,25 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		// GET /bucket or GET /bucket?list-type=2 → ListObjectsV2
 		return handleListObjectsV2(s.store, ctx)
 
+	case http.MethodPost:
+		// POST /bucket/key?uploads → CreateMultipartUpload
+		if isObjectPath && hasUploads {
+			return handleCreateMultipartUpload(s.store, ctx)
+		}
+		// POST /bucket/key?uploadId=X → CompleteMultipartUpload
+		if isObjectPath && uploadId != "" {
+			resp, err := handleCompleteMultipartUpload(s.store, ctx)
+			if err == nil && s.bus != nil {
+				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:CompleteMultipartUpload")
+			}
+			return resp, err
+		}
+
 	case http.MethodPut:
+		// PUT /bucket/key?partNumber=N&uploadId=X → UploadPart
+		if isObjectPath && uploadId != "" && partNumber != "" {
+			return handleUploadPart(s.store, ctx)
+		}
 		if isBucketPath && isObjectPath {
 			// PUT /bucket/key with copy-source → CopyObject
 			if r.Header.Get("x-amz-copy-source") != "" || r.Header.Get("X-Amz-Copy-Source") != "" {
@@ -125,6 +162,10 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		}
 
 	case http.MethodDelete:
+		// DELETE /bucket/key?uploadId=X → AbortMultipartUpload
+		if isObjectPath && uploadId != "" {
+			return handleAbortMultipartUpload(s.store, ctx)
+		}
 		if isBucketPath && isObjectPath {
 			// DELETE /bucket/key → DeleteObject
 			resp, err := handleDeleteObject(s.store, ctx)

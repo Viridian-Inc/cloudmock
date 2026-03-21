@@ -15,6 +15,7 @@ import (
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/neureaux/cloudmock/pkg/service"
 	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
 	ec2svc "github.com/neureaux/cloudmock/services/ec2"
 	cfnsvc "github.com/neureaux/cloudmock/services/cloudformation"
@@ -71,58 +72,124 @@ func main() {
 	// Service registry
 	registry := routing.NewRegistry()
 
-	// Register S3 with event bus support
+	// Determine which Tier 1 services to eagerly initialize based on profile.
+	// "minimal"  — only the 8 core services used by almost every app.
+	// "standard" — all Tier 1 services.
+	// "full"     — all Tier 1 services (Tier 2 stubs are lazy regardless).
+	profile := cfg.Profile
+
+	// minimalSet is the set of Tier 1 service names always loaded eagerly.
+	minimalSet := map[string]bool{
+		"s3": true, "sts": true, "iam": true, "dynamodb": true,
+		"sqs": true, "sns": true, "lambda": true, "logs": true,
+	}
+
+	eagerAll := profile == "standard" || profile == "full"
+
+	// --- Always-eager: S3 with event bus support ---
 	registry.Register(s3svc.NewWithBus(bus))
 
 	registry.Register(stssvc.New(cfg.AccountID))
-	registry.Register(kmssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(secretssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(ssmsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(sqssvc.New(cfg.AccountID, cfg.Region))
-	sesService := sessvc.New(cfg.AccountID, cfg.Region)
-	registry.Register(sesService)
 
-	// Register SNS with service locator for SNS → SQS fan-out
-	snsService := snssvc.New(cfg.AccountID, cfg.Region)
-	registry.Register(snsService)
+	// Tier 1 services that may be eager or lazy depending on profile.
+	registerOrDefer := func(name string, factory func() service.Service) service.Service {
+		if eagerAll || minimalSet[name] {
+			svc := factory()
+			registry.Register(svc)
+			return svc
+		}
+		registry.RegisterLazy(name, factory)
+		return nil
+	}
 
-	registry.Register(dynamodbsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(logssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(cwsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(firehosesvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(kinesissvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(r53svc.New(cfg.AccountID, cfg.Region))
-	registry.Register(ecrsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(ecssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(cognitosvc.New(cfg.AccountID, cfg.Region))
+	_ = registerOrDefer("kms", func() service.Service { return kmssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("secretsmanager", func() service.Service { return secretssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ssm", func() service.Service { return ssmsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("sqs", func() service.Service { return sqssvc.New(cfg.AccountID, cfg.Region) })
 
-	// Register EventBridge with service locator for target delivery
-	ebService := ebsvc.New(cfg.AccountID, cfg.Region)
-	registry.Register(ebService)
+	// SES — keep a typed reference only when eager (needed by admin API).
+	var sesService *sessvc.SESService
+	if eagerAll || minimalSet["ses"] {
+		sesService = sessvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(sesService)
+	} else {
+		registry.RegisterLazy("ses", func() service.Service { return sessvc.New(cfg.AccountID, cfg.Region) })
+	}
 
-	registry.Register(sfnsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(rdssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(apigwsvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(cfnsvc.New(cfg.AccountID, cfg.Region))
+	// SNS — needs a locator; wire it after all services are registered.
+	var snsService *snssvc.SNSService
+	if eagerAll || minimalSet["sns"] {
+		snsService = snssvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(snsService)
+	} else {
+		registry.RegisterLazy("sns", func() service.Service {
+			svc := snssvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
 
-	// Register Lambda with service locator for S3 code source
-	lambdaService := lambdasvc.New(cfg.AccountID, cfg.Region)
-	registry.Register(lambdaService)
+	_ = registerOrDefer("dynamodb", func() service.Service { return dynamodbsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("logs", func() service.Service { return logssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cloudwatch", func() service.Service { return cwsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("firehose", func() service.Service { return firehosesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("kinesis", func() service.Service { return kinesissvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("route53", func() service.Service { return r53svc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ecr", func() service.Service { return ecrsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ecs", func() service.Service { return ecssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cognito-idp", func() service.Service { return cognitosvc.New(cfg.AccountID, cfg.Region) })
 
-	// Set service locators now that all services are registered.
+	// EventBridge — needs a locator; wire it after all services are registered.
+	var ebService *ebsvc.EventBridgeService
+	if eagerAll || minimalSet["events"] {
+		ebService = ebsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(ebService)
+	} else {
+		registry.RegisterLazy("events", func() service.Service {
+			svc := ebsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	_ = registerOrDefer("states", func() service.Service { return sfnsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("rds", func() service.Service { return rdssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("apigateway", func() service.Service { return apigwsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cloudformation", func() service.Service { return cfnsvc.New(cfg.AccountID, cfg.Region) })
+
+	// Lambda — needs a locator; wire it after all services are registered.
+	var lambdaService *lambdasvc.LambdaService
+	if eagerAll || minimalSet["lambda"] {
+		lambdaService = lambdasvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(lambdaService)
+	} else {
+		registry.RegisterLazy("lambda", func() service.Service {
+			svc := lambdasvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	_ = registerOrDefer("ec2", func() service.Service { return ec2svc.New(cfg.AccountID, cfg.Region) })
+
+	// Set service locators now that all eager services are registered.
 	// (This breaks the circular dependency: services need the registry,
 	// but the registry needs the services.)
-	snsService.SetLocator(registry)
-	ebService.SetLocator(registry)
-	lambdaService.SetLocator(registry)
+	if snsService != nil {
+		snsService.SetLocator(registry)
+	}
+	if ebService != nil {
+		ebService.SetLocator(registry)
+	}
+	if lambdaService != nil {
+		lambdaService.SetLocator(registry)
+	}
 
 	// Wire cross-service integrations via event bus
 	integration.WireIntegrations(bus, registry, cfg.AccountID, cfg.Region)
 
-	registry.Register(ec2svc.New(cfg.AccountID, cfg.Region))
-
-	// Tier 2 stub services
-	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)
+	// Tier 2 stub services — always lazy to avoid initializing ~73 services at startup.
+	stubs.RegisterAllLazy(registry, cfg.AccountID, cfg.Region)
 
 	requestLog := gateway.NewRequestLog(1000)
 	requestStats := gateway.NewRequestStats()
@@ -130,10 +197,16 @@ func main() {
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
 
-	// Wire Lambda logs, IAM engine, and SES store to admin API
-	adminAPI.SetLambdaLogs(lambdaService.Logs())
+	// Wire Lambda logs, IAM engine, and SES store to admin API.
+	// lambdaService and sesService may be nil when running in minimal profile
+	// (they are registered lazily). In that case, skip optional admin wiring.
+	if lambdaService != nil {
+		adminAPI.SetLambdaLogs(lambdaService.Logs())
+	}
 	adminAPI.SetIAMEngine(engine)
-	adminAPI.SetSESStore(sesService.GetStore())
+	if sesService != nil {
+		adminAPI.SetSESStore(sesService.GetStore())
+	}
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	var handler http.Handler = gw

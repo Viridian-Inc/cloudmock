@@ -27,6 +27,7 @@ import (
 	sqssvc "github.com/neureaux/cloudmock/services/sqs"
 	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
 	stssvc "github.com/neureaux/cloudmock/services/sts"
+	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
 )
 
 func main() {
@@ -71,6 +72,7 @@ func main() {
 	registry.Register(ecrsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cognitosvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ebsvc.New(cfg.AccountID, cfg.Region))
+	registry.Register(sfnsvc.New(cfg.AccountID, cfg.Region))
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 

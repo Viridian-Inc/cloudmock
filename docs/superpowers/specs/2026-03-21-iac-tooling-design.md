@@ -11,7 +11,7 @@ Extend cloudmock with Infrastructure-as-Code provider support (Terraform, Pulumi
 ## Goals
 
 - Code-generated providers from a unified schema registry — add a service once, all providers update
-- Terraform provider with 98 resources + data sources for all cloudmock services
+- Terraform provider covering all 98 services with ~200+ resources + data sources (services like EC2 and S3 have multiple resource types each)
 - Pulumi provider bridging Terraform for TypeScript, Python, Go, C#, Java, YAML
 - Crossplane provider via upjet + AWS provider endpoint configuration
 - Full EC2/VPC networking promoted to Tier 1 with 50+ actions and referential integrity
@@ -31,15 +31,37 @@ pkg/schema/registry.go (unified schemas for 98 services)
         ▼
 codegen/main.go (reads schemas, emits code)
         │
-        ├──▶ providers/terraform/generated/   (98 resource files)
-        ├──▶ providers/crossplane/generated/   (CRDs + controllers)
-        ├──▶ providers/pulumi/ (bridge config from terraform schema)
-        └──▶ custodian/scanner/rules.go (resource definitions)
+        ├──▶ providers/terraform/generated/   (~200 resource files via SDKv2)
+        ├──▶ providers/crossplane/config/     (upjet config files — upjet then generates CRDs)
+        ├──▶ providers/pulumi/provider.go     (tfbridge mapping from Terraform schema)
+        └──▶ custodian/scanner/rules.go       (compliance rule definitions)
+
+Crossplane generation is a two-step process:
+  1. codegen emits upjet configuration (resource overrides, external names, group mappings)
+  2. upjet reads Terraform provider binary schema and generates CRDs + controllers
 ```
+
+### Schema Registry Bootstrap
+
+The current codebase has no schema extraction capability. Building the registry requires two foundational changes:
+
+**1. New `SchemaProvider` interface (opt-in, not breaking):**
+```go
+// pkg/service/schema.go
+type SchemaProvider interface {
+    ResourceSchemas() []schema.ResourceSchema
+}
+```
+Each Tier 1 service implements this interface alongside `Service`. The schema registry checks for `SchemaProvider` via type assertion — services that don't implement it are skipped (not a breaking change to the `Service` interface). All 23 Tier 1 services must be retrofitted to implement `SchemaProvider`.
+
+**2. Augmented `ServiceModel` for Tier 2 stubs:**
+The current `Field` type in `pkg/stub/model.go` only has Name, Type, Required. The following fields must be added: `Computed bool`, `ForceNew bool`, `Default interface{}`, `RefTo string`. The `ResourceType` must gain `ArnPattern`, `ImportID`, and `References []ResourceRef`. All 74 stub model definitions in `services/stubs/catalog.go` must be updated with this metadata.
+
+**Retrofitting scope:** ~23 Tier 1 services × ~20 lines each (schema method) + ~74 Tier 2 models × ~5 additional field annotations each. This is mechanical work suitable for code generation or a single pass.
 
 ### Schema Registry
 
-Single source of truth combining Tier 1 service schemas (extracted from service code via `Schema()` method) and Tier 2 stub schemas (from `ServiceModel` definitions).
+Single source of truth combining Tier 1 service schemas (extracted via opt-in `SchemaProvider` interface) and Tier 2 stub schemas (from augmented `ServiceModel` definitions).
 
 ```go
 type ResourceSchema struct {
@@ -120,9 +142,10 @@ Query-string/form-encoded with `Action` parameter. XML responses. Namespace: `ht
 - Route targets validate gateway/endpoint exists
 - Delete operations return `DependencyViolation` if dependents exist
 - DeleteVpc fails if subnets, IGWs, or ENIs still exist
+- Cross-service IAM referential integrity (instance profiles, service-linked roles) is NOT enforced — EC2 accepts any role ARN string without validating it exists in IAM. This is a deliberate simplification.
 
 ### Default VPC
-Auto-created on first EC2 API call:
+Auto-created at EC2 service startup (matching AWS behavior where default VPC exists at account creation time, not on first API call). This avoids read operations (DescribeVpcs) having side effects and prevents Terraform data sources from triggering creation during plan.
 - VPC 172.31.0.0/16 with `isDefault=true`
 - 3 subnets (172.31.0.0/20, 172.31.16.0/20, 172.31.32.0/20) in us-east-1a/b/c
 - Default route table with local + IGW routes
@@ -133,7 +156,9 @@ Auto-created on first EC2 API call:
 ## Terraform Provider
 
 **Name:** `terraform-provider-cloudmock`
-**Framework:** `terraform-plugin-framework`
+**Framework:** `terraform-plugin-sdk/v2` (not plugin-framework)
+
+Note: We use SDKv2 rather than the newer plugin-framework because Pulumi's tfbridge requires SDKv2 for full compatibility. The tfbridge SDK (v3.x) has experimental plugin-framework support but SDKv2 is the stable, proven path for bridging.
 
 ### Provider Configuration
 ```hcl
@@ -148,7 +173,8 @@ provider "cloudmock" {
 ### Resource Naming
 `cloudmock_<service>_<resource>` — e.g., `cloudmock_s3_bucket`, `cloudmock_vpc`, `cloudmock_dynamodb_table`
 
-### Generated Per Resource (98 total)
+### Generated Per Resource (~200+ total, one per resource type across 98 services)
+EC2 alone has 14 resource types (VPC, Subnet, SecurityGroup, etc.). S3 has bucket + bucket_policy + bucket_notification. Most services have 1-3 resource types. Total estimated: ~200 resources.
 - Schema definition (attributes with types, required/computed/optional)
 - CRUD handlers mapping to cloudmock API calls
 - Import support by ID
@@ -156,6 +182,13 @@ provider "cloudmock" {
 
 ### Data Sources
 Generated for all describe/list operations — e.g., `data.cloudmock_vpc.selected`
+
+### Provider-to-cloudmock Communication
+- HTTP client: AWS SDK Go v2 configured with cloudmock endpoint (reuses SDK's request signing, serialization, error handling)
+- Authentication: SigV4 with configurable access key/secret (default test/test)
+- All requests go through the gateway (port 4566), not direct service endpoints
+- Timeouts: 30s default, configurable per provider block
+- Retries: disabled by default (cloudmock is local, retries mask bugs)
 
 ### Acceptance Tests
 Each resource gets a test that runs against live cloudmock: create → read → update → delete → import.
@@ -228,7 +261,18 @@ spec:
 ```
 
 ### Mode 2: Native Provider (`provider-cloudmock`)
-Built using `upjet` (wraps Terraform provider as Crossplane provider).
+Built using `upjet` v1.x (wraps Terraform provider as Crossplane provider).
+
+**upjet workflow:**
+1. Build and install `terraform-provider-cloudmock` locally
+2. upjet reads the provider's schema via `terraform providers schema -json` (requires Terraform binary)
+3. upjet generates Go controllers + CRD YAML for each Terraform resource
+4. The code generator (`codegen/crossplane.go`) generates upjet configuration files (resource overrides, external name configs, API group mappings), NOT the CRDs directly
+5. upjet then generates the final CRDs + controllers from those configs
+
+**API group convention:** `<service>.cloudmock.io/v1alpha1` — e.g., `s3.cloudmock.io`, `ec2.cloudmock.io`, `dynamodb.cloudmock.io`. The service name matches the Terraform provider's resource prefix after `cloudmock_`.
+
+**Requirements:** Terraform >= 1.5, upjet v1.4+, local provider binary (not registry-published).
 
 ```yaml
 apiVersion: s3.cloudmock.io/v1alpha1
@@ -279,7 +323,14 @@ Minimal Python plugin (required by Custodian's architecture):
 - Auto endpoint configuration
 
 ### Compliance Scanner (`custodian/scanner/`)
-Go binary that runs all policies and generates reports:
+Go binary with its own rule engine (independent of Cloud Custodian). This is NOT a wrapper around Custodian — it is a standalone tool that queries cloudmock's API directly and evaluates rules written in Go. This avoids Python as a runtime dependency.
+
+The Go scanner and the Custodian policy library serve different audiences:
+- **Go scanner:** CI pipelines and developers who want fast, zero-dependency compliance checks
+- **Custodian policies:** Teams already using Cloud Custodian who want to test their policies against cloudmock
+
+Rule drift between the two is accepted — the Go scanner covers the most common checks, while Custodian policies can be arbitrarily complex.
+
 ```bash
 cloudmock-compliance scan --endpoint http://localhost:4566 --format html
 cloudmock-compliance scan --format json --output report.json
@@ -315,7 +366,7 @@ Wraps Chalice. Configures deployer endpoints. Creates API Gateway + Lambda + IAM
 Wraps Copilot. Points at cloudmock ECS/ECR/CloudFormation.
 
 ### All wrappers support:
-- `--real-aws` flag to bypass cloudmock
+- `--real-aws` flag to bypass cloudmock (requires confirmation prompt: "You are about to run against REAL AWS. Continue? [y/N]". Skippable with `--real-aws --yes` or `CLOUDMOCK_ALLOW_REAL_AWS=1` env var)
 - Auto health check before execution
 - `--endpoint` flag to override default
 
@@ -340,7 +391,7 @@ cloudmock-ci report --format <markdown|json|junit>  # Generate report
 | CircleCI | `.circleci/config.yml` | Secondary Docker image |
 | Bitbucket Pipelines | `bitbucket-pipelines.yml` | `definitions.services` |
 | Buildkite | `.buildkite/pipeline.yml` | docker-compose plugin |
-| CodeBuild | `buildspec.yml` | Docker run in install phase |
+| CodeBuild | `buildspec.yml` | Docker run in install phase (requires privileged mode for DinD) |
 | Travis CI | `.travis.yml` | Docker service |
 
 ### Template Features (all systems)
@@ -375,8 +426,8 @@ cloudmock/
   pkg/schema/
     registry.go                   # Unified schema registry
     types.go                      # ResourceSchema, AttributeSchema, ResourceRef
-    extract.go                    # Extract schemas from Tier 1 services
-    merge.go                      # Merge Tier 1 + Tier 2 schemas
+    extract.go                    # Type-assert SchemaProvider on each service, call ResourceSchemas()
+    merge.go                      # Combine Tier 1 schemas + Tier 2 stub models. For promoted services (EC2), Tier 1 schema takes precedence and Tier 2 stub is dropped.
   codegen/
     main.go                       # Code generator entrypoint
     terraform.go                  # Emit Terraform resources
@@ -388,7 +439,7 @@ cloudmock/
   providers/terraform/
     main.go                       # Provider entrypoint
     provider.go                   # Provider configuration
-    generated/                    # 98 generated resource files + data sources
+    generated/                    # ~200 generated resource files + data sources
     tests/                        # Acceptance tests
 
   # Pulumi Provider

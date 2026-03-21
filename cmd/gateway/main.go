@@ -15,6 +15,7 @@ import (
 	dynamodbsvc "github.com/neureaux/cloudmock/services/dynamodb"
 	kinesissvc "github.com/neureaux/cloudmock/services/kinesis"
 	kmssvc "github.com/neureaux/cloudmock/services/kms"
+	r53svc "github.com/neureaux/cloudmock/services/route53"
 	s3svc "github.com/neureaux/cloudmock/services/s3"
 	secretssvc "github.com/neureaux/cloudmock/services/secretsmanager"
 	sessvc "github.com/neureaux/cloudmock/services/ses"
@@ -61,6 +62,7 @@ func main() {
 	registry.Register(logssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cwsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(kinesissvc.New(cfg.AccountID, cfg.Region))
+	registry.Register(r53svc.New(cfg.AccountID, cfg.Region))
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 

@@ -1,0 +1,37 @@
+# Go binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Test output
+*.test
+coverage.out
+*.cover
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+*.iml
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build directories
+dist/
+build/
+
+# Vendor
+vendor/
+
+# Environment files
+.env
+.env.local

@@ -79,7 +79,8 @@ func main() {
 	registry.Register(secretssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ssmsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(sqssvc.New(cfg.AccountID, cfg.Region))
-	registry.Register(sessvc.New(cfg.AccountID, cfg.Region))
+	sesService := sessvc.New(cfg.AccountID, cfg.Region)
+	registry.Register(sesService)
 
 	// Register SNS with service locator for SNS → SQS fan-out
 	snsService := snssvc.New(cfg.AccountID, cfg.Region)
@@ -129,8 +130,10 @@ func main() {
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
 
-	// Wire Lambda logs to the admin API broadcaster.
+	// Wire Lambda logs, IAM engine, and SES store to admin API
 	adminAPI.SetLambdaLogs(lambdaService.Logs())
+	adminAPI.SetIAMEngine(engine)
+	adminAPI.SetSESStore(sesService.GetStore())
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	var handler http.Handler = gw

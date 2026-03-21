@@ -18,6 +18,9 @@ func New(accountID, region string) *SESService {
 	}
 }
 
+// GetStore returns the internal SES store for admin API access.
+func (s *SESService) GetStore() *Store { return s.store }
+
 // Name returns the AWS service name used for routing.
 func (s *SESService) Name() string { return "ses" }
 

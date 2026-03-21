@@ -16,6 +16,7 @@ import (
 	kmssvc "github.com/neureaux/cloudmock/services/kms"
 	s3svc "github.com/neureaux/cloudmock/services/s3"
 	secretssvc "github.com/neureaux/cloudmock/services/secretsmanager"
+	sessvc "github.com/neureaux/cloudmock/services/ses"
 	snssvc "github.com/neureaux/cloudmock/services/sns"
 	sqssvc "github.com/neureaux/cloudmock/services/sqs"
 	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
@@ -53,6 +54,7 @@ func main() {
 	registry.Register(secretssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ssmsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(sqssvc.New(cfg.AccountID, cfg.Region))
+	registry.Register(sessvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(snssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(dynamodbsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(logssvc.New(cfg.AccountID, cfg.Region))

@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'preact/hooks';
+import { Ref } from 'preact';
 import { DDBItem, TableDescription } from './types';
 import { extractValue, getType, typeBadgeColor, collectColumns } from './utils';
 import { ddbRequest } from '../../api';
@@ -17,11 +18,13 @@ interface ItemBrowserProps {
   onEditItem: (item: DDBItem) => void;
   onDeleteItems: (items: DDBItem[]) => void;
   showToast: (msg: string) => void;
+  searchRef?: Ref<HTMLInputElement>;
 }
 
 export function ItemBrowser({
   items, tableDesc, tableName, pageSize, onPageSizeChange,
   page, hasNext, onNextPage, onPrevPage, onEditItem, onDeleteItems, showToast,
+  searchRef,
 }: ItemBrowserProps) {
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
@@ -33,6 +36,7 @@ export function ItemBrowser({
   const [editingValue, setEditingValue] = useState('');
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const [resizing, setResizing] = useState<{ col: string; startX: number; startW: number } | null>(null);
+  const [filterText, setFilterText] = useState('');
 
   const keyAttrs = useMemo(() =>
     tableDesc.KeySchema.map(k => k.AttributeName),
@@ -43,14 +47,21 @@ export function ItemBrowser({
   const columns = useMemo(() => allColumns.filter(c => !hiddenCols.has(c)), [allColumns, hiddenCols]);
 
   const sortedItems = useMemo(() => {
-    if (!sortCol) return items;
-    return [...items].sort((a, b) => {
+    let filtered = items;
+    if (filterText) {
+      const q = filterText.toLowerCase();
+      filtered = items.filter(item =>
+        Object.values(item).some(v => extractValue(v).toLowerCase().includes(q))
+      );
+    }
+    if (!sortCol) return filtered;
+    return [...filtered].sort((a, b) => {
       const va = extractValue(a[sortCol]);
       const vb = extractValue(b[sortCol]);
       const cmp = va.localeCompare(vb, undefined, { numeric: true });
       return sortDir === 'asc' ? cmp : -cmp;
     });
-  }, [items, sortCol, sortDir]);
+  }, [items, sortCol, sortDir, filterText]);
 
   function toggleSort(col: string) {
     if (sortCol === col) {
@@ -94,7 +105,6 @@ export function ItemBrowser({
     const item = { ...sortedItems[editingCell.row] };
     const oldVal = item[editingCell.col];
     const type = getType(oldVal);
-    // Build new attribute value
     let newVal: any;
     if (type === 'S') newVal = { S: editingValue };
     else if (type === 'N') newVal = { N: editingValue };
@@ -140,10 +150,42 @@ export function ItemBrowser({
     );
   }, []);
 
+  // Compute sticky left offsets for key columns
+  function getStickyStyle(col: string, colIndex: number): string {
+    if (!keyAttrs.includes(col)) return '';
+    // Calculate left offset: checkbox (40px) + sum of widths of previous key columns
+    let left = 40; // checkbox column width
+    for (let i = 0; i < colIndex; i++) {
+      if (keyAttrs.includes(columns[i])) {
+        left += colWidths[columns[i]] || 150;
+      }
+    }
+    return `position:sticky;left:${left}px;z-index:2;background:var(--sticky-col-bg, var(--n50))`;
+  }
+
+  function getStickyCellStyle(col: string, colIndex: number): string {
+    if (!keyAttrs.includes(col)) return '';
+    let left = 40;
+    for (let i = 0; i < colIndex; i++) {
+      if (keyAttrs.includes(columns[i])) {
+        left += colWidths[columns[i]] || 150;
+      }
+    }
+    return `position:sticky;left:${left}px;z-index:1;background:var(--sticky-col-bg, white)`;
+  }
+
   return (
     <div>
       <div class="ddb-browser-toolbar">
         <div class="flex items-center gap-2">
+          <input
+            ref={searchRef}
+            class="input input-search"
+            placeholder="Filter items..."
+            style="height:32px;font-size:13px;width:220px"
+            value={filterText}
+            onInput={(e) => setFilterText((e.target as HTMLInputElement).value)}
+          />
           {selected.size > 0 && (
             <>
               <span class="text-sm text-muted">{selected.size} selected</span>
@@ -195,18 +237,18 @@ export function ItemBrowser({
           <table class="ddb-items-table">
             <thead>
               <tr>
-                <th style="width:40px;text-align:center">
+                <th style="width:40px;text-align:center;position:sticky;left:0;z-index:3;background:var(--sticky-col-bg, var(--n50))">
                   <input
                     type="checkbox"
                     checked={selected.size === sortedItems.length && sortedItems.length > 0}
                     onChange={toggleSelectAll}
                   />
                 </th>
-                {columns.map(c => (
+                {columns.map((c, ci) => (
                   <th
                     key={c}
                     class="sortable"
-                    style={colWidths[c] ? `width:${colWidths[c]}px;min-width:${colWidths[c]}px` : 'min-width:120px'}
+                    style={`${colWidths[c] ? `width:${colWidths[c]}px;min-width:${colWidths[c]}px` : 'min-width:120px'};${getStickyStyle(c, ci)}`}
                     onClick={() => toggleSort(c)}
                   >
                     <div class="ddb-th-inner">
@@ -232,10 +274,10 @@ export function ItemBrowser({
                     key={idx}
                     class={`ddb-item-row ${selected.has(idx) ? 'selected' : ''} ${expandedRow === idx ? 'expanded' : ''}`}
                   >
-                    <td style="width:40px;text-align:center" onClick={(e) => e.stopPropagation()}>
+                    <td style="width:40px;text-align:center;position:sticky;left:0;z-index:1;background:var(--sticky-col-bg, white)" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(idx)} onChange={() => toggleSelect(idx)} />
                     </td>
-                    {columns.map(c => {
+                    {columns.map((c, ci) => {
                       const val = item[c];
                       const display = extractValue(val);
                       const isEditing = editingCell?.row === idx && editingCell?.col === c;
@@ -245,7 +287,7 @@ export function ItemBrowser({
                           class="ddb-cell"
                           onClick={() => setExpandedRow(expandedRow === idx ? null : idx)}
                           onDblClick={(e) => { e.stopPropagation(); startCellEdit(idx, c, display); }}
-                          style={colWidths[c] ? `max-width:${colWidths[c]}px` : 'max-width:250px'}
+                          style={`${colWidths[c] ? `max-width:${colWidths[c]}px` : 'max-width:250px'};${getStickyCellStyle(c, ci)}`}
                         >
                           {isEditing ? (
                             <input

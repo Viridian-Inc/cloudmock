@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import { ddbRequest } from '../api';
 import { Modal } from '../components/Modal';
-import { DatabaseIcon, PlusIcon, RefreshIcon, TrashIcon } from '../components/Icons';
+import { DatabaseIcon, PlusIcon, RefreshIcon, TrashIcon, XIcon } from '../components/Icons';
 import { DDBItem, TableDescription } from './dynamodb/types';
 import { TableList } from './dynamodb/TableList';
 import { ItemBrowser } from './dynamodb/ItemBrowser';
@@ -10,27 +10,48 @@ import { TableInfo } from './dynamodb/TableInfo';
 import { ItemEditor } from './dynamodb/ItemEditor';
 import { CreateTable } from './dynamodb/CreateTable';
 import { ExportMenu } from './dynamodb/ExportMenu';
+import { ImportMenu } from './dynamodb/ImportMenu';
+import { BatchWrite } from './dynamodb/BatchWrite';
 
 interface DynamoDBPageProps {
   showToast: (msg: string) => void;
 }
 
+interface OpenTab {
+  name: string;
+  tableDesc: TableDescription | null;
+  items: DDBItem[];
+  page: number;
+  lastKeys: any[];
+  activeTab: 'items' | 'query' | 'scan' | 'info';
+}
+
 export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
   const [tables, setTables] = useState<string[]>([]);
   const [tableCounts, setTableCounts] = useState<Record<string, number>>({});
-  const [selectedTable, setSelectedTable] = useState<string | null>(null);
-  const [tableDesc, setTableDesc] = useState<TableDescription | null>(null);
-  const [items, setItems] = useState<DDBItem[]>([]);
-  const [page, setPage] = useState(0);
+  const [openTabs, setOpenTabs] = useState<OpenTab[]>([]);
+  const [activeTabIndex, setActiveTabIndex] = useState<number>(-1);
   const [pageSize, setPageSize] = useState(25);
-  const [lastKeys, setLastKeys] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'items' | 'query' | 'scan' | 'info'>('items');
   const [editItem, setEditItem] = useState<DDBItem | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showCreateItem, setShowCreateItem] = useState(false);
   const [showCreateTable, setShowCreateTable] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleteItemsConfirm, setDeleteItemsConfirm] = useState<DDBItem[] | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+
+  const currentTab = activeTabIndex >= 0 && activeTabIndex < openTabs.length ? openTabs[activeTabIndex] : null;
+  const selectedTable = currentTab?.name || null;
+  const tableDesc = currentTab?.tableDesc || null;
+  const items = currentTab?.items || [];
+  const page = currentTab?.page || 0;
+  const lastKeys = currentTab?.lastKeys || [];
+  const activeTab = currentTab?.activeTab || 'items';
+
+  // Helper to update current tab state
+  function updateTab(index: number, patch: Partial<OpenTab>) {
+    setOpenTabs(prev => prev.map((t, i) => i === index ? { ...t, ...patch } : t));
+  }
 
   // Load tables
   const loadTables = useCallback(async () => {
@@ -38,7 +59,6 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
       const r = await ddbRequest('ListTables', {});
       const names: string[] = r.TableNames || [];
       setTables(names);
-      // Fetch item counts
       const counts: Record<string, number> = {};
       for (const name of names) {
         try {
@@ -55,66 +75,101 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
   useEffect(() => { loadTables(); }, [loadTables]);
 
   // Scan items
-  const scanItems = useCallback(async (tableName: string, startKey: any, size: number = pageSize) => {
+  const scanItems = useCallback(async (tableName: string, startKey: any, tabIdx: number, size: number = pageSize) => {
     const params: any = { TableName: tableName, Limit: size };
     if (startKey) params.ExclusiveStartKey = startKey;
     try {
       const r = await ddbRequest('Scan', params);
-      setItems(r.Items || []);
-      if (r.LastEvaluatedKey) {
-        setLastKeys(prev => [...prev, r.LastEvaluatedKey]);
-      }
+      setOpenTabs(prev => prev.map((t, i) => {
+        if (i !== tabIdx) return t;
+        const newLastKeys = r.LastEvaluatedKey
+          ? [...t.lastKeys, r.LastEvaluatedKey]
+          : t.lastKeys;
+        return { ...t, items: r.Items || [], lastKeys: startKey ? newLastKeys : (r.LastEvaluatedKey ? [r.LastEvaluatedKey] : []) };
+      }));
     } catch {
-      setItems([]);
+      setOpenTabs(prev => prev.map((t, i) => i === tabIdx ? { ...t, items: [] } : t));
     }
   }, [pageSize]);
 
-  // Select table
+  // Select table — open as tab or switch to existing
   function selectTable(name: string) {
-    setSelectedTable(name);
-    setPage(0);
-    setLastKeys([]);
-    setActiveTab('items');
+    const existingIdx = openTabs.findIndex(t => t.name === name);
+    if (existingIdx >= 0) {
+      setActiveTabIndex(existingIdx);
+      return;
+    }
+    const newTab: OpenTab = {
+      name,
+      tableDesc: null,
+      items: [],
+      page: 0,
+      lastKeys: [],
+      activeTab: 'items',
+    };
+    const newTabs = [...openTabs, newTab];
+    const newIdx = newTabs.length - 1;
+    setOpenTabs(newTabs);
+    setActiveTabIndex(newIdx);
     ddbRequest('DescribeTable', { TableName: name }).then((r: any) => {
-      setTableDesc(r.Table);
+      setOpenTabs(prev => prev.map((t, i) => i === newIdx ? { ...t, tableDesc: r.Table } : t));
     }).catch(() => {});
-    scanItems(name, null);
+    scanItems(name, null, newIdx);
+  }
+
+  function closeTab(index: number, e?: Event) {
+    if (e) { e.stopPropagation(); e.preventDefault(); }
+    const newTabs = openTabs.filter((_, i) => i !== index);
+    setOpenTabs(newTabs);
+    if (newTabs.length === 0) {
+      setActiveTabIndex(-1);
+    } else if (activeTabIndex === index) {
+      setActiveTabIndex(Math.min(index, newTabs.length - 1));
+    } else if (activeTabIndex > index) {
+      setActiveTabIndex(activeTabIndex - 1);
+    }
+  }
+
+  function setContentTab(tab: 'items' | 'query' | 'scan' | 'info') {
+    if (activeTabIndex >= 0) updateTab(activeTabIndex, { activeTab: tab });
   }
 
   function refresh() {
-    if (selectedTable) {
-      setPage(0);
-      setLastKeys([]);
-      scanItems(selectedTable, null);
+    if (selectedTable && activeTabIndex >= 0) {
+      updateTab(activeTabIndex, { page: 0, lastKeys: [] });
+      scanItems(selectedTable, null, activeTabIndex);
       ddbRequest('DescribeTable', { TableName: selectedTable }).then((r: any) => {
-        setTableDesc(r.Table);
+        if (activeTabIndex >= 0) updateTab(activeTabIndex, { tableDesc: r.Table });
       }).catch(() => {});
     }
   }
 
   function nextPage() {
-    const lastKey = lastKeys[page];
+    if (!currentTab) return;
+    const lastKey = currentTab.lastKeys[currentTab.page];
     if (!lastKey) return;
-    setPage(p => p + 1);
-    scanItems(selectedTable!, lastKey);
+    const newPage = currentTab.page + 1;
+    updateTab(activeTabIndex, { page: newPage });
+    scanItems(selectedTable!, lastKey, activeTabIndex);
   }
 
   function prevPage() {
-    if (page <= 0) return;
-    const newPage = page - 1;
-    setPage(newPage);
+    if (!currentTab || currentTab.page <= 0) return;
+    const newPage = currentTab.page - 1;
+    updateTab(activeTabIndex, { page: newPage });
     if (newPage === 0) {
-      scanItems(selectedTable!, null);
+      scanItems(selectedTable!, null, activeTabIndex);
     } else {
-      scanItems(selectedTable!, lastKeys[newPage - 1]);
+      scanItems(selectedTable!, currentTab.lastKeys[newPage - 1], activeTabIndex);
     }
   }
 
   function handlePageSizeChange(size: number) {
     setPageSize(size);
-    setPage(0);
-    setLastKeys([]);
-    if (selectedTable) scanItems(selectedTable, null, size);
+    if (selectedTable && activeTabIndex >= 0) {
+      updateTab(activeTabIndex, { page: 0, lastKeys: [] });
+      scanItems(selectedTable, null, activeTabIndex, size);
+    }
   }
 
   // Item operations
@@ -122,9 +177,10 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     try {
       await ddbRequest('PutItem', { TableName: selectedTable, Item: item });
       showToast('Item saved');
-      setPage(0);
-      setLastKeys([]);
-      scanItems(selectedTable!, null);
+      if (activeTabIndex >= 0) {
+        updateTab(activeTabIndex, { page: 0, lastKeys: [] });
+        scanItems(selectedTable!, null, activeTabIndex);
+      }
       setShowEditModal(false);
       setShowCreateItem(false);
     } catch {
@@ -141,9 +197,10 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     try {
       await ddbRequest('DeleteItem', { TableName: selectedTable, Key: key });
       showToast('Item deleted');
-      setPage(0);
-      setLastKeys([]);
-      scanItems(selectedTable!, null);
+      if (activeTabIndex >= 0) {
+        updateTab(activeTabIndex, { page: 0, lastKeys: [] });
+        scanItems(selectedTable!, null, activeTabIndex);
+      }
       setShowEditModal(false);
     } catch {
       showToast('Delete failed');
@@ -168,20 +225,19 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
     }
     showToast(`Deleted ${deleteItemsConfirm.length - failed} items${failed ? `, ${failed} failed` : ''}`);
     setDeleteItemsConfirm(null);
-    setPage(0);
-    setLastKeys([]);
-    scanItems(selectedTable!, null);
+    if (activeTabIndex >= 0) {
+      updateTab(activeTabIndex, { page: 0, lastKeys: [] });
+      scanItems(selectedTable!, null, activeTabIndex);
+    }
   }
 
   function deleteTable(name: string) {
     ddbRequest('DeleteTable', { TableName: name }).then(() => {
       showToast('Table deleted');
       loadTables();
-      if (selectedTable === name) {
-        setSelectedTable(null);
-        setItems([]);
-        setTableDesc(null);
-      }
+      // Close tab if open
+      const tabIdx = openTabs.findIndex(t => t.name === name);
+      if (tabIdx >= 0) closeTab(tabIdx);
       setDeleteConfirm(null);
     }).catch(() => showToast('Delete table failed'));
   }
@@ -192,19 +248,20 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
   }
 
   function handleDuplicate(item: DDBItem) {
-    // Open as new item (user must change keys)
     setEditItem(null);
     setShowCreateItem(true);
-    // The CreateItem will pre-populate from the last edited state
   }
 
   function handleDescribeTable(name: string) {
-    setSelectedTable(name);
-    setActiveTab('info');
-    ddbRequest('DescribeTable', { TableName: name }).then((r: any) => {
-      setTableDesc(r.Table);
-    }).catch(() => {});
-    scanItems(name, null);
+    selectTable(name);
+    // Set to info tab after opening
+    setTimeout(() => {
+      setOpenTabs(prev => {
+        const idx = prev.findIndex(t => t.name === name);
+        if (idx >= 0) return prev.map((t, i) => i === idx ? { ...t, activeTab: 'info' as const } : t);
+        return prev;
+      });
+    }, 50);
   }
 
   // Keyboard shortcuts
@@ -216,7 +273,8 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
         if (selectedTable && tableDesc) setShowCreateItem(true);
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
-        // Let table search handle it — noop here
+        e.preventDefault();
+        searchRef.current?.focus();
       }
       if ((e.ctrlKey || e.metaKey) && e.key === 'r') {
         e.preventDefault();
@@ -229,13 +287,13 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
         setDeleteConfirm(null);
         setDeleteItemsConfirm(null);
       }
-      if (e.key === 'Delete' && deleteItemsConfirm) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && deleteItemsConfirm) {
         confirmDeleteItems();
       }
     }
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [selectedTable, tableDesc, deleteItemsConfirm]);
+  }, [selectedTable, tableDesc, deleteItemsConfirm, activeTabIndex]);
 
   return (
     <div class="ddb-layout">
@@ -252,11 +310,40 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
       />
 
       <div class="ddb-main">
+        {/* Table Tabs Bar */}
+        {openTabs.length > 0 && (
+          <div class="ddb-tab-bar">
+            {openTabs.map((tab, idx) => (
+              <div
+                key={tab.name}
+                class={`ddb-tab-item ${idx === activeTabIndex ? 'active' : ''}`}
+                onClick={() => setActiveTabIndex(idx)}
+              >
+                <span class="ddb-tab-name">{tab.name}</span>
+                <button
+                  class="ddb-tab-close"
+                  onClick={(e) => closeTab(idx, e)}
+                  title="Close tab"
+                >
+                  <XIcon width="12" height="12" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {!selectedTable ? (
           <div class="empty-state">
             <DatabaseIcon width="48" height="48" />
             <div style="margin-top:12px;font-size:16px;font-weight:500">Select a table to browse items</div>
             <div style="margin-top:4px;font-size:13px;color:var(--n400)">Or create a new table to get started</div>
+            <div style="margin-top:16px;font-size:12px;color:var(--n400)">
+              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+N</kbd> New Item
+              &nbsp;&middot;&nbsp;
+              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+F</kbd> Search
+              &nbsp;&middot;&nbsp;
+              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+R</kbd> Refresh
+            </div>
           </div>
         ) : (
           <div>
@@ -282,12 +369,24 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
               </div>
               <div class="flex gap-2">
                 {activeTab === 'items' && (
-                  <ExportMenu
-                    items={items}
-                    selectedItems={[]}
-                    tableName={selectedTable}
-                    showToast={showToast}
-                  />
+                  <>
+                    <ExportMenu
+                      items={items}
+                      selectedItems={[]}
+                      tableName={selectedTable}
+                      showToast={showToast}
+                    />
+                    <ImportMenu
+                      tableName={selectedTable}
+                      showToast={showToast}
+                      onComplete={refresh}
+                    />
+                    <BatchWrite
+                      tableName={selectedTable}
+                      showToast={showToast}
+                      onComplete={refresh}
+                    />
+                  </>
                 )}
                 <button class="btn btn-primary btn-sm" onClick={() => setShowCreateItem(true)}>
                   <PlusIcon /> New Item
@@ -301,12 +400,12 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
               </div>
             </div>
 
-            {/* Tabs */}
+            {/* Content Tabs */}
             <div class="tabs">
-              <button class={`tab ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setActiveTab('items')}>Items</button>
-              <button class={`tab ${activeTab === 'query' ? 'active' : ''}`} onClick={() => setActiveTab('query')}>Query</button>
-              <button class={`tab ${activeTab === 'scan' ? 'active' : ''}`} onClick={() => setActiveTab('scan')}>Scan</button>
-              <button class={`tab ${activeTab === 'info' ? 'active' : ''}`} onClick={() => setActiveTab('info')}>Table Info</button>
+              <button class={`tab ${activeTab === 'items' ? 'active' : ''}`} onClick={() => setContentTab('items')}>Items</button>
+              <button class={`tab ${activeTab === 'query' ? 'active' : ''}`} onClick={() => setContentTab('query')}>Query</button>
+              <button class={`tab ${activeTab === 'scan' ? 'active' : ''}`} onClick={() => setContentTab('scan')}>Scan</button>
+              <button class={`tab ${activeTab === 'info' ? 'active' : ''}`} onClick={() => setContentTab('info')}>Table Info</button>
             </div>
 
             {/* Tab content */}
@@ -324,6 +423,7 @@ export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
                 onEditItem={handleEditItem}
                 onDeleteItems={deleteItems}
                 showToast={showToast}
+                searchRef={searchRef}
               />
             )}
 

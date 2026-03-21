@@ -29,14 +29,12 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
   const [loading, setLoading] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  const pkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'HASH')?.AttributeName || '';
-  const skAttr = tableDesc.KeySchema.find(k => k.KeyType === 'RANGE')?.AttributeName || '';
-  const pkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === pkAttr)?.AttributeType || 'S';
-  const skType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === skAttr)?.AttributeType || 'S';
+  const tablePkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'HASH')?.AttributeName || '';
+  const tableSkAttr = tableDesc.KeySchema.find(k => k.KeyType === 'RANGE')?.AttributeName || '';
 
   const indexes = useMemo(() => {
     const list: { name: string; pk: string; sk: string }[] = [
-      { name: '', pk: pkAttr, sk: skAttr },
+      { name: '', pk: tablePkAttr, sk: tableSkAttr },
     ];
     if (tableDesc.GlobalSecondaryIndexes) {
       for (const gsi of tableDesc.GlobalSecondaryIndexes) {
@@ -60,6 +58,8 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
   }, [tableDesc]);
 
   const activeIndex = indexes.find(i => i.name === indexName) || indexes[0];
+  const activePkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.pk)?.AttributeType || 'S';
+  const activeSkType = tableDesc.AttributeDefinitions.find(a => a.AttributeName === activeIndex.sk)?.AttributeType || 'S';
 
   function addFilter() {
     setFilters(prev => [...prev, { attribute: '', operator: '=', value: '', value2: '', connector: 'AND' }]);
@@ -112,7 +112,6 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
         // Build key condition
         const exprNames: Record<string, string> = {};
         const exprValues: Record<string, any> = {};
-        const activePkType = pkType;
 
         exprNames['#pk'] = activeIndex.pk;
         exprValues[':pkv'] = activePkType === 'N' ? { N: pkValue } : { S: pkValue };
@@ -120,10 +119,10 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
         let keyExpr = '#pk = :pkv';
         if (activeIndex.sk && skValue) {
           exprNames['#sk'] = activeIndex.sk;
-          const skTyped = skType === 'N' ? { N: skValue } : { S: skValue };
+          const skTyped = activeSkType === 'N' ? { N: skValue } : { S: skValue };
           exprValues[':skv'] = skTyped;
           if (skOp === 'between') {
-            exprValues[':skv2'] = skType === 'N' ? { N: skValue2 } : { S: skValue2 };
+            exprValues[':skv2'] = activeSkType === 'N' ? { N: skValue2 } : { S: skValue2 };
             keyExpr += ' AND #sk BETWEEN :skv AND :skv2';
           } else if (skOp === 'begins_with') {
             keyExpr += ' AND begins_with(#sk, :skv)';
@@ -252,23 +251,32 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem }: Qu
 
           {mode === 'query' && (
             <>
-              {/* Index selector */}
-              {indexes.length > 1 && (
-                <div class="mb-4">
-                  <div class="label">Index</div>
-                  <select
-                    class="select w-full"
-                    value={indexName}
-                    onChange={(e) => setIndexName((e.target as HTMLSelectElement).value)}
-                  >
-                    {indexes.map(idx => (
+              {/* Index selector — always show so users can switch between table/GSI/LSI */}
+              <div class="mb-4">
+                <div class="label">Index</div>
+                <select
+                  class="select w-full"
+                  value={indexName}
+                  onChange={(e) => {
+                    const val = (e.target as HTMLSelectElement).value;
+                    setIndexName(val);
+                    setPkValue('');
+                    setSkValue('');
+                    setSkValue2('');
+                  }}
+                >
+                  {indexes.map(idx => {
+                    const isGSI = tableDesc.GlobalSecondaryIndexes?.some(g => g.IndexName === idx.name);
+                    const isLSI = tableDesc.LocalSecondaryIndexes?.some(l => l.IndexName === idx.name);
+                    const tag = isGSI ? ' [GSI]' : isLSI ? ' [LSI]' : '';
+                    return (
                       <option key={idx.name} value={idx.name}>
-                        {idx.name || `Table (${idx.pk}${idx.sk ? ', ' + idx.sk : ''})`}
+                        {idx.name ? `${idx.name}${tag} (${idx.pk}${idx.sk ? ', ' + idx.sk : ''})` : `Table (${idx.pk}${idx.sk ? ', ' + idx.sk : ''})`}
                       </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    );
+                  })}
+                </select>
+              </div>
 
               {/* Partition key */}
               <div class="mb-4">

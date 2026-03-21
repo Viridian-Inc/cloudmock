@@ -708,7 +708,7 @@ function App() {
         </div>
         <div class="header-spacer" />
         <div class="header-badge" id="health-badge">
-          <span class="dot ${health && health.status === ›healthy' ? 'dot-green' : 'dot-yellow'}" id="health-dot"></span>
+          <span class="dot ${health && health.status === ‹healthy› ? 'dot-green' : 'dot-yellow'}" id="health-dot"></span>
           <span>${health ? (health.status === 'healthy' ? 'Healthy' : 'Degraded') : '...'}</span>
         </div>
         <div class="header-badge" id="sse-badge">
@@ -723,7 +723,7 @@ function App() {
       <div class="body-wrap">
         <nav class="sidebar">
           ${navItems.map(item => html‹
-            <a class="nav-item ${activePath === item.id ? ›active' : ''}"
+            <a class="nav-item ${activePath === item.id ? ‹active› : ''}"
                href=${'#' + item.id}
                onclick=${(e) => { e.preventDefault(); location.hash = item.id; }}>
               ${icons[item.icon]}
@@ -805,9 +805,9 @@ function ServicesPage({ services, stats, health }) {
 
       <div class="services-grid">
         ${filtered.map(svc => {
-          const tier = svc.action_count > 5 ? ›T1' : 'T2';
+          const tier = svc.action_count > 5 ? ‹T1› : 'T2';
           return html‹
-            <div class="svc-card" onclick=${() => location.hash = ›/resources?service=' + svc.name}>
+            <div class="svc-card" onclick=${() => location.hash = ‹/resources?service=› + svc.name}>
               <div class="svc-card-head">
                 <span class="svc-card-name">${svc.name}</span>
                 <span class="svc-card-tier ${tier === 'T1' ? 'tier-t1' : 'tier-t2'}">${tier}</span>
@@ -893,7 +893,7 @@ function RequestsPage({ sse, showToast }) {
           <div>
             <div class="flex items-center justify-between mb-4">
               <span class="section-title" style="margin:0">Request Body</span>
-              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.request_body || req.body || ›', null, 2)); showToast('Copied'); }}>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.request_body || req.body || '', null, 2)); showToast('Copied'); }}>
                 ${icons.copy} Copy
               </button>
             </div>
@@ -905,7 +905,7 @@ function RequestsPage({ sse, showToast }) {
           <div>
             <div class="flex items-center justify-between mb-4">
               <span class="section-title" style="margin:0">Response Body</span>
-              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.response_body || ›', null, 2)); showToast('Copied'); }}>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.response_body || '', null, 2)); showToast('Copied'); }}>
                 ${icons.copy} Copy
               </button>
             </div>
@@ -918,7 +918,7 @@ function RequestsPage({ sse, showToast }) {
             <table>
               <tbody>
                 <tr><td style="font-weight:600;width:150px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
-                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ›'}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
               </tbody>
             </table>
           </div>
@@ -928,7 +928,7 @@ function RequestsPage({ sse, showToast }) {
           <div>
             <table>
               <tbody>
-                <tr><td style="font-weight:600;width:150px">Method</td><td>${req.method || ›POST'}</td></tr>
+                <tr><td style="font-weight:600;width:150px">Method</td><td>${req.method || ‹POST›}</td></tr>
                 <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
                 <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
                 <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
@@ -949,7 +949,7 @@ function RequestsPage({ sse, showToast }) {
           <h1 class="page-title">Request Log</h1>
           <p class="page-desc">All API requests to cloudmock services</p>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick=${() => api(›/api/requests?limit=200').then(setRequests)}>
+        <button class="btn btn-ghost btn-sm" onclick=${() => api(‹/api/requests?limit=200›).then(setRequests)}>
           ${icons.refresh} Refresh
         </button>
       </div>
@@ -990,7 +990,7 @@ function RequestsPage({ sse, showToast }) {
                 <tr><td colspan="6" class="empty-state">No requests recorded yet</td></tr>
               › : filtered.map(req => html‹
                 <${Fragment} key=${req.id || Math.random()}>
-                  <tr class="clickable ${expanded === req.id ? ›expanded' : ''}"
+                  <tr class="clickable ${expanded === req.id ? ‹expanded› : ''}"
                       onclick=${() => toggleExpand(req.id)}>
                     <td class="font-mono text-sm">${fmtTime(req.timestamp || req.time)}</td>
                     <td><span style="font-weight:600">${req.service}</span></td>
@@ -1010,8 +1010,8 @@ function RequestsPage({ sse, showToast }) {
                         <div class="req-expand">
                           <div class="req-expand-inner">
                             <div class="tabs" style="padding:0 16px">
-                              ${[›overview','request','response','timing'].map(t => html‹
-                                <button class="tab ${detailTab === t ? ›active' : ''}"
+                              ${[‹overview›,'request','response','timing'].map(t => html‹
+                                <button class="tab ${detailTab === t ? ‹active› : ''}"
                                         onclick=${() => setDetailTab(t)}>
                                   ${t.charAt(0).toUpperCase() + t.slice(1)}
                                 </button>
@@ -1041,7 +1041,7 @@ function RequestsPage({ sse, showToast }) {
                 <button class="btn btn-sm btn-ghost" onclick=${() => replayRequest(drawer.id)}>
                   ${icons.play} Replay
                 </button>
-                <a class="btn btn-sm btn-secondary" href=${›#/requests/' + drawer.id}
+                <a class="btn btn-sm btn-secondary" href=${‹#/requests/› + drawer.id}
                    style="text-decoration:none;color:white">
                   Full Page
                 </a>
@@ -1053,7 +1053,7 @@ function RequestsPage({ sse, showToast }) {
             <div class="drawer-body">
               <div class="tabs">
                 ${['overview','request','response','timing'].map(t => html‹
-                  <button class="tab ${detailTab === t ? ›active' : ''}"
+                  <button class="tab ${detailTab === t ? ‹active› : ''}"
                           onclick=${() => setDetailTab(t)}>
                     ${t.charAt(0).toUpperCase() + t.slice(1)}
                   </button>
@@ -1087,7 +1087,7 @@ function RequestDetailPage({ id, showToast }) {
       <div>
         <div class="flex items-center justify-between mb-4">
           <span class="section-title" style="margin:0">${label}</span>
-          <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(body || ›', null, 2)); showToast('Copied'); }}>
+          <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(body || '', null, 2)); showToast('Copied'); }}>
             ${icons.copy} Copy
           </button>
         </div>
@@ -1111,8 +1111,8 @@ function RequestDetailPage({ id, showToast }) {
 
       <div class="card">
         <div class="tabs" style="padding:0 20px">
-          ${[›overview','request','response','timing'].map(t => html‹
-            <button class="tab ${tab === t ? ›active' : ''}" onclick=${() => setTab(t)}>
+          ${[‹overview›,'request','response','timing'].map(t => html‹
+            <button class="tab ${tab === t ? ‹active› : ''}" onclick=${() => setTab(t)}>
               ${t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ')}
@@ -1121,7 +1121,7 @@ function RequestDetailPage({ id, showToast }) {
           ${tab === 'overview' && html‹
             <table>
               <tbody>
-                <tr><td style="font-weight:600;width:160px">Method</td><td>${req.method || ›POST'}</td></tr>
+                <tr><td style="font-weight:600;width:160px">Method</td><td>${req.method || ‹POST›}</td></tr>
                 <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
                 <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
                 <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
@@ -1136,7 +1136,7 @@ function RequestDetailPage({ id, showToast }) {
             <table>
               <tbody>
                 <tr><td style="font-weight:600;width:160px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
-                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ›'}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
               </tbody>
             </table>
           '}
@@ -1357,7 +1357,7 @@ function DynamoDBPage({ showToast }) {
           ${filteredTables.length === 0 ? html›
             <div style="padding:24px;text-align:center;color:var(--n400);font-size:13px">No tables found</div>
           ' : filteredTables.map(t => html‹
-            <div class="ddb-table-item ${selectedTable === t ? ›active' : ''}"
+            <div class="ddb-table-item ${selectedTable === t ? ‹active› : ''}"
                  onclick=${() => selectTable(t)}>
               <span class="name">${t}</span>
             </div>
@@ -1462,7 +1462,7 @@ function DynamoDBPage({ showToast }) {
                 <div class="card" style="margin-bottom:16px">
                   <div class="card-body">
                     <div class="flex gap-3 mb-4">
-                      <button class="btn btn-sm ${queryMode === ›query' ? 'btn-secondary' : 'btn-ghost'}"
+                      <button class="btn btn-sm ${queryMode === ‹query› ? 'btn-secondary' : 'btn-ghost'}"
                               onclick=${() => setQueryMode('query')}>Query</button>
                       <button class="btn btn-sm ${queryMode === 'scan' ? 'btn-secondary' : 'btn-ghost'}"
                               onclick=${() => setQueryMode('scan')}>Scan</button>
@@ -1491,7 +1491,7 @@ function DynamoDBPage({ showToast }) {
                       ${queryResults && html‹
                         <button class="btn btn-ghost btn-sm" onclick=${() => {
                           copyToClipboard(JSON.stringify(queryResults, null, 2));
-                          showToast(›Exported to clipboard');
+                          showToast('Exported to clipboard');
                         }}>Export JSON</button>
                       '}
                     </div>
@@ -1745,10 +1745,10 @@ function LambdaPage({ sse }) {
               <span style="font-weight:600;font-size:14px">Functions</span>
             </div>
             <div class="card-body" style="padding:4px 8px;overflow-y:auto" id="lambda-filter">
-              <div class="nav-item ${!selected ? ›active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+              <div class="nav-item ${!selected ? ‹active› : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
                    onclick=${() => selectFunction('')}>All Functions</div>
               ${functions.map(fn => html‹
-                <div class="nav-item ${selected === fn ? ›active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+                <div class="nav-item ${selected === fn ? ‹active› : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
                      onclick=${() => selectFunction(fn)}>
                   <span class="truncate">${fn}</span>
                 </div>
@@ -1780,7 +1780,7 @@ function LambdaPage({ sse }) {
                   ${filtered.length === 0 ? html‹
                     <tr><td colspan="4" class="empty-state">No logs</td></tr>
                   › : filtered.map(l => html‹
-                    <tr class="${l.stream === ›stderr' ? 'stderr' : ''}">
+                    <tr class="${l.stream === ‹stderr› ? 'stderr' : ''}">
                       <td class="font-mono text-sm">${fmtTime(l.timestamp || l.time)}</td>
                       <td class="truncate" style="max-width:180px">${l.function_name || ''}</td>
                       <td class="font-mono text-sm truncate" style="max-width:120px">${l.request_id || ''}</td>
@@ -1853,11 +1853,11 @@ function IAMPage({ showToast }) {
                        value=${resource} onInput=${(e) => setResource(e.target.value)} />
               </div>
               <button class="btn btn-primary" onclick=${evaluate} disabled=${loading}>
-                ${loading ? ›Evaluating...' : 'Evaluate'}
+                ${loading ? ‹Evaluating...› : 'Evaluate'}
               </button>
 
               ${result && html‹
-                <div class="iam-result ${result.decision === ›ALLOW' ? 'iam-allow' : 'iam-deny'}">
+                <div class="iam-result ${result.decision === ‹ALLOW› ? 'iam-allow' : 'iam-deny'}">
                   ${result.decision}
                 </div>
                 ${result.reason && html‹<p class="text-sm text-muted mb-4">${result.reason}</p>›}
@@ -1883,7 +1883,7 @@ function IAMPage({ showToast }) {
               › : history.map(h => html‹
                 <div style="padding:8px 0;border-bottom:1px solid var(--n100);font-size:13px">
                   <div class="flex items-center gap-2">
-                    <span class="status-pill ${h.decision === ›ALLOW' ? 'status-2xx' : 'status-5xx'}" style="font-size:11px">${h.decision}</span>
+                    <span class="status-pill ${h.decision === ‹ALLOW› ? 'status-2xx' : 'status-5xx'}" style="font-size:11px">${h.decision}</span>
                     <span class="font-mono">${h.action}</span>
                   </div>
                   <div class="text-muted truncate" style="margin-top:2px">${h.resource}</div>
@@ -1955,7 +1955,7 @@ function MailPage() {
                 ${detail.html_body ? html‹
                   <div dangerouslySetInnerHTML=${{ __html: detail.html_body }}></div>
                 › : html‹
-                  <pre style="white-space:pre-wrap;font-size:14px">${detail.text_body || detail.body || ›(empty)'}</pre>
+                  <pre style="white-space:pre-wrap;font-size:14px">${detail.text_body || detail.body || '(empty)'}</pre>
                 '}
               </div>
             </div>

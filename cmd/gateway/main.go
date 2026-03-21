@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
@@ -126,7 +127,13 @@ func main() {
 	requestStats := gateway.NewRequestStats()
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
-	loggedGW := gateway.LoggingMiddleware(gw, requestLog, requestStats)
+	var handler http.Handler = gw
+	// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
+	corsEnabled := os.Getenv("CLOUDMOCK_CORS")
+	if corsEnabled != "false" && corsEnabled != "0" {
+		handler = gateway.CORSMiddleware(handler)
+	}
+	loggedGW := gateway.LoggingMiddleware(handler, requestLog, requestStats)
 
 	// Admin API
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)

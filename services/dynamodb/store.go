@@ -32,7 +32,7 @@ func (s *TableStore) tableARN(name string) string {
 }
 
 // CreateTable creates a new table. Returns ResourceInUseException if it already exists.
-func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attrDefs []AttributeDefinition, billingMode string, pt *ProvisionedThroughput) (*Table, *service.AWSError) {
+func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attrDefs []AttributeDefinition, billingMode string, pt *ProvisionedThroughput, gsis []GSI, lsis []LSI) (*Table, *service.AWSError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -45,6 +45,15 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		billingMode = "PROVISIONED"
 	}
 
+	gsiItems := make(map[string][]Item)
+	for _, gsi := range gsis {
+		gsiItems[gsi.IndexName] = nil
+	}
+	lsiItems := make(map[string][]Item)
+	for _, lsi := range lsis {
+		lsiItems[lsi.IndexName] = nil
+	}
+
 	table := &Table{
 		Name:                  name,
 		KeySchema:             keySchema,
@@ -55,6 +64,10 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		ItemCount:             0,
 		BillingMode:           billingMode,
 		ProvisionedThroughput: pt,
+		GSIs:                  gsis,
+		LSIs:                  lsis,
+		GSIItems:              gsiItems,
+		LSIItems:              lsiItems,
 	}
 	s.tables[name] = table
 	return table, nil
@@ -116,7 +129,11 @@ func (s *TableStore) getTable(name string) (*Table, *service.AWSError) {
 func (s *TableStore) PutItem(tableName string, item Item) *service.AWSError {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.putItemLocked(tableName, item)
+}
 
+// putItemLocked adds or replaces an item (caller must hold write lock).
+func (s *TableStore) putItemLocked(tableName string, item Item) *service.AWSError {
 	table, awsErr := s.getTable(tableName)
 	if awsErr != nil {
 		return awsErr
@@ -125,12 +142,15 @@ func (s *TableStore) PutItem(tableName string, item Item) *service.AWSError {
 	// Replace existing item with same key, or append.
 	for i, existing := range table.Items {
 		if table.keyMatchesItem(item, existing) {
+			table.deindexItem(existing)
 			table.Items[i] = item
+			table.indexItem(item)
 			return nil
 		}
 	}
 	table.Items = append(table.Items, item)
 	table.ItemCount = int64(len(table.Items))
+	table.indexItem(item)
 	return nil
 }
 
@@ -160,7 +180,11 @@ func (s *TableStore) GetItem(tableName string, key Item, projExpr string, exprNa
 func (s *TableStore) DeleteItem(tableName string, key Item) *service.AWSError {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.deleteItemLocked(tableName, key)
+}
 
+// deleteItemLocked removes an item by key (caller must hold write lock).
+func (s *TableStore) deleteItemLocked(tableName string, key Item) *service.AWSError {
 	table, awsErr := s.getTable(tableName)
 	if awsErr != nil {
 		return awsErr
@@ -168,6 +192,7 @@ func (s *TableStore) DeleteItem(tableName string, key Item) *service.AWSError {
 
 	for i, item := range table.Items {
 		if table.keyMatchesItem(key, item) {
+			table.deindexItem(item)
 			table.Items = append(table.Items[:i], table.Items[i+1:]...)
 			table.ItemCount = int64(len(table.Items))
 			return nil
@@ -180,7 +205,11 @@ func (s *TableStore) DeleteItem(tableName string, key Item) *service.AWSError {
 func (s *TableStore) UpdateItem(tableName string, key Item, updateExpr string, exprNames map[string]string, exprValues map[string]AttributeValue, returnValues string) (Item, *service.AWSError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	return s.updateItemLocked(tableName, key, updateExpr, exprNames, exprValues, returnValues)
+}
 
+// updateItemLocked updates an item (caller must hold write lock).
+func (s *TableStore) updateItemLocked(tableName string, key Item, updateExpr string, exprNames map[string]string, exprValues map[string]AttributeValue, returnValues string) (Item, *service.AWSError) {
 	table, awsErr := s.getTable(tableName)
 	if awsErr != nil {
 		return nil, awsErr
@@ -203,11 +232,13 @@ func (s *TableStore) UpdateItem(tableName string, key Item, updateExpr string, e
 	target = parseUpdateExpression(target, updateExpr, exprNames, exprValues)
 
 	if idx >= 0 {
+		table.deindexItem(table.Items[idx])
 		table.Items[idx] = target
 	} else {
 		table.Items = append(table.Items, target)
 		table.ItemCount = int64(len(table.Items))
 	}
+	table.indexItem(target)
 
 	switch returnValues {
 	case "ALL_NEW":
@@ -220,7 +251,7 @@ func (s *TableStore) UpdateItem(tableName string, key Item, updateExpr string, e
 }
 
 // Query finds items matching a key condition expression, applies filter and projection.
-func (s *TableStore) Query(tableName string, keyCondExpr string, filterExpr string, projExpr string, exprNames map[string]string, exprValues map[string]AttributeValue, scanForward *bool, limit int) ([]Item, int, int, *service.AWSError) {
+func (s *TableStore) Query(tableName string, indexName string, keyCondExpr string, filterExpr string, projExpr string, exprNames map[string]string, exprValues map[string]AttributeValue, scanForward *bool, limit int) ([]Item, int, int, *service.AWSError) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -229,9 +260,42 @@ func (s *TableStore) Query(tableName string, keyCondExpr string, filterExpr stri
 		return nil, 0, 0, awsErr
 	}
 
+	// Determine source items and range key based on index.
+	var sourceItems []Item
+	var rk string
+	if indexName != "" {
+		// Check GSIs first, then LSIs.
+		found := false
+		for _, gsi := range table.GSIs {
+			if gsi.IndexName == indexName {
+				sourceItems = table.GSIItems[indexName]
+				rk = gsiRangeKeyName(gsi.KeySchema)
+				found = true
+				break
+			}
+		}
+		if !found {
+			for _, lsi := range table.LSIs {
+				if lsi.IndexName == indexName {
+					sourceItems = table.LSIItems[indexName]
+					rk = gsiRangeKeyName(lsi.KeySchema)
+					found = true
+					break
+				}
+			}
+		}
+		if !found {
+			return nil, 0, 0, service.NewAWSError("ValidationException",
+				fmt.Sprintf("The table does not have the specified index: %s", indexName), http.StatusBadRequest)
+		}
+	} else {
+		sourceItems = table.Items
+		rk = table.rangeKeyName()
+	}
+
 	// Find items matching key condition.
 	var matched []Item
-	for _, item := range table.Items {
+	for _, item := range sourceItems {
 		if evaluateCondition(keyCondExpr, item, exprNames, exprValues) {
 			matched = append(matched, item)
 		}
@@ -240,7 +304,6 @@ func (s *TableStore) Query(tableName string, keyCondExpr string, filterExpr stri
 	scannedCount := len(matched)
 
 	// Sort by sort key if present.
-	rk := table.rangeKeyName()
 	if rk != "" {
 		forward := true
 		if scanForward != nil {
@@ -322,6 +385,196 @@ func (s *TableStore) Scan(tableName string, filterExpr string, projExpr string, 
 	}
 
 	return results, len(results), scannedCount, nil
+}
+
+// TransactWriteItems executes a transactional write across multiple tables.
+func (s *TableStore) TransactWriteItems(items []transactWriteItem) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Phase 1: Validate all conditions.
+	reasons := make([]cancellationReason, len(items))
+	anyFailed := false
+
+	for i, txItem := range items {
+		reasons[i] = cancellationReason{Code: "None"}
+
+		if txItem.ConditionCheck != nil {
+			cc := txItem.ConditionCheck
+			table, awsErr := s.getTable(cc.TableName)
+			if awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+				continue
+			}
+			var found Item
+			for _, item := range table.Items {
+				if table.keyMatchesItem(cc.Key, item) {
+					found = item
+					break
+				}
+			}
+			if found == nil || !evaluateCondition(cc.ConditionExpression, found, cc.ExpressionAttributeNames, cc.ExpressionAttributeValues) {
+				reasons[i] = cancellationReason{Code: "ConditionalCheckFailed", Message: "The conditional request failed."}
+				anyFailed = true
+			}
+		}
+
+		if txItem.Put != nil && txItem.Put.ConditionExpression != "" {
+			p := txItem.Put
+			table, awsErr := s.getTable(p.TableName)
+			if awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+				continue
+			}
+			var found Item
+			for _, item := range table.Items {
+				if table.keyMatchesItem(p.Item, item) {
+					found = item
+					break
+				}
+			}
+			// For Put with condition, evaluate against existing item (or empty if not found).
+			if found == nil {
+				found = make(Item)
+			}
+			if !evaluateCondition(p.ConditionExpression, found, p.ExpressionAttributeNames, p.ExpressionAttributeValues) {
+				reasons[i] = cancellationReason{Code: "ConditionalCheckFailed", Message: "The conditional request failed."}
+				anyFailed = true
+			}
+		}
+
+		if txItem.Delete != nil && txItem.Delete.ConditionExpression != "" {
+			d := txItem.Delete
+			table, awsErr := s.getTable(d.TableName)
+			if awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+				continue
+			}
+			var found Item
+			for _, item := range table.Items {
+				if table.keyMatchesItem(d.Key, item) {
+					found = item
+					break
+				}
+			}
+			if found == nil {
+				found = make(Item)
+			}
+			if !evaluateCondition(d.ConditionExpression, found, d.ExpressionAttributeNames, d.ExpressionAttributeValues) {
+				reasons[i] = cancellationReason{Code: "ConditionalCheckFailed", Message: "The conditional request failed."}
+				anyFailed = true
+			}
+		}
+
+		if txItem.Update != nil && txItem.Update.ConditionExpression != "" {
+			u := txItem.Update
+			table, awsErr := s.getTable(u.TableName)
+			if awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+				continue
+			}
+			var found Item
+			for _, item := range table.Items {
+				if table.keyMatchesItem(u.Key, item) {
+					found = item
+					break
+				}
+			}
+			if found == nil {
+				found = make(Item)
+			}
+			if !evaluateCondition(u.ConditionExpression, found, u.ExpressionAttributeNames, u.ExpressionAttributeValues) {
+				reasons[i] = cancellationReason{Code: "ConditionalCheckFailed", Message: "The conditional request failed."}
+				anyFailed = true
+			}
+		}
+
+		// Also validate that tables exist for non-condition operations.
+		if txItem.Put != nil && txItem.Put.ConditionExpression == "" {
+			if _, awsErr := s.getTable(txItem.Put.TableName); awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+			}
+		}
+		if txItem.Delete != nil && txItem.Delete.ConditionExpression == "" {
+			if _, awsErr := s.getTable(txItem.Delete.TableName); awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+			}
+		}
+		if txItem.Update != nil && txItem.Update.ConditionExpression == "" {
+			if _, awsErr := s.getTable(txItem.Update.TableName); awsErr != nil {
+				reasons[i] = cancellationReason{Code: "ValidationException", Message: awsErr.Message}
+				anyFailed = true
+			}
+		}
+	}
+
+	if anyFailed {
+		return service.NewAWSError("TransactionCanceledException",
+			"Transaction cancelled, please refer cancellation reasons for specific reasons ["+formatReasons(reasons)+"]",
+			http.StatusBadRequest)
+	}
+
+	// Phase 2: Execute all writes.
+	for _, txItem := range items {
+		if txItem.Put != nil {
+			s.putItemLocked(txItem.Put.TableName, txItem.Put.Item)
+		}
+		if txItem.Delete != nil {
+			s.deleteItemLocked(txItem.Delete.TableName, txItem.Delete.Key)
+		}
+		if txItem.Update != nil {
+			u := txItem.Update
+			s.updateItemLocked(u.TableName, u.Key, u.UpdateExpression, u.ExpressionAttributeNames, u.ExpressionAttributeValues, "NONE")
+		}
+	}
+
+	return nil
+}
+
+// TransactGetItems retrieves items transactionally.
+func (s *TableStore) TransactGetItems(items []transactGetItem) ([]transactGetResponse, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	responses := make([]transactGetResponse, len(items))
+	for i, txItem := range items {
+		if txItem.Get == nil {
+			continue
+		}
+		g := txItem.Get
+		table, awsErr := s.getTable(g.TableName)
+		if awsErr != nil {
+			return nil, awsErr
+		}
+		for _, item := range table.Items {
+			if table.keyMatchesItem(g.Key, item) {
+				result := copyItem(item)
+				if g.ProjectionExpression != "" {
+					result = applyProjection(result, g.ProjectionExpression, g.ExpressionAttributeNames)
+				}
+				responses[i] = transactGetResponse{Item: result}
+				break
+			}
+		}
+	}
+	return responses, nil
+}
+
+func formatReasons(reasons []cancellationReason) string {
+	result := ""
+	for i, r := range reasons {
+		if i > 0 {
+			result += ", "
+		}
+		result += r.Code
+	}
+	return result
 }
 
 // copyItem returns a shallow copy of an item.

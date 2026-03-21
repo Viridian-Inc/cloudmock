@@ -886,3 +886,438 @@ func TestDDB_UnknownAction(t *testing.T) {
 		t.Fatalf("unknown action: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
+
+// ---- GSI Tests ----
+
+func TestDDB_CreateTable_WithGSI_DescribeTable(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+		"TableName": "GSITable",
+		"KeySchema": []map[string]string{
+			{"AttributeName": "pk", "KeyType": "HASH"},
+			{"AttributeName": "sk", "KeyType": "RANGE"},
+		},
+		"AttributeDefinitions": []map[string]string{
+			{"AttributeName": "pk", "AttributeType": "S"},
+			{"AttributeName": "sk", "AttributeType": "S"},
+			{"AttributeName": "gsiPk", "AttributeType": "S"},
+			{"AttributeName": "gsiSk", "AttributeType": "S"},
+		},
+		"BillingMode": "PAY_PER_REQUEST",
+		"GlobalSecondaryIndexes": []map[string]interface{}{
+			{
+				"IndexName": "gsi-index",
+				"KeySchema": []map[string]string{
+					{"AttributeName": "gsiPk", "KeyType": "HASH"},
+					{"AttributeName": "gsiSk", "KeyType": "RANGE"},
+				},
+				"Projection": map[string]string{
+					"ProjectionType": "ALL",
+				},
+			},
+		},
+	}))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateTable with GSI: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// DescribeTable should show the GSI.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]interface{}{
+		"TableName": "GSITable",
+	}))
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("DescribeTable: expected 200, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+
+	m := decodeJSON(t, w2.Body.String())
+	table := m["Table"].(map[string]interface{})
+	gsis, ok := table["GlobalSecondaryIndexes"].([]interface{})
+	if !ok || len(gsis) != 1 {
+		t.Fatalf("DescribeTable: expected 1 GSI, got %v", table["GlobalSecondaryIndexes"])
+	}
+	gsi := gsis[0].(map[string]interface{})
+	if gsi["IndexName"] != "gsi-index" {
+		t.Errorf("DescribeTable: expected IndexName=gsi-index, got %v", gsi["IndexName"])
+	}
+	if gsi["IndexStatus"] != "ACTIVE" {
+		t.Errorf("DescribeTable: expected IndexStatus=ACTIVE, got %v", gsi["IndexStatus"])
+	}
+}
+
+func TestDDB_Query_GSI(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	// Create table with GSI.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+		"TableName": "GSIQuery",
+		"KeySchema": []map[string]string{
+			{"AttributeName": "pk", "KeyType": "HASH"},
+			{"AttributeName": "sk", "KeyType": "RANGE"},
+		},
+		"AttributeDefinitions": []map[string]string{
+			{"AttributeName": "pk", "AttributeType": "S"},
+			{"AttributeName": "sk", "AttributeType": "S"},
+			{"AttributeName": "status", "AttributeType": "S"},
+			{"AttributeName": "createdAt", "AttributeType": "S"},
+		},
+		"BillingMode": "PAY_PER_REQUEST",
+		"GlobalSecondaryIndexes": []map[string]interface{}{
+			{
+				"IndexName": "status-createdAt-index",
+				"KeySchema": []map[string]string{
+					{"AttributeName": "status", "KeyType": "HASH"},
+					{"AttributeName": "createdAt", "KeyType": "RANGE"},
+				},
+				"Projection": map[string]string{
+					"ProjectionType": "ALL",
+				},
+			},
+		},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Put items with different statuses.
+	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
+		"pk":        map[string]interface{}{"S": "order1"},
+		"sk":        map[string]interface{}{"S": "detail"},
+		"status":    map[string]interface{}{"S": "active"},
+		"createdAt": map[string]interface{}{"S": "2024-01-01"},
+	})
+	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
+		"pk":        map[string]interface{}{"S": "order2"},
+		"sk":        map[string]interface{}{"S": "detail"},
+		"status":    map[string]interface{}{"S": "active"},
+		"createdAt": map[string]interface{}{"S": "2024-01-02"},
+	})
+	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
+		"pk":        map[string]interface{}{"S": "order3"},
+		"sk":        map[string]interface{}{"S": "detail"},
+		"status":    map[string]interface{}{"S": "completed"},
+		"createdAt": map[string]interface{}{"S": "2024-01-03"},
+	})
+
+	// Query GSI for active orders.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]interface{}{
+		"TableName":              "GSIQuery",
+		"IndexName":              "status-createdAt-index",
+		"KeyConditionExpression": "#s = :status",
+		"ExpressionAttributeNames": map[string]string{
+			"#s": "status",
+		},
+		"ExpressionAttributeValues": map[string]interface{}{
+			":status": map[string]interface{}{"S": "active"},
+		},
+	}))
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("Query GSI: expected 200, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+
+	m := decodeJSON(t, w2.Body.String())
+	count := int(m["Count"].(float64))
+	if count != 2 {
+		t.Errorf("Query GSI: expected 2 active items, got %d\nbody: %s", count, w2.Body.String())
+	}
+}
+
+func TestDDB_Query_GSI_WithSortKeyCondition(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	// Create table with GSI.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+		"TableName": "GSISortQuery",
+		"KeySchema": []map[string]string{
+			{"AttributeName": "pk", "KeyType": "HASH"},
+			{"AttributeName": "sk", "KeyType": "RANGE"},
+		},
+		"AttributeDefinitions": []map[string]string{
+			{"AttributeName": "pk", "AttributeType": "S"},
+			{"AttributeName": "sk", "AttributeType": "S"},
+			{"AttributeName": "category", "AttributeType": "S"},
+			{"AttributeName": "price", "AttributeType": "N"},
+		},
+		"BillingMode": "PAY_PER_REQUEST",
+		"GlobalSecondaryIndexes": []map[string]interface{}{
+			{
+				"IndexName": "category-price-index",
+				"KeySchema": []map[string]string{
+					{"AttributeName": "category", "KeyType": "HASH"},
+					{"AttributeName": "price", "KeyType": "RANGE"},
+				},
+				"Projection": map[string]string{
+					"ProjectionType": "ALL",
+				},
+			},
+		},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Put items.
+	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
+		"pk":       map[string]interface{}{"S": "p1"},
+		"sk":       map[string]interface{}{"S": "s1"},
+		"category": map[string]interface{}{"S": "electronics"},
+		"price":    map[string]interface{}{"N": "100"},
+	})
+	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
+		"pk":       map[string]interface{}{"S": "p2"},
+		"sk":       map[string]interface{}{"S": "s1"},
+		"category": map[string]interface{}{"S": "electronics"},
+		"price":    map[string]interface{}{"N": "200"},
+	})
+	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
+		"pk":       map[string]interface{}{"S": "p3"},
+		"sk":       map[string]interface{}{"S": "s1"},
+		"category": map[string]interface{}{"S": "electronics"},
+		"price":    map[string]interface{}{"N": "50"},
+	})
+
+	// Query GSI with sort key condition: price > 75.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]interface{}{
+		"TableName":              "GSISortQuery",
+		"IndexName":              "category-price-index",
+		"KeyConditionExpression": "category = :cat AND price > :minPrice",
+		"ExpressionAttributeValues": map[string]interface{}{
+			":cat":      map[string]interface{}{"S": "electronics"},
+			":minPrice": map[string]interface{}{"N": "75"},
+		},
+	}))
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("Query GSI sort key: expected 200, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+
+	m := decodeJSON(t, w2.Body.String())
+	count := int(m["Count"].(float64))
+	if count != 2 {
+		t.Errorf("Query GSI sort key: expected 2 items (price > 75), got %d", count)
+	}
+
+	// Verify items are sorted by price ascending (default).
+	items := m["Items"].([]interface{})
+	price0 := items[0].(map[string]interface{})["price"].(map[string]interface{})["N"]
+	price1 := items[1].(map[string]interface{})["price"].(map[string]interface{})["N"]
+	if price0 != "100" || price1 != "200" {
+		t.Errorf("Query GSI sort key: expected prices 100, 200, got %v, %v", price0, price1)
+	}
+}
+
+// ---- Transaction Tests ----
+
+func TestDDB_TransactWriteItems_PutAndDelete(t *testing.T) {
+	handler := newDDBGateway(t)
+	createTestTable(t, handler, "TxTable1")
+	createTestTable(t, handler, "TxTable2")
+
+	// Pre-populate an item to delete.
+	putTestItem(t, handler, "TxTable2", map[string]interface{}{
+		"pk":   map[string]interface{}{"S": "del1"},
+		"sk":   map[string]interface{}{"S": "s1"},
+		"data": map[string]interface{}{"S": "to-be-deleted"},
+	})
+
+	// TransactWriteItems: Put into TxTable1, Delete from TxTable2.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]interface{}{
+		"TransactItems": []map[string]interface{}{
+			{
+				"Put": map[string]interface{}{
+					"TableName": "TxTable1",
+					"Item": map[string]interface{}{
+						"pk":   map[string]interface{}{"S": "new1"},
+						"sk":   map[string]interface{}{"S": "s1"},
+						"data": map[string]interface{}{"S": "created-in-tx"},
+					},
+				},
+			},
+			{
+				"Delete": map[string]interface{}{
+					"TableName": "TxTable2",
+					"Key": map[string]interface{}{
+						"pk": map[string]interface{}{"S": "del1"},
+						"sk": map[string]interface{}{"S": "s1"},
+					},
+				},
+			},
+		},
+	}))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("TransactWriteItems: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify put succeeded.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+		"TableName": "TxTable1",
+		"Key": map[string]interface{}{
+			"pk": map[string]interface{}{"S": "new1"},
+			"sk": map[string]interface{}{"S": "s1"},
+		},
+	}))
+	m := decodeJSON(t, w2.Body.String())
+	if m["Item"] == nil {
+		t.Error("TransactWriteItems: put item not found")
+	}
+
+	// Verify delete succeeded.
+	w3 := httptest.NewRecorder()
+	handler.ServeHTTP(w3, ddbReq(t, "GetItem", map[string]interface{}{
+		"TableName": "TxTable2",
+		"Key": map[string]interface{}{
+			"pk": map[string]interface{}{"S": "del1"},
+			"sk": map[string]interface{}{"S": "s1"},
+		},
+	}))
+	m2 := decodeJSON(t, w3.Body.String())
+	if m2["Item"] != nil {
+		t.Error("TransactWriteItems: deleted item still exists")
+	}
+}
+
+func TestDDB_TransactWriteItems_ConditionCheckFailure(t *testing.T) {
+	handler := newDDBGateway(t)
+	createTestTable(t, handler, "TxCondTable")
+
+	// Put an item with status=active.
+	putTestItem(t, handler, "TxCondTable", map[string]interface{}{
+		"pk":     map[string]interface{}{"S": "item1"},
+		"sk":     map[string]interface{}{"S": "s1"},
+		"status": map[string]interface{}{"S": "active"},
+	})
+
+	// TransactWriteItems with ConditionCheck that will fail (expects status=completed).
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]interface{}{
+		"TransactItems": []map[string]interface{}{
+			{
+				"ConditionCheck": map[string]interface{}{
+					"TableName": "TxCondTable",
+					"Key": map[string]interface{}{
+						"pk": map[string]interface{}{"S": "item1"},
+						"sk": map[string]interface{}{"S": "s1"},
+					},
+					"ConditionExpression": "#s = :expected",
+					"ExpressionAttributeNames": map[string]string{
+						"#s": "status",
+					},
+					"ExpressionAttributeValues": map[string]interface{}{
+						":expected": map[string]interface{}{"S": "completed"},
+					},
+				},
+			},
+			{
+				"Put": map[string]interface{}{
+					"TableName": "TxCondTable",
+					"Item": map[string]interface{}{
+						"pk":     map[string]interface{}{"S": "item2"},
+						"sk":     map[string]interface{}{"S": "s1"},
+						"status": map[string]interface{}{"S": "new"},
+					},
+				},
+			},
+		},
+	}))
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("TransactWriteItems condition failure: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "TransactionCanceledException" {
+		t.Errorf("TransactWriteItems: expected TransactionCanceledException, got %v", errType)
+	}
+
+	// Verify the Put was rolled back (item2 should not exist).
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+		"TableName": "TxCondTable",
+		"Key": map[string]interface{}{
+			"pk": map[string]interface{}{"S": "item2"},
+			"sk": map[string]interface{}{"S": "s1"},
+		},
+	}))
+	m2 := decodeJSON(t, w2.Body.String())
+	if m2["Item"] != nil {
+		t.Error("TransactWriteItems: put should have been rolled back but item2 exists")
+	}
+}
+
+func TestDDB_TransactGetItems(t *testing.T) {
+	handler := newDDBGateway(t)
+	createTestTable(t, handler, "TxGetTable1")
+	createTestTable(t, handler, "TxGetTable2")
+
+	putTestItem(t, handler, "TxGetTable1", map[string]interface{}{
+		"pk":   map[string]interface{}{"S": "a1"},
+		"sk":   map[string]interface{}{"S": "s1"},
+		"name": map[string]interface{}{"S": "Alice"},
+	})
+	putTestItem(t, handler, "TxGetTable2", map[string]interface{}{
+		"pk":   map[string]interface{}{"S": "b1"},
+		"sk":   map[string]interface{}{"S": "s1"},
+		"name": map[string]interface{}{"S": "Bob"},
+	})
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "TransactGetItems", map[string]interface{}{
+		"TransactItems": []map[string]interface{}{
+			{
+				"Get": map[string]interface{}{
+					"TableName": "TxGetTable1",
+					"Key": map[string]interface{}{
+						"pk": map[string]interface{}{"S": "a1"},
+						"sk": map[string]interface{}{"S": "s1"},
+					},
+				},
+			},
+			{
+				"Get": map[string]interface{}{
+					"TableName": "TxGetTable2",
+					"Key": map[string]interface{}{
+						"pk": map[string]interface{}{"S": "b1"},
+						"sk": map[string]interface{}{"S": "s1"},
+					},
+				},
+			},
+		},
+	}))
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("TransactGetItems: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	m := decodeJSON(t, w.Body.String())
+	responses, ok := m["Responses"].([]interface{})
+	if !ok || len(responses) != 2 {
+		t.Fatalf("TransactGetItems: expected 2 responses, got %v", m["Responses"])
+	}
+
+	r0 := responses[0].(map[string]interface{})
+	item0 := r0["Item"].(map[string]interface{})
+	name0 := item0["name"].(map[string]interface{})["S"]
+	if name0 != "Alice" {
+		t.Errorf("TransactGetItems: expected first item name=Alice, got %v", name0)
+	}
+
+	r1 := responses[1].(map[string]interface{})
+	item1 := r1["Item"].(map[string]interface{})
+	name1 := item1["name"].(map[string]interface{})["S"]
+	if name1 != "Bob" {
+		t.Errorf("TransactGetItems: expected second item name=Bob, got %v", name1)
+	}
+}

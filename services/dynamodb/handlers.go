@@ -10,23 +10,47 @@ import (
 // ---- JSON request/response types ----
 
 type createTableRequest struct {
-	TableName             string                 `json:"TableName"`
+	TableName              string                 `json:"TableName"`
+	KeySchema              []KeySchemaElement      `json:"KeySchema"`
+	AttributeDefinitions   []AttributeDefinition   `json:"AttributeDefinitions"`
+	BillingMode            string                  `json:"BillingMode"`
+	ProvisionedThroughput  *ProvisionedThroughput  `json:"ProvisionedThroughput"`
+	GlobalSecondaryIndexes []GSI                   `json:"GlobalSecondaryIndexes"`
+	LocalSecondaryIndexes  []LSI                   `json:"LocalSecondaryIndexes"`
+}
+
+type gsiDescription struct {
+	IndexName             string                 `json:"IndexName"`
 	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	AttributeDefinitions  []AttributeDefinition   `json:"AttributeDefinitions"`
-	BillingMode           string                  `json:"BillingMode"`
-	ProvisionedThroughput *ProvisionedThroughput  `json:"ProvisionedThroughput"`
+	Projection            map[string]interface{} `json:"Projection"`
+	IndexStatus           string                 `json:"IndexStatus"`
+	ItemCount             int64                  `json:"ItemCount"`
+	IndexSizeBytes        int64                  `json:"IndexSizeBytes"`
+	IndexArn              string                 `json:"IndexArn"`
+	ProvisionedThroughput *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
+}
+
+type lsiDescription struct {
+	IndexName      string                 `json:"IndexName"`
+	KeySchema      []KeySchemaElement      `json:"KeySchema"`
+	Projection     map[string]interface{} `json:"Projection"`
+	ItemCount      int64                  `json:"ItemCount"`
+	IndexSizeBytes int64                  `json:"IndexSizeBytes"`
+	IndexArn       string                 `json:"IndexArn"`
 }
 
 type tableDescription struct {
-	TableName             string                 `json:"TableName"`
-	TableStatus           string                 `json:"TableStatus"`
-	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	AttributeDefinitions  []AttributeDefinition   `json:"AttributeDefinitions"`
-	CreationDateTime      float64                `json:"CreationDateTime"`
-	ItemCount             int64                  `json:"ItemCount"`
-	TableArn              string                 `json:"TableArn"`
-	BillingModeSummary    *billingModeSummary    `json:"BillingModeSummary,omitempty"`
-	ProvisionedThroughput *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
+	TableName              string                 `json:"TableName"`
+	TableStatus            string                 `json:"TableStatus"`
+	KeySchema              []KeySchemaElement      `json:"KeySchema"`
+	AttributeDefinitions   []AttributeDefinition   `json:"AttributeDefinitions"`
+	CreationDateTime       float64                `json:"CreationDateTime"`
+	ItemCount              int64                  `json:"ItemCount"`
+	TableArn               string                 `json:"TableArn"`
+	BillingModeSummary     *billingModeSummary    `json:"BillingModeSummary,omitempty"`
+	ProvisionedThroughput  *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
+	GlobalSecondaryIndexes []gsiDescription       `json:"GlobalSecondaryIndexes,omitempty"`
+	LocalSecondaryIndexes  []lsiDescription       `json:"LocalSecondaryIndexes,omitempty"`
 }
 
 type billingModeSummary struct {
@@ -93,6 +117,7 @@ type updateItemResponse struct {
 
 type queryRequest struct {
 	TableName                 string                     `json:"TableName"`
+	IndexName                 string                     `json:"IndexName"`
 	KeyConditionExpression    string                     `json:"KeyConditionExpression"`
 	FilterExpression          string                     `json:"FilterExpression"`
 	ProjectionExpression      string                     `json:"ProjectionExpression"`
@@ -159,6 +184,80 @@ type batchWriteItemResponse struct {
 	UnprocessedItems map[string][]writeRequest `json:"UnprocessedItems"`
 }
 
+// ---- Transaction types ----
+
+type transactWriteItemsRequest struct {
+	TransactItems []transactWriteItem `json:"TransactItems"`
+}
+
+type transactWriteItem struct {
+	Put            *transactPut            `json:"Put,omitempty"`
+	Delete         *transactDelete         `json:"Delete,omitempty"`
+	Update         *transactUpdate         `json:"Update,omitempty"`
+	ConditionCheck *transactConditionCheck `json:"ConditionCheck,omitempty"`
+}
+
+type transactPut struct {
+	TableName                 string                    `json:"TableName"`
+	Item                      Item                      `json:"Item"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+}
+
+type transactDelete struct {
+	TableName                 string                    `json:"TableName"`
+	Key                       Item                      `json:"Key"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+}
+
+type transactUpdate struct {
+	TableName                 string                    `json:"TableName"`
+	Key                       Item                      `json:"Key"`
+	UpdateExpression          string                    `json:"UpdateExpression"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+}
+
+type transactConditionCheck struct {
+	TableName                 string                    `json:"TableName"`
+	Key                       Item                      `json:"Key"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+}
+
+type transactGetItemsRequest struct {
+	TransactItems []transactGetItem `json:"TransactItems"`
+}
+
+type transactGetItem struct {
+	Get *transactGet `json:"Get"`
+}
+
+type transactGet struct {
+	TableName                string            `json:"TableName"`
+	Key                      Item              `json:"Key"`
+	ProjectionExpression     string            `json:"ProjectionExpression"`
+	ExpressionAttributeNames map[string]string `json:"ExpressionAttributeNames"`
+}
+
+type transactGetItemsResponse struct {
+	Responses []transactGetResponse `json:"Responses"`
+}
+
+type transactGetResponse struct {
+	Item Item `json:"Item,omitempty"`
+}
+
+type cancellationReason struct {
+	Code    string `json:"Code"`
+	Message string `json:"Message,omitempty"`
+}
+
 // ---- helpers ----
 
 func jsonOK(body interface{}) (*service.Response, error) {
@@ -200,6 +299,30 @@ func tableToDescription(t *Table, arn string) tableDescription {
 	if t.ProvisionedThroughput != nil {
 		desc.ProvisionedThroughput = t.ProvisionedThroughput
 	}
+	for _, gsi := range t.GSIs {
+		itemCount := int64(len(t.GSIItems[gsi.IndexName]))
+		desc.GlobalSecondaryIndexes = append(desc.GlobalSecondaryIndexes, gsiDescription{
+			IndexName:             gsi.IndexName,
+			KeySchema:             gsi.KeySchema,
+			Projection:            gsi.Projection,
+			IndexStatus:           "ACTIVE",
+			ItemCount:             itemCount,
+			IndexSizeBytes:        itemCount * 100, // approximate
+			IndexArn:              arn + "/index/" + gsi.IndexName,
+			ProvisionedThroughput: gsi.ProvisionedThroughput,
+		})
+	}
+	for _, lsi := range t.LSIs {
+		itemCount := int64(len(t.LSIItems[lsi.IndexName]))
+		desc.LocalSecondaryIndexes = append(desc.LocalSecondaryIndexes, lsiDescription{
+			IndexName:      lsi.IndexName,
+			KeySchema:      lsi.KeySchema,
+			Projection:     lsi.Projection,
+			ItemCount:      itemCount,
+			IndexSizeBytes: itemCount * 100,
+			IndexArn:       arn + "/index/" + lsi.IndexName,
+		})
+	}
 	return desc
 }
 
@@ -219,7 +342,7 @@ func handleCreateTable(ctx *service.RequestContext, store *TableStore) (*service
 			"KeySchema is required.", http.StatusBadRequest))
 	}
 
-	table, awsErr := store.CreateTable(req.TableName, req.KeySchema, req.AttributeDefinitions, req.BillingMode, req.ProvisionedThroughput)
+	table, awsErr := store.CreateTable(req.TableName, req.KeySchema, req.AttributeDefinitions, req.BillingMode, req.ProvisionedThroughput, req.GlobalSecondaryIndexes, req.LocalSecondaryIndexes)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}
@@ -358,7 +481,7 @@ func handleQuery(ctx *service.RequestContext, store *TableStore) (*service.Respo
 			"KeyConditionExpression is required.", http.StatusBadRequest))
 	}
 
-	items, count, scanned, awsErr := store.Query(req.TableName, req.KeyConditionExpression, req.FilterExpression, req.ProjectionExpression, req.ExpressionAttributeNames, req.ExpressionAttributeValues, req.ScanIndexForward, req.Limit)
+	items, count, scanned, awsErr := store.Query(req.TableName, req.IndexName, req.KeyConditionExpression, req.FilterExpression, req.ProjectionExpression, req.ExpressionAttributeNames, req.ExpressionAttributeValues, req.ScanIndexForward, req.Limit)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}
@@ -454,4 +577,37 @@ func handleBatchWriteItem(ctx *service.RequestContext, store *TableStore) (*serv
 	return jsonOK(batchWriteItemResponse{
 		UnprocessedItems: map[string][]writeRequest{},
 	})
+}
+
+func handleTransactWriteItems(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
+	var req transactWriteItemsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if len(req.TransactItems) == 0 {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"TransactItems is required and must not be empty.", http.StatusBadRequest))
+	}
+
+	if awsErr := store.TransactWriteItems(req.TransactItems); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(struct{}{})
+}
+
+func handleTransactGetItems(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
+	var req transactGetItemsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if len(req.TransactItems) == 0 {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"TransactItems is required and must not be empty.", http.StatusBadRequest))
+	}
+
+	responses, awsErr := store.TransactGetItems(req.TransactItems)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(transactGetItemsResponse{Responses: responses})
 }

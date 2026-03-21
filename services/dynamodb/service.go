@@ -37,6 +37,8 @@ func (s *DynamoDBService) Actions() []service.Action {
 		{Name: "Scan", Method: http.MethodPost, IAMAction: "dynamodb:Scan"},
 		{Name: "BatchGetItem", Method: http.MethodPost, IAMAction: "dynamodb:BatchGetItem"},
 		{Name: "BatchWriteItem", Method: http.MethodPost, IAMAction: "dynamodb:BatchWriteItem"},
+		{Name: "TransactWriteItems", Method: http.MethodPost, IAMAction: "dynamodb:TransactWriteItems"},
+		{Name: "TransactGetItems", Method: http.MethodPost, IAMAction: "dynamodb:TransactGetItems"},
 	}
 }
 
@@ -98,6 +100,10 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleBatchGetItem(ctx, s.store)
 	case "BatchWriteItem":
 		return handleBatchWriteItem(ctx, s.store)
+	case "TransactWriteItems":
+		return handleTransactWriteItems(ctx, s.store)
+	case "TransactGetItems":
+		return handleTransactGetItems(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

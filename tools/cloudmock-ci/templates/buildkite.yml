@@ -1,0 +1,17 @@
+steps:
+  - label: ":cloud: cloudmock tests"
+    plugins:
+      - docker-compose#v5.1.0:
+          run: test
+          config: docker-compose.ci.yml
+
+    commands:
+      - cloudmock-ci wait --timeout 30s
+      - cloudmock-ci run --tool terraform
+      - cloudmock-ci report --format junit --output results.xml
+
+    artifact_paths:
+      - results.xml
+
+    env:
+      CLOUDMOCK_ENDPOINT: http://cloudmock:4566

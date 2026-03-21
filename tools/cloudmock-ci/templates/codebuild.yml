@@ -1,0 +1,31 @@
+version: 0.2
+
+env:
+  variables:
+    CLOUDMOCK_ENDPOINT: http://localhost:4566
+
+phases:
+  install:
+    runtime-versions:
+      golang: 1.21
+    commands:
+      - docker run -d --name cloudmock -p 4566:4566 ghcr.io/neureaux/cloudmock:latest
+
+  pre_build:
+    commands:
+      - cloudmock-ci wait --timeout 30s
+
+  build:
+    commands:
+      - cloudmock-ci run --tool terraform
+
+  post_build:
+    commands:
+      - cloudmock-ci report --format junit --output results.xml
+      - docker stop cloudmock
+
+reports:
+  cloudmock-report:
+    files:
+      - results.xml
+    file-format: JUNITXML

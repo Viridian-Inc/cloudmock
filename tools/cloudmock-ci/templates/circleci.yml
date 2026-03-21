@@ -1,0 +1,34 @@
+version: 2.1
+
+jobs:
+  test:
+    docker:
+      - image: cimg/base:current
+      - image: ghcr.io/neureaux/cloudmock:latest
+
+    environment:
+      CLOUDMOCK_ENDPOINT: http://localhost:4566
+
+    steps:
+      - checkout
+
+      - run:
+          name: Wait for cloudmock
+          command: cloudmock-ci wait --timeout 30s
+
+      - run:
+          name: Run tests
+          command: cloudmock-ci run --tool terraform
+
+      - run:
+          name: Generate report
+          command: cloudmock-ci report --format junit --output results.xml
+          when: always
+
+      - store_test_results:
+          path: results.xml
+
+workflows:
+  cloudmock-tests:
+    jobs:
+      - test

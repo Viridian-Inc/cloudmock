@@ -1,0 +1,25 @@
+stages:
+  - test
+
+cloudmock-test:
+  stage: test
+  image: ubuntu:latest
+
+  services:
+    - name: ghcr.io/neureaux/cloudmock:latest
+      alias: cloudmock
+
+  variables:
+    CLOUDMOCK_ENDPOINT: http://cloudmock:4566
+
+  script:
+    - cloudmock-ci wait --timeout 30s
+    - cloudmock-ci run --tool terraform
+
+  after_script:
+    - cloudmock-ci report --format junit --output results.xml
+
+  artifacts:
+    when: always
+    reports:
+      junit: results.xml

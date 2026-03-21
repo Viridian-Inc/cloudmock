@@ -1,0 +1,24 @@
+pipelines:
+  default:
+    - step:
+        name: cloudmock tests
+        image: ubuntu:latest
+
+        services:
+          - cloudmock
+
+        script:
+          - export CLOUDMOCK_ENDPOINT=http://localhost:4566
+          - cloudmock-ci wait --timeout 30s
+          - cloudmock-ci run --tool terraform
+          - cloudmock-ci report --format junit --output results.xml
+
+        artifacts:
+          - results.xml
+
+definitions:
+  services:
+    cloudmock:
+      image: ghcr.io/neureaux/cloudmock:latest
+      variables:
+        SERVICES: s3,sqs,dynamodb

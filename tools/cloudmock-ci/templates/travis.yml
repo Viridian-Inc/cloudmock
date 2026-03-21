@@ -1,0 +1,21 @@
+language: minimal
+
+services:
+  - docker
+
+env:
+  global:
+    - CLOUDMOCK_ENDPOINT=http://localhost:4566
+
+before_install:
+  - docker run -d --name cloudmock -p 4566:4566 ghcr.io/neureaux/cloudmock:latest
+
+before_script:
+  - cloudmock-ci wait --timeout 30s
+
+script:
+  - cloudmock-ci run --tool terraform
+
+after_script:
+  - cloudmock-ci report --format junit --output results.xml
+  - docker stop cloudmock

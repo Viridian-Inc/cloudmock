@@ -1,24 +1,37 @@
 package gateway
 
 import (
+	"bytes"
+	"fmt"
+	"io"
 	"net/http"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
+// maxBodyCapture is the maximum number of bytes captured for request/response bodies.
+const maxBodyCapture = 10 * 1024
+
 // RequestEntry holds data about a single request processed by the gateway.
 type RequestEntry struct {
-	Timestamp  time.Time     `json:"timestamp"`
-	Service    string        `json:"service"`
-	Action     string        `json:"action"`
-	Method     string        `json:"method"`
-	Path       string        `json:"path"`
-	StatusCode int           `json:"status_code"`
-	Latency    time.Duration `json:"latency_ns"`
-	CallerID   string        `json:"caller_id"`
-	Error      string        `json:"error,omitempty"`
+	ID             string            `json:"id"`
+	Timestamp      time.Time         `json:"timestamp"`
+	Service        string            `json:"service"`
+	Action         string            `json:"action"`
+	Method         string            `json:"method"`
+	Path           string            `json:"path"`
+	StatusCode     int               `json:"status_code"`
+	Latency        time.Duration     `json:"latency_ns"`
+	CallerID       string            `json:"caller_id"`
+	Error          string            `json:"error,omitempty"`
+	RequestHeaders map[string]string `json:"request_headers,omitempty"`
+	RequestBody    string            `json:"request_body,omitempty"`
+	ResponseBody   string            `json:"response_body,omitempty"`
 }
+
+// requestIDCounter is a simple monotonic counter for generating unique request IDs.
+var requestIDCounter atomic.Int64
 
 // RequestLog is a thread-safe circular buffer of recent request entries.
 type RequestLog struct {
@@ -72,6 +85,21 @@ func (rl *RequestLog) Recent(service string, limit int) []RequestEntry {
 	return result
 }
 
+// GetByID returns the entry with the given ID, or nil if not found.
+func (rl *RequestLog) GetByID(id string) *RequestEntry {
+	rl.mu.RLock()
+	defer rl.mu.RUnlock()
+
+	for i := 0; i < rl.count; i++ {
+		idx := (rl.pos - 1 - i + rl.size) % rl.size
+		if rl.entries[idx].ID == id {
+			e := rl.entries[idx]
+			return &e
+		}
+	}
+	return nil
+}
+
 // RequestStats tracks per-service request counts using atomic counters.
 type RequestStats struct {
 	mu     sync.RWMutex
@@ -115,15 +143,28 @@ func (rs *RequestStats) Snapshot() map[string]int64 {
 	return out
 }
 
-// responseRecorder wraps http.ResponseWriter to capture the status code.
+// responseRecorder wraps http.ResponseWriter to capture the status code and response body.
 type responseRecorder struct {
 	http.ResponseWriter
 	statusCode int
+	body       bytes.Buffer
 }
 
 func (rr *responseRecorder) WriteHeader(code int) {
 	rr.statusCode = code
 	rr.ResponseWriter.WriteHeader(code)
+}
+
+func (rr *responseRecorder) Write(b []byte) (int, error) {
+	if rr.body.Len() < maxBodyCapture {
+		remaining := maxBodyCapture - rr.body.Len()
+		if len(b) > remaining {
+			rr.body.Write(b[:remaining])
+		} else {
+			rr.body.Write(b)
+		}
+	}
+	return rr.ResponseWriter.Write(b)
 }
 
 // RequestBroadcaster is an optional interface for broadcasting request events.
@@ -140,6 +181,28 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 
+		// Capture request headers.
+		reqHeaders := make(map[string]string, len(r.Header))
+		for k := range r.Header {
+			reqHeaders[k] = r.Header.Get(k)
+		}
+
+		// Capture request body (first maxBodyCapture bytes), then restore it.
+		var reqBody string
+		if r.Body != nil {
+			bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, int64(maxBodyCapture)+1))
+			if err == nil {
+				if len(bodyBytes) > maxBodyCapture {
+					reqBody = string(bodyBytes[:maxBodyCapture])
+				} else {
+					reqBody = string(bodyBytes)
+				}
+				// Restore the body so downstream handlers can read it.
+				remaining, _ := io.ReadAll(r.Body)
+				r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes), bytes.NewReader(remaining)))
+			}
+		}
+
 		rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
 		next.ServeHTTP(rec, r)
 
@@ -148,15 +211,22 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, 
 
 		latency := time.Since(start)
 
+		id := time.Now().UnixNano()
+		counter := requestIDCounter.Add(1)
+
 		entry := RequestEntry{
-			Timestamp:  start,
-			Service:    svcName,
-			Action:     action,
-			Method:     r.Method,
-			Path:       r.URL.Path,
-			StatusCode: rec.statusCode,
-			Latency:    latency,
-			CallerID:   extractCallerID(r),
+			ID:             fmt.Sprintf("%d-%d", id, counter),
+			Timestamp:      start,
+			Service:        svcName,
+			Action:         action,
+			Method:         r.Method,
+			Path:           r.URL.Path,
+			StatusCode:     rec.statusCode,
+			Latency:        latency,
+			CallerID:       extractCallerID(r),
+			RequestHeaders: reqHeaders,
+			RequestBody:    reqBody,
+			ResponseBody:   rec.body.String(),
 		}
 
 		log.Add(entry)

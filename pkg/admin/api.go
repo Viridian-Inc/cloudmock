@@ -9,8 +9,10 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/services/lambda"
+	"github.com/neureaux/cloudmock/services/ses"
 )
 
 // Resettable is an optional interface that services can implement to support state reset.
@@ -39,6 +41,8 @@ type API struct {
 	stats       *gateway.RequestStats
 	broadcaster *EventBroadcaster
 	lambdaLogs  *lambda.LogBuffer
+	iamEngine   *iam.Engine
+	sesStore    *ses.Store
 	mux         *http.ServeMux
 }
 
@@ -63,6 +67,11 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/stream", a.handleStream)
 	a.mux.HandleFunc("/api/lambda/logs", a.handleLambdaLogs)
 	a.mux.HandleFunc("/api/lambda/logs/stream", a.handleLambdaLogStream)
+	a.mux.HandleFunc("/api/requests/", a.handleRequestByID)
+	a.mux.HandleFunc("/api/iam/evaluate", a.handleIAMEvaluate)
+	a.mux.HandleFunc("/api/ses/emails", a.handleSESEmails)
+	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
+	a.mux.HandleFunc("/api/topology", a.handleTopology)
 
 	return a
 }
@@ -329,6 +338,233 @@ func (a *API) handleLambdaLogStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+}
+
+// SetIAMEngine sets the IAM engine for the admin API to use for policy evaluation.
+func (a *API) SetIAMEngine(engine *iam.Engine) {
+	a.iamEngine = engine
+}
+
+// SetSESStore sets the SES store for the admin API to expose captured emails.
+func (a *API) SetSESStore(store *ses.Store) {
+	a.sesStore = store
+}
+
+// handleRequestByID returns the full detail of a single request entry.
+func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/requests/")
+
+	if r.Method == http.MethodPost && strings.HasSuffix(id, "/replay") {
+		// Replay not yet implemented — return a stub.
+		id = strings.TrimSuffix(id, "/replay")
+		entry := a.log.GetByID(id)
+		if entry == nil {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "replayed", "id": id})
+		return
+	}
+
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	entry := a.log.GetByID(id)
+	if entry == nil {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, http.StatusOK, entry)
+}
+
+// IAMEvalRequest is the request body for the IAM evaluate endpoint.
+type IAMEvalRequest struct {
+	Principal string `json:"principal"`
+	Action    string `json:"action"`
+	Resource  string `json:"resource"`
+}
+
+// IAMEvalResponse is the response for the IAM evaluate endpoint.
+type IAMEvalResponse struct {
+	Decision         string         `json:"decision"`
+	Reason           string         `json:"reason"`
+	MatchedStatement *iam.Statement `json:"matched_statement,omitempty"`
+}
+
+func (a *API) handleIAMEvaluate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if a.iamEngine == nil {
+		writeJSON(w, http.StatusOK, IAMEvalResponse{
+			Decision: "DENY",
+			Reason:   "IAM engine not configured",
+		})
+		return
+	}
+
+	var req IAMEvalRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	result := a.iamEngine.Evaluate(&iam.EvalRequest{
+		Principal: req.Principal,
+		Action:    req.Action,
+		Resource:  req.Resource,
+	})
+
+	decision := "DENY"
+	if result.Decision == iam.Allow {
+		decision = "ALLOW"
+	}
+
+	resp := IAMEvalResponse{
+		Decision: decision,
+		Reason:   result.Reason,
+	}
+	if result.MatchedStatement != nil {
+		resp.MatchedStatement = result.MatchedStatement
+	}
+
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// SESEmailSummary is a summary of a captured email for listing.
+type SESEmailSummary struct {
+	MessageId string   `json:"message_id"`
+	Source    string    `json:"source"`
+	To       []string  `json:"to"`
+	Subject  string    `json:"subject"`
+	Timestamp string   `json:"timestamp"`
+}
+
+func (a *API) handleSESEmails(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if a.sesStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	emails := a.sesStore.GetEmails()
+	summaries := make([]SESEmailSummary, 0, len(emails))
+	for i := len(emails) - 1; i >= 0; i-- {
+		e := emails[i]
+		summaries = append(summaries, SESEmailSummary{
+			MessageId: e.MessageId,
+			Source:    e.Source,
+			To:        e.ToAddresses,
+			Subject:   e.Subject,
+			Timestamp: e.Timestamp.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+
+	writeJSON(w, http.StatusOK, summaries)
+}
+
+func (a *API) handleSESEmailByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/ses/emails/")
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	if a.sesStore == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	emails := a.sesStore.GetEmails()
+	for _, e := range emails {
+		if e.MessageId == id {
+			writeJSON(w, http.StatusOK, e)
+			return
+		}
+	}
+
+	http.NotFound(w, r)
+}
+
+// TopologyNode describes a service in the topology graph.
+type TopologyNode struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+// TopologyEdge describes a connection between services.
+type TopologyEdge struct {
+	Source string `json:"source"`
+	Target string `json:"target"`
+	Label  string `json:"label"`
+}
+
+// TopologyResponse is the topology graph.
+type TopologyResponse struct {
+	Nodes []TopologyNode `json:"nodes"`
+	Edges []TopologyEdge `json:"edges"`
+}
+
+func (a *API) handleTopology(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Build topology from registered services and known inter-service connections.
+	svcs := a.registry.List()
+	nodes := make([]TopologyNode, 0, len(svcs))
+	svcSet := make(map[string]bool)
+	for _, svc := range svcs {
+		nodes = append(nodes, TopologyNode{
+			ID:   svc.Name(),
+			Name: svc.Name(),
+			Type: "service",
+		})
+		svcSet[svc.Name()] = true
+	}
+
+	// Known AWS cross-service integrations.
+	knownEdges := []TopologyEdge{
+		{Source: "s3", Target: "sqs", Label: "event notification"},
+		{Source: "s3", Target: "sns", Label: "event notification"},
+		{Source: "s3", Target: "lambda", Label: "event notification"},
+		{Source: "sns", Target: "sqs", Label: "subscription"},
+		{Source: "sns", Target: "lambda", Label: "subscription"},
+		{Source: "eventbridge", Target: "sqs", Label: "target"},
+		{Source: "eventbridge", Target: "sns", Label: "target"},
+		{Source: "eventbridge", Target: "lambda", Label: "target"},
+		{Source: "dynamodb", Target: "lambda", Label: "streams"},
+		{Source: "kinesis", Target: "lambda", Label: "event source"},
+		{Source: "sqs", Target: "lambda", Label: "event source"},
+		{Source: "apigateway", Target: "lambda", Label: "integration"},
+		{Source: "cognito", Target: "lambda", Label: "triggers"},
+		{Source: "ses", Target: "sns", Label: "notifications"},
+		{Source: "cloudwatch", Target: "sns", Label: "alarm actions"},
+	}
+
+	edges := make([]TopologyEdge, 0)
+	for _, e := range knownEdges {
+		if svcSet[e.Source] && svcSet[e.Target] {
+			edges = append(edges, e)
+		}
+	}
+
+	writeJSON(w, http.StatusOK, TopologyResponse{Nodes: nodes, Edges: edges})
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

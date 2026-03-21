@@ -3,10 +3,14 @@
 package dashboard
 
 import (
+	_ "embed"
 	"fmt"
 	"net/http"
 	"strings"
 )
+
+//go:embed htm-preact.min.js
+var htmPreactUMD string
 
 // Handler serves the cloudmock web dashboard as a self-contained SPA.
 type Handler struct {
@@ -33,6 +37,7 @@ func buildHTML(adminPort int) string {
 	// placeholders for JS template literal backticks. Replace them here.
 	result = strings.ReplaceAll(result, "\u2039", "`") // ‹ → `
 	result = strings.ReplaceAll(result, "\u203a", "`") // › → `
+	result = strings.Replace(result, "/*HTMPREACT*/", htmPreactUMD, 1)
 	return result
 }
 
@@ -446,6 +451,20 @@ pre, code { font-family: var(--font-mono); }
 .font-mono { font-family: var(--font-mono); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w-full { width: 100%%; }
+.grid { display: grid; }
+.grid-cols-2 { grid-template-columns: repeat(2, 1fr); }
+.grid-cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid-cols-4 { grid-template-columns: repeat(4, 1fr); }
+.px-3 { padding-left: 12px; padding-right: 12px; }
+.px-4 { padding-left: 16px; padding-right: 16px; }
+.py-2 { padding-top: 8px; padding-bottom: 8px; }
+.py-3 { padding-top: 12px; padding-bottom: 12px; }
+.overflow-auto { overflow: auto; }
+.overflow-x-auto { overflow-x: auto; }
+.whitespace-pre { white-space: pre; }
+.cursor-pointer { cursor: pointer; }
+.relative { position: relative; }
+.absolute { position: absolute; }
 .page-title { font-size: 22px; font-weight: 700; color: var(--n900); }
 .page-desc { font-size: 14px; color: var(--n500); margin-top: 2px; }
 .section-title { font-size: 16px; font-weight: 700; color: var(--n800); margin-bottom: 12px; }
@@ -477,7 +496,7 @@ pre, code { font-family: var(--font-mono); }
 <body>
 <div id="app"></div>
 
-<script src="https://unpkg.com/htm@3.1.1/preact/standalone.umd.js"></script>
+<script>/*HTMPREACT*/</script>
 <script>
 const { html, render, Component, h, useState, useEffect, useRef, useCallback, useMemo, useReducer, useContext, createContext } = htmPreact;
 const Fragment = 'div';

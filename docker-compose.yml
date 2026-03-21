@@ -1,38 +1,10 @@
-networks:
-  cloudmock:
-    driver: bridge
-
 services:
-  gateway:
-    build:
-      context: .
-      dockerfile: docker/gateway.Dockerfile
-    container_name: cloudmock-gateway
+  cloudmock:
+    image: ghcr.io/neureaux/cloudmock:latest
     ports:
-      - "4566:4566"
-      - "127.0.0.1:4500:4500"
-      - "127.0.0.1:4599:4599"
+      - "4566:4566"    # AWS API
+      - "4500:4500"    # Dashboard
+      - "4599:4599"    # Admin API
     environment:
-      - CLOUDMOCK_REGION=${CLOUDMOCK_REGION:-us-east-1}
-      - CLOUDMOCK_IAM_MODE=${CLOUDMOCK_IAM_MODE:-none}
-      - CLOUDMOCK_LOG_LEVEL=${CLOUDMOCK_LOG_LEVEL:-info}
-    networks:
-      - cloudmock
-    labels:
-      cloudmock.component: gateway
-    depends_on:
-      s3:
-        condition: service_healthy
-
-  s3:
-    build:
-      context: .
-      dockerfile: services/s3/Dockerfile
-    container_name: cloudmock-s3
-    networks:
-      - cloudmock
-    labels:
-      cloudmock.service: s3
-      cloudmock.tier: "1"
-    expose:
-      - "8080"
+      - CLOUDMOCK_IAM_MODE=none
+      - CLOUDMOCK_LOG_LEVEL=info

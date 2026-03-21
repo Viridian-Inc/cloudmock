@@ -1,0 +1,29 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26' }
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Build dashboard
+        run: cd dashboard && npm ci && npm run build && cp -r dist/ ../pkg/dashboard/dist/
+      - name: Build binaries
+        run: make release
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          push: true
+          tags: |
+            ghcr.io/neureaux/cloudmock:${{ github.ref_name }}
+            ghcr.io/neureaux/cloudmock:latest

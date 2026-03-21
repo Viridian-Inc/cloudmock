@@ -16,6 +16,26 @@ A standalone, open-source local AWS emulator written in Go. Run a single binary 
 
 ---
 
+## Installation
+
+### Docker (recommended)
+
+```bash
+docker run -p 4566:4566 -p 4500:4500 ghcr.io/neureaux/cloudmock:latest
+```
+
+### Binary
+
+Download from [GitHub Releases](https://github.com/neureaux/cloudmock/releases) for your platform.
+
+### From source
+
+```bash
+go install github.com/neureaux/cloudmock/cmd/gateway@latest
+```
+
+---
+
 ## Quick Start
 
 ### Binary

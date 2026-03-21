@@ -1,4 +1,6 @@
-.PHONY: build build-gateway build-cli build-tools test lint clean proto docker docker-up docker-down help
+.PHONY: build build-gateway build-cli build-tools build-dashboard test lint clean proto docker docker-push docker-up docker-down release help
+
+VERSION ?= 0.1.0
 
 help:
 	@echo "Available targets:"
@@ -6,13 +8,16 @@ help:
 	@echo "  build-gateway   - Build the gateway binary"
 	@echo "  build-cli       - Build the CLI binary"
 	@echo "  build-tools     - Build AWS tool wrappers and CI helper"
+	@echo "  build-dashboard - Build the web dashboard"
 	@echo "  test            - Run all tests"
 	@echo "  lint            - Run golangci-lint"
 	@echo "  clean           - Remove build artifacts"
 	@echo "  proto           - Generate protobuf files"
 	@echo "  docker          - Build Docker image"
+	@echo "  docker-push     - Tag and push Docker image to ghcr.io"
 	@echo "  docker-up       - Start Docker containers"
 	@echo "  docker-down     - Stop Docker containers"
+	@echo "  release         - Build cross-platform release binaries"
 
 build: build-gateway build-cli build-tools
 
@@ -55,8 +60,24 @@ proto:
 	@echo "Proto generation not yet implemented"
 
 docker:
-	@echo "Building Docker image..."
-	@docker build -t cloudmock:latest .
+	docker build -t cloudmock:$(VERSION) -t cloudmock:latest .
+
+docker-push:
+	docker tag cloudmock:latest ghcr.io/neureaux/cloudmock:$(VERSION)
+	docker tag cloudmock:latest ghcr.io/neureaux/cloudmock:latest
+	docker push ghcr.io/neureaux/cloudmock:$(VERSION)
+	docker push ghcr.io/neureaux/cloudmock:latest
+
+release: build-dashboard
+	GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-linux-amd64 ./cmd/gateway
+	GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o dist/cloudmock-linux-arm64 ./cmd/gateway
+	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-darwin-amd64 ./cmd/gateway
+	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/cloudmock-darwin-arm64 ./cmd/gateway
+	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-windows-amd64.exe ./cmd/gateway
+
+build-dashboard:
+	cd dashboard && npm run build
+	cp -r dashboard/dist/ pkg/dashboard/dist/
 
 docker-up:
 	@echo "Starting Docker containers..."

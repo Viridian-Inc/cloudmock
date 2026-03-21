@@ -133,6 +133,20 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 	return &service.Response{Format: service.FormatXML}, awsErr
 }
 
+// GetObjectData retrieves the raw bytes of an S3 object by bucket and key.
+// This is used for cross-service communication (e.g., Lambda fetching code from S3).
+func (s *S3Service) GetObjectData(bucket, key string) ([]byte, error) {
+	objs, err := s.store.bucketObjects(bucket)
+	if err != nil {
+		return nil, err
+	}
+	obj, err := objs.GetObject(key)
+	if err != nil {
+		return nil, err
+	}
+	return obj.Body, nil
+}
+
 // publishObjectEvent sends an S3 object event to the event bus.
 func (s *S3Service) publishObjectEvent(ctx *service.RequestContext, bucket, key, eventType string) {
 	// Look up object metadata for the event detail.

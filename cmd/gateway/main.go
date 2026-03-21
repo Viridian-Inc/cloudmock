@@ -35,6 +35,7 @@ import (
 	sqssvc "github.com/neureaux/cloudmock/services/sqs"
 	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
 	stssvc "github.com/neureaux/cloudmock/services/sts"
+	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
 	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
 	"github.com/neureaux/cloudmock/services/stubs"
 )
@@ -101,11 +102,16 @@ func main() {
 	registry.Register(apigwsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cfnsvc.New(cfg.AccountID, cfg.Region))
 
+	// Register Lambda with service locator for S3 code source
+	lambdaService := lambdasvc.New(cfg.AccountID, cfg.Region)
+	registry.Register(lambdaService)
+
 	// Set service locators now that all services are registered.
 	// (This breaks the circular dependency: services need the registry,
 	// but the registry needs the services.)
 	snsService.SetLocator(registry)
 	ebService.SetLocator(registry)
+	lambdaService.SetLocator(registry)
 
 	// Wire cross-service integrations via event bus
 	integration.WireIntegrations(bus, registry, cfg.AccountID, cfg.Region)

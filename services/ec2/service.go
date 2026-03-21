@@ -81,6 +81,17 @@ func (s *EC2Service) Actions() []service.Action {
 		{Name: "CreateVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:CreateVpcPeeringConnection"},
 		{Name: "AcceptVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:AcceptVpcPeeringConnection"},
 		{Name: "DeleteVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:DeleteVpcPeeringConnection"},
+		// Instances
+		{Name: "RunInstances", Method: http.MethodPost, IAMAction: "ec2:RunInstances"},
+		{Name: "DescribeInstances", Method: http.MethodPost, IAMAction: "ec2:DescribeInstances"},
+		{Name: "TerminateInstances", Method: http.MethodPost, IAMAction: "ec2:TerminateInstances"},
+		{Name: "StopInstances", Method: http.MethodPost, IAMAction: "ec2:StopInstances"},
+		{Name: "StartInstances", Method: http.MethodPost, IAMAction: "ec2:StartInstances"},
+		{Name: "DescribeInstanceStatus", Method: http.MethodPost, IAMAction: "ec2:DescribeInstanceStatus"},
+		// Tagging
+		{Name: "CreateTags", Method: http.MethodPost, IAMAction: "ec2:CreateTags"},
+		{Name: "DeleteTags", Method: http.MethodPost, IAMAction: "ec2:DeleteTags"},
+		{Name: "DescribeTags", Method: http.MethodPost, IAMAction: "ec2:DescribeTags"},
 	}
 }
 
@@ -204,6 +215,26 @@ func (s *EC2Service) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAcceptVpcPeeringConnection(ctx, s.store)
 	case "DeleteVpcPeeringConnection":
 		return handleDeleteVpcPeeringConnection(ctx, s.store)
+	// Instances
+	case "RunInstances":
+		return handleRunInstances(ctx, s.store)
+	case "DescribeInstances":
+		return handleDescribeInstances(ctx, s.store)
+	case "TerminateInstances":
+		return handleTerminateInstances(ctx, s.store)
+	case "StopInstances":
+		return handleStopInstances(ctx, s.store)
+	case "StartInstances":
+		return handleStartInstances(ctx, s.store)
+	case "DescribeInstanceStatus":
+		return handleDescribeInstanceStatus(ctx, s.store)
+	// Tagging
+	case "CreateTags":
+		return handleCreateTags(ctx, s.store)
+	case "DeleteTags":
+		return handleDeleteTags(ctx, s.store)
+	case "DescribeTags":
+		return handleDescribeTags(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

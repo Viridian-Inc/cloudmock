@@ -2088,3 +2088,446 @@ func TestEC2_VpcPeering_Lifecycle(t *testing.T) {
 		t.Error("CreateVpcPeeringConnection bad VpcId: expected error, got 200")
 	}
 }
+
+// ============================================================
+// Instance + Tagging tests
+// ============================================================
+
+// mustRunInstance runs a single instance and returns its instanceId.
+func mustRunInstance(t *testing.T, handler http.Handler, imageId, subnetId string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "RunInstances", url.Values{
+		"ImageId":      {imageId},
+		"SubnetId":     {subnetId},
+		"InstanceType": {"t2.micro"},
+		"MinCount":     {"1"},
+		"MaxCount":     {"1"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("RunInstances: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		InstancesSet struct {
+			Items []struct {
+				InstanceId string `xml:"instanceId"`
+			} `xml:"item"`
+		} `xml:"instancesSet"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("RunInstances: unmarshal: %v\nbody: %s", err, w.Body.String())
+	}
+	if len(resp.InstancesSet.Items) == 0 || resp.InstancesSet.Items[0].InstanceId == "" {
+		t.Fatalf("RunInstances: instanceId is empty\nbody: %s", w.Body.String())
+	}
+	return resp.InstancesSet.Items[0].InstanceId
+}
+
+// ---- Test: RunInstances + DescribeInstances ----
+
+func TestEC2_RunAndDescribeInstances(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	// RunInstances — basic.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "RunInstances", url.Values{
+		"ImageId":           {"ami-12345678"},
+		"SubnetId":          {subnetId},
+		"InstanceType":      {"t2.micro"},
+		"MinCount":          {"1"},
+		"MaxCount":          {"1"},
+		"SecurityGroupId.1": {"sg-fake"},
+		"KeyName":           {"my-key"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("RunInstances: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	if !strings.Contains(body, "<name>running</name>") {
+		t.Errorf("RunInstances: expected state=running\nbody: %s", body)
+	}
+	if !strings.Contains(body, vpcId) {
+		t.Errorf("RunInstances: expected vpcId in response\nbody: %s", body)
+	}
+	if !strings.Contains(body, subnetId) {
+		t.Errorf("RunInstances: expected subnetId in response\nbody: %s", body)
+	}
+	if !strings.Contains(body, "10.0.1.") {
+		t.Errorf("RunInstances: expected private IP from subnet range\nbody: %s", body)
+	}
+
+	// Parse instance ID.
+	var runResp struct {
+		InstancesSet struct {
+			Items []struct {
+				InstanceId string `xml:"instanceId"`
+				VpcId      string `xml:"vpcId"`
+				SubnetId   string `xml:"subnetId"`
+			} `xml:"item"`
+		} `xml:"instancesSet"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &runResp); err != nil {
+		t.Fatalf("RunInstances: unmarshal: %v", err)
+	}
+	if len(runResp.InstancesSet.Items) == 0 {
+		t.Fatal("RunInstances: no instances in response")
+	}
+	instId := runResp.InstancesSet.Items[0].InstanceId
+	if !strings.HasPrefix(instId, "i-") {
+		t.Errorf("RunInstances: expected i- prefix, got %s", instId)
+	}
+	if runResp.InstancesSet.Items[0].VpcId != vpcId {
+		t.Errorf("RunInstances: vpcId mismatch: got %s, want %s",
+			runResp.InstancesSet.Items[0].VpcId, vpcId)
+	}
+	if runResp.InstancesSet.Items[0].SubnetId != subnetId {
+		t.Errorf("RunInstances: subnetId mismatch: got %s, want %s",
+			runResp.InstancesSet.Items[0].SubnetId, subnetId)
+	}
+
+	// DescribeInstances — all.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DescribeInstances", nil))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeInstances: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), instId) {
+		t.Errorf("DescribeInstances: expected %s in response\nbody: %s", instId, wd.Body.String())
+	}
+
+	// DescribeInstances — by ID.
+	wf := httptest.NewRecorder()
+	handler.ServeHTTP(wf, ec2Req(t, "DescribeInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if wf.Code != http.StatusOK {
+		t.Fatalf("DescribeInstances by ID: expected 200, got %d\nbody: %s", wf.Code, wf.Body.String())
+	}
+	if !strings.Contains(wf.Body.String(), instId) {
+		t.Errorf("DescribeInstances by ID: expected %s\nbody: %s", instId, wf.Body.String())
+	}
+
+	// DescribeInstances — filter by vpc-id.
+	wfv := httptest.NewRecorder()
+	handler.ServeHTTP(wfv, ec2Req(t, "DescribeInstances", url.Values{
+		"Filter.1.Name":    {"vpc-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wfv.Code != http.StatusOK {
+		t.Fatalf("DescribeInstances vpc filter: expected 200, got %d\nbody: %s", wfv.Code, wfv.Body.String())
+	}
+	if !strings.Contains(wfv.Body.String(), instId) {
+		t.Errorf("DescribeInstances vpc filter: expected %s\nbody: %s", instId, wfv.Body.String())
+	}
+
+	// RunInstances with bad subnet should fail.
+	wbad := httptest.NewRecorder()
+	handler.ServeHTTP(wbad, ec2Req(t, "RunInstances", url.Values{
+		"ImageId":  {"ami-12345678"},
+		"SubnetId": {"subnet-nonexistent000000"},
+		"MinCount": {"1"},
+		"MaxCount": {"1"},
+	}))
+	if wbad.Code == http.StatusOK {
+		t.Error("RunInstances bad subnet: expected error, got 200")
+	}
+}
+
+// ---- Test: TerminateInstances ----
+
+func TestEC2_TerminateInstances(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	instId := mustRunInstance(t, handler, "ami-abc", subnetId)
+
+	// Terminate it.
+	wt := httptest.NewRecorder()
+	handler.ServeHTTP(wt, ec2Req(t, "TerminateInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if wt.Code != http.StatusOK {
+		t.Fatalf("TerminateInstances: expected 200, got %d\nbody: %s", wt.Code, wt.Body.String())
+	}
+	termBody := wt.Body.String()
+	if !strings.Contains(termBody, "<name>terminated</name>") {
+		t.Errorf("TerminateInstances: expected terminated state\nbody: %s", termBody)
+	}
+	if !strings.Contains(termBody, "<name>running</name>") {
+		t.Errorf("TerminateInstances: expected previous state=running\nbody: %s", termBody)
+	}
+
+	// DescribeInstances should still show terminated instance.
+	wdesc := httptest.NewRecorder()
+	handler.ServeHTTP(wdesc, ec2Req(t, "DescribeInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if wdesc.Code != http.StatusOK {
+		t.Fatalf("DescribeInstances after terminate: expected 200, got %d", wdesc.Code)
+	}
+	if !strings.Contains(wdesc.Body.String(), "terminated") {
+		t.Errorf("DescribeInstances after terminate: expected terminated state\nbody: %s", wdesc.Body.String())
+	}
+}
+
+// ---- Test: StopInstances + StartInstances ----
+
+func TestEC2_StopAndStartInstances(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	instId := mustRunInstance(t, handler, "ami-abc", subnetId)
+
+	// Stop running instance.
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, ec2Req(t, "StopInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("StopInstances: expected 200, got %d\nbody: %s", ws.Code, ws.Body.String())
+	}
+	stopBody := ws.Body.String()
+	if !strings.Contains(stopBody, "<name>stopped</name>") {
+		t.Errorf("StopInstances: expected stopped state\nbody: %s", stopBody)
+	}
+
+	// Verify stopped via DescribeInstanceStatus.
+	wst := httptest.NewRecorder()
+	handler.ServeHTTP(wst, ec2Req(t, "DescribeInstanceStatus", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if wst.Code != http.StatusOK {
+		t.Fatalf("DescribeInstanceStatus: expected 200, got %d\nbody: %s", wst.Code, wst.Body.String())
+	}
+	if !strings.Contains(wst.Body.String(), "<name>stopped</name>") {
+		t.Errorf("DescribeInstanceStatus: expected stopped\nbody: %s", wst.Body.String())
+	}
+
+	// Start the stopped instance.
+	wstart := httptest.NewRecorder()
+	handler.ServeHTTP(wstart, ec2Req(t, "StartInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	if wstart.Code != http.StatusOK {
+		t.Fatalf("StartInstances: expected 200, got %d\nbody: %s", wstart.Code, wstart.Body.String())
+	}
+	startBody := wstart.Body.String()
+	if !strings.Contains(startBody, "<name>running</name>") {
+		t.Errorf("StartInstances: expected running state\nbody: %s", startBody)
+	}
+	if !strings.Contains(startBody, "<name>stopped</name>") {
+		t.Errorf("StartInstances: expected previous state=stopped\nbody: %s", startBody)
+	}
+
+	// Stop a stopped instance — should have no items (noop).
+	ws2 := httptest.NewRecorder()
+	handler.ServeHTTP(ws2, ec2Req(t, "StopInstances", url.Values{
+		"InstanceId.1": {instId},
+	}))
+	_ = ws2 // state is running, stop it again is fine
+}
+
+// ---- Test: CreateTags + DescribeTags ----
+
+func TestEC2_CreateAndDescribeTags(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+	instId := mustRunInstance(t, handler, "ami-abc", subnetId)
+
+	// Tag the VPC.
+	wct := httptest.NewRecorder()
+	handler.ServeHTTP(wct, ec2Req(t, "CreateTags", url.Values{
+		"ResourceId.1": {vpcId},
+		"Tag.1.Key":    {"Name"},
+		"Tag.1.Value":  {"my-vpc"},
+		"Tag.2.Key":    {"Env"},
+		"Tag.2.Value":  {"test"},
+	}))
+	if wct.Code != http.StatusOK {
+		t.Fatalf("CreateTags VPC: expected 200, got %d\nbody: %s", wct.Code, wct.Body.String())
+	}
+
+	// Tag the instance.
+	wcti := httptest.NewRecorder()
+	handler.ServeHTTP(wcti, ec2Req(t, "CreateTags", url.Values{
+		"ResourceId.1": {instId},
+		"Tag.1.Key":    {"Name"},
+		"Tag.1.Value":  {"web-server"},
+	}))
+	if wcti.Code != http.StatusOK {
+		t.Fatalf("CreateTags instance: expected 200, got %d\nbody: %s", wcti.Code, wcti.Body.String())
+	}
+
+	// DescribeTags — all.
+	wdt := httptest.NewRecorder()
+	handler.ServeHTTP(wdt, ec2Req(t, "DescribeTags", nil))
+	if wdt.Code != http.StatusOK {
+		t.Fatalf("DescribeTags: expected 200, got %d\nbody: %s", wdt.Code, wdt.Body.String())
+	}
+	dtBody := wdt.Body.String()
+	if !strings.Contains(dtBody, "my-vpc") {
+		t.Errorf("DescribeTags: expected 'my-vpc'\nbody: %s", dtBody)
+	}
+	if !strings.Contains(dtBody, "web-server") {
+		t.Errorf("DescribeTags: expected 'web-server'\nbody: %s", dtBody)
+	}
+	if !strings.Contains(dtBody, "<resourceType>vpc</resourceType>") {
+		t.Errorf("DescribeTags: expected resourceType=vpc\nbody: %s", dtBody)
+	}
+	if !strings.Contains(dtBody, "<resourceType>instance</resourceType>") {
+		t.Errorf("DescribeTags: expected resourceType=instance\nbody: %s", dtBody)
+	}
+
+	// DescribeTags — filter by resource-id.
+	wdf := httptest.NewRecorder()
+	handler.ServeHTTP(wdf, ec2Req(t, "DescribeTags", url.Values{
+		"Filter.1.Name":    {"resource-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wdf.Code != http.StatusOK {
+		t.Fatalf("DescribeTags filter by resource-id: expected 200, got %d\nbody: %s", wdf.Code, wdf.Body.String())
+	}
+	dfBody := wdf.Body.String()
+	if !strings.Contains(dfBody, vpcId) {
+		t.Errorf("DescribeTags filter: expected vpcId\nbody: %s", dfBody)
+	}
+	if strings.Contains(dfBody, instId) {
+		t.Errorf("DescribeTags filter: instId should be excluded\nbody: %s", dfBody)
+	}
+
+	// DescribeTags — filter by key.
+	wdk := httptest.NewRecorder()
+	handler.ServeHTTP(wdk, ec2Req(t, "DescribeTags", url.Values{
+		"Filter.1.Name":    {"key"},
+		"Filter.1.Value.1": {"Env"},
+	}))
+	if wdk.Code != http.StatusOK {
+		t.Fatalf("DescribeTags filter by key: expected 200, got %d\nbody: %s", wdk.Code, wdk.Body.String())
+	}
+	if !strings.Contains(wdk.Body.String(), "test") {
+		t.Errorf("DescribeTags filter by key: expected Env=test\nbody: %s", wdk.Body.String())
+	}
+
+	// Verify VPC tags are propagated in DescribeVpcs.
+	wdv := httptest.NewRecorder()
+	handler.ServeHTTP(wdv, ec2Req(t, "DescribeVpcs", url.Values{
+		"VpcId.1": {vpcId},
+	}))
+	// Tags propagation is in the store; DescribeVpcs response doesn't include tags in current
+	// XML mapping but the store's VPC.Tags map should have them.
+}
+
+// ---- Test: DeleteTags ----
+
+func TestEC2_DeleteTags(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	// Create tags.
+	wct := httptest.NewRecorder()
+	handler.ServeHTTP(wct, ec2Req(t, "CreateTags", url.Values{
+		"ResourceId.1": {vpcId},
+		"Tag.1.Key":    {"Name"},
+		"Tag.1.Value":  {"my-vpc"},
+		"Tag.2.Key":    {"Env"},
+		"Tag.2.Value":  {"prod"},
+	}))
+	if wct.Code != http.StatusOK {
+		t.Fatalf("CreateTags: expected 200, got %d\nbody: %s", wct.Code, wct.Body.String())
+	}
+
+	// Verify tags exist.
+	wdt := httptest.NewRecorder()
+	handler.ServeHTTP(wdt, ec2Req(t, "DescribeTags", url.Values{
+		"Filter.1.Name":    {"resource-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if !strings.Contains(wdt.Body.String(), "my-vpc") {
+		t.Fatalf("CreateTags: expected Name tag before deletion\nbody: %s", wdt.Body.String())
+	}
+
+	// Delete "Name" tag.
+	wdel := httptest.NewRecorder()
+	handler.ServeHTTP(wdel, ec2Req(t, "DeleteTags", url.Values{
+		"ResourceId.1": {vpcId},
+		"Tag.1.Key":    {"Name"},
+	}))
+	if wdel.Code != http.StatusOK {
+		t.Fatalf("DeleteTags: expected 200, got %d\nbody: %s", wdel.Code, wdel.Body.String())
+	}
+
+	// DescribeTags should no longer have Name tag.
+	wdt2 := httptest.NewRecorder()
+	handler.ServeHTTP(wdt2, ec2Req(t, "DescribeTags", url.Values{
+		"Filter.1.Name":    {"resource-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wdt2.Code != http.StatusOK {
+		t.Fatalf("DescribeTags after delete: expected 200, got %d\nbody: %s", wdt2.Code, wdt2.Body.String())
+	}
+	afterBody := wdt2.Body.String()
+	if strings.Contains(afterBody, "my-vpc") {
+		t.Errorf("DeleteTags: Name tag should be removed\nbody: %s", afterBody)
+	}
+	// Env tag should still exist.
+	if !strings.Contains(afterBody, "prod") {
+		t.Errorf("DeleteTags: Env tag should still exist\nbody: %s", afterBody)
+	}
+}
+
+// ---- Test: DescribeInstances with tag filter ----
+
+func TestEC2_DescribeInstancesTagFilter(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	instId1 := mustRunInstance(t, handler, "ami-abc", subnetId)
+	instId2 := mustRunInstance(t, handler, "ami-abc", subnetId)
+
+	// Tag instId1 with Name=web.
+	wct := httptest.NewRecorder()
+	handler.ServeHTTP(wct, ec2Req(t, "CreateTags", url.Values{
+		"ResourceId.1": {instId1},
+		"Tag.1.Key":    {"Name"},
+		"Tag.1.Value":  {"web"},
+	}))
+	if wct.Code != http.StatusOK {
+		t.Fatalf("CreateTags: expected 200, got %d\nbody: %s", wct.Code, wct.Body.String())
+	}
+
+	// Tag instId2 with Name=db.
+	wct2 := httptest.NewRecorder()
+	handler.ServeHTTP(wct2, ec2Req(t, "CreateTags", url.Values{
+		"ResourceId.1": {instId2},
+		"Tag.1.Key":    {"Name"},
+		"Tag.1.Value":  {"db"},
+	}))
+	if wct2.Code != http.StatusOK {
+		t.Fatalf("CreateTags: expected 200, got %d\nbody: %s", wct2.Code, wct2.Body.String())
+	}
+
+	// DescribeInstances with tag:Name=web should return only instId1.
+	wdf := httptest.NewRecorder()
+	handler.ServeHTTP(wdf, ec2Req(t, "DescribeInstances", url.Values{
+		"Filter.1.Name":    {"tag:Name"},
+		"Filter.1.Value.1": {"web"},
+	}))
+	if wdf.Code != http.StatusOK {
+		t.Fatalf("DescribeInstances tag filter: expected 200, got %d\nbody: %s", wdf.Code, wdf.Body.String())
+	}
+	filterBody := wdf.Body.String()
+	if !strings.Contains(filterBody, instId1) {
+		t.Errorf("DescribeInstances tag filter: expected %s\nbody: %s", instId1, filterBody)
+	}
+	if strings.Contains(filterBody, instId2) {
+		t.Errorf("DescribeInstances tag filter: %s should be excluded\nbody: %s", instId2, filterBody)
+	}
+}

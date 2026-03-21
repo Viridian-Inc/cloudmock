@@ -2,9 +2,12 @@ package ec2
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+	"time"
 )
 
 // VPC represents an EC2 Virtual Private Cloud.
@@ -160,6 +163,21 @@ type VPCPeeringConnection struct {
 	Tags                map[string]string
 }
 
+// Instance represents an EC2 instance.
+type Instance struct {
+	InstanceId       string
+	ImageId          string
+	InstanceType     string
+	SubnetId         string
+	VpcId            string
+	SecurityGroupIds []string
+	KeyName          string
+	State            string // pending, running, stopping, stopped, shutting-down, terminated
+	LaunchTime       time.Time
+	PrivateIpAddress string
+	Tags             map[string]string
+}
+
 // Store manages all EC2 resources.
 type Store struct {
 	mu                      sync.RWMutex
@@ -176,6 +194,9 @@ type Store struct {
 	networkInterfaces       map[string]*NetworkInterface
 	vpcEndpoints            map[string]*VPCEndpoint
 	vpcPeeringConnections   map[string]*VPCPeeringConnection
+	instances               map[string]*Instance
+	tags                    map[string]map[string]string // resourceId -> key -> value
+	subnetIPCounters        map[string]uint32            // subnetId -> next host offset
 	accountID               string
 	region                  string
 }
@@ -196,6 +217,9 @@ func NewStore(accountID, region string) *Store {
 		networkInterfaces:       make(map[string]*NetworkInterface),
 		vpcEndpoints:            make(map[string]*VPCEndpoint),
 		vpcPeeringConnections:   make(map[string]*VPCPeeringConnection),
+		instances:               make(map[string]*Instance),
+		tags:                    make(map[string]map[string]string),
+		subnetIPCounters:        make(map[string]uint32),
 		accountID:               accountID,
 		region:                  region,
 	}
@@ -1588,6 +1612,473 @@ func lastAddr(n *net.IPNet) net.IP {
 		ip[i] |= ^n.Mask[i]
 	}
 	return ip
+}
+
+// ---- Instance operations ----
+
+// instanceStateCode returns the numeric AWS state code for a state name.
+func instanceStateCode(state string) int {
+	switch state {
+	case "pending":
+		return 0
+	case "running":
+		return 16
+	case "shutting-down":
+		return 32
+	case "terminated":
+		return 48
+	case "stopping":
+		return 64
+	case "stopped":
+		return 80
+	default:
+		return 0
+	}
+}
+
+// allocatePrivateIP allocates the next sequential IP from the subnet's CIDR.
+// AWS reserves the first 4 and last 1 addresses; we start allocating from
+// network+4 (offset 4) and increment per call.
+func (s *Store) allocatePrivateIP(subnetId string) string {
+	sub, ok := s.subnets[subnetId]
+	if !ok {
+		return ""
+	}
+	_, ipNet, err := net.ParseCIDR(sub.CidrBlock)
+	if err != nil {
+		return ""
+	}
+
+	// Current counter (starts at 0 meaning first allocation = offset 4).
+	offset := s.subnetIPCounters[subnetId]
+	s.subnetIPCounters[subnetId] = offset + 1
+
+	// Convert network base IP to uint32, add 4 + offset.
+	ip4 := ipNet.IP.To4()
+	if ip4 == nil {
+		return ""
+	}
+	base := binary.BigEndian.Uint32(ip4)
+	addr := base + 4 + offset
+
+	result := make(net.IP, 4)
+	binary.BigEndian.PutUint32(result, addr)
+	return result.String()
+}
+
+// RunInstances creates count instances.
+// Returns the created instances and a reservation ID, or an error code.
+func (s *Store) RunInstances(imageId, instanceType, subnetId, keyName string, sgIds []string, count int) ([]*Instance, string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sub, ok := s.subnets[subnetId]
+	if !ok {
+		return nil, "", "subnet_not_found"
+	}
+
+	reservationId := genID("r-")
+	instances := make([]*Instance, 0, count)
+	for i := 0; i < count; i++ {
+		inst := &Instance{
+			InstanceId:       genID("i-"),
+			ImageId:          imageId,
+			InstanceType:     instanceType,
+			SubnetId:         subnetId,
+			VpcId:            sub.VpcId,
+			SecurityGroupIds: sgIds,
+			KeyName:          keyName,
+			State:            "running",
+			LaunchTime:       time.Now().UTC(),
+			PrivateIpAddress: s.allocatePrivateIP(subnetId),
+			Tags:             make(map[string]string),
+		}
+		s.instances[inst.InstanceId] = inst
+		instances = append(instances, inst)
+	}
+	return instances, reservationId, ""
+}
+
+// ListInstances returns instances filtered by IDs and/or filters.
+// filters: map of filter-name -> values (any match).
+func (s *Store) ListInstances(ids []string, filters map[string][]string) []*Instance {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*Instance, 0)
+	for _, inst := range s.instances {
+		if idSet != nil {
+			if _, ok := idSet[inst.InstanceId]; !ok {
+				continue
+			}
+		}
+		if !instanceMatchesFilters(inst, filters) {
+			continue
+		}
+		result = append(result, inst)
+	}
+	return result
+}
+
+// instanceMatchesFilters returns true if inst matches all provided filters.
+func instanceMatchesFilters(inst *Instance, filters map[string][]string) bool {
+	for name, vals := range filters {
+		if len(vals) == 0 {
+			continue
+		}
+		switch name {
+		case "vpc-id":
+			if !anyEqual(vals, inst.VpcId) {
+				return false
+			}
+		case "subnet-id":
+			if !anyEqual(vals, inst.SubnetId) {
+				return false
+			}
+		case "instance-state-name":
+			if !anyEqual(vals, inst.State) {
+				return false
+			}
+		default:
+			// tag:Name or tag:<key>
+			if strings.HasPrefix(name, "tag:") {
+				tagKey := name[4:]
+				tagVal, exists := inst.Tags[tagKey]
+				if !exists {
+					return false
+				}
+				if !anyEqual(vals, tagVal) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// anyEqual returns true if target equals any element of vals.
+func anyEqual(vals []string, target string) bool {
+	for _, v := range vals {
+		if v == target {
+			return true
+		}
+	}
+	return false
+}
+
+// TerminateInstances sets state to terminated for the given instance IDs.
+// Returns a map of instanceId -> {previousState, currentState}.
+func (s *Store) TerminateInstances(ids []string) map[string][2]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := make(map[string][2]string)
+	for _, id := range ids {
+		inst, ok := s.instances[id]
+		if !ok {
+			continue
+		}
+		prev := inst.State
+		inst.State = "terminated"
+		result[id] = [2]string{prev, "terminated"}
+	}
+	return result
+}
+
+// StopInstances sets state to stopped for the given instance IDs.
+// Only instances in "running" state can be stopped.
+func (s *Store) StopInstances(ids []string) map[string][2]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := make(map[string][2]string)
+	for _, id := range ids {
+		inst, ok := s.instances[id]
+		if !ok {
+			continue
+		}
+		if inst.State != "running" {
+			continue
+		}
+		prev := inst.State
+		inst.State = "stopped"
+		result[id] = [2]string{prev, "stopped"}
+	}
+	return result
+}
+
+// StartInstances sets state to running for the given instance IDs.
+// Only instances in "stopped" state can be started.
+func (s *Store) StartInstances(ids []string) map[string][2]string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	result := make(map[string][2]string)
+	for _, id := range ids {
+		inst, ok := s.instances[id]
+		if !ok {
+			continue
+		}
+		if inst.State != "stopped" {
+			continue
+		}
+		prev := inst.State
+		inst.State = "running"
+		result[id] = [2]string{prev, "running"}
+	}
+	return result
+}
+
+// ---- Tagging operations ----
+
+// resourceTypeFromID infers the EC2 resource type from the resource ID prefix.
+func resourceTypeFromID(id string) string {
+	switch {
+	case strings.HasPrefix(id, "vpc-"):
+		return "vpc"
+	case strings.HasPrefix(id, "subnet-"):
+		return "subnet"
+	case strings.HasPrefix(id, "sg-"):
+		return "security-group"
+	case strings.HasPrefix(id, "i-"):
+		return "instance"
+	case strings.HasPrefix(id, "igw-"):
+		return "internet-gateway"
+	case strings.HasPrefix(id, "nat-"):
+		return "natgateway"
+	case strings.HasPrefix(id, "rtb-"):
+		return "route-table"
+	case strings.HasPrefix(id, "eipalloc-"):
+		return "elastic-ip"
+	case strings.HasPrefix(id, "eni-"):
+		return "network-interface"
+	case strings.HasPrefix(id, "acl-"):
+		return "network-acl"
+	case strings.HasPrefix(id, "vpce-"):
+		return "vpc-endpoint"
+	case strings.HasPrefix(id, "pcx-"):
+		return "vpc-peering-connection"
+	case strings.HasPrefix(id, "r-"):
+		return "reservation"
+	default:
+		return "unknown"
+	}
+}
+
+// applyTagsToResource propagates tags from the central tags map to the resource's own Tags map.
+func (s *Store) applyTagsToResource(resourceId string, kv map[string]string) {
+	for k, v := range kv {
+		switch {
+		case strings.HasPrefix(resourceId, "vpc-"):
+			if r, ok := s.vpcs[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "subnet-"):
+			if r, ok := s.subnets[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "sg-"):
+			if r, ok := s.securityGroups[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "i-"):
+			if r, ok := s.instances[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "igw-"):
+			if r, ok := s.internetGateways[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "nat-"):
+			if r, ok := s.natGateways[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "rtb-"):
+			if r, ok := s.routeTables[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "eipalloc-"):
+			if r, ok := s.elasticIPs[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "eni-"):
+			if r, ok := s.networkInterfaces[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "acl-"):
+			if r, ok := s.networkACLs[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "vpce-"):
+			if r, ok := s.vpcEndpoints[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		case strings.HasPrefix(resourceId, "pcx-"):
+			if r, ok := s.vpcPeeringConnections[resourceId]; ok {
+				r.Tags[k] = v
+			}
+		}
+	}
+}
+
+// removeTagsFromResource removes keys from the resource's own Tags map.
+func (s *Store) removeTagsFromResource(resourceId string, keys []string) {
+	var tags map[string]string
+	switch {
+	case strings.HasPrefix(resourceId, "vpc-"):
+		if r, ok := s.vpcs[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "subnet-"):
+		if r, ok := s.subnets[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "sg-"):
+		if r, ok := s.securityGroups[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "i-"):
+		if r, ok := s.instances[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "igw-"):
+		if r, ok := s.internetGateways[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "nat-"):
+		if r, ok := s.natGateways[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "rtb-"):
+		if r, ok := s.routeTables[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "eipalloc-"):
+		if r, ok := s.elasticIPs[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "eni-"):
+		if r, ok := s.networkInterfaces[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "acl-"):
+		if r, ok := s.networkACLs[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "vpce-"):
+		if r, ok := s.vpcEndpoints[resourceId]; ok {
+			tags = r.Tags
+		}
+	case strings.HasPrefix(resourceId, "pcx-"):
+		if r, ok := s.vpcPeeringConnections[resourceId]; ok {
+			tags = r.Tags
+		}
+	}
+	if tags != nil {
+		for _, k := range keys {
+			delete(tags, k)
+		}
+	}
+}
+
+// CreateTags applies tags to one or more resources.
+func (s *Store) CreateTags(resourceIds []string, tags map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, id := range resourceIds {
+		if s.tags[id] == nil {
+			s.tags[id] = make(map[string]string)
+		}
+		for k, v := range tags {
+			s.tags[id][k] = v
+		}
+		s.applyTagsToResource(id, tags)
+	}
+}
+
+// DeleteTags removes specific tag keys from one or more resources.
+func (s *Store) DeleteTags(resourceIds []string, keys []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	for _, id := range resourceIds {
+		if m, ok := s.tags[id]; ok {
+			for _, k := range keys {
+				delete(m, k)
+			}
+		}
+		s.removeTagsFromResource(id, keys)
+	}
+}
+
+// TagEntry represents a single tag associated with a resource.
+type TagEntry struct {
+	ResourceId   string
+	ResourceType string
+	Key          string
+	Value        string
+}
+
+// ListTags returns all tags matching the provided filters.
+// Supported filters: resource-id, resource-type, key, value.
+func (s *Store) ListTags(filters map[string][]string) []TagEntry {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var result []TagEntry
+	for resourceId, kv := range s.tags {
+		resourceType := resourceTypeFromID(resourceId)
+		for k, v := range kv {
+			entry := TagEntry{
+				ResourceId:   resourceId,
+				ResourceType: resourceType,
+				Key:          k,
+				Value:        v,
+			}
+			if !tagEntryMatchesFilters(entry, filters) {
+				continue
+			}
+			result = append(result, entry)
+		}
+	}
+	return result
+}
+
+// tagEntryMatchesFilters returns true if the entry satisfies all filters.
+func tagEntryMatchesFilters(e TagEntry, filters map[string][]string) bool {
+	for name, vals := range filters {
+		if len(vals) == 0 {
+			continue
+		}
+		switch name {
+		case "resource-id":
+			if !anyEqual(vals, e.ResourceId) {
+				return false
+			}
+		case "resource-type":
+			if !anyEqual(vals, e.ResourceType) {
+				return false
+			}
+		case "key":
+			if !anyEqual(vals, e.Key) {
+				return false
+			}
+		case "value":
+			if !anyEqual(vals, e.Value) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // genID generates an ID with the given prefix followed by 17 random hex characters.

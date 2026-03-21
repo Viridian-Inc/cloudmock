@@ -1539,3 +1539,552 @@ func TestEC2_ReplaceRoute(t *testing.T) {
 		}
 	}
 }
+
+// ============================================================
+// Task 4: Network Resources tests
+// ============================================================
+
+// ---- Test: EIP (AllocateAddress, AssociateAddress, DisassociateAddress, ReleaseAddress) ----
+
+func TestEC2_EIP_Lifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	// AllocateAddress.
+	wa := httptest.NewRecorder()
+	handler.ServeHTTP(wa, ec2Req(t, "AllocateAddress", nil))
+	if wa.Code != http.StatusOK {
+		t.Fatalf("AllocateAddress: expected 200, got %d\nbody: %s", wa.Code, wa.Body.String())
+	}
+	allocBody := wa.Body.String()
+	if !strings.Contains(allocBody, "eipalloc-") {
+		t.Errorf("AllocateAddress: expected eipalloc- prefix\nbody: %s", allocBody)
+	}
+	if !strings.Contains(allocBody, "<domain>vpc</domain>") {
+		t.Errorf("AllocateAddress: expected domain=vpc\nbody: %s", allocBody)
+	}
+	var allocResp struct {
+		AllocationId string `xml:"allocationId"`
+		PublicIp     string `xml:"publicIp"`
+	}
+	if err := xml.Unmarshal(wa.Body.Bytes(), &allocResp); err != nil {
+		t.Fatalf("AllocateAddress unmarshal: %v", err)
+	}
+	allocationId := allocResp.AllocationId
+	if allocationId == "" {
+		t.Fatalf("AllocateAddress: empty allocationId")
+	}
+	if !strings.HasPrefix(allocResp.PublicIp, "54.") {
+		t.Errorf("AllocateAddress: expected 54.x.x.x PublicIp, got %s", allocResp.PublicIp)
+	}
+
+	// DescribeAddresses — verify the EIP exists.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeAddresses", url.Values{
+			"AllocationId.1": {allocationId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeAddresses: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), allocationId) {
+			t.Errorf("DescribeAddresses: expected allocationId\nbody: %s", w.Body.String())
+		}
+	}
+
+	// AssociateAddress with a fake instanceId (store doesn't validate instance existence).
+	wAssoc := httptest.NewRecorder()
+	handler.ServeHTTP(wAssoc, ec2Req(t, "AssociateAddress", url.Values{
+		"AllocationId": {allocationId},
+		"InstanceId":   {"i-00000000000000001"},
+	}))
+	if wAssoc.Code != http.StatusOK {
+		t.Fatalf("AssociateAddress: expected 200, got %d\nbody: %s", wAssoc.Code, wAssoc.Body.String())
+	}
+	if !strings.Contains(wAssoc.Body.String(), "eipassoc-") {
+		t.Errorf("AssociateAddress: expected eipassoc- prefix\nbody: %s", wAssoc.Body.String())
+	}
+	var assocResp struct {
+		AssociationId string `xml:"associationId"`
+	}
+	if err := xml.Unmarshal(wAssoc.Body.Bytes(), &assocResp); err != nil {
+		t.Fatalf("AssociateAddress unmarshal: %v", err)
+	}
+	assocId := assocResp.AssociationId
+
+	// ReleaseAddress while still associated should fail.
+	wRelFail := httptest.NewRecorder()
+	handler.ServeHTTP(wRelFail, ec2Req(t, "ReleaseAddress", url.Values{
+		"AllocationId": {allocationId},
+	}))
+	if wRelFail.Code == http.StatusOK {
+		t.Error("ReleaseAddress while associated: expected error, got 200")
+	}
+	if !strings.Contains(wRelFail.Body.String(), "InvalidIPAddress.InUse") {
+		t.Errorf("ReleaseAddress while associated: expected InvalidIPAddress.InUse\nbody: %s", wRelFail.Body.String())
+	}
+
+	// DisassociateAddress.
+	wDisassoc := httptest.NewRecorder()
+	handler.ServeHTTP(wDisassoc, ec2Req(t, "DisassociateAddress", url.Values{
+		"AssociationId": {assocId},
+	}))
+	if wDisassoc.Code != http.StatusOK {
+		t.Fatalf("DisassociateAddress: expected 200, got %d\nbody: %s", wDisassoc.Code, wDisassoc.Body.String())
+	}
+
+	// ReleaseAddress after disassociation should succeed.
+	wRel := httptest.NewRecorder()
+	handler.ServeHTTP(wRel, ec2Req(t, "ReleaseAddress", url.Values{
+		"AllocationId": {allocationId},
+	}))
+	if wRel.Code != http.StatusOK {
+		t.Fatalf("ReleaseAddress: expected 200, got %d\nbody: %s", wRel.Code, wRel.Body.String())
+	}
+
+	// DescribeAddresses after release should be empty for that ID.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeAddresses", url.Values{
+			"AllocationId.1": {allocationId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeAddresses after release: expected 200, got %d", w.Code)
+		}
+		if strings.Contains(w.Body.String(), allocationId) {
+			t.Errorf("DescribeAddresses after release: allocationId should be gone\nbody: %s", w.Body.String())
+		}
+	}
+}
+
+// ---- Test: ENI (CreateNetworkInterface, DescribeNetworkInterfaces, DeleteNetworkInterface) ----
+
+func TestEC2_NetworkInterface_Lifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	// CreateNetworkInterface.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ec2Req(t, "CreateNetworkInterface", url.Values{
+		"SubnetId":         {subnetId},
+		"SecurityGroupId.1": {"sg-dummy00000000001"},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateNetworkInterface: expected 200, got %d\nbody: %s", wc.Code, wc.Body.String())
+	}
+	createBody := wc.Body.String()
+	if !strings.Contains(createBody, "eni-") {
+		t.Errorf("CreateNetworkInterface: expected eni- prefix\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, subnetId) {
+		t.Errorf("CreateNetworkInterface: expected subnetId in response\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, vpcId) {
+		t.Errorf("CreateNetworkInterface: expected vpcId in response\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, "<status>available</status>") {
+		t.Errorf("CreateNetworkInterface: expected status=available\nbody: %s", createBody)
+	}
+	var createResp struct {
+		NetworkInterface struct {
+			NetworkInterfaceId string `xml:"networkInterfaceId"`
+		} `xml:"networkInterface"`
+	}
+	if err := xml.Unmarshal(wc.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("CreateNetworkInterface unmarshal: %v", err)
+	}
+	eniId := createResp.NetworkInterface.NetworkInterfaceId
+	if eniId == "" {
+		t.Fatalf("CreateNetworkInterface: empty networkInterfaceId")
+	}
+
+	// DescribeNetworkInterfaces — by ID.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DescribeNetworkInterfaces", url.Values{
+		"NetworkInterfaceId.1": {eniId},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeNetworkInterfaces: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), eniId) {
+		t.Errorf("DescribeNetworkInterfaces: expected eniId\nbody: %s", wd.Body.String())
+	}
+
+	// DescribeNetworkInterfaces — by subnet-id filter.
+	wf := httptest.NewRecorder()
+	handler.ServeHTTP(wf, ec2Req(t, "DescribeNetworkInterfaces", url.Values{
+		"Filter.1.Name":    {"subnet-id"},
+		"Filter.1.Value.1": {subnetId},
+	}))
+	if wf.Code != http.StatusOK {
+		t.Fatalf("DescribeNetworkInterfaces subnet filter: expected 200, got %d", wf.Code)
+	}
+	if !strings.Contains(wf.Body.String(), eniId) {
+		t.Errorf("DescribeNetworkInterfaces subnet filter: expected eniId\nbody: %s", wf.Body.String())
+	}
+
+	// DeleteNetworkInterface.
+	wdel := httptest.NewRecorder()
+	handler.ServeHTTP(wdel, ec2Req(t, "DeleteNetworkInterface", url.Values{
+		"NetworkInterfaceId": {eniId},
+	}))
+	if wdel.Code != http.StatusOK {
+		t.Fatalf("DeleteNetworkInterface: expected 200, got %d\nbody: %s", wdel.Code, wdel.Body.String())
+	}
+
+	// Delete again should fail.
+	wdel2 := httptest.NewRecorder()
+	handler.ServeHTTP(wdel2, ec2Req(t, "DeleteNetworkInterface", url.Values{
+		"NetworkInterfaceId": {eniId},
+	}))
+	if wdel2.Code == http.StatusOK {
+		t.Error("DeleteNetworkInterface second call: expected error, got 200")
+	}
+}
+
+// ---- Test: NACL (CreateNetworkAcl, CreateNetworkAclEntry, DescribeNetworkAcls, DeleteNetworkAclEntry, DeleteNetworkAcl) ----
+
+func TestEC2_NetworkACL_Lifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	// CreateNetworkAcl.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ec2Req(t, "CreateNetworkAcl", url.Values{
+		"VpcId": {vpcId},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateNetworkAcl: expected 200, got %d\nbody: %s", wc.Code, wc.Body.String())
+	}
+	createBody := wc.Body.String()
+	if !strings.Contains(createBody, "acl-") {
+		t.Errorf("CreateNetworkAcl: expected acl- prefix\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, vpcId) {
+		t.Errorf("CreateNetworkAcl: expected vpcId\nbody: %s", createBody)
+	}
+	var createResp struct {
+		NetworkAcl struct {
+			NetworkAclId string `xml:"networkAclId"`
+		} `xml:"networkAcl"`
+	}
+	if err := xml.Unmarshal(wc.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("CreateNetworkAcl unmarshal: %v", err)
+	}
+	aclId := createResp.NetworkAcl.NetworkAclId
+	if aclId == "" {
+		t.Fatalf("CreateNetworkAcl: empty networkAclId")
+	}
+
+	// CreateNetworkAclEntry — add custom rule 200 allow tcp inbound.
+	we := httptest.NewRecorder()
+	handler.ServeHTTP(we, ec2Req(t, "CreateNetworkAclEntry", url.Values{
+		"NetworkAclId": {aclId},
+		"RuleNumber":   {"200"},
+		"Protocol":     {"6"},
+		"RuleAction":   {"allow"},
+		"Egress":       {"false"},
+		"CidrBlock":    {"10.0.0.0/8"},
+	}))
+	if we.Code != http.StatusOK {
+		t.Fatalf("CreateNetworkAclEntry: expected 200, got %d\nbody: %s", we.Code, we.Body.String())
+	}
+
+	// Duplicate rule number + direction should fail.
+	wdup := httptest.NewRecorder()
+	handler.ServeHTTP(wdup, ec2Req(t, "CreateNetworkAclEntry", url.Values{
+		"NetworkAclId": {aclId},
+		"RuleNumber":   {"200"},
+		"Protocol":     {"6"},
+		"RuleAction":   {"deny"},
+		"Egress":       {"false"},
+		"CidrBlock":    {"192.168.0.0/16"},
+	}))
+	if wdup.Code == http.StatusOK {
+		t.Error("CreateNetworkAclEntry duplicate rule: expected error, got 200")
+	}
+	if !strings.Contains(wdup.Body.String(), "NetworkAclEntryAlreadyExists") {
+		t.Errorf("CreateNetworkAclEntry duplicate: expected NetworkAclEntryAlreadyExists\nbody: %s", wdup.Body.String())
+	}
+
+	// DescribeNetworkAcls — by ID should include the new entry.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DescribeNetworkAcls", url.Values{
+		"NetworkAclId.1": {aclId},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeNetworkAcls: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	descBody := wd.Body.String()
+	if !strings.Contains(descBody, aclId) {
+		t.Errorf("DescribeNetworkAcls: expected aclId\nbody: %s", descBody)
+	}
+	if !strings.Contains(descBody, "<ruleNumber>200</ruleNumber>") {
+		t.Errorf("DescribeNetworkAcls: expected rule 200\nbody: %s", descBody)
+	}
+
+	// DescribeNetworkAcls — filter by vpc-id.
+	wvf := httptest.NewRecorder()
+	handler.ServeHTTP(wvf, ec2Req(t, "DescribeNetworkAcls", url.Values{
+		"Filter.1.Name":    {"vpc-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wvf.Code != http.StatusOK {
+		t.Fatalf("DescribeNetworkAcls vpc filter: expected 200, got %d", wvf.Code)
+	}
+	if !strings.Contains(wvf.Body.String(), aclId) {
+		t.Errorf("DescribeNetworkAcls vpc filter: expected aclId\nbody: %s", wvf.Body.String())
+	}
+
+	// DeleteNetworkAclEntry — remove rule 200 inbound.
+	wde := httptest.NewRecorder()
+	handler.ServeHTTP(wde, ec2Req(t, "DeleteNetworkAclEntry", url.Values{
+		"NetworkAclId": {aclId},
+		"RuleNumber":   {"200"},
+		"Egress":       {"false"},
+	}))
+	if wde.Code != http.StatusOK {
+		t.Fatalf("DeleteNetworkAclEntry: expected 200, got %d\nbody: %s", wde.Code, wde.Body.String())
+	}
+
+	// Verify entry is gone.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeNetworkAcls", url.Values{
+			"NetworkAclId.1": {aclId},
+		}))
+		if strings.Contains(w.Body.String(), "<ruleNumber>200</ruleNumber>") {
+			t.Errorf("DeleteNetworkAclEntry: rule 200 should be gone\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DeleteNetworkAcl.
+	wdel := httptest.NewRecorder()
+	handler.ServeHTTP(wdel, ec2Req(t, "DeleteNetworkAcl", url.Values{
+		"NetworkAclId": {aclId},
+	}))
+	if wdel.Code != http.StatusOK {
+		t.Fatalf("DeleteNetworkAcl: expected 200, got %d\nbody: %s", wdel.Code, wdel.Body.String())
+	}
+
+	// Delete default NACL should fail.
+	// First find the default NACL for this VPC.
+	wdn := httptest.NewRecorder()
+	handler.ServeHTTP(wdn, ec2Req(t, "DescribeNetworkAcls", url.Values{
+		"Filter.1.Name":    {"vpc-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	var descAll struct {
+		Items []struct {
+			NetworkAclId string `xml:"networkAclId"`
+			IsDefault    bool   `xml:"default"`
+		} `xml:"networkAclSet>item"`
+	}
+	if err := xml.Unmarshal(wdn.Body.Bytes(), &descAll); err != nil {
+		t.Fatalf("DescribeNetworkAcls for default: unmarshal: %v", err)
+	}
+	var defaultAclId string
+	for _, item := range descAll.Items {
+		if item.IsDefault {
+			defaultAclId = item.NetworkAclId
+			break
+		}
+	}
+	if defaultAclId == "" {
+		t.Fatal("could not find default NACL")
+	}
+	wdelDefault := httptest.NewRecorder()
+	handler.ServeHTTP(wdelDefault, ec2Req(t, "DeleteNetworkAcl", url.Values{
+		"NetworkAclId": {defaultAclId},
+	}))
+	if wdelDefault.Code == http.StatusOK {
+		t.Error("DeleteNetworkAcl default: expected error, got 200")
+	}
+	if !strings.Contains(wdelDefault.Body.String(), "InvalidParameterValue") {
+		t.Errorf("DeleteNetworkAcl default: expected error code\nbody: %s", wdelDefault.Body.String())
+	}
+}
+
+// ---- Test: VPC Endpoint (CreateVpcEndpoint, DescribeVpcEndpoints, DeleteVpcEndpoints) ----
+
+func TestEC2_VpcEndpoint_Lifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	// CreateVpcEndpoint — Gateway type.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ec2Req(t, "CreateVpcEndpoint", url.Values{
+		"VpcId":           {vpcId},
+		"ServiceName":     {"com.amazonaws.us-east-1.s3"},
+		"VpcEndpointType": {"Gateway"},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateVpcEndpoint: expected 200, got %d\nbody: %s", wc.Code, wc.Body.String())
+	}
+	createBody := wc.Body.String()
+	if !strings.Contains(createBody, "vpce-") {
+		t.Errorf("CreateVpcEndpoint: expected vpce- prefix\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, "<state>available</state>") {
+		t.Errorf("CreateVpcEndpoint: expected state=available\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, "com.amazonaws.us-east-1.s3") {
+		t.Errorf("CreateVpcEndpoint: expected serviceName\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, "<vpcEndpointType>Gateway</vpcEndpointType>") {
+		t.Errorf("CreateVpcEndpoint: expected type=Gateway\nbody: %s", createBody)
+	}
+	var createResp struct {
+		VpcEndpoint struct {
+			VpcEndpointId string `xml:"vpcEndpointId"`
+		} `xml:"vpcEndpoint"`
+	}
+	if err := xml.Unmarshal(wc.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("CreateVpcEndpoint unmarshal: %v", err)
+	}
+	epId := createResp.VpcEndpoint.VpcEndpointId
+	if epId == "" {
+		t.Fatalf("CreateVpcEndpoint: empty vpcEndpointId")
+	}
+
+	// DescribeVpcEndpoints — by ID.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ec2Req(t, "DescribeVpcEndpoints", url.Values{
+		"VpcEndpointId.1": {epId},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeVpcEndpoints: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), epId) {
+		t.Errorf("DescribeVpcEndpoints: expected epId\nbody: %s", wd.Body.String())
+	}
+
+	// DescribeVpcEndpoints — filter by vpc-id.
+	wvf := httptest.NewRecorder()
+	handler.ServeHTTP(wvf, ec2Req(t, "DescribeVpcEndpoints", url.Values{
+		"Filter.1.Name":    {"vpc-id"},
+		"Filter.1.Value.1": {vpcId},
+	}))
+	if wvf.Code != http.StatusOK {
+		t.Fatalf("DescribeVpcEndpoints vpc filter: expected 200, got %d", wvf.Code)
+	}
+	if !strings.Contains(wvf.Body.String(), epId) {
+		t.Errorf("DescribeVpcEndpoints vpc filter: expected epId\nbody: %s", wvf.Body.String())
+	}
+
+	// DeleteVpcEndpoints.
+	wdel := httptest.NewRecorder()
+	handler.ServeHTTP(wdel, ec2Req(t, "DeleteVpcEndpoints", url.Values{
+		"VpcEndpointId.1": {epId},
+	}))
+	if wdel.Code != http.StatusOK {
+		t.Fatalf("DeleteVpcEndpoints: expected 200, got %d\nbody: %s", wdel.Code, wdel.Body.String())
+	}
+
+	// Delete again should fail.
+	wdel2 := httptest.NewRecorder()
+	handler.ServeHTTP(wdel2, ec2Req(t, "DeleteVpcEndpoints", url.Values{
+		"VpcEndpointId.1": {epId},
+	}))
+	if wdel2.Code == http.StatusOK {
+		t.Error("DeleteVpcEndpoints second call: expected error, got 200")
+	}
+}
+
+// ---- Test: VPC Peering (CreateVpcPeeringConnection, AcceptVpcPeeringConnection, DeleteVpcPeeringConnection) ----
+
+func TestEC2_VpcPeering_Lifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId1 := mustCreateVpc(t, handler, "10.0.0.0/16")
+	vpcId2 := mustCreateVpc(t, handler, "10.1.0.0/16")
+
+	// CreateVpcPeeringConnection.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ec2Req(t, "CreateVpcPeeringConnection", url.Values{
+		"VpcId":     {vpcId1},
+		"PeerVpcId": {vpcId2},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateVpcPeeringConnection: expected 200, got %d\nbody: %s", wc.Code, wc.Body.String())
+	}
+	createBody := wc.Body.String()
+	if !strings.Contains(createBody, "pcx-") {
+		t.Errorf("CreateVpcPeeringConnection: expected pcx- prefix\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, "pending-acceptance") {
+		t.Errorf("CreateVpcPeeringConnection: expected status=pending-acceptance\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, vpcId1) {
+		t.Errorf("CreateVpcPeeringConnection: expected requesterVpcId\nbody: %s", createBody)
+	}
+	if !strings.Contains(createBody, vpcId2) {
+		t.Errorf("CreateVpcPeeringConnection: expected accepterVpcId\nbody: %s", createBody)
+	}
+	var createResp struct {
+		VpcPeeringConnection struct {
+			VpcPeeringConnectionId string `xml:"vpcPeeringConnectionId"`
+		} `xml:"vpcPeeringConnection"`
+	}
+	if err := xml.Unmarshal(wc.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("CreateVpcPeeringConnection unmarshal: %v", err)
+	}
+	pcxId := createResp.VpcPeeringConnection.VpcPeeringConnectionId
+	if pcxId == "" {
+		t.Fatalf("CreateVpcPeeringConnection: empty vpcPeeringConnectionId")
+	}
+
+	// AcceptVpcPeeringConnection.
+	wacc := httptest.NewRecorder()
+	handler.ServeHTTP(wacc, ec2Req(t, "AcceptVpcPeeringConnection", url.Values{
+		"VpcPeeringConnectionId": {pcxId},
+	}))
+	if wacc.Code != http.StatusOK {
+		t.Fatalf("AcceptVpcPeeringConnection: expected 200, got %d\nbody: %s", wacc.Code, wacc.Body.String())
+	}
+	if !strings.Contains(wacc.Body.String(), "active") {
+		t.Errorf("AcceptVpcPeeringConnection: expected status=active\nbody: %s", wacc.Body.String())
+	}
+
+	// Accept again (now active) should fail.
+	wacc2 := httptest.NewRecorder()
+	handler.ServeHTTP(wacc2, ec2Req(t, "AcceptVpcPeeringConnection", url.Values{
+		"VpcPeeringConnectionId": {pcxId},
+	}))
+	if wacc2.Code == http.StatusOK {
+		t.Error("AcceptVpcPeeringConnection second call: expected error, got 200")
+	}
+	if !strings.Contains(wacc2.Body.String(), "InvalidStateTransition") {
+		t.Errorf("AcceptVpcPeeringConnection second: expected InvalidStateTransition\nbody: %s", wacc2.Body.String())
+	}
+
+	// DeleteVpcPeeringConnection.
+	wdel := httptest.NewRecorder()
+	handler.ServeHTTP(wdel, ec2Req(t, "DeleteVpcPeeringConnection", url.Values{
+		"VpcPeeringConnectionId": {pcxId},
+	}))
+	if wdel.Code != http.StatusOK {
+		t.Fatalf("DeleteVpcPeeringConnection: expected 200, got %d\nbody: %s", wdel.Code, wdel.Body.String())
+	}
+
+	// Delete again should fail.
+	wdel2 := httptest.NewRecorder()
+	handler.ServeHTTP(wdel2, ec2Req(t, "DeleteVpcPeeringConnection", url.Values{
+		"VpcPeeringConnectionId": {pcxId},
+	}))
+	if wdel2.Code == http.StatusOK {
+		t.Error("DeleteVpcPeeringConnection second call: expected error, got 200")
+	}
+	if !strings.Contains(wdel2.Body.String(), "InvalidVpcPeeringConnectionID.NotFound") {
+		t.Errorf("DeleteVpcPeeringConnection second: expected NotFound\nbody: %s", wdel2.Body.String())
+	}
+
+	// Create with non-existent requester VPC should fail.
+	wbad := httptest.NewRecorder()
+	handler.ServeHTTP(wbad, ec2Req(t, "CreateVpcPeeringConnection", url.Values{
+		"VpcId":     {"vpc-nonexistent00000000"},
+		"PeerVpcId": {vpcId2},
+	}))
+	if wbad.Code == http.StatusOK {
+		t.Error("CreateVpcPeeringConnection bad VpcId: expected error, got 200")
+	}
+}

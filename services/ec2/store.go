@@ -102,41 +102,102 @@ type SecurityGroup struct {
 	Tags         map[string]string
 }
 
+// ElasticIP represents an allocated Elastic IP address.
+type ElasticIP struct {
+	AllocationId       string
+	PublicIp           string
+	AssociationId      string
+	InstanceId         string
+	NetworkInterfaceId string
+	Tags               map[string]string
+}
+
+// NetworkInterface represents an EC2 elastic network interface.
+type NetworkInterface struct {
+	NetworkInterfaceId string
+	SubnetId           string
+	VpcId              string
+	PrivateIpAddress   string
+	SecurityGroupIds   []string
+	Status             string // available, in-use
+	Tags               map[string]string
+}
+
 // NetworkACL represents a VPC network ACL (auto-created with VPC).
 type NetworkACL struct {
 	NetworkAclId string
 	VpcId        string
+	Entries      []NACLEntry
 	IsDefault    bool
+	Tags         map[string]string
+}
+
+// NACLEntry represents a single rule in a Network ACL.
+type NACLEntry struct {
+	RuleNumber int
+	Protocol   string
+	RuleAction string // allow, deny
+	Egress     bool
+	CidrBlock  string
+}
+
+// VPCEndpoint represents a VPC endpoint.
+type VPCEndpoint struct {
+	VpcEndpointId   string
+	VpcId           string
+	ServiceName     string
+	VpcEndpointType string
+	State           string
+	Tags            map[string]string
+}
+
+// VPCPeeringConnection represents a VPC peering connection.
+type VPCPeeringConnection struct {
+	PeeringConnectionId string
+	RequesterVpcId      string
+	AccepterVpcId       string
+	Status              string // pending-acceptance, active, deleted
+	Tags                map[string]string
 }
 
 // Store manages all EC2 resources.
 type Store struct {
-	mu                    sync.RWMutex
-	vpcs                  map[string]*VPC
-	subnets               map[string]*Subnet
-	routeTables           map[string]*RouteTable
-	routeTableAssociations map[string]*RouteTableAssociation
-	securityGroups        map[string]*SecurityGroup
-	networkACLs           map[string]*NetworkACL
-	internetGateways      map[string]*InternetGateway
-	natGateways           map[string]*NatGateway
-	accountID             string
-	region                string
+	mu                      sync.RWMutex
+	vpcs                    map[string]*VPC
+	subnets                 map[string]*Subnet
+	routeTables             map[string]*RouteTable
+	routeTableAssociations  map[string]*RouteTableAssociation
+	securityGroups          map[string]*SecurityGroup
+	networkACLs             map[string]*NetworkACL
+	internetGateways        map[string]*InternetGateway
+	natGateways             map[string]*NatGateway
+	elasticIPs              map[string]*ElasticIP              // keyed by AllocationId
+	eipAssociations         map[string]string                  // AssociationId -> AllocationId
+	networkInterfaces       map[string]*NetworkInterface
+	vpcEndpoints            map[string]*VPCEndpoint
+	vpcPeeringConnections   map[string]*VPCPeeringConnection
+	accountID               string
+	region                  string
 }
 
 // NewStore returns a new Store for the given account and region.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		vpcs:                  make(map[string]*VPC),
-		subnets:               make(map[string]*Subnet),
-		routeTables:           make(map[string]*RouteTable),
-		routeTableAssociations: make(map[string]*RouteTableAssociation),
-		securityGroups:        make(map[string]*SecurityGroup),
-		networkACLs:           make(map[string]*NetworkACL),
-		internetGateways:      make(map[string]*InternetGateway),
-		natGateways:           make(map[string]*NatGateway),
-		accountID:             accountID,
-		region:                region,
+		vpcs:                    make(map[string]*VPC),
+		subnets:                 make(map[string]*Subnet),
+		routeTables:             make(map[string]*RouteTable),
+		routeTableAssociations:  make(map[string]*RouteTableAssociation),
+		securityGroups:          make(map[string]*SecurityGroup),
+		networkACLs:             make(map[string]*NetworkACL),
+		internetGateways:        make(map[string]*InternetGateway),
+		natGateways:             make(map[string]*NatGateway),
+		elasticIPs:              make(map[string]*ElasticIP),
+		eipAssociations:         make(map[string]string),
+		networkInterfaces:       make(map[string]*NetworkInterface),
+		vpcEndpoints:            make(map[string]*VPCEndpoint),
+		vpcPeeringConnections:   make(map[string]*VPCPeeringConnection),
+		accountID:               accountID,
+		region:                  region,
 	}
 }
 
@@ -198,11 +259,18 @@ func (s *Store) CreateVPC(cidrBlock string, enableDnsSupport, enableDnsHostnames
 	}
 	s.securityGroups[sg.GroupId] = sg
 
-	// Auto-create default network ACL.
+	// Auto-create default network ACL with allow-all inbound/outbound.
 	nacl := &NetworkACL{
 		NetworkAclId: genID("acl-"),
 		VpcId:        vpc.VpcId,
 		IsDefault:    true,
+		Entries: []NACLEntry{
+			{RuleNumber: 100, Protocol: "-1", RuleAction: "allow", Egress: false, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 32767, Protocol: "-1", RuleAction: "deny", Egress: false, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 100, Protocol: "-1", RuleAction: "allow", Egress: true, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 32767, Protocol: "-1", RuleAction: "deny", Egress: true, CidrBlock: "0.0.0.0/0"},
+		},
+		Tags: make(map[string]string),
 	}
 	s.networkACLs[nacl.NetworkAclId] = nacl
 
@@ -1074,6 +1142,429 @@ func (s *Store) ListRouteTableAssociations(rtbId string) []*RouteTableAssociatio
 		}
 	}
 	return result
+}
+
+// ---- ElasticIP operations ----
+
+// AllocateAddress allocates a new Elastic IP in the vpc domain.
+func (s *Store) AllocateAddress() *ElasticIP {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Generate a pseudo-random 54.x.x.x public IP.
+	b := make([]byte, 3)
+	_, _ = rand.Read(b)
+	publicIp := fmt.Sprintf("54.%d.%d.%d", b[0], b[1], b[2])
+
+	eip := &ElasticIP{
+		AllocationId: genID("eipalloc-"),
+		PublicIp:     publicIp,
+		Tags:         make(map[string]string),
+	}
+	s.elasticIPs[eip.AllocationId] = eip
+	return eip
+}
+
+// ReleaseAddress releases an allocated Elastic IP. Returns an error code string.
+func (s *Store) ReleaseAddress(allocationId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	eip, ok := s.elasticIPs[allocationId]
+	if !ok {
+		return "not_found"
+	}
+	if eip.AssociationId != "" {
+		return "still_associated"
+	}
+	delete(s.elasticIPs, allocationId)
+	return ""
+}
+
+// AssociateAddress associates an EIP with an instance or ENI. Returns the
+// association ID and an error code string.
+func (s *Store) AssociateAddress(allocationId, instanceId, networkInterfaceId string) (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	eip, ok := s.elasticIPs[allocationId]
+	if !ok {
+		return "", "not_found"
+	}
+	if eip.AssociationId != "" {
+		return "", "already_associated"
+	}
+
+	assocId := genID("eipassoc-")
+	eip.AssociationId = assocId
+	eip.InstanceId = instanceId
+	eip.NetworkInterfaceId = networkInterfaceId
+	s.eipAssociations[assocId] = allocationId
+	return assocId, ""
+}
+
+// DisassociateAddress removes an EIP association. Returns an error code string.
+func (s *Store) DisassociateAddress(assocId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	allocationId, ok := s.eipAssociations[assocId]
+	if !ok {
+		return "not_found"
+	}
+	eip, ok := s.elasticIPs[allocationId]
+	if !ok {
+		return "not_found"
+	}
+	eip.AssociationId = ""
+	eip.InstanceId = ""
+	eip.NetworkInterfaceId = ""
+	delete(s.eipAssociations, assocId)
+	return ""
+}
+
+// ListAddresses returns EIPs, optionally filtered by allocation IDs.
+func (s *Store) ListAddresses(ids []string) []*ElasticIP {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*ElasticIP, 0)
+	for _, eip := range s.elasticIPs {
+		if idSet != nil {
+			if _, ok := idSet[eip.AllocationId]; !ok {
+				continue
+			}
+		}
+		result = append(result, eip)
+	}
+	return result
+}
+
+// ---- NetworkInterface operations ----
+
+// CreateNetworkInterface creates a new ENI in the given subnet. Assigns a
+// private IP from the subnet's CIDR (10.0.x.x range).
+func (s *Store) CreateNetworkInterface(subnetId string, sgIds []string) (*NetworkInterface, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sub, ok := s.subnets[subnetId]
+	if !ok {
+		return nil, "subnet_not_found"
+	}
+
+	// Derive a pseudo-random private IP within the subnet CIDR.
+	_, subNet, err := net.ParseCIDR(sub.CidrBlock)
+	var privateIP string
+	if err == nil {
+		b := make([]byte, 1)
+		_, _ = rand.Read(b)
+		ip := make(net.IP, len(subNet.IP))
+		copy(ip, subNet.IP)
+		// Set the host octet to a random value in [10,250].
+		ip[len(ip)-1] = 10 + b[0]%240
+		privateIP = ip.String()
+	} else {
+		privateIP = "10.0.0.10"
+	}
+
+	eni := &NetworkInterface{
+		NetworkInterfaceId: genID("eni-"),
+		SubnetId:           subnetId,
+		VpcId:              sub.VpcId,
+		PrivateIpAddress:   privateIP,
+		SecurityGroupIds:   sgIds,
+		Status:             "available",
+		Tags:               make(map[string]string),
+	}
+	s.networkInterfaces[eni.NetworkInterfaceId] = eni
+	return eni, ""
+}
+
+// ListNetworkInterfaces returns ENIs filtered by IDs and/or subnet ID.
+func (s *Store) ListNetworkInterfaces(ids []string, filterSubnetId string) []*NetworkInterface {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*NetworkInterface, 0)
+	for _, eni := range s.networkInterfaces {
+		if idSet != nil {
+			if _, ok := idSet[eni.NetworkInterfaceId]; !ok {
+				continue
+			}
+		}
+		if filterSubnetId != "" && eni.SubnetId != filterSubnetId {
+			continue
+		}
+		result = append(result, eni)
+	}
+	return result
+}
+
+// DeleteNetworkInterface removes an ENI. Returns an error code string.
+func (s *Store) DeleteNetworkInterface(eniId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	eni, ok := s.networkInterfaces[eniId]
+	if !ok {
+		return "not_found"
+	}
+	if eni.Status == "in-use" {
+		return "in_use"
+	}
+	delete(s.networkInterfaces, eniId)
+	return ""
+}
+
+// ---- NetworkACL operations ----
+
+// CreateNetworkACL creates a new (non-default) network ACL in the given VPC.
+func (s *Store) CreateNetworkACL(vpcId string) (*NetworkACL, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcs[vpcId]; !ok {
+		return nil, "vpc_not_found"
+	}
+
+	acl := &NetworkACL{
+		NetworkAclId: genID("acl-"),
+		VpcId:        vpcId,
+		IsDefault:    false,
+		Entries: []NACLEntry{
+			{RuleNumber: 100, Protocol: "-1", RuleAction: "allow", Egress: false, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 32767, Protocol: "-1", RuleAction: "deny", Egress: false, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 100, Protocol: "-1", RuleAction: "allow", Egress: true, CidrBlock: "0.0.0.0/0"},
+			{RuleNumber: 32767, Protocol: "-1", RuleAction: "deny", Egress: true, CidrBlock: "0.0.0.0/0"},
+		},
+		Tags: make(map[string]string),
+	}
+	s.networkACLs[acl.NetworkAclId] = acl
+	return acl, ""
+}
+
+// ListNetworkACLs returns NACLs filtered by IDs and/or VPC ID.
+func (s *Store) ListNetworkACLs(ids []string, filterVpcId string) []*NetworkACL {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*NetworkACL, 0)
+	for _, acl := range s.networkACLs {
+		if idSet != nil {
+			if _, ok := idSet[acl.NetworkAclId]; !ok {
+				continue
+			}
+		}
+		if filterVpcId != "" && acl.VpcId != filterVpcId {
+			continue
+		}
+		result = append(result, acl)
+	}
+	return result
+}
+
+// DeleteNetworkACL removes a non-default NACL. Returns an error code string.
+func (s *Store) DeleteNetworkACL(aclId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	acl, ok := s.networkACLs[aclId]
+	if !ok {
+		return "not_found"
+	}
+	if acl.IsDefault {
+		return "default_acl"
+	}
+	delete(s.networkACLs, aclId)
+	return ""
+}
+
+// CreateNetworkACLEntry adds a rule to a NACL. Returns an error code string.
+func (s *Store) CreateNetworkACLEntry(aclId string, entry NACLEntry) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	acl, ok := s.networkACLs[aclId]
+	if !ok {
+		return "not_found"
+	}
+	// Check for duplicate rule number + direction.
+	for _, e := range acl.Entries {
+		if e.RuleNumber == entry.RuleNumber && e.Egress == entry.Egress {
+			return "duplicate_rule"
+		}
+	}
+	acl.Entries = append(acl.Entries, entry)
+	return ""
+}
+
+// DeleteNetworkACLEntry removes a rule from a NACL. Returns an error code string.
+func (s *Store) DeleteNetworkACLEntry(aclId string, ruleNumber int, egress bool) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	acl, ok := s.networkACLs[aclId]
+	if !ok {
+		return "not_found"
+	}
+	newEntries := acl.Entries[:0:0]
+	found := false
+	for _, e := range acl.Entries {
+		if e.RuleNumber == ruleNumber && e.Egress == egress {
+			found = true
+			continue
+		}
+		newEntries = append(newEntries, e)
+	}
+	if !found {
+		return "entry_not_found"
+	}
+	acl.Entries = newEntries
+	return ""
+}
+
+// ---- VPCEndpoint operations ----
+
+// CreateVPCEndpoint creates a new VPC endpoint. Returns the endpoint and an
+// error code string.
+func (s *Store) CreateVPCEndpoint(vpcId, serviceName, epType string) (*VPCEndpoint, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcs[vpcId]; !ok {
+		return nil, "vpc_not_found"
+	}
+
+	ep := &VPCEndpoint{
+		VpcEndpointId:   genID("vpce-"),
+		VpcId:           vpcId,
+		ServiceName:     serviceName,
+		VpcEndpointType: epType,
+		State:           "available",
+		Tags:            make(map[string]string),
+	}
+	s.vpcEndpoints[ep.VpcEndpointId] = ep
+	return ep, ""
+}
+
+// ListVPCEndpoints returns endpoints filtered by IDs and/or VPC ID.
+func (s *Store) ListVPCEndpoints(ids []string, filterVpcId string) []*VPCEndpoint {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*VPCEndpoint, 0)
+	for _, ep := range s.vpcEndpoints {
+		if idSet != nil {
+			if _, ok := idSet[ep.VpcEndpointId]; !ok {
+				continue
+			}
+		}
+		if filterVpcId != "" && ep.VpcId != filterVpcId {
+			continue
+		}
+		result = append(result, ep)
+	}
+	return result
+}
+
+// DeleteVPCEndpoint removes a VPC endpoint. Returns an error code string.
+func (s *Store) DeleteVPCEndpoint(epId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcEndpoints[epId]; !ok {
+		return "not_found"
+	}
+	delete(s.vpcEndpoints, epId)
+	return ""
+}
+
+// ---- VPCPeeringConnection operations ----
+
+// CreateVPCPeeringConnection creates a new peering connection between two VPCs.
+// Returns the connection and an error code string.
+func (s *Store) CreateVPCPeeringConnection(requesterVpcId, accepterVpcId string) (*VPCPeeringConnection, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcs[requesterVpcId]; !ok {
+		return nil, "requester_not_found"
+	}
+	if _, ok := s.vpcs[accepterVpcId]; !ok {
+		return nil, "accepter_not_found"
+	}
+
+	pcx := &VPCPeeringConnection{
+		PeeringConnectionId: genID("pcx-"),
+		RequesterVpcId:      requesterVpcId,
+		AccepterVpcId:       accepterVpcId,
+		Status:              "pending-acceptance",
+		Tags:                make(map[string]string),
+	}
+	s.vpcPeeringConnections[pcx.PeeringConnectionId] = pcx
+	return pcx, ""
+}
+
+// AcceptVPCPeeringConnection accepts a pending peering connection. Returns the
+// updated connection and an error code string.
+func (s *Store) AcceptVPCPeeringConnection(pcxId string) (*VPCPeeringConnection, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pcx, ok := s.vpcPeeringConnections[pcxId]
+	if !ok {
+		return nil, "not_found"
+	}
+	if pcx.Status != "pending-acceptance" {
+		return nil, "invalid_state"
+	}
+	pcx.Status = "active"
+	return pcx, ""
+}
+
+// DeleteVPCPeeringConnection deletes a peering connection. Returns an error code.
+func (s *Store) DeleteVPCPeeringConnection(pcxId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.vpcPeeringConnections[pcxId]; !ok {
+		return "not_found"
+	}
+	delete(s.vpcPeeringConnections, pcxId)
+	return ""
 }
 
 // ---- helpers ----

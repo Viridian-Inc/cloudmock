@@ -57,6 +57,30 @@ func (s *EC2Service) Actions() []service.Action {
 		{Name: "ReplaceRoute", Method: http.MethodPost, IAMAction: "ec2:ReplaceRoute"},
 		{Name: "AssociateRouteTable", Method: http.MethodPost, IAMAction: "ec2:AssociateRouteTable"},
 		{Name: "DisassociateRouteTable", Method: http.MethodPost, IAMAction: "ec2:DisassociateRouteTable"},
+		// Elastic IP
+		{Name: "AllocateAddress", Method: http.MethodPost, IAMAction: "ec2:AllocateAddress"},
+		{Name: "ReleaseAddress", Method: http.MethodPost, IAMAction: "ec2:ReleaseAddress"},
+		{Name: "AssociateAddress", Method: http.MethodPost, IAMAction: "ec2:AssociateAddress"},
+		{Name: "DisassociateAddress", Method: http.MethodPost, IAMAction: "ec2:DisassociateAddress"},
+		{Name: "DescribeAddresses", Method: http.MethodPost, IAMAction: "ec2:DescribeAddresses"},
+		// Network Interface
+		{Name: "CreateNetworkInterface", Method: http.MethodPost, IAMAction: "ec2:CreateNetworkInterface"},
+		{Name: "DescribeNetworkInterfaces", Method: http.MethodPost, IAMAction: "ec2:DescribeNetworkInterfaces"},
+		{Name: "DeleteNetworkInterface", Method: http.MethodPost, IAMAction: "ec2:DeleteNetworkInterface"},
+		// Network ACL
+		{Name: "CreateNetworkAcl", Method: http.MethodPost, IAMAction: "ec2:CreateNetworkAcl"},
+		{Name: "DescribeNetworkAcls", Method: http.MethodPost, IAMAction: "ec2:DescribeNetworkAcls"},
+		{Name: "DeleteNetworkAcl", Method: http.MethodPost, IAMAction: "ec2:DeleteNetworkAcl"},
+		{Name: "CreateNetworkAclEntry", Method: http.MethodPost, IAMAction: "ec2:CreateNetworkAclEntry"},
+		{Name: "DeleteNetworkAclEntry", Method: http.MethodPost, IAMAction: "ec2:DeleteNetworkAclEntry"},
+		// VPC Endpoint
+		{Name: "CreateVpcEndpoint", Method: http.MethodPost, IAMAction: "ec2:CreateVpcEndpoint"},
+		{Name: "DescribeVpcEndpoints", Method: http.MethodPost, IAMAction: "ec2:DescribeVpcEndpoints"},
+		{Name: "DeleteVpcEndpoints", Method: http.MethodPost, IAMAction: "ec2:DeleteVpcEndpoints"},
+		// VPC Peering
+		{Name: "CreateVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:CreateVpcPeeringConnection"},
+		{Name: "AcceptVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:AcceptVpcPeeringConnection"},
+		{Name: "DeleteVpcPeeringConnection", Method: http.MethodPost, IAMAction: "ec2:DeleteVpcPeeringConnection"},
 	}
 }
 
@@ -137,6 +161,49 @@ func (s *EC2Service) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAssociateRouteTable(ctx, s.store)
 	case "DisassociateRouteTable":
 		return handleDisassociateRouteTable(ctx, s.store)
+	// Elastic IP
+	case "AllocateAddress":
+		return handleAllocateAddress(ctx, s.store)
+	case "ReleaseAddress":
+		return handleReleaseAddress(ctx, s.store)
+	case "AssociateAddress":
+		return handleAssociateAddress(ctx, s.store)
+	case "DisassociateAddress":
+		return handleDisassociateAddress(ctx, s.store)
+	case "DescribeAddresses":
+		return handleDescribeAddresses(ctx, s.store)
+	// Network Interface
+	case "CreateNetworkInterface":
+		return handleCreateNetworkInterface(ctx, s.store)
+	case "DescribeNetworkInterfaces":
+		return handleDescribeNetworkInterfaces(ctx, s.store)
+	case "DeleteNetworkInterface":
+		return handleDeleteNetworkInterface(ctx, s.store)
+	// Network ACL
+	case "CreateNetworkAcl":
+		return handleCreateNetworkAcl(ctx, s.store)
+	case "DescribeNetworkAcls":
+		return handleDescribeNetworkAcls(ctx, s.store)
+	case "DeleteNetworkAcl":
+		return handleDeleteNetworkAcl(ctx, s.store)
+	case "CreateNetworkAclEntry":
+		return handleCreateNetworkAclEntry(ctx, s.store)
+	case "DeleteNetworkAclEntry":
+		return handleDeleteNetworkAclEntry(ctx, s.store)
+	// VPC Endpoint
+	case "CreateVpcEndpoint":
+		return handleCreateVpcEndpoint(ctx, s.store)
+	case "DescribeVpcEndpoints":
+		return handleDescribeVpcEndpoints(ctx, s.store)
+	case "DeleteVpcEndpoints":
+		return handleDeleteVpcEndpoints(ctx, s.store)
+	// VPC Peering
+	case "CreateVpcPeeringConnection":
+		return handleCreateVpcPeeringConnection(ctx, s.store)
+	case "AcceptVpcPeeringConnection":
+		return handleAcceptVpcPeeringConnection(ctx, s.store)
+	case "DeleteVpcPeeringConnection":
+		return handleDeleteVpcPeeringConnection(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

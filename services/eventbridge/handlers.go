@@ -1,0 +1,711 @@
+package eventbridge
+
+import (
+	"crypto/rand"
+	"encoding/json"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/neureaux/cloudmock/pkg/service"
+)
+
+// ---- helpers ----
+
+func jsonOK(body interface{}) (*service.Response, error) {
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       body,
+		Format:     service.FormatJSON,
+	}, nil
+}
+
+func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
+	return &service.Response{Format: service.FormatJSON}, awsErr
+}
+
+func parseJSON(body []byte, v interface{}) *service.AWSError {
+	if len(body) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(body, v); err != nil {
+		return service.NewAWSError("InvalidParameterException",
+			"Request body is not valid JSON.", http.StatusBadRequest)
+	}
+	return nil
+}
+
+func emptyOK() (*service.Response, error) {
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       struct{}{},
+		Format:     service.FormatJSON,
+	}, nil
+}
+
+// newUUID returns a random UUID-shaped identifier.
+func newUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+// ---- CreateEventBus ----
+
+type createEventBusRequest struct {
+	Name string            `json:"Name"`
+	Tags map[string]string `json:"Tags"`
+}
+
+type createEventBusResponse struct {
+	EventBusArn string `json:"EventBusArn"`
+}
+
+func handleCreateEventBus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createEventBusRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	bus, ok := store.CreateEventBus(req.Name, req.Tags)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceAlreadyExistsException",
+			"Event bus "+req.Name+" already exists.", http.StatusConflict))
+	}
+
+	return jsonOK(&createEventBusResponse{EventBusArn: bus.ARN})
+}
+
+// ---- DeleteEventBus ----
+
+type deleteEventBusRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleDeleteEventBus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteEventBusRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	if req.Name == "default" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"Cannot delete the default event bus.", http.StatusBadRequest))
+	}
+
+	if !store.DeleteEventBus(req.Name) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Event bus "+req.Name+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- DescribeEventBus ----
+
+type describeEventBusRequest struct {
+	Name string `json:"Name"`
+}
+
+type describeEventBusResponse struct {
+	Name   string `json:"Name"`
+	Arn    string `json:"Arn"`
+	Policy string `json:"Policy,omitempty"`
+}
+
+func handleDescribeEventBus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeEventBusRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	name := req.Name
+	if name == "" {
+		name = "default"
+	}
+
+	bus, ok := store.GetEventBus(name)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Event bus "+name+" does not exist.", http.StatusNotFound))
+	}
+
+	return jsonOK(&describeEventBusResponse{
+		Name:   bus.Name,
+		Arn:    bus.ARN,
+		Policy: bus.Policy,
+	})
+}
+
+// ---- ListEventBuses ----
+
+type listEventBusesRequest struct {
+	NamePrefix string `json:"NamePrefix"`
+	Limit      int    `json:"Limit"`
+}
+
+type eventBusEntry struct {
+	Name   string `json:"Name"`
+	Arn    string `json:"Arn"`
+	Policy string `json:"Policy,omitempty"`
+}
+
+type listEventBusesResponse struct {
+	EventBuses []eventBusEntry `json:"EventBuses"`
+}
+
+func handleListEventBuses(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listEventBusesRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	buses := store.ListEventBuses()
+	entries := make([]eventBusEntry, 0, len(buses))
+	for _, bus := range buses {
+		if req.NamePrefix != "" {
+			if len(bus.Name) < len(req.NamePrefix) || bus.Name[:len(req.NamePrefix)] != req.NamePrefix {
+				continue
+			}
+		}
+		entries = append(entries, eventBusEntry{
+			Name:   bus.Name,
+			Arn:    bus.ARN,
+			Policy: bus.Policy,
+		})
+	}
+
+	return jsonOK(&listEventBusesResponse{EventBuses: entries})
+}
+
+// ---- PutRule ----
+
+type putRuleRequest struct {
+	Name               string            `json:"Name"`
+	EventBusName       string            `json:"EventBusName"`
+	EventPattern       string            `json:"EventPattern"`
+	ScheduleExpression string            `json:"ScheduleExpression"`
+	State              string            `json:"State"`
+	Description        string            `json:"Description"`
+	Tags               map[string]string `json:"Tags"`
+}
+
+type putRuleResponse struct {
+	RuleArn string `json:"RuleArn"`
+}
+
+func handlePutRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req putRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	arn, ok := store.PutRule(busName, req.Name, req.EventPattern, req.ScheduleExpression,
+		req.State, req.Description, req.Tags)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Event bus "+busName+" does not exist.", http.StatusNotFound))
+	}
+
+	return jsonOK(&putRuleResponse{RuleArn: arn})
+}
+
+// ---- DeleteRule ----
+
+type deleteRuleRequest struct {
+	Name         string `json:"Name"`
+	EventBusName string `json:"EventBusName"`
+}
+
+func handleDeleteRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	if !store.DeleteRule(busName, req.Name) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Name+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- DescribeRule ----
+
+type describeRuleRequest struct {
+	Name         string `json:"Name"`
+	EventBusName string `json:"EventBusName"`
+}
+
+type describeRuleResponse struct {
+	Name               string `json:"Name"`
+	Arn                string `json:"Arn"`
+	EventBusName       string `json:"EventBusName"`
+	EventPattern       string `json:"EventPattern,omitempty"`
+	ScheduleExpression string `json:"ScheduleExpression,omitempty"`
+	State              string `json:"State"`
+	Description        string `json:"Description,omitempty"`
+}
+
+func handleDescribeRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	rule, ok := store.GetRule(busName, req.Name)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Name+" does not exist.", http.StatusNotFound))
+	}
+
+	return jsonOK(&describeRuleResponse{
+		Name:               rule.Name,
+		Arn:                rule.ARN,
+		EventBusName:       rule.EventBusName,
+		EventPattern:       rule.EventPattern,
+		ScheduleExpression: rule.ScheduleExpression,
+		State:              rule.State,
+		Description:        rule.Description,
+	})
+}
+
+// ---- ListRules ----
+
+type listRulesRequest struct {
+	EventBusName string `json:"EventBusName"`
+	NamePrefix   string `json:"NamePrefix"`
+}
+
+type ruleEntry struct {
+	Name               string `json:"Name"`
+	Arn                string `json:"Arn"`
+	EventBusName       string `json:"EventBusName"`
+	EventPattern       string `json:"EventPattern,omitempty"`
+	ScheduleExpression string `json:"ScheduleExpression,omitempty"`
+	State              string `json:"State"`
+	Description        string `json:"Description,omitempty"`
+}
+
+type listRulesResponse struct {
+	Rules []ruleEntry `json:"Rules"`
+}
+
+func handleListRules(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listRulesRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	rules, ok := store.ListRules(busName, req.NamePrefix)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Event bus "+busName+" does not exist.", http.StatusNotFound))
+	}
+
+	entries := make([]ruleEntry, 0, len(rules))
+	for _, r := range rules {
+		entries = append(entries, ruleEntry{
+			Name:               r.Name,
+			Arn:                r.ARN,
+			EventBusName:       r.EventBusName,
+			EventPattern:       r.EventPattern,
+			ScheduleExpression: r.ScheduleExpression,
+			State:              r.State,
+			Description:        r.Description,
+		})
+	}
+
+	return jsonOK(&listRulesResponse{Rules: entries})
+}
+
+// ---- PutTargets ----
+
+type targetJSON struct {
+	Id        string `json:"Id"`
+	Arn       string `json:"Arn"`
+	Input     string `json:"Input,omitempty"`
+	InputPath string `json:"InputPath,omitempty"`
+}
+
+type putTargetsRequest struct {
+	Rule         string       `json:"Rule"`
+	EventBusName string       `json:"EventBusName"`
+	Targets      []targetJSON `json:"Targets"`
+}
+
+type failedEntry struct {
+	TargetId     string `json:"TargetId"`
+	ErrorCode    string `json:"ErrorCode"`
+	ErrorMessage string `json:"ErrorMessage"`
+}
+
+type putTargetsResponse struct {
+	FailedEntryCount int           `json:"FailedEntryCount"`
+	FailedEntries    []failedEntry `json:"FailedEntries"`
+}
+
+func handlePutTargets(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req putTargetsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Rule == "" {
+		return jsonErr(service.ErrValidation("Rule is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	targets := make([]Target, 0, len(req.Targets))
+	for _, t := range req.Targets {
+		targets = append(targets, Target{
+			Id:        t.Id,
+			Arn:       t.Arn,
+			Input:     t.Input,
+			InputPath: t.InputPath,
+		})
+	}
+
+	_, ok := store.PutTargets(busName, req.Rule, targets)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Rule+" does not exist.", http.StatusNotFound))
+	}
+
+	return jsonOK(&putTargetsResponse{
+		FailedEntryCount: 0,
+		FailedEntries:    []failedEntry{},
+	})
+}
+
+// ---- RemoveTargets ----
+
+type removeTargetsRequest struct {
+	Rule         string   `json:"Rule"`
+	EventBusName string   `json:"EventBusName"`
+	Ids          []string `json:"Ids"`
+}
+
+type removeTargetsFailedEntry struct {
+	TargetId     string `json:"TargetId"`
+	ErrorCode    string `json:"ErrorCode"`
+	ErrorMessage string `json:"ErrorMessage"`
+}
+
+type removeTargetsResponse struct {
+	FailedEntryCount int                        `json:"FailedEntryCount"`
+	FailedEntries    []removeTargetsFailedEntry `json:"FailedEntries"`
+}
+
+func handleRemoveTargets(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req removeTargetsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Rule == "" {
+		return jsonErr(service.ErrValidation("Rule is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	notFound, ok := store.RemoveTargets(busName, req.Rule, req.Ids)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Rule+" does not exist.", http.StatusNotFound))
+	}
+
+	failed := make([]removeTargetsFailedEntry, 0, len(notFound))
+	for _, id := range notFound {
+		failed = append(failed, removeTargetsFailedEntry{
+			TargetId:     id,
+			ErrorCode:    "TargetNotFoundException",
+			ErrorMessage: "Target " + id + " not found.",
+		})
+	}
+
+	return jsonOK(&removeTargetsResponse{
+		FailedEntryCount: len(failed),
+		FailedEntries:    failed,
+	})
+}
+
+// ---- ListTargetsByRule ----
+
+type listTargetsByRuleRequest struct {
+	Rule         string `json:"Rule"`
+	EventBusName string `json:"EventBusName"`
+}
+
+type listTargetsByRuleResponse struct {
+	Targets []targetJSON `json:"Targets"`
+}
+
+func handleListTargetsByRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listTargetsByRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Rule == "" {
+		return jsonErr(service.ErrValidation("Rule is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	targets, ok := store.ListTargetsByRule(busName, req.Rule)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Rule+" does not exist.", http.StatusNotFound))
+	}
+
+	entries := make([]targetJSON, 0, len(targets))
+	for _, t := range targets {
+		entries = append(entries, targetJSON{
+			Id:        t.Id,
+			Arn:       t.Arn,
+			Input:     t.Input,
+			InputPath: t.InputPath,
+		})
+	}
+
+	return jsonOK(&listTargetsByRuleResponse{Targets: entries})
+}
+
+// ---- PutEvents ----
+
+type putEventEntry struct {
+	Source       string   `json:"Source"`
+	DetailType   string   `json:"DetailType"`
+	Detail       string   `json:"Detail"`
+	EventBusName string   `json:"EventBusName"`
+	Resources    []string `json:"Resources"`
+	Time         string   `json:"Time,omitempty"` // ISO8601
+}
+
+type putEventsRequest struct {
+	Entries []putEventEntry `json:"Entries"`
+}
+
+type putEventResultEntry struct {
+	EventId string `json:"EventId,omitempty"`
+}
+
+type putEventsResponse struct {
+	FailedEntryCount int                   `json:"FailedEntryCount"`
+	Entries          []putEventResultEntry `json:"Entries"`
+}
+
+func handlePutEvents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req putEventsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if len(req.Entries) == 0 {
+		return jsonErr(service.ErrValidation("Entries is required and must not be empty."))
+	}
+
+	storeEntries := make([]PutEvent, 0, len(req.Entries))
+	for _, e := range req.Entries {
+		busName := e.EventBusName
+		if busName == "" {
+			busName = "default"
+		}
+		var t time.Time
+		if e.Time != "" {
+			if parsed, err := time.Parse(time.RFC3339, e.Time); err == nil {
+				t = parsed
+			}
+		}
+		storeEntries = append(storeEntries, PutEvent{
+			Source:       e.Source,
+			DetailType:   e.DetailType,
+			Detail:       e.Detail,
+			EventBusName: busName,
+			Resources:    e.Resources,
+			Time:         t,
+		})
+	}
+
+	ids := store.PutEvents(storeEntries)
+
+	resultEntries := make([]putEventResultEntry, 0, len(ids))
+	for _, id := range ids {
+		resultEntries = append(resultEntries, putEventResultEntry{EventId: id})
+	}
+
+	return jsonOK(&putEventsResponse{
+		FailedEntryCount: 0,
+		Entries:          resultEntries,
+	})
+}
+
+// ---- TagResource ----
+
+type tagResourceRequest struct {
+	ResourceARN string            `json:"ResourceARN"`
+	Tags        map[string]string `json:"Tags"`
+}
+
+func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req tagResourceRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ResourceARN == "" {
+		return jsonErr(service.ErrValidation("ResourceARN is required."))
+	}
+
+	if !store.TagResource(req.ResourceARN, req.Tags) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Resource "+req.ResourceARN+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- UntagResource ----
+
+type untagResourceRequest struct {
+	ResourceARN string   `json:"ResourceARN"`
+	TagKeys     []string `json:"TagKeys"`
+}
+
+func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req untagResourceRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ResourceARN == "" {
+		return jsonErr(service.ErrValidation("ResourceARN is required."))
+	}
+
+	if !store.UntagResource(req.ResourceARN, req.TagKeys) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Resource "+req.ResourceARN+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- ListTagsForResource ----
+
+type listTagsForResourceRequest struct {
+	ResourceARN string `json:"ResourceARN"`
+}
+
+type listTagsForResourceResponse struct {
+	Tags map[string]string `json:"Tags"`
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listTagsForResourceRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ResourceARN == "" {
+		return jsonErr(service.ErrValidation("ResourceARN is required."))
+	}
+
+	tags, ok := store.ListTagsForResource(req.ResourceARN)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Resource "+req.ResourceARN+" does not exist.", http.StatusNotFound))
+	}
+	return jsonOK(&listTagsForResourceResponse{Tags: tags})
+}
+
+// ---- EnableRule ----
+
+type enableRuleRequest struct {
+	Name         string `json:"Name"`
+	EventBusName string `json:"EventBusName"`
+}
+
+func handleEnableRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req enableRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	if !store.SetRuleState(busName, req.Name, "ENABLED") {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Name+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- DisableRule ----
+
+type disableRuleRequest struct {
+	Name         string `json:"Name"`
+	EventBusName string `json:"EventBusName"`
+}
+
+func handleDisableRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req disableRuleRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+
+	busName := req.EventBusName
+	if busName == "" {
+		busName = "default"
+	}
+
+	if !store.SetRuleState(busName, req.Name, "DISABLED") {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Rule "+req.Name+" does not exist.", http.StatusNotFound))
+	}
+	return emptyOK()
+}

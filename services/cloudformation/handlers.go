@@ -240,12 +240,13 @@ type xmlDescribeStackResourcesResult struct {
 }
 
 type xmlStackResource struct {
-	StackId           string `xml:"StackId"`
-	StackName         string `xml:"StackName"`
-	LogicalResourceId string `xml:"LogicalResourceId"`
-	ResourceType      string `xml:"ResourceType"`
-	ResourceStatus    string `xml:"ResourceStatus"`
-	Timestamp         string `xml:"Timestamp"`
+	StackId            string `xml:"StackId"`
+	StackName          string `xml:"StackName"`
+	LogicalResourceId  string `xml:"LogicalResourceId"`
+	PhysicalResourceId string `xml:"PhysicalResourceId,omitempty"`
+	ResourceType       string `xml:"ResourceType"`
+	ResourceStatus     string `xml:"ResourceStatus"`
+	Timestamp          string `xml:"Timestamp"`
 }
 
 func handleDescribeStackResources(ctx *service.RequestContext, store *StackStore) (*service.Response, error) {
@@ -265,12 +266,13 @@ func handleDescribeStackResources(ctx *service.RequestContext, store *StackStore
 	resources := make([]xmlStackResource, 0, len(st.Resources))
 	for _, r := range st.Resources {
 		resources = append(resources, xmlStackResource{
-			StackId:           st.StackId,
-			StackName:         st.StackName,
-			LogicalResourceId: r.LogicalResourceId,
-			ResourceType:      r.ResourceType,
-			ResourceStatus:    r.ResourceStatus,
-			Timestamp:         r.Timestamp.Format("2006-01-02T15:04:05Z"),
+			StackId:            st.StackId,
+			StackName:          st.StackName,
+			LogicalResourceId:  r.LogicalResourceId,
+			PhysicalResourceId: r.PhysicalResourceId,
+			ResourceType:       r.ResourceType,
+			ResourceStatus:     r.ResourceStatus,
+			Timestamp:          r.Timestamp.Format("2006-01-02T15:04:05Z"),
 		})
 	}
 

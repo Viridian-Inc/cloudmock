@@ -170,7 +170,18 @@ func main() {
 	_ = registerOrDefer("states", func() service.Service { return sfnsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("rds", func() service.Service { return rdssvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("apigateway", func() service.Service { return apigwsvc.New(cfg.AccountID, cfg.Region) })
-	_ = registerOrDefer("cloudformation", func() service.Service { return cfnsvc.New(cfg.AccountID, cfg.Region) })
+	// CloudFormation — needs a locator for resource provisioning; wire after registration.
+	var cfnService *cfnsvc.CloudFormationService
+	if eagerAll || minimalSet["cloudformation"] {
+		cfnService = cfnsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(cfnService)
+	} else {
+		registry.RegisterLazy("cloudformation", func() service.Service {
+			svc := cfnsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
 
 	// Lambda — needs a locator; wire it after all services are registered.
 	var lambdaService *lambdasvc.LambdaService
@@ -201,6 +212,9 @@ func main() {
 	}
 	if cwService != nil {
 		cwService.SetLocator(registry)
+	}
+	if cfnService != nil {
+		cfnService.SetLocator(registry)
 	}
 
 	// Wire cross-service integrations via event bus

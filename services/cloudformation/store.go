@@ -32,10 +32,11 @@ type Output struct {
 
 // StackResource represents a resource parsed from the template.
 type StackResource struct {
-	LogicalResourceId string
-	ResourceType      string
-	ResourceStatus    string
-	Timestamp         time.Time
+	LogicalResourceId  string
+	PhysicalResourceId string
+	ResourceType       string
+	ResourceStatus     string
+	Timestamp          time.Time
 }
 
 // StackEvent represents a single lifecycle event for a stack.
@@ -109,10 +110,11 @@ type cfnExport struct {
 
 // StackStore manages all CloudFormation stacks in memory.
 type StackStore struct {
-	mu        sync.RWMutex
-	stacks    map[string]*Stack // keyed by StackName
-	accountID string
-	region    string
+	mu          sync.RWMutex
+	stacks      map[string]*Stack // keyed by StackName
+	accountID   string
+	region      string
+	provisioner *Provisioner
 }
 
 // NewStore creates a new StackStore.
@@ -124,12 +126,21 @@ func NewStore(accountID, region string) *StackStore {
 	}
 }
 
+// SetProvisioner sets the resource provisioner for this store.
+// When set, CreateStack will create real resources via cloudmock services.
+func (s *StackStore) SetProvisioner(p *Provisioner) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.provisioner = p
+}
+
 // stackARN builds a CloudFormation stack ARN.
 func (s *StackStore) stackARN(name, uid string) string {
 	return fmt.Sprintf("arn:aws:cloudformation:%s:%s:stack/%s/%s", s.region, s.accountID, name, uid)
 }
 
 // CreateStack creates a new stack by parsing the template and recording metadata.
+// If a provisioner is set, it also creates real resources in cloudmock services.
 // Returns the new Stack or an error.
 func (s *StackStore) CreateStack(name, templateBody string, params []Parameter, tags []Tag) (*Stack, error) {
 	s.mu.Lock()
@@ -145,6 +156,33 @@ func (s *StackStore) CreateStack(name, templateBody string, params []Parameter, 
 
 	// Parse template.
 	description, resources, outputs := parseTemplate(templateBody, params)
+
+	// If a provisioner is set, create real resources.
+	if s.provisioner != nil {
+		paramMap := make(map[string]string, len(params))
+		for _, p := range params {
+			paramMap[p.ParameterKey] = p.ParameterValue
+		}
+		// Add stack name to pseudo-parameters.
+		paramMap["AWS::StackName"] = name
+
+		provisioned, err := s.provisioner.ProvisionStack(templateBody, paramMap)
+		if err == nil && len(provisioned) > 0 {
+			// Build a lookup from logical ID to provisioned resource.
+			provMap := make(map[string]*ProvisionedResource, len(provisioned))
+			for i := range provisioned {
+				provMap[provisioned[i].LogicalId] = &provisioned[i]
+			}
+
+			// Update resources with physical IDs.
+			for i, r := range resources {
+				if pr, ok := provMap[r.LogicalResourceId]; ok {
+					resources[i].PhysicalResourceId = pr.PhysicalId
+					resources[i].ResourceStatus = pr.Status
+				}
+			}
+		}
+	}
 
 	// Build creation events.
 	events := []StackEvent{
@@ -165,7 +203,7 @@ func (s *StackStore) CreateStack(name, templateBody string, params []Parameter, 
 			StackName:         name,
 			LogicalResourceId: r.LogicalResourceId,
 			ResourceType:      r.ResourceType,
-			ResourceStatus:    "CREATE_COMPLETE",
+			ResourceStatus:    r.ResourceStatus,
 			Timestamp:         now,
 		})
 	}
@@ -189,7 +227,8 @@ func (s *StackStore) CreateStack(name, templateBody string, params []Parameter, 
 	return stack, nil
 }
 
-// DeleteStack marks a stack as DELETE_COMPLETE. Returns false if not found.
+// DeleteStack marks a stack as DELETE_COMPLETE and deletes provisioned resources.
+// Returns false if not found.
 func (s *StackStore) DeleteStack(name string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -198,6 +237,25 @@ func (s *StackStore) DeleteStack(name string) bool {
 	if !ok {
 		return false
 	}
+
+	// Delete provisioned resources in reverse order.
+	if s.provisioner != nil {
+		var provisioned []ProvisionedResource
+		for _, r := range stack.Resources {
+			if r.PhysicalResourceId != "" {
+				provisioned = append(provisioned, ProvisionedResource{
+					LogicalId:  r.LogicalResourceId,
+					PhysicalId: r.PhysicalResourceId,
+					Type:       r.ResourceType,
+					Status:     r.ResourceStatus,
+				})
+			}
+		}
+		if len(provisioned) > 0 {
+			s.provisioner.DeleteResources(provisioned)
+		}
+	}
+
 	stack.StackStatus = "DELETE_COMPLETE"
 	return true
 }

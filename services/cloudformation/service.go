@@ -8,14 +8,25 @@ import (
 
 // CloudFormationService is the cloudmock implementation of the AWS CloudFormation API.
 type CloudFormationService struct {
-	store *StackStore
+	store     *StackStore
+	accountID string
+	region    string
 }
 
 // New returns a new CloudFormationService for the given AWS account ID and region.
 func New(accountID, region string) *CloudFormationService {
 	return &CloudFormationService{
-		store: NewStore(accountID, region),
+		store:     NewStore(accountID, region),
+		accountID: accountID,
+		region:    region,
 	}
+}
+
+// SetLocator wires the service locator, enabling real resource provisioning
+// when CreateStack is called.
+func (s *CloudFormationService) SetLocator(locator ServiceLocator) {
+	p := NewProvisioner(locator, s.accountID, s.region)
+	s.store.SetProvisioner(p)
 }
 
 // Name returns the AWS service name used for routing.

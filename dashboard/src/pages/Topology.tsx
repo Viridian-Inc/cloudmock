@@ -415,6 +415,9 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [pulsing, setPulsing] = useState<Map<string, number>>(new Map());
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showAll, setShowAll] = useState(false);
+  const [expandedNode, setExpandedNode] = useState<string | null>(null);
+  const [nodeResources, setNodeResources] = useState<Record<string, any[]>>({});
+  const [loadingResources, setLoadingResources] = useState<Set<string>>(new Set());
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -551,6 +554,37 @@ export function TopologyPage({ sse }: TopologyPageProps) {
     });
   }
 
+  async function handleNodeClick(serviceName: string) {
+    if (expandedNode === serviceName) {
+      setExpandedNode(null);
+      return;
+    }
+
+    setExpandedNode(serviceName);
+
+    // Fetch resources if not already cached or loading
+    if (!(serviceName in nodeResources) && !loadingResources.has(serviceName)) {
+      setLoadingResources(prev => new Set([...prev, serviceName]));
+      try {
+        const res = await api(`/api/resources/${encodeURIComponent(serviceName)}`);
+        setNodeResources(prev => ({ ...prev, [serviceName]: res.resources || [] }));
+      } catch {
+        setNodeResources(prev => ({ ...prev, [serviceName]: [] }));
+      } finally {
+        setLoadingResources(prev => {
+          const next = new Set(prev);
+          next.delete(serviceName);
+          return next;
+        });
+      }
+    }
+  }
+
+  function navigateToResource(serviceName: string, resource: any) {
+    const id = resource.name || resource.id || (typeof resource === 'string' ? resource : '');
+    location.hash = `/resources?service=${encodeURIComponent(serviceName)}&resource=${encodeURIComponent(id)}`;
+  }
+
   // SVG dimensions
   const svgW = 1200;
   const svgH = 750;
@@ -676,7 +710,13 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
             </filter>
           </defs>
-          <rect width={svgW} height={svgH} fill="url(#topo-grid)" />
+          <rect
+            width={svgW}
+            height={svgH}
+            fill="url(#topo-grid)"
+            onClick={() => setExpandedNode(null)}
+            style={{ cursor: 'grab' }}
+          />
 
           <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
             {/* Layer / category headers */}
@@ -794,8 +834,10 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                   }}
                   onMouseEnter={() => setHoveredNode(node.id)}
                   onMouseLeave={() => setHoveredNode(null)}
-                  onClick={() => {
-                    if (!isClient) location.hash = `/resources?service=${encodeURIComponent(node.label)}`;
+                  onClick={(e: MouseEvent) => {
+                    if (isClient) return;
+                    e.stopPropagation();
+                    handleNodeClick(node.id);
                   }}
                 >
                   {/* Pulse glow */}
@@ -915,6 +957,80 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                 </g>
               );
             })}
+
+            {/* Expanded resource panels */}
+            {expandedNode && (() => {
+              const node = filteredNodes.find(n => n.id === expandedNode);
+              if (!node) return null;
+              const x = nodeX(node.layer);
+              const y = node.y;
+              const resources = nodeResources[expandedNode] || [];
+              const isLoading = loadingResources.has(expandedNode);
+              const panelW = 280;
+              const rowH = 28;
+              const headerH = 40;
+              const footerH = 32;
+              const listMaxH = 220;
+              const listH = Math.min(listMaxH, resources.length * rowH);
+              const panelH = isLoading ? headerH + 48 + footerH : headerH + listH + footerH;
+              // Position panel to the right of the node, clamped within SVG
+              let panelX = x + NODE_W + 12;
+              if (panelX + panelW > 1180) panelX = x - panelW - 12;
+              const panelY = Math.max(10, Math.min(y - 20, svgH - panelH - 10));
+
+              return (
+                <foreignObject
+                  key={`panel-${expandedNode}`}
+                  x={panelX}
+                  y={panelY}
+                  width={panelW}
+                  height={panelH + 4}
+                  style={{ overflow: 'visible' }}
+                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                >
+                  <div
+                    class="topo-resource-panel"
+                    style={{ width: `${panelW}px`, height: `${panelH}px` }}
+                  >
+                    <div class="topo-resource-header">
+                      <span>{node.label} Resources</span>
+                      <button
+                        class="topo-resource-close"
+                        onClick={(e: MouseEvent) => { e.stopPropagation(); setExpandedNode(null); }}
+                      >×</button>
+                    </div>
+                    <div class="topo-resource-list">
+                      {isLoading ? (
+                        <div class="topo-resource-loading">Loading…</div>
+                      ) : resources.length === 0 ? (
+                        <div class="topo-resource-empty">No resources found</div>
+                      ) : (
+                        resources.map((r: any, i: number) => {
+                          const name = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
+                          return (
+                            <div
+                              key={i}
+                              class="topo-resource-item"
+                              onClick={(e: MouseEvent) => { e.stopPropagation(); navigateToResource(expandedNode, r); }}
+                            >
+                              <span class="topo-resource-dot" />
+                              <span class="topo-resource-name">{name}</span>
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                    <a
+                      class="topo-resource-footer"
+                      href={`#/resources?service=${encodeURIComponent(expandedNode)}`}
+                      onClick={(e: MouseEvent) => e.stopPropagation()}
+                    >
+                      View all in Explorer →
+                    </a>
+                  </div>
+                </foreignObject>
+              );
+            })()}
           </g>
 
           {/* Minimap */}

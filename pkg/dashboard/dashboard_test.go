@@ -48,8 +48,8 @@ func TestHandler_ContainsExpectedElements(t *testing.T) {
 		snippet string
 	}{
 		{"cloudmock branding", "cloudmock"},
-		{"Preact import", "preact@10.19.3"},
-		{"HTM import", "htm@3.1.1"},
+		{"Preact+HTM standalone bundle", "htm@3.1.1/preact/standalone"},
+		{"htmPreact destructure", "htmPreact"},
 		{"Figtree font", "Figtree"},
 		{"admin API services endpoint", "/api/services"},
 		{"admin API stats endpoint", "/api/stats"},

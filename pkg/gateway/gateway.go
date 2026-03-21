@@ -160,6 +160,11 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(k, v)
 	}
 
+	if resp.Body == nil {
+		w.WriteHeader(resp.StatusCode)
+		return
+	}
+
 	switch resp.Format {
 	case service.FormatJSON:
 		_ = service.WriteJSONResponse(w, resp.StatusCode, resp.Body)

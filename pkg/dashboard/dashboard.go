@@ -30,7 +30,7 @@ func buildHTML(adminPort int) string {
 	return fmt.Sprintf(htmlTemplate, adminBase)
 }
 
-// htmlTemplate is the complete SPA. The single %%q verb is replaced with the
+// htmlTemplate is the complete SPA. The single %%s verb is replaced with the
 // admin base URL (e.g. "http://localhost:4599").
 const htmlTemplate = `<!DOCTYPE html>
 <html lang="en">
@@ -42,1834 +42,608 @@ const htmlTemplate = `<!DOCTYPE html>
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* ─── Reset ─── */
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+/* ─── Reset ─── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-  /* ─── Design Tokens ─── */
-  :root {
-    --brand-blue: #097FF5;
-    --brand-dark: #0A1F44;
-    --brand-teal: #4AE5F8;
-    --brand-orange: #F7711E;
-    --brand-yellow: #FEC307;
-    --success: #029662;
-    --warning: #FF9A4B;
-    --error: #FF4E5E;
-    --info: #7CCEF2;
-    --neutral-50: #F8FAFC;
-    --neutral-100: #F1F5F9;
-    --neutral-200: #E2E8F0;
-    --neutral-300: #CBD5E1;
-    --neutral-400: #94A3B8;
-    --neutral-500: #64748B;
-    --neutral-600: #475569;
-    --neutral-700: #334155;
-    --neutral-800: #1E293B;
-    --neutral-900: #0F172A;
-    --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, sans-serif;
-    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
-    --radius-sm: 4px;
-    --radius-md: 8px;
-    --radius-lg: 12px;
-    --radius-xl: 16px;
-    --shadow-sm: 0 1px 3px rgba(0,0,0,0.1);
-    --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
-    --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
-  }
+/* ─── Design Tokens ─── */
+:root {
+  --brand-blue: #097FF5;
+  --brand-dark: #0A1F44;
+  --primary-green: #029662;
+  --accent-cyan: #7CCEF2;
+  --error: #FF4E5E;
+  --warning: #FF9A4B;
+  --brand-yellow: #FEC307;
 
-  body {
-    font-family: var(--font-sans);
-    font-size: 14px;
-    background: var(--neutral-50);
-    color: var(--neutral-800);
-    min-height: 100vh;
-    overflow: hidden;
-  }
+  --n50: #F8FAFC; --n100: #F1F5F9; --n200: #E2E8F0; --n300: #CBD5E1;
+  --n400: #94A3B8; --n500: #64748B; --n600: #475569; --n700: #334155;
+  --n800: #1E293B; --n900: #0F172A;
 
-  /* ─── Layout ─── */
-  #app {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-  }
+  --font-sans: 'Figtree', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 
-  /* ─── Header ─── */
-  .header {
-    background: var(--brand-dark);
-    color: #fff;
-    padding: 0 24px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    z-index: 200;
-    flex-shrink: 0;
-  }
-  .header-brand {
-    font-size: 20px;
-    font-weight: 700;
-    letter-spacing: -0.5px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    color: #fff;
-  }
-  .header-brand svg { width: 24px; height: 24px; }
-  .header-brand span { color: var(--brand-teal); }
-  .header-right {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .sse-badge {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--neutral-400);
-  }
-  .sse-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%%;
-    background: var(--neutral-400);
-    transition: background 0.3s ease;
-  }
-  .sse-dot.connected { background: var(--success); box-shadow: 0 0 6px rgba(2,150,98,0.5); }
-  .sse-dot.disconnected { background: var(--error); box-shadow: 0 0 6px rgba(255,78,94,0.5); }
-  .cmd-k-hint {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    font-size: 12px;
-    color: var(--neutral-400);
-    background: rgba(255,255,255,0.08);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: var(--radius-sm);
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-  }
-  .cmd-k-hint:hover { background: rgba(255,255,255,0.14); }
-  .cmd-k-hint kbd {
-    font-family: var(--font-mono);
-    font-size: 11px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 3px;
-    padding: 1px 5px;
-  }
+  --radius-sm: 4px; --radius-md: 8px; --radius-lg: 12px; --radius-xl: 16px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 32px rgba(0,0,0,0.12);
 
-  /* ─── Body Layout ─── */
-  .body-layout {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-  }
+  --sidebar-width: 200px;
+  --header-height: 56px;
+}
 
-  /* ─── Sidebar ─── */
-  .sidebar {
-    width: 200px;
-    background: var(--brand-dark);
-    color: #fff;
-    display: flex;
-    flex-direction: column;
-    flex-shrink: 0;
-    border-right: 1px solid rgba(255,255,255,0.06);
-  }
-  .sidebar-nav {
-    flex: 1;
-    padding: 12px 0;
-    overflow-y: auto;
-  }
-  .nav-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 10px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--neutral-400);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border-left: 3px solid transparent;
-    text-decoration: none;
-  }
-  .nav-item:hover {
-    color: #fff;
-    background: rgba(255,255,255,0.04);
-  }
-  .nav-item.active {
-    color: #fff;
-    background: rgba(9,127,245,0.12);
-    border-left-color: var(--brand-blue);
-  }
-  .nav-item svg {
-    width: 18px;
-    height: 18px;
-    flex-shrink: 0;
-  }
-  .nav-badge {
-    margin-left: auto;
-    background: var(--brand-blue);
-    color: #fff;
-    font-size: 11px;
-    font-weight: 600;
-    padding: 1px 7px;
-    border-radius: 10px;
-    min-width: 20px;
-    text-align: center;
-  }
-  .sidebar-footer {
-    padding: 16px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-    font-size: 11px;
-    color: var(--neutral-500);
-  }
+html, body { height: 100%%; font-family: var(--font-sans); background: var(--n50); color: var(--n800); }
+body { overflow: hidden; }
+#app { height: 100%%; }
 
-  /* ─── Main Content ─── */
-  .main-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-  }
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--n300); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--n400); }
 
-  /* ─── Cards ─── */
-  .card {
-    background: #fff;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-    transition: box-shadow 0.2s ease;
-  }
-  .card:hover { box-shadow: var(--shadow-md); }
-  .card-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--neutral-200);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #fff;
-  }
-  .card-header h2 {
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--neutral-700);
-  }
-  .card-body { padding: 0; }
-  .card-body-padded { padding: 20px; }
+/* ─── Layout ─── */
+.layout { display: flex; flex-direction: column; height: 100%%; }
+.header {
+  height: var(--header-height); background: var(--brand-dark); color: white;
+  display: flex; align-items: center; padding: 0 20px; gap: 16px; flex-shrink: 0;
+  z-index: 100;
+}
+.header-logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 16px; }
+.header-logo svg { width: 24px; height: 24px; }
+.header-spacer { flex: 1; }
+.header-badge {
+  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.1);
+}
+.header-badge .dot { width: 8px; height: 8px; border-radius: 50%%; }
+.dot-green { background: var(--primary-green); }
+.dot-red { background: var(--error); }
+.dot-yellow { background: var(--warning); }
 
-  /* ─── Stats Bar ─── */
-  .stats-bar {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
-  }
-  .stat-card {
-    background: #fff;
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-    transition: box-shadow 0.2s ease, transform 0.2s ease;
-  }
-  .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-  .stat-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--neutral-500);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 8px;
-  }
-  .stat-value {
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--neutral-900);
-  }
-  .stat-value.success { color: var(--success); }
-  .stat-value.brand { color: var(--brand-blue); }
+.cmd-k-btn {
+  display: flex; align-items: center; gap: 6px; padding: 6px 14px;
+  background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--radius-md); color: var(--n400); font-size: 13px;
+  cursor: pointer; transition: all 0.15s;
+}
+.cmd-k-btn:hover { background: rgba(255,255,255,0.14); color: white; }
+.cmd-k-btn kbd {
+  font-family: var(--font-sans); font-size: 11px; padding: 1px 5px;
+  background: rgba(255,255,255,0.1); border-radius: 4px;
+}
 
-  /* ─── Service Grid ─── */
-  .service-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-  }
-  @media (max-width: 1200px) { .service-grid { grid-template-columns: repeat(2, 1fr); } }
-  .service-card {
-    background: #fff;
-    border-radius: var(--radius-lg);
-    padding: 20px;
-    box-shadow: var(--shadow-sm);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    border: 1px solid transparent;
-  }
-  .service-card:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-    border-color: var(--brand-blue);
-  }
-  .svc-card-top {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 12px;
-  }
-  .svc-name {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--neutral-900);
-  }
-  .svc-tier {
-    font-size: 10px;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: var(--neutral-100);
-    color: var(--neutral-500);
-    text-transform: uppercase;
-  }
-  .svc-tier.tier-1 { background: rgba(9,127,245,0.1); color: var(--brand-blue); }
-  .svc-card-meta {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    font-size: 12px;
-    color: var(--neutral-500);
-  }
-  .svc-status {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .status-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%%;
-  }
-  .status-dot.healthy { background: var(--success); }
-  .status-dot.degraded { background: var(--warning); }
-  .status-dot.error { background: var(--error); }
-  .svc-requests {
-    font-family: var(--font-mono);
-    font-weight: 600;
-    color: var(--brand-blue);
-  }
+.body-wrap { display: flex; flex: 1; overflow: hidden; }
 
-  /* ─── Tables ─── */
-  table { width: 100%%; border-collapse: collapse; }
-  th {
-    text-align: left;
-    padding: 10px 16px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--neutral-500);
-    background: var(--neutral-50);
-    border-bottom: 1px solid var(--neutral-200);
-    white-space: nowrap;
-  }
-  td {
-    padding: 10px 16px;
-    border-bottom: 1px solid var(--neutral-100);
-    color: var(--neutral-700);
-    font-size: 13px;
-  }
-  tr:last-child td { border-bottom: none; }
-  tbody tr { transition: background 0.15s ease; cursor: pointer; }
-  tbody tr:hover td { background: var(--neutral-50); }
+.sidebar {
+  width: var(--sidebar-width); background: var(--brand-dark); color: var(--n300);
+  display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto;
+  padding: 8px 0; border-right: 1px solid rgba(255,255,255,0.06);
+}
+.nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 16px;
+  font-size: 14px; cursor: pointer; transition: all 0.15s;
+  border-left: 3px solid transparent; text-decoration: none; color: inherit;
+}
+.nav-item:hover { background: rgba(255,255,255,0.06); color: white; }
+.nav-item.active {
+  border-left-color: var(--brand-blue); background: rgba(9,127,245,0.08); color: white;
+  font-weight: 600;
+}
+.nav-item svg { width: 18px; height: 18px; opacity: 0.7; flex-shrink: 0; }
+.nav-item.active svg { opacity: 1; }
+.nav-badge {
+  margin-left: auto; font-size: 11px; padding: 1px 7px;
+  background: rgba(255,255,255,0.1); border-radius: 10px; font-weight: 600;
+}
+.nav-divider { height: 1px; background: rgba(255,255,255,0.08); margin: 8px 16px; }
+.nav-footer {
+  margin-top: auto; padding: 12px 16px; font-size: 12px; color: var(--n500);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
 
-  .mono { font-family: var(--font-mono); font-size: 12px; }
-  .empty-state {
-    text-align: center;
-    color: var(--neutral-400);
-    padding: 48px 24px;
-    font-size: 14px;
-  }
+.main { flex: 1; overflow-y: auto; padding: 24px; }
 
-  /* ─── Status Codes ─── */
-  .status-code {
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: var(--radius-sm);
-    font-size: 12px;
-    font-weight: 600;
-    font-family: var(--font-mono);
-  }
-  .status-2xx { background: rgba(2,150,98,0.1); color: var(--success); }
-  .status-3xx { background: rgba(124,206,242,0.2); color: var(--info); }
-  .status-4xx { background: rgba(254,195,7,0.15); color: #92700C; }
-  .status-5xx { background: rgba(255,78,94,0.1); color: var(--error); }
+/* ─── Cards ─── */
+.card {
+  background: white; border: 1px solid var(--n200); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm); transition: all 0.2s;
+}
+.card-clickable { cursor: pointer; }
+.card-clickable:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--n300); }
+.card-header { padding: 16px 20px; border-bottom: 1px solid var(--n100); display: flex; align-items: center; gap: 12px; }
+.card-body { padding: 16px 20px; }
 
-  /* ─── Breadcrumb ─── */
-  .breadcrumb {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    font-size: 13px;
-    color: var(--neutral-500);
-    margin-bottom: 20px;
-  }
-  .breadcrumb a {
-    color: var(--brand-blue);
-    text-decoration: none;
-    cursor: pointer;
-  }
-  .breadcrumb a:hover { text-decoration: underline; }
+/* ─── Stat Cards ─── */
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: white; border: 1px solid var(--n200); border-radius: var(--radius-lg);
+  padding: 20px; box-shadow: var(--shadow-sm);
+}
+.stat-label { font-size: 13px; color: var(--n500); margin-bottom: 4px; font-weight: 500; }
+.stat-value { font-size: 28px; font-weight: 700; color: var(--n900); }
+.stat-sub { font-size: 12px; color: var(--n400); margin-top: 2px; }
 
-  /* ─── Search / Filters ─── */
-  .search-input {
-    font-family: var(--font-sans);
-    font-size: 13px;
-    padding: 8px 12px;
-    border: 1px solid var(--neutral-200);
-    border-radius: var(--radius-md);
-    background: #fff;
-    color: var(--neutral-800);
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    width: 240px;
-  }
-  .search-input:focus {
-    border-color: var(--brand-blue);
-    box-shadow: 0 0 0 3px rgba(9,127,245,0.1);
-  }
-  .filter-select {
-    font-family: var(--font-sans);
-    font-size: 13px;
-    padding: 8px 12px;
-    border: 1px solid var(--neutral-200);
-    border-radius: var(--radius-md);
-    background: #fff;
-    color: var(--neutral-700);
-    cursor: pointer;
-    outline: none;
-    transition: border-color 0.2s ease;
-  }
-  .filter-select:focus { border-color: var(--brand-blue); }
-  .filter-bar {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-  }
+/* ─── Service Cards Grid ─── */
+.services-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.svc-card {
+  background: white; border: 1px solid var(--n200); border-radius: var(--radius-lg);
+  padding: 20px; cursor: pointer; transition: all 0.2s; box-shadow: var(--shadow-sm);
+}
+.svc-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); border-color: var(--brand-blue); }
+.svc-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.svc-card-name { font-weight: 700; font-size: 15px; color: var(--n900); }
+.svc-card-tier {
+  font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+}
+.tier-t1 { background: rgba(2,150,98,0.1); color: var(--primary-green); }
+.tier-t2 { background: var(--n100); color: var(--n500); }
+.svc-card-status { margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--n500); }
+.svc-card-status .dot { width: 8px; height: 8px; border-radius: 50%%; }
+.svc-card-meta { font-size: 13px; color: var(--n500); display: flex; gap: 16px; }
 
-  /* ─── Buttons ─── */
-  .btn {
-    font-family: var(--font-sans);
-    font-size: 13px;
-    font-weight: 600;
-    padding: 8px 16px;
-    border-radius: var(--radius-md);
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-  }
-  .btn-primary {
-    background: var(--brand-blue);
-    color: #fff;
-  }
-  .btn-primary:hover { background: #0870D9; }
-  .btn-primary:active { background: #0660BF; }
-  .btn-ghost {
-    background: transparent;
-    color: var(--neutral-600);
-    border: 1px solid var(--neutral-200);
-  }
-  .btn-ghost:hover { background: var(--neutral-50); border-color: var(--neutral-300); }
-  .btn-danger {
-    background: rgba(255,78,94,0.1);
-    color: var(--error);
-  }
-  .btn-danger:hover { background: rgba(255,78,94,0.2); }
-  .btn-sm { padding: 4px 10px; font-size: 12px; }
+/* ─── Tables ─── */
+.table-wrap { overflow-x: auto; }
+table { width: 100%%; border-collapse: collapse; font-size: 14px; }
+thead th {
+  text-align: left; padding: 10px 16px; font-weight: 600; color: var(--n600);
+  background: var(--n50); border-bottom: 2px solid var(--n200); font-size: 13px;
+  white-space: nowrap; user-select: none;
+}
+thead th.sortable { cursor: pointer; }
+thead th.sortable:hover { color: var(--brand-blue); }
+tbody td { padding: 10px 16px; border-bottom: 1px solid var(--n100); }
+tbody tr { transition: background 0.1s; }
+tbody tr:hover { background: var(--n50); }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: rgba(9,127,245,0.04); }
+tbody tr.expanded { background: rgba(9,127,245,0.04); }
+.empty-state { text-align: center; padding: 48px 20px; color: var(--n400); }
+.empty-state svg { width: 48px; height: 48px; margin-bottom: 12px; opacity: 0.4; }
 
-  /* ─── Drawer ─── */
-  .drawer-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.4);
-    z-index: 300;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-    pointer-events: none;
-  }
-  .drawer-overlay.open { opacity: 1; pointer-events: auto; }
-  .drawer {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    width: 42%%;
-    min-width: 400px;
-    max-width: 700px;
-    background: #fff;
-    z-index: 301;
-    transform: translateX(100%%);
-    transition: transform 0.25s ease;
-    display: flex;
-    flex-direction: column;
-    box-shadow: -4px 0 20px rgba(0,0,0,0.15);
-  }
-  .drawer.open { transform: translateX(0); }
-  .drawer-header {
-    padding: 20px 24px;
-    border-bottom: 1px solid var(--neutral-200);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-  .drawer-header h3 {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--neutral-900);
-  }
-  .drawer-close {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--neutral-400);
-    padding: 4px;
-    border-radius: var(--radius-sm);
-    transition: color 0.2s ease, background 0.2s ease;
-  }
-  .drawer-close:hover { color: var(--neutral-700); background: var(--neutral-100); }
-  .drawer-body {
-    flex: 1;
-    overflow-y: auto;
-    padding: 24px;
-  }
-  .drawer-tabs {
-    display: flex;
-    border-bottom: 1px solid var(--neutral-200);
-    padding: 0 24px;
-  }
-  .drawer-tab {
-    padding: 12px 16px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--neutral-500);
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s ease;
-  }
-  .drawer-tab:hover { color: var(--neutral-700); }
-  .drawer-tab.active { color: var(--brand-blue); border-bottom-color: var(--brand-blue); }
+/* ─── Status Badges ─── */
+.status-pill {
+  display: inline-flex; padding: 2px 10px; border-radius: 12px;
+  font-size: 12px; font-weight: 600; font-family: var(--font-mono);
+}
+.status-2xx { background: rgba(2,150,98,0.1); color: var(--primary-green); }
+.status-3xx { background: rgba(9,127,245,0.1); color: var(--brand-blue); }
+.status-4xx { background: rgba(254,195,7,0.15); color: #B8860B; }
+.status-5xx { background: rgba(255,78,94,0.1); color: var(--error); }
 
-  /* ─── Code Block ─── */
-  .code-block {
-    background: var(--neutral-900);
-    color: var(--neutral-200);
-    border-radius: var(--radius-md);
-    padding: 16px;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    line-height: 1.6;
-    overflow-x: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
-  }
-  .code-block .key { color: var(--brand-teal); }
-  .code-block .string { color: var(--brand-yellow); }
-  .code-block .number { color: var(--brand-orange); }
-  .code-block .bool { color: var(--brand-blue); }
+/* ─── Buttons ─── */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  font-family: var(--font-sans); font-weight: 600; border: none; cursor: pointer;
+  border-radius: var(--radius-md); transition: all 0.15s; font-size: 14px;
+  padding: 0 16px; height: 40px; white-space: nowrap;
+}
+.btn:hover { transform: scale(0.97); }
+.btn:active { opacity: 0.9; }
+.btn-sm { height: 32px; font-size: 13px; padding: 0 12px; }
+.btn-lg { height: 48px; font-size: 15px; padding: 0 24px; }
+.btn-primary { background: var(--primary-green); color: white; }
+.btn-primary:hover { background: #028555; }
+.btn-secondary { background: var(--brand-blue); color: white; }
+.btn-secondary:hover { background: #0870D9; }
+.btn-ghost { background: transparent; color: var(--n600); border: 1px solid var(--n300); }
+.btn-ghost:hover { background: var(--n50); border-color: var(--n400); }
+.btn-danger { background: var(--error); color: white; }
+.btn-danger:hover { background: #E8404F; }
+.btn-icon { width: 36px; height: 36px; padding: 0; border-radius: var(--radius-md); }
+.btn-icon.btn-sm { width: 28px; height: 28px; }
 
-  /* ─── Request Detail Sections ─── */
-  .detail-grid {
-    display: grid;
-    grid-template-columns: 120px 1fr;
-    gap: 8px 16px;
-    font-size: 13px;
-  }
-  .detail-label {
-    font-weight: 500;
-    color: var(--neutral-500);
-  }
-  .detail-value {
-    color: var(--neutral-800);
-  }
+/* ─── Inputs ─── */
+.input, .select {
+  font-family: var(--font-sans); font-size: 14px; padding: 8px 12px;
+  border: 1px solid var(--n300); border-radius: var(--radius-md);
+  background: white; color: var(--n800); outline: none; transition: border-color 0.15s;
+}
+.input:focus, .select:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(9,127,245,0.1); }
+.input-search {
+  padding-left: 36px; background-image: url("data:image/svg+xml,%%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%%2394A3B8' stroke-width='2'%%3E%%3Ccircle cx='11' cy='11' r='8'%%3E%%3C/circle%%3E%%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%%3E%%3C/line%%3E%%3C/svg%%3E");
+  background-repeat: no-repeat; background-position: 10px center;
+}
 
-  /* ─── Inline Expand ─── */
-  .expand-row td {
-    padding: 0;
-    background: var(--neutral-50);
-  }
-  .expand-content {
-    padding: 16px 20px;
-    border-top: 1px solid var(--neutral-200);
-    font-size: 13px;
-  }
+/* ─── Tabs ─── */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid var(--n200); margin-bottom: 16px; }
+.tab {
+  padding: 10px 20px; font-size: 14px; font-weight: 500; color: var(--n500);
+  cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px;
+  transition: all 0.15s; background: none; border-top: none; border-left: none; border-right: none;
+  font-family: var(--font-sans);
+}
+.tab:hover { color: var(--n700); }
+.tab.active { color: var(--brand-blue); border-bottom-color: var(--brand-blue); font-weight: 600; }
 
-  /* ─── Command Palette ─── */
-  .palette-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 400;
-    display: flex;
-    align-items: flex-start;
-    justify-content: center;
-    padding-top: 20vh;
-    opacity: 0;
-    transition: opacity 0.15s ease;
-    pointer-events: none;
-  }
-  .palette-overlay.open { opacity: 1; pointer-events: auto; }
-  .palette {
-    background: #fff;
-    border-radius: var(--radius-xl);
-    width: 560px;
-    max-height: 420px;
-    box-shadow: var(--shadow-lg), 0 0 0 1px rgba(0,0,0,0.05);
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    transform: scale(0.96);
-    transition: transform 0.15s ease;
-  }
-  .palette-overlay.open .palette { transform: scale(1); }
-  .palette-input {
-    font-family: var(--font-sans);
-    font-size: 16px;
-    padding: 16px 20px;
-    border: none;
-    outline: none;
-    width: 100%%;
-    border-bottom: 1px solid var(--neutral-200);
-  }
-  .palette-results {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-  }
-  .palette-item {
-    padding: 10px 14px;
-    border-radius: var(--radius-md);
-    font-size: 14px;
-    color: var(--neutral-700);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: background 0.1s ease;
-  }
-  .palette-item:hover, .palette-item.selected {
-    background: var(--neutral-100);
-  }
-  .palette-item .hint {
-    margin-left: auto;
-    font-size: 12px;
-    color: var(--neutral-400);
-    font-family: var(--font-mono);
-  }
+/* ─── Modal ─── */
+.modal-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  z-index: 1000; display: flex; align-items: center; justify-content: center;
+  animation: fadeIn 0.15s ease;
+}
+.modal {
+  background: white; border-radius: var(--radius-xl); box-shadow: var(--shadow-lg);
+  max-height: 85vh; overflow-y: auto; animation: slideUp 0.2s ease;
+}
+.modal-sm { width: 400px; }
+.modal-md { width: 500px; }
+.modal-lg { width: 600px; }
+.modal-xl { width: 800px; }
+.modal-header {
+  padding: 20px 24px; border-bottom: 1px solid var(--n100);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-header h3 { font-size: 18px; font-weight: 700; }
+.modal-body { padding: 24px; }
+.modal-footer {
+  padding: 16px 24px; border-top: 1px solid var(--n100);
+  display: flex; justify-content: flex-end; gap: 8px;
+}
 
-  /* ─── Resource Explorer ─── */
-  .explorer-layout {
-    display: flex;
-    gap: 0;
-    height: calc(100vh - 56px - 48px);
-  }
-  .explorer-sidebar {
-    width: 220px;
-    background: #fff;
-    border-right: 1px solid var(--neutral-200);
-    overflow-y: auto;
-    flex-shrink: 0;
-  }
-  .explorer-sidebar .nav-item {
-    color: var(--neutral-600);
-    border-left: 3px solid transparent;
-    padding: 10px 16px;
-    font-size: 13px;
-    cursor: pointer;
-    transition: all 0.15s ease;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-  .explorer-sidebar .nav-item:hover { background: var(--neutral-50); color: var(--neutral-800); }
-  .explorer-sidebar .nav-item.active {
-    background: rgba(9,127,245,0.06);
-    color: var(--brand-blue);
-    border-left-color: var(--brand-blue);
-    font-weight: 600;
-  }
-  .explorer-main {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-  }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
 
-  /* ─── IAM Debugger ─── */
-  .iam-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    max-width: 600px;
-  }
-  .form-group { display: flex; flex-direction: column; gap: 6px; }
-  .form-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--neutral-600);
-    text-transform: uppercase;
-    letter-spacing: 0.3px;
-  }
-  .form-input {
-    font-family: var(--font-mono);
-    font-size: 13px;
-    padding: 10px 12px;
-    border: 1px solid var(--neutral-200);
-    border-radius: var(--radius-md);
-    outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-  }
-  .form-input:focus {
-    border-color: var(--brand-blue);
-    box-shadow: 0 0 0 3px rgba(9,127,245,0.1);
-  }
-  .iam-result {
-    margin-top: 20px;
-    padding: 20px;
-    border-radius: var(--radius-lg);
-    font-size: 14px;
-  }
-  .iam-result.allow { background: rgba(2,150,98,0.08); border: 1px solid rgba(2,150,98,0.2); }
-  .iam-result.deny { background: rgba(255,78,94,0.06); border: 1px solid rgba(255,78,94,0.2); }
-  .iam-result-decision {
-    font-size: 20px;
-    font-weight: 700;
-    margin-bottom: 8px;
-  }
-  .iam-result.allow .iam-result-decision { color: var(--success); }
-  .iam-result.deny .iam-result-decision { color: var(--error); }
+/* ─── Drawer ─── */
+.drawer-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.3); z-index: 900;
+  animation: fadeIn 0.15s ease;
+}
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 40%%; min-width: 480px;
+  background: white; box-shadow: var(--shadow-lg); z-index: 901;
+  display: flex; flex-direction: column; animation: slideIn 0.2s ease;
+}
+.drawer-header {
+  padding: 16px 20px; border-bottom: 1px solid var(--n100);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.drawer-body { flex: 1; overflow-y: auto; padding: 20px; }
 
-  /* ─── SES Mailbox ─── */
-  .email-preview {
-    padding: 20px;
-    border-bottom: 1px solid var(--neutral-100);
-    cursor: pointer;
-    transition: background 0.15s ease;
-  }
-  .email-preview:hover { background: var(--neutral-50); }
-  .email-preview:last-child { border-bottom: none; }
-  .email-from { font-weight: 600; color: var(--neutral-800); margin-bottom: 4px; }
-  .email-subject { color: var(--neutral-700); margin-bottom: 4px; }
-  .email-to { font-size: 12px; color: var(--neutral-500); }
-  .email-date { font-size: 12px; color: var(--neutral-400); }
-  .email-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
-  }
+@keyframes slideIn { from { transform: translateX(100%%); } to { transform: translateX(0); } }
 
-  /* ─── Topology ─── */
-  .topology-container {
-    position: relative;
-    min-height: 500px;
-    background: #fff;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-sm);
-    overflow: hidden;
-  }
-  .topo-node {
-    position: absolute;
-    padding: 12px 20px;
-    background: #fff;
-    border: 2px solid var(--neutral-200);
-    border-radius: var(--radius-lg);
-    font-size: 13px;
-    font-weight: 600;
-    color: var(--neutral-800);
-    cursor: pointer;
-    transition: all 0.2s ease;
-    box-shadow: var(--shadow-sm);
-    z-index: 2;
-  }
-  .topo-node:hover {
-    border-color: var(--brand-blue);
-    box-shadow: var(--shadow-md);
-    transform: scale(1.05);
-  }
-  .topo-svg {
-    position: absolute;
-    inset: 0;
-    width: 100%%;
-    height: 100%%;
-    z-index: 1;
-  }
-  .topo-edge { stroke: var(--neutral-300); stroke-width: 2; fill: none; }
-  .topo-edge-label {
-    font-size: 10px;
-    fill: var(--neutral-400);
-  }
+/* ─── Request Detail Expand ─── */
+.req-expand {
+  background: var(--n50); border-top: 1px solid var(--n200);
+  padding: 16px 20px;
+}
+.req-expand-inner {
+  background: white; border: 1px solid var(--n200); border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.req-expand-body { padding: 16px; }
 
-  /* ─── Lambda Logs ─── */
-  .log-stderr td {
-    color: var(--error) !important;
-    background: rgba(255,78,94,0.04);
-  }
-  .log-stderr:hover td {
-    background: rgba(255,78,94,0.08) !important;
-  }
-  .lambda-table-wrap {
-    max-height: 600px;
-    overflow-y: auto;
-  }
+/* ─── JSON Display ─── */
+.json-view {
+  font-family: var(--font-mono); font-size: 13px; line-height: 1.6;
+  white-space: pre-wrap; word-break: break-all; background: var(--n900);
+  color: var(--n300); padding: 16px; border-radius: var(--radius-md);
+  overflow-x: auto; max-height: 400px; overflow-y: auto;
+}
+.json-key { color: var(--brand-blue); }
+.json-string { color: var(--primary-green); }
+.json-number { color: var(--warning); }
+.json-boolean { color: #A78BFA; }
+.json-null { color: var(--n500); }
 
-  /* ─── Fade In Animation ─── */
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-4px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .fade-in { animation: fadeIn 0.3s ease-out; }
+/* ─── Code/Pre ─── */
+pre, code { font-family: var(--font-mono); }
+.mono { font-family: var(--font-mono); }
 
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(8px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-  .slide-up { animation: slideUp 0.3s ease-out; }
+/* ─── Filters Bar ─── */
+.filters-bar {
+  display: flex; gap: 12px; align-items: center; margin-bottom: 16px; flex-wrap: wrap;
+}
+.filters-bar .input, .filters-bar .select { height: 36px; }
 
-  @keyframes pulse {
-    0%%   { box-shadow: 0 0 0 0 rgba(9,127,245,0.3); }
-    70%%  { box-shadow: 0 0 0 6px rgba(9,127,245,0); }
-    100%% { box-shadow: 0 0 0 0 rgba(9,127,245,0); }
-  }
-  .svc-pulse { animation: pulse 0.5s ease-out; }
+/* ─── Pagination ─── */
+.pagination {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 16px 0; font-size: 14px; color: var(--n600);
+}
+.pagination button {
+  padding: 6px 12px; border: 1px solid var(--n300); border-radius: var(--radius-md);
+  background: white; cursor: pointer; font-family: var(--font-sans); font-size: 13px;
+}
+.pagination button:hover { background: var(--n50); }
+.pagination button:disabled { opacity: 0.4; cursor: default; }
+.pagination .page-info { font-weight: 500; }
 
-  /* ─── Scrollbar ─── */
-  ::-webkit-scrollbar { width: 6px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb {
-    background: var(--neutral-300);
-    border-radius: 3px;
-  }
-  ::-webkit-scrollbar-thumb:hover { background: var(--neutral-400); }
+/* ─── DynamoDB Browser ─── */
+.ddb-layout { display: flex; gap: 0; height: calc(100vh - var(--header-height) - 48px); margin: -24px; }
+.ddb-sidebar {
+  width: 260px; border-right: 1px solid var(--n200); background: white;
+  display: flex; flex-direction: column; flex-shrink: 0;
+}
+.ddb-sidebar-header { padding: 16px; border-bottom: 1px solid var(--n100); }
+.ddb-sidebar-list { flex: 1; overflow-y: auto; }
+.ddb-table-item {
+  padding: 12px 16px; cursor: pointer; border-bottom: 1px solid var(--n50);
+  transition: background 0.1s; display: flex; align-items: center; justify-content: space-between;
+}
+.ddb-table-item:hover { background: var(--n50); }
+.ddb-table-item.active { background: rgba(9,127,245,0.06); border-left: 3px solid var(--brand-blue); }
+.ddb-table-item .name { font-weight: 600; font-size: 14px; }
+.ddb-table-item .count { font-size: 12px; color: var(--n400); }
+.ddb-main { flex: 1; overflow-y: auto; padding: 24px; }
+.ddb-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ddb-key-schema { font-size: 13px; color: var(--n500); display: flex; gap: 12px; }
+.ddb-key-schema span { padding: 2px 8px; background: var(--n100); border-radius: var(--radius-sm); font-family: var(--font-mono); }
 
-  /* ─── Page Title ─── */
-  .page-title {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--neutral-900);
-    margin-bottom: 20px;
-  }
-  .section-gap { margin-bottom: 24px; }
+/* ─── Topology ─── */
+.topology-container { width: 100%%; height: calc(100vh - var(--header-height) - 48px); }
+.topology-container svg { width: 100%%; height: 100%%; }
+
+/* ─── Command Palette ─── */
+.palette-backdrop {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);
+  z-index: 2000; display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 20vh; animation: fadeIn 0.1s ease;
+}
+.palette {
+  width: 560px; background: white; border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-lg); overflow: hidden; animation: slideUp 0.15s ease;
+}
+.palette-input {
+  width: 100%%; padding: 16px 20px; font-size: 16px; border: none; outline: none;
+  font-family: var(--font-sans); border-bottom: 1px solid var(--n100);
+}
+.palette-results { max-height: 320px; overflow-y: auto; }
+.palette-item {
+  padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px;
+  font-size: 14px; transition: background 0.1s;
+}
+.palette-item:hover, .palette-item.active { background: var(--n50); }
+.palette-item .label { font-weight: 600; }
+.palette-item .desc { color: var(--n400); font-size: 13px; margin-left: auto; }
+
+/* ─── Lambda Logs ─── */
+.log-entry { font-family: var(--font-mono); font-size: 13px; padding: 4px 0; line-height: 1.5; }
+.log-entry.stderr { color: var(--error); }
+.log-time { color: var(--n400); margin-right: 8px; }
+.log-reqid { color: var(--brand-blue); margin-right: 8px; }
+
+/* ─── IAM Debugger ─── */
+.iam-result {
+  padding: 16px 20px; border-radius: var(--radius-lg); font-size: 16px; font-weight: 700;
+  margin: 16px 0; text-align: center;
+}
+.iam-allow { background: rgba(2,150,98,0.1); color: var(--primary-green); border: 1px solid rgba(2,150,98,0.2); }
+.iam-deny { background: rgba(255,78,94,0.1); color: var(--error); border: 1px solid rgba(255,78,94,0.2); }
+
+/* ─── Mail ─── */
+.mail-list { border: 1px solid var(--n200); border-radius: var(--radius-lg); overflow: hidden; }
+.mail-row {
+  padding: 14px 20px; border-bottom: 1px solid var(--n100); cursor: pointer;
+  display: flex; gap: 16px; align-items: center; transition: background 0.1s;
+}
+.mail-row:hover { background: var(--n50); }
+.mail-row:last-child { border-bottom: none; }
+.mail-from { font-weight: 600; width: 200px; flex-shrink: 0; font-size: 14px; }
+.mail-subject { flex: 1; font-size: 14px; }
+.mail-date { color: var(--n400); font-size: 13px; flex-shrink: 0; }
+
+/* ─── Utility ─── */
+.flex { display: flex; }
+.flex-col { flex-direction: column; }
+.items-center { align-items: center; }
+.justify-between { justify-content: space-between; }
+.gap-2 { gap: 8px; }
+.gap-3 { gap: 12px; }
+.gap-4 { gap: 16px; }
+.mb-4 { margin-bottom: 16px; }
+.mb-6 { margin-bottom: 24px; }
+.mt-4 { margin-top: 16px; }
+.mr-2 { margin-right: 8px; }
+.ml-auto { margin-left: auto; }
+.text-sm { font-size: 13px; }
+.text-muted { color: var(--n500); }
+.font-mono { font-family: var(--font-mono); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.w-full { width: 100%%; }
+.page-title { font-size: 22px; font-weight: 700; color: var(--n900); }
+.page-desc { font-size: 14px; color: var(--n500); margin-top: 2px; }
+.section-title { font-size: 16px; font-weight: 700; color: var(--n800); margin-bottom: 12px; }
+.copy-btn {
+  padding: 4px 10px; font-size: 12px; border: 1px solid var(--n300);
+  background: white; border-radius: var(--radius-sm); cursor: pointer;
+  font-family: var(--font-sans); color: var(--n600);
+}
+.copy-btn:hover { background: var(--n50); }
+.label { font-size: 13px; font-weight: 600; color: var(--n600); margin-bottom: 6px; }
+.field-row { display: flex; gap: 12px; margin-bottom: 12px; }
+.field-row .input, .field-row .select { flex: 1; }
+.textarea {
+  font-family: var(--font-mono); font-size: 13px; padding: 12px;
+  border: 1px solid var(--n300); border-radius: var(--radius-md);
+  background: white; color: var(--n800); outline: none; resize: vertical;
+  min-height: 200px; width: 100%%; line-height: 1.5;
+}
+.textarea:focus { border-color: var(--brand-blue); box-shadow: 0 0 0 3px rgba(9,127,245,0.1); }
+
+.toast {
+  position: fixed; bottom: 24px; right: 24px; padding: 12px 20px;
+  background: var(--n900); color: white; border-radius: var(--radius-md);
+  font-size: 14px; z-index: 3000; animation: slideUp 0.2s ease;
+  box-shadow: var(--shadow-lg);
+}
 </style>
 </head>
 <body>
 <div id="app"></div>
 
 <script type="module">
-import { h, render } from 'https://esm.sh/preact@10.19.3';
+import { h, render, Fragment } from 'https://esm.sh/preact@10.19.3';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'https://esm.sh/preact@10.19.3/hooks';
 import htm from 'https://esm.sh/htm@3.1.1';
 const html = htm.bind(h);
 
-const ADMIN = %q;
-const MAX_ROWS = 200;
+const ADMIN = '%s';
+const GW_ENDPOINT = ADMIN.replace(/:\d+$/, ':4566');
 
-// ─── Helpers ───
-
-function fmtTime(iso) {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  const p = n => String(n).padStart(2, '0');
-  return p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+// ─── Utility ───────────────────────────────────────────────────
+function api(path, opts) {
+  return fetch(ADMIN + path, opts).then(r => r.ok ? r.json() : Promise.reject(r));
 }
 
-function fmtTimeFull(iso) {
-  if (!iso) return '-';
-  const d = new Date(iso);
-  return d.toLocaleString();
-}
-
-function fmtLatency(ns) {
-  if (!ns || ns === 0) return '-';
-  if (ns < 1000000) return (ns / 1000).toFixed(0) + ' us';
-  if (ns < 1000000000) return (ns / 1000000).toFixed(1) + ' ms';
-  return (ns / 1000000000).toFixed(2) + ' s';
+function ddbRequest(action, body) {
+  return fetch(GW_ENDPOINT, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/x-amz-json-1.0',
+      'X-Amz-Target': 'DynamoDB_20120810.' + action,
+      'Authorization': 'AWS4-HMAC-SHA256 Credential=test/20260321/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=fake',
+    },
+    body: JSON.stringify(body || {}),
+  }).then(r => r.json());
 }
 
 function statusClass(code) {
-  if (!code) return '';
-  if (code >= 200 && code < 300) return 'status-2xx';
-  if (code >= 300 && code < 400) return 'status-3xx';
-  if (code >= 400 && code < 500) return 'status-4xx';
   if (code >= 500) return 'status-5xx';
-  return '';
+  if (code >= 400) return 'status-4xx';
+  if (code >= 300) return 'status-3xx';
+  return 'status-2xx';
 }
 
-async function apiFetch(path, opts) {
-  const resp = await fetch(ADMIN + path, opts);
-  if (!resp.ok) throw new Error('HTTP ' + resp.status);
-  return resp.json();
+function fmtTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
 }
 
-// Sanitize text for safe display — strips any HTML tags.
-function sanitizeText(s) {
-  if (!s) return '';
-  const div = document.createElement('div');
-  div.textContent = s;
-  return div.innerHTML;
+function fmtDuration(ms) {
+  if (ms === undefined || ms === null) return '';
+  if (ms < 1) return '<1ms';
+  if (ms < 1000) return ms + 'ms';
+  return (ms / 1000).toFixed(1) + 's';
 }
 
-function syntaxHighlight(json) {
-  if (!json) return '';
+function syntaxHighlight(jsonStr) {
+  if (!jsonStr) return '';
   try {
-    if (typeof json === 'string') json = JSON.parse(json);
-    json = JSON.stringify(json, null, 2);
-  } catch(e) {
-    return sanitizeText(typeof json === 'string' ? json : JSON.stringify(json));
-  }
-  // Only highlight JSON tokens — all values are escaped via JSON.stringify.
-  return json.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
+    if (typeof jsonStr === 'object') jsonStr = JSON.stringify(jsonStr, null, 2);
+    else jsonStr = JSON.stringify(JSON.parse(jsonStr), null, 2);
+  } catch(e) { return jsonStr; }
+  return jsonStr.replace(/("(\\u[\da-fA-F]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?)/g,
     function(match) {
-      let cls = 'number';
+      let cls = 'json-number';
       if (/^"/.test(match)) {
-        cls = /:$/.test(match) ? 'key' : 'string';
+        cls = /:$/.test(match) ? 'json-key' : 'json-string';
       } else if (/true|false/.test(match)) {
-        cls = 'bool';
+        cls = 'json-boolean';
+      } else if (/null/.test(match)) {
+        cls = 'json-null';
       }
       return '<span class="' + cls + '">' + match + '</span>';
     });
 }
 
-function fuzzyMatch(query, text) {
-  const q = query.toLowerCase();
-  const t = text.toLowerCase();
-  if (t.includes(q)) return true;
-  let qi = 0;
-  for (let ti = 0; ti < t.length && qi < q.length; ti++) {
-    if (t[ti] === q[qi]) qi++;
-  }
-  return qi === q.length;
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).catch(() => {});
 }
 
-// ─── SVG Icons (inline, no deps) ───
-
-const Icons = {
-  services: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>` + "`" + `,
-  requests: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>` + "`" + `,
-  resources: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>` + "`" + `,
-  lambda: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>` + "`" + `,
-  iam: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>` + "`" + `,
-  mail: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>` + "`" + `,
-  topology: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><circle cx="20" cy="12" r="2"/><circle cx="4" cy="12" r="2"/><circle cx="12" cy="4" r="2"/><circle cx="12" cy="20" r="2"/><line x1="14" y1="12" x2="18" y2="12"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="12" y1="6" x2="12" y2="10"/><line x1="12" y1="14" x2="12" y2="18"/></svg>` + "`" + `,
-  close: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>` + "`" + `,
-  expand: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>` + "`" + `,
-  cloud: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/></svg>` + "`" + `,
-  search: html` + "`" + `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>` + "`" + `,
-};
-
-// ─── SSE Hook ───
-
+// ─── Hooks ─────────────────────────────────────────────────────
 function useSSE() {
   const [connected, setConnected] = useState(false);
-  const listenersRef = useRef([]);
+  const [events, setEvents] = useState([]);
+  const esRef = useRef(null);
 
   useEffect(() => {
-    let es;
-    function connect() {
-      es = new EventSource(ADMIN + '/api/stream');
-      es.onopen = () => setConnected(true);
-      es.onerror = () => setConnected(false);
-      es.onmessage = (e) => {
-        try {
-          const event = JSON.parse(e.data);
-          listenersRef.current.forEach(fn => fn(event));
-        } catch(_) {}
-      };
-    }
-    connect();
-    return () => { if (es) es.close(); };
-  }, []);
-
-  const subscribe = useCallback((fn) => {
-    listenersRef.current.push(fn);
-    return () => {
-      listenersRef.current = listenersRef.current.filter(f => f !== fn);
+    const es = new EventSource(ADMIN + '/api/stream');
+    esRef.current = es;
+    es.onopen = () => setConnected(true);
+    es.onerror = () => setConnected(false);
+    es.onmessage = (e) => {
+      try {
+        const event = JSON.parse(e.data);
+        setEvents(prev => [event, ...prev].slice(0, 500));
+      } catch(err) {}
     };
+    return () => es.close();
   }, []);
 
-  return { connected, subscribe };
+  return { connected, events };
 }
 
-// ─── Router ───
-
-function useRouter() {
-  const [route, setRoute] = useState(window.location.hash || '#/');
-
+function useRoute() {
+  const [route, setRoute] = useState(location.hash || '#/');
   useEffect(() => {
-    const onHash = () => setRoute(window.location.hash || '#/');
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
+    const handler = () => setRoute(location.hash || '#/');
+    window.addEventListener('hashchange', handler);
+    return () => window.removeEventListener('hashchange', handler);
   }, []);
-
-  const navigate = useCallback((hash) => {
-    window.location.hash = hash;
-  }, []);
-
-  return { route, navigate };
+  return route;
 }
 
-// ─── Command Palette ───
-
-function CommandPalette({ open, onClose, navigate, services }) {
-  const [query, setQuery] = useState('');
-  const [selectedIdx, setSelectedIdx] = useState(0);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (open && inputRef.current) {
-      setQuery('');
-      setSelectedIdx(0);
-      setTimeout(() => inputRef.current.focus(), 50);
-    }
-  }, [open]);
-
-  const commands = useMemo(() => {
-    const cmds = [
-      { label: 'Services Overview', action: () => navigate('#/'), hint: '#/' },
-      { label: 'Request Log', action: () => navigate('#/requests'), hint: '#/requests' },
-      { label: 'Resource Explorer', action: () => navigate('#/resources'), hint: '#/resources' },
-      { label: 'Lambda Logs', action: () => navigate('#/lambda'), hint: '#/lambda' },
-      { label: 'IAM Debugger', action: () => navigate('#/iam'), hint: '#/iam' },
-      { label: 'SES Mailbox', action: () => navigate('#/mail'), hint: '#/mail' },
-      { label: 'Service Topology', action: () => navigate('#/topology'), hint: '#/topology' },
-      { label: 'Reset All Services', action: () => { apiFetch('/api/reset', { method: 'POST' }); }, hint: 'POST' },
-    ];
-    (services || []).forEach(s => {
-      cmds.push({
-        label: 'Jump to ' + s.name,
-        action: () => navigate('#/services/' + s.name),
-        hint: s.name,
-      });
-      cmds.push({
-        label: 'Reset ' + s.name,
-        action: () => { apiFetch('/api/services/' + s.name + '/reset', { method: 'POST' }); },
-        hint: 'POST',
-      });
-    });
-    return cmds;
-  }, [services, navigate]);
-
-  const filtered = useMemo(() => {
-    if (!query) return commands;
-    return commands.filter(c => fuzzyMatch(query, c.label));
-  }, [query, commands]);
-
-  useEffect(() => { setSelectedIdx(0); }, [query]);
-
-  const onKeyDown = (e) => {
-    if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedIdx(i => Math.min(i + 1, filtered.length - 1)); }
-    if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedIdx(i => Math.max(i - 1, 0)); }
-    if (e.key === 'Enter' && filtered[selectedIdx]) {
-      filtered[selectedIdx].action();
-      onClose();
-    }
-    if (e.key === 'Escape') onClose();
-  };
-
-  return html` + "`" + `
-    <div class="palette-overlay ${open ? 'open' : ''}" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div class="palette">
-        <input
-          ref=${inputRef}
-          class="palette-input"
-          placeholder="Type a command..."
-          value=${query}
-          onInput=${(e) => setQuery(e.target.value)}
-          onKeyDown=${onKeyDown}
-        />
-        <div class="palette-results">
-          ${filtered.map((cmd, i) => html` + "`" + `
-            <div
-              class="palette-item ${i === selectedIdx ? 'selected' : ''}"
-              onClick=${() => { cmd.action(); onClose(); }}
-              onMouseEnter=${() => setSelectedIdx(i)}
-            >
-              ${cmd.label}
-              <span class="hint">${cmd.hint}</span>
-            </div>
-          ` + "`" + `)}
-          ${filtered.length === 0 ? html` + "`" + `<div class="empty-state" style="padding:20px">No matching commands</div>` + "`" + ` : null}
-        </div>
-      </div>
-    </div>
-  ` + "`" + `;
+function parseRoute(hash) {
+  const path = hash.replace('#', '') || '/';
+  const segments = path.split('/').filter(Boolean);
+  return { path, segments };
 }
 
-// ─── Sidebar ───
+// ─── SVG Icons ─────────────────────────────────────────────────
+const icons = {
+  cloud: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>',
+  services: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
+  requests: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
+  database: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>',
+  resources: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>',
+  lambda: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>',
+  shield: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
+  mail: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>',
+  topology: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><line x1="6" y1="9" x2="6" y2="21"></line><path d="M9 6h6"></path><path d="M6 21a3 3 0 0 0 3-3V9"></path></svg>',
+  expand: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
+  x: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
+  chevDown: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>',
+  chevRight: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>',
+  search: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
+  plus: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
+  trash: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
+  copy: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
+  play: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
+  refresh: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>',
+};
 
-function Sidebar({ route, navigate, emailCount }) {
-  const items = [
-    { hash: '#/', label: 'Services', icon: Icons.services },
-    { hash: '#/requests', label: 'Requests', icon: Icons.requests },
-    { hash: '#/resources', label: 'Resources', icon: Icons.resources },
-    { hash: '#/lambda', label: 'Lambda', icon: Icons.lambda },
-    { hash: '#/iam', label: 'IAM', icon: Icons.iam },
-    { hash: '#/mail', label: 'Mail', icon: Icons.mail, badge: emailCount },
-    { hash: '#/topology', label: 'Topology', icon: Icons.topology },
-  ];
-
-  const isActive = (hash) => {
-    if (hash === '#/') return route === '#/' || route === '#/services';
-    return route.startsWith(hash);
-  };
-
-  return html` + "`" + `
-    <div class="sidebar">
-      <nav class="sidebar-nav">
-        ${items.map(item => html` + "`" + `
-          <div
-            class="nav-item ${isActive(item.hash) ? 'active' : ''}"
-            onClick=${() => navigate(item.hash)}
-          >
-            ${item.icon}
-            ${item.label}
-            ${item.badge > 0 ? html` + "`" + `<span class="nav-badge">${item.badge}</span>` + "`" + ` : null}
-          </div>
-        ` + "`" + `)}
-      </nav>
-      <div class="sidebar-footer">cloudmock v0.1.0</div>
-    </div>
-  ` + "`" + `;
+// ─── Toast ─────────────────────────────────────────────────────
+let toastTimer = null;
+function Toast({ message }) {
+  if (!message) return null;
+  return html'<div class="toast">${message}</div>';
 }
 
-// ─── Services Overview Page ───
-
-function ServicesPage({ navigate, services, stats }) {
-  const [search, setSearch] = useState('');
-
-  const totalRequests = Object.values(stats || {}).reduce((a, b) => a + b, 0);
-  const healthyCount = (services || []).filter(s => s.healthy).length;
-
-  const filtered = useMemo(() => {
-    if (!services) return [];
-    if (!search) return services;
-    const q = search.toLowerCase();
-    return services.filter(s => s.name.toLowerCase().includes(q));
-  }, [services, search]);
-
-  const tier1 = ['s3', 'dynamodb', 'sqs', 'sns', 'lambda', 'iam', 'sts', 'cloudwatch-logs',
-    'rds', 'cloudformation', 'ec2', 'ecr', 'ecs', 'secretsmanager', 'ssm',
-    'kinesis', 'firehose', 'events', 'stepfunctions', 'apigateway'];
-
-  return html` + "`" + `
-    <div>
-      <div class="stats-bar slide-up">
-        <div class="stat-card">
-          <div class="stat-label">Services</div>
-          <div class="stat-value brand">${(services || []).length}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Total Requests</div>
-          <div class="stat-value">${totalRequests.toLocaleString()}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Healthy</div>
-          <div class="stat-value success">${healthyCount}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Uptime</div>
-          <div class="stat-value success">100%%</div>
-        </div>
-      </div>
-
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <h1 class="page-title" style="margin-bottom:0">Services</h1>
-        <input
-          class="search-input"
-          placeholder="Filter services..."
-          value=${search}
-          onInput=${(e) => setSearch(e.target.value)}
-        />
-      </div>
-
-      <div class="service-grid">
-        ${filtered.map(svc => {
-          const count = (stats && stats[svc.name]) || 0;
-          const t1 = tier1.includes(svc.name);
-          return html` + "`" + `
-            <div class="service-card fade-in" onClick=${() => navigate('#/services/' + svc.name)}>
-              <div class="svc-card-top">
-                <span class="svc-name">${svc.name}</span>
-                <span class="svc-tier ${t1 ? 'tier-1' : ''}">${t1 ? 'Tier 1' : 'Tier 2'}</span>
-              </div>
-              <div class="svc-card-meta">
-                <span class="svc-status">
-                  <span class="status-dot ${svc.healthy ? 'healthy' : 'degraded'}"></span>
-                  ${svc.healthy ? 'Healthy' : 'Degraded'}
-                </span>
-                <span class="svc-requests">${count} reqs</span>
-                <span>${svc.action_count} actions</span>
-              </div>
-            </div>
-          ` + "`" + `;
-        })}
-      </div>
-      ${filtered.length === 0 ? html` + "`" + `<div class="empty-state">No services match your filter</div>` + "`" + ` : null}
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Service Detail Page ───
-
-function ServiceDetailPage({ name, navigate, stats }) {
-  const [svc, setSvc] = useState(null);
-  const [svcRequests, setSvcRequests] = useState([]);
-
-  useEffect(() => {
-    apiFetch('/api/services/' + name).then(setSvc).catch(() => {});
-    apiFetch('/api/requests?service=' + name + '&limit=20').then(setSvcRequests).catch(() => {});
-  }, [name]);
-
-  if (!svc) return html` + "`" + `<div class="empty-state">Loading service...</div>` + "`" + `;
-
-  const count = (stats && stats[name]) || 0;
-
-  return html` + "`" + `
-    <div>
-      <div class="breadcrumb">
-        <a onClick=${() => navigate('#/')}>Services</a>
-        <span>/</span>
-        <span>${name}</span>
-      </div>
-      <h1 class="page-title">${name}</h1>
-
-      <div class="stats-bar section-gap">
-        <div class="stat-card">
-          <div class="stat-label">Status</div>
-          <div class="stat-value ${svc.healthy ? 'success' : ''}">${svc.healthy ? 'Healthy' : 'Degraded'}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Actions</div>
-          <div class="stat-value brand">${svc.action_count}</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-label">Requests</div>
-          <div class="stat-value">${count}</div>
-        </div>
-      </div>
-
-      <div class="card section-gap">
-        <div class="card-header"><h2>Recent Requests</h2></div>
-        <div class="card-body">
-          ${svcRequests.length === 0
-            ? html` + "`" + `<div class="empty-state">No requests for this service yet</div>` + "`" + `
-            : html` + "`" + `
-              <table>
-                <thead><tr><th>Time</th><th>Action</th><th>Status</th><th>Latency</th></tr></thead>
-                <tbody>
-                  ${svcRequests.map(r => html` + "`" + `
-                    <tr>
-                      <td class="mono">${fmtTime(r.timestamp)}</td>
-                      <td class="mono">${r.action || '-'}</td>
-                      <td><span class="status-code ${statusClass(r.status_code)}">${r.status_code || '?'}</span></td>
-                      <td class="mono">${fmtLatency(r.latency_ns)}</td>
-                    </tr>
-                  ` + "`" + `)}
-                </tbody>
-              </table>
-            ` + "`" + `
-          }
-        </div>
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Request Log Page ───
-
-function RequestLogPage({ subscribe }) {
-  const [requests, setRequests] = useState([]);
-  const [svcFilter, setSvcFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
-  const [search, setSearch] = useState('');
-  const [services, setServices] = useState([]);
-  const [expandedId, setExpandedId] = useState(null);
-  const [drawer, setDrawer] = useState(null);
-
-  useEffect(() => {
-    apiFetch('/api/requests?limit=100').then(setRequests).catch(() => {});
-    apiFetch('/api/services').then(s => setServices((s || []).map(x => x.name))).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    return subscribe((event) => {
-      if (event.type === 'request') {
-        setRequests(prev => {
-          const next = [event.data, ...prev];
-          if (next.length > MAX_ROWS) next.length = MAX_ROWS;
-          return next;
-        });
-      }
-    });
-  }, [subscribe]);
-
-  const filtered = useMemo(() => {
-    return requests.filter(r => {
-      if (svcFilter && r.service !== svcFilter) return false;
-      if (statusFilter) {
-        const code = r.status_code || 0;
-        if (statusFilter === '2xx' && (code < 200 || code >= 300)) return false;
-        if (statusFilter === '4xx' && (code < 400 || code >= 500)) return false;
-        if (statusFilter === '5xx' && code < 500) return false;
-      }
-      if (search) {
-        const q = search.toLowerCase();
-        const haystack = (r.service + ' ' + r.action + ' ' + r.path).toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [requests, svcFilter, statusFilter, search]);
-
-  const openDrawer = (r) => {
-    if (r.id) {
-      apiFetch('/api/requests/' + r.id).then(setDrawer).catch(() => setDrawer(r));
-    } else {
-      setDrawer(r);
-    }
-  };
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">Request Log</h1>
-      <div class="filter-bar section-gap">
-        <select class="filter-select" id="service-filter" value=${svcFilter} onChange=${(e) => setSvcFilter(e.target.value)}>
-          <option value="">All services</option>
-          ${services.map(s => html` + "`" + `<option value=${s}>${s}</option>` + "`" + `)}
-        </select>
-        <select class="filter-select" value=${statusFilter} onChange=${(e) => setStatusFilter(e.target.value)}>
-          <option value="">All status</option>
-          <option value="2xx">2xx</option>
-          <option value="4xx">4xx</option>
-          <option value="5xx">5xx</option>
-        </select>
-        <input class="search-input" placeholder="Search..." value=${search} onInput=${(e) => setSearch(e.target.value)} />
-      </div>
-      <div class="card">
-        <div class="card-body">
-          <table id="requests-table">
-            <thead>
-              <tr>
-                <th>Time</th><th>Service</th><th>Action</th><th>Status</th><th>Latency</th><th>Caller</th><th></th>
-              </tr>
-            </thead>
-            <tbody id="requests-tbody">
-              ${filtered.length === 0 ? html` + "`" + `<tr><td colspan="7" class="empty-state">No requests recorded yet</td></tr>` + "`" + ` : null}
-              ${filtered.map(r => html` + "`" + `
-                <tr class="fade-in" onClick=${() => setExpandedId(expandedId === r.id ? null : r.id)}>
-                  <td class="mono">${fmtTime(r.timestamp)}</td>
-                  <td>${r.service || '-'}</td>
-                  <td class="mono">${r.action || '-'}</td>
-                  <td><span class="status-code ${statusClass(r.status_code)}">${r.status_code || '?'}</span></td>
-                  <td class="mono">${fmtLatency(r.latency_ns)}</td>
-                  <td class="mono" style="font-size:11px">${r.caller_id || '-'}</td>
-                  <td>
-                    <button class="btn btn-ghost btn-sm" onClick=${(e) => { e.stopPropagation(); openDrawer(r); }}>
-                      ${Icons.expand}
-                    </button>
-                  </td>
-                </tr>
-                ${expandedId === r.id ? html` + "`" + `
-                  <tr class="expand-row">
-                    <td colspan="7">
-                      <div class="expand-content">
-                        <div class="detail-grid">
-                          <span class="detail-label">Method</span><span class="detail-value">${r.method}</span>
-                          <span class="detail-label">Path</span><span class="detail-value mono">${r.path}</span>
-                          <span class="detail-label">Timestamp</span><span class="detail-value">${fmtTimeFull(r.timestamp)}</span>
-                        </div>
-                        ${r.request_body ? html` + "`" + `
-                          <div style="margin-top:12px">
-                            <div class="detail-label" style="margin-bottom:6px">Request Body</div>
-                            <div class="code-block">${r.request_body}</div>
-                          </div>
-                        ` + "`" + ` : null}
-                        ${r.response_body ? html` + "`" + `
-                          <div style="margin-top:12px">
-                            <div class="detail-label" style="margin-bottom:6px">Response Body</div>
-                            <div class="code-block">${r.response_body}</div>
-                          </div>
-                        ` + "`" + ` : null}
-                      </div>
-                    </td>
-                  </tr>
-                ` + "`" + ` : null}
-              ` + "`" + `)}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <${RequestDrawer} entry=${drawer} onClose=${() => setDrawer(null)} />
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Request Drawer ───
-
-function RequestDrawer({ entry, onClose }) {
-  const [tab, setTab] = useState('overview');
-  const isOpen = !!entry;
-
-  useEffect(() => { if (isOpen) setTab('overview'); }, [isOpen]);
-
-  return html` + "`" + `
-    <div class="drawer-overlay ${isOpen ? 'open' : ''}" onClick=${(e) => { if (e.target === e.currentTarget) onClose(); }}>
-    </div>
-    <div class="drawer ${isOpen ? 'open' : ''}">
-      <div class="drawer-header">
-        <h3>Request Detail</h3>
-        <button class="drawer-close" onClick=${onClose}>${Icons.close}</button>
-      </div>
-      <div class="drawer-tabs">
-        ${['overview','request','response','timing'].map(t => html` + "`" + `
-          <div class="drawer-tab ${tab === t ? 'active' : ''}" onClick=${() => setTab(t)}>${t.charAt(0).toUpperCase() + t.slice(1)}</div>
-        ` + "`" + `)}
-      </div>
-      <div class="drawer-body">
-        ${entry && tab === 'overview' ? html` + "`" + `
-          <div class="detail-grid">
-            <span class="detail-label">Service</span><span class="detail-value">${entry.service}</span>
-            <span class="detail-label">Action</span><span class="detail-value mono">${entry.action}</span>
-            <span class="detail-label">Status</span><span class="detail-value"><span class="status-code ${statusClass(entry.status_code)}">${entry.status_code}</span></span>
-            <span class="detail-label">Latency</span><span class="detail-value mono">${fmtLatency(entry.latency_ns)}</span>
-            <span class="detail-label">Timestamp</span><span class="detail-value">${fmtTimeFull(entry.timestamp)}</span>
-            <span class="detail-label">Caller</span><span class="detail-value mono">${entry.caller_id || '-'}</span>
-            <span class="detail-label">Method</span><span class="detail-value">${entry.method}</span>
-            <span class="detail-label">Path</span><span class="detail-value mono">${entry.path}</span>
-          </div>
-          <div style="margin-top:20px">
-            <button class="btn btn-ghost btn-sm" onClick=${() => {
-              apiFetch('/api/requests/' + entry.id + '/replay', { method: 'POST' });
-            }}>Replay Request</button>
-          </div>
-        ` + "`" + ` : null}
-        ${entry && tab === 'request' ? html` + "`" + `
-          <div>
-            ${entry.request_headers ? html` + "`" + `
-              <div style="margin-bottom:16px">
-                <div class="detail-label" style="margin-bottom:8px">Headers</div>
-                <div class="code-block">${Object.entries(entry.request_headers || {}).map(([k,v]) => k + ': ' + v).join('\n')}</div>
-              </div>
-            ` + "`" + ` : null}
-            <div class="detail-label" style="margin-bottom:8px">Body</div>
-            <div class="code-block">${entry.request_body || '(empty)'}</div>
-          </div>
-        ` + "`" + ` : null}
-        ${entry && tab === 'response' ? html` + "`" + `
-          <div>
-            <div class="detail-label" style="margin-bottom:8px">Body</div>
-            <div class="code-block">${entry.response_body || '(empty)'}</div>
-          </div>
-        ` + "`" + ` : null}
-        ${entry && tab === 'timing' ? html` + "`" + `
-          <div class="detail-grid">
-            <span class="detail-label">Total</span><span class="detail-value mono">${fmtLatency(entry.latency_ns)}</span>
-            <span class="detail-label">Start</span><span class="detail-value">${fmtTimeFull(entry.timestamp)}</span>
-          </div>
-        ` + "`" + ` : null}
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Resource Explorer Page ───
-
-function ResourceExplorerPage({ services }) {
-  const [selectedSvc, setSelectedSvc] = useState(null);
-  const [resources, setResources] = useState(null);
-  const [loading, setLoading] = useState(false);
-
-  const svcList = (services || []).map(s => s.name).sort();
-
-  const loadResources = (svc) => {
-    setSelectedSvc(svc);
-    setLoading(true);
-    setResources(null);
-    apiFetch('/api/services/' + svc)
-      .then(data => {
-        setResources(data);
-        setLoading(false);
-      })
-      .catch(() => {
-        setResources({ error: 'Failed to load' });
-        setLoading(false);
-      });
-  };
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">Resource Explorer</h1>
-      <div style="display:flex;gap:0;border-radius:var(--radius-lg);overflow:hidden;box-shadow:var(--shadow-sm);background:#fff;min-height:500px">
-        <div class="explorer-sidebar">
-          ${svcList.map(s => html` + "`" + `
-            <div class="nav-item ${selectedSvc === s ? 'active' : ''}" onClick=${() => loadResources(s)}>
-              ${s}
-            </div>
-          ` + "`" + `)}
-        </div>
-        <div class="explorer-main">
-          ${!selectedSvc ? html` + "`" + `<div class="empty-state">Select a service from the sidebar</div>` + "`" + ` : null}
-          ${loading ? html` + "`" + `<div class="empty-state">Loading...</div>` + "`" + ` : null}
-          ${selectedSvc && !loading && resources ? html` + "`" + `
-            <div>
-              <h2 style="font-size:16px;font-weight:600;margin-bottom:16px;color:var(--neutral-900)">${selectedSvc}</h2>
-              <div class="detail-grid">
-                <span class="detail-label">Name</span><span class="detail-value">${resources.name || selectedSvc}</span>
-                <span class="detail-label">Actions</span><span class="detail-value">${resources.action_count || 0}</span>
-                <span class="detail-label">Status</span><span class="detail-value">${resources.healthy ? 'Healthy' : 'Degraded'}</span>
-              </div>
-            </div>
-          ` + "`" + ` : null}
-        </div>
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Lambda Logs Page ───
-
-function LambdaLogsPage({ subscribe }) {
-  const [logs, setLogs] = useState([]);
-  const [fnFilter, setFnFilter] = useState('');
-  const [functions, setFunctions] = useState(new Set());
-  const [expandedIdx, setExpandedIdx] = useState(null);
-
-  useEffect(() => {
-    apiFetch('/api/lambda/logs?limit=100').then(entries => {
-      setLogs(entries || []);
-      const fns = new Set();
-      (entries || []).forEach(e => { if (e.functionName) fns.add(e.functionName); });
-      setFunctions(fns);
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    return subscribe((event) => {
-      if (event.type === 'lambda_log') {
-        setLogs(prev => {
-          const next = [event.data, ...prev];
-          if (next.length > 500) next.length = 500;
-          return next;
-        });
-        if (event.data.functionName) {
-          setFunctions(prev => {
-            const next = new Set(prev);
-            next.add(event.data.functionName);
-            return next;
-          });
-        }
-      }
-    });
-  }, [subscribe]);
-
-  const filtered = useMemo(() => {
-    if (!fnFilter) return logs;
-    return logs.filter(l => l.functionName === fnFilter);
-  }, [logs, fnFilter]);
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">Lambda Logs</h1>
-      <div class="filter-bar section-gap">
-        <select class="filter-select" id="lambda-filter" value=${fnFilter} onChange=${(e) => setFnFilter(e.target.value)}>
-          <option value="">All functions</option>
-          ${[...functions].map(f => html` + "`" + `<option value=${f}>${f}</option>` + "`" + `)}
-        </select>
-      </div>
-      <div class="card">
-        <div class="card-body lambda-table-wrap">
-          <table id="lambda-table">
-            <thead>
-              <tr><th>Time</th><th>Function</th><th>Request ID</th><th>Duration</th><th>Message</th></tr>
-            </thead>
-            <tbody id="lambda-tbody">
-              ${filtered.length === 0 ? html` + "`" + `<tr><td colspan="5" class="empty-state">No Lambda logs yet</td></tr>` + "`" + ` : null}
-              ${filtered.map((entry, i) => html` + "`" + `
-                <tr class="${entry.stream === 'stderr' ? 'log-stderr' : ''} fade-in"
-                    onClick=${() => setExpandedIdx(expandedIdx === i ? null : i)}>
-                  <td class="mono">${fmtTime(entry.timestamp)}</td>
-                  <td>${entry.functionName || '-'}</td>
-                  <td class="mono" title=${entry.requestId || ''}>${(entry.requestId || '-').substring(0, 12)}</td>
-                  <td class="mono">-</td>
-                  <td class="mono" style="max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${entry.message || ''}</td>
-                </tr>
-                ${expandedIdx === i ? html` + "`" + `
-                  <tr class="expand-row">
-                    <td colspan="5">
-                      <div class="expand-content">
-                        <div class="code-block">${entry.message || '(no output)'}</div>
-                      </div>
-                    </td>
-                  </tr>
-                ` + "`" + ` : null}
-              ` + "`" + `)}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── IAM Debugger Page ───
-
-function IAMDebuggerPage() {
-  const [principal, setPrincipal] = useState('');
-  const [action, setAction] = useState('');
-  const [resource, setResource] = useState('*');
-  const [result, setResult] = useState(null);
-  const [history, setHistory] = useState([]);
-
-  const evaluate = () => {
-    apiFetch('/api/iam/evaluate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ principal, action, resource }),
-    }).then(r => {
-      setResult(r);
-      setHistory(prev => [{ principal, action, resource, ...r, time: new Date().toISOString() }, ...prev].slice(0, 20));
-    }).catch(() => {
-      setResult({ decision: 'ERROR', reason: 'Failed to evaluate' });
-    });
-  };
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">IAM Debugger</h1>
-      <div style="display:flex;gap:32px;flex-wrap:wrap">
-        <div style="flex:1;min-width:300px">
-          <div class="card">
-            <div class="card-header"><h2>Evaluate Policy</h2></div>
-            <div class="card-body-padded">
-              <div class="iam-form">
-                <div class="form-group">
-                  <label class="form-label">Principal</label>
-                  <input class="form-input" placeholder="e.g. admin-user" value=${principal} onInput=${(e) => setPrincipal(e.target.value)} />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Action</label>
-                  <input class="form-input" placeholder="e.g. s3:GetObject" value=${action} onInput=${(e) => setAction(e.target.value)} />
-                </div>
-                <div class="form-group">
-                  <label class="form-label">Resource ARN</label>
-                  <input class="form-input" placeholder="e.g. arn:aws:s3:::my-bucket/*" value=${resource} onInput=${(e) => setResource(e.target.value)} />
-                </div>
-                <button class="btn btn-primary" onClick=${evaluate}>Evaluate</button>
-              </div>
-
-              ${result ? html` + "`" + `
-                <div class="iam-result ${result.decision === 'ALLOW' ? 'allow' : 'deny'}">
-                  <div class="iam-result-decision">${result.decision}</div>
-                  <div style="color:var(--neutral-600)">${result.reason}</div>
-                  ${result.matched_statement ? html` + "`" + `
-                    <div style="margin-top:12px">
-                      <div class="detail-label" style="margin-bottom:6px">Matched Statement</div>
-                      <div class="code-block">${JSON.stringify(result.matched_statement, null, 2)}</div>
-                    </div>
-                  ` + "`" + ` : null}
-                </div>
-              ` + "`" + ` : null}
-            </div>
-          </div>
-        </div>
-
-        <div style="flex:1;min-width:300px">
-          <div class="card">
-            <div class="card-header"><h2>Evaluation History</h2></div>
-            <div class="card-body">
-              ${history.length === 0 ? html` + "`" + `<div class="empty-state">No evaluations yet</div>` + "`" + ` : html` + "`" + `
-                <table>
-                  <thead><tr><th>Time</th><th>Action</th><th>Decision</th></tr></thead>
-                  <tbody>
-                    ${history.map(h => html` + "`" + `
-                      <tr>
-                        <td class="mono">${fmtTime(h.time)}</td>
-                        <td class="mono">${h.action}</td>
-                        <td><span class="status-code ${h.decision === 'ALLOW' ? 'status-2xx' : 'status-5xx'}">${h.decision}</span></td>
-                      </tr>
-                    ` + "`" + `)}
-                  </tbody>
-                </table>
-              ` + "`" + `}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── SES Mailbox Page ───
-
-function SESMailboxPage() {
-  const [emails, setEmails] = useState([]);
-  const [selected, setSelected] = useState(null);
-
-  useEffect(() => {
-    apiFetch('/api/ses/emails').then(setEmails).catch(() => {});
-  }, []);
-
-  const openEmail = (email) => {
-    if (email.message_id) {
-      apiFetch('/api/ses/emails/' + email.message_id).then(setSelected).catch(() => setSelected(email));
-    } else {
-      setSelected(email);
-    }
-  };
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">SES Mailbox</h1>
-      <div style="display:flex;gap:24px">
-        <div class="card" style="flex:1">
-          <div class="card-header"><h2>Captured Emails (${emails.length})</h2></div>
-          <div class="card-body">
-            ${emails.length === 0 ? html` + "`" + `<div class="empty-state">No captured emails yet</div>` + "`" + ` : null}
-            ${emails.map(e => html` + "`" + `
-              <div class="email-preview" onClick=${() => openEmail(e)}>
-                <div class="email-meta">
-                  <span class="email-from">${e.source || 'Unknown'}</span>
-                  <span class="email-date">${fmtTimeFull(e.timestamp)}</span>
-                </div>
-                <div class="email-subject">${e.subject || '(no subject)'}</div>
-                <div class="email-to">To: ${(e.to || []).join(', ')}</div>
-              </div>
-            ` + "`" + `)}
-          </div>
-        </div>
-
-        ${selected ? html` + "`" + `
-          <div class="card" style="flex:1.5">
-            <div class="card-header">
-              <h2>${selected.Subject || selected.subject || '(no subject)'}</h2>
-              <button class="btn btn-ghost btn-sm" onClick=${() => setSelected(null)}>${Icons.close}</button>
-            </div>
-            <div class="card-body-padded">
-              <div class="detail-grid" style="margin-bottom:16px">
-                <span class="detail-label">From</span><span class="detail-value">${selected.Source || selected.source}</span>
-                <span class="detail-label">To</span><span class="detail-value">${(selected.ToAddresses || selected.to || []).join(', ')}</span>
-                <span class="detail-label">Date</span><span class="detail-value">${fmtTimeFull(selected.Timestamp || selected.timestamp)}</span>
-              </div>
-              ${(selected.HtmlBody || selected.html_body)
-                ? html` + "`" + `<div style="border:1px solid var(--neutral-200);border-radius:var(--radius-md);padding:16px;background:var(--neutral-50)">
-                    <div class="detail-label" style="margin-bottom:8px">HTML Email Body</div>
-                    <pre class="code-block">${selected.HtmlBody || selected.html_body}</pre>
-                  </div>` + "`" + `
-                : html` + "`" + `<pre class="code-block">${selected.TextBody || selected.text_body || '(empty body)'}</pre>` + "`" + `}
-            </div>
-          </div>
-        ` + "`" + ` : null}
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── Topology Page ───
-
-function TopologyPage({ navigate }) {
-  const [topo, setTopo] = useState(null);
-
-  useEffect(() => {
-    apiFetch('/api/topology').then(setTopo).catch(() => {});
-  }, []);
-
-  if (!topo) return html` + "`" + `<div class="empty-state">Loading topology...</div>` + "`" + `;
-
-  // Layout nodes in a grid-like arrangement
-  const nodes = topo.nodes || [];
-  const edges = topo.edges || [];
-  const cols = Math.ceil(Math.sqrt(nodes.length));
-  const cellW = 160;
-  const cellH = 80;
-  const padX = 40;
-  const padY = 40;
-  const width = cols * cellW + padX * 2;
-  const rows = Math.ceil(nodes.length / cols);
-  const height = rows * cellH + padY * 2;
-
-  const nodePositions = {};
-  nodes.forEach((n, i) => {
-    const col = i %% cols;
-    const row = Math.floor(i / cols);
-    nodePositions[n.id] = {
-      x: padX + col * cellW + cellW / 2,
-      y: padY + row * cellH + cellH / 2,
-    };
-  });
-
-  return html` + "`" + `
-    <div>
-      <h1 class="page-title">Service Topology</h1>
-      <div class="topology-container" style="width:${width}px;height:${height}px;margin:0 auto">
-        <svg class="topo-svg" viewBox="0 0 ${width} ${height}">
-          ${edges.map(e => {
-            const s = nodePositions[e.source];
-            const t = nodePositions[e.target];
-            if (!s || !t) return null;
-            const midX = (s.x + t.x) / 2;
-            const midY = (s.y + t.y) / 2;
-            return html` + "`" + `
-              <line class="topo-edge" x1=${s.x} y1=${s.y} x2=${t.x} y2=${t.y} />
-              <text class="topo-edge-label" x=${midX} y=${midY - 6} text-anchor="middle">${e.label}</text>
-            ` + "`" + `;
-          })}
-        </svg>
-        ${nodes.map((n, i) => {
-          const pos = nodePositions[n.id];
-          return html` + "`" + `
-            <div
-              class="topo-node"
-              style="left:${pos.x - 50}px;top:${pos.y - 18}px"
-              onClick=${() => navigate('#/services/' + n.id)}
-            >${n.name}</div>
-          ` + "`" + `;
-        })}
-      </div>
-    </div>
-  ` + "`" + `;
-}
-
-// ─── App ───
-
+// ─── App ───────────────────────────────────────────────────────
 function App() {
-  const { route, navigate } = useRouter();
-  const { connected, subscribe } = useSSE();
+  const route = useRoute();
+  const sse = useSSE();
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const [services, setServices] = useState([]);
   const [stats, setStats] = useState({});
-  const [paletteOpen, setPaletteOpen] = useState(false);
-  const [emailCount, setEmailCount] = useState(0);
+  const [health, setHealth] = useState(null);
+  const [toast, setToast] = useState('');
+  const [mailCount, setMailCount] = useState(0);
 
-  // Initial data load
-  useEffect(() => {
-    apiFetch('/api/services').then(setServices).catch(() => {});
-    apiFetch('/api/stats').then(setStats).catch(() => {});
-    apiFetch('/api/ses/emails').then(e => setEmailCount((e || []).length)).catch(() => {});
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => setToast(''), 3000);
   }, []);
 
-  // SSE updates for service counts
   useEffect(() => {
-    return subscribe((event) => {
-      if (event.type === 'request' && event.data && event.data.service) {
-        setStats(prev => ({
-          ...prev,
-          [event.data.service]: (prev[event.data.service] || 0) + 1,
-        }));
-      }
-    });
-  }, [subscribe]);
+    api('/api/services').then(setServices).catch(() => {});
+    api('/api/stats').then(setStats).catch(() => {});
+    api('/api/health').then(setHealth).catch(() => {});
+    api('/api/ses/emails').then(e => setMailCount(Array.isArray(e) ? e.length : 0)).catch(() => {});
+  }, []);
 
-  // Cmd+K shortcut
+  // Refresh stats periodically
+  useEffect(() => {
+    const iv = setInterval(() => {
+      api('/api/stats').then(setStats).catch(() => {});
+      api('/api/ses/emails').then(e => setMailCount(Array.isArray(e) ? e.length : 0)).catch(() => {});
+    }, 5000);
+    return () => clearInterval(iv);
+  }, []);
+
+  // Cmd+K handler
   useEffect(() => {
     const handler = (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
@@ -1882,70 +656,1447 @@ function App() {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  // Periodic health refresh
-  useEffect(() => {
-    const interval = setInterval(() => {
-      apiFetch('/api/services').then(setServices).catch(() => {});
-      apiFetch('/api/stats').then(setStats).catch(() => {});
-    }, 15000);
-    return () => clearInterval(interval);
-  }, []);
+  const { path, segments } = parseRoute(route);
+  const navItems = [
+    { id: '/', label: 'Services', icon: 'services' },
+    { id: '/requests', label: 'Requests', icon: 'requests' },
+    { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
+    { id: '/resources', label: 'Resources', icon: 'resources' },
+    { id: '/lambda', label: 'Lambda', icon: 'lambda' },
+    { id: '/iam', label: 'IAM', icon: 'shield' },
+    { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
+    { id: '/topology', label: 'Topology', icon: 'topology' },
+  ];
 
-  // Route matching
-  let content;
-  if (route.startsWith('#/services/') && route !== '#/services') {
-    const name = route.replace('#/services/', '');
-    content = html` + "`" + `<${ServiceDetailPage} name=${name} navigate=${navigate} stats=${stats} />` + "`" + `;
-  } else if (route === '#/requests') {
-    content = html` + "`" + `<${RequestLogPage} subscribe=${subscribe} />` + "`" + `;
-  } else if (route === '#/resources') {
-    content = html` + "`" + `<${ResourceExplorerPage} services=${services} />` + "`" + `;
-  } else if (route === '#/lambda') {
-    content = html` + "`" + `<${LambdaLogsPage} subscribe=${subscribe} />` + "`" + `;
-  } else if (route === '#/iam') {
-    content = html` + "`" + `<${IAMDebuggerPage} />` + "`" + `;
-  } else if (route === '#/mail') {
-    content = html` + "`" + `<${SESMailboxPage} />` + "`" + `;
-  } else if (route === '#/topology') {
-    content = html` + "`" + `<${TopologyPage} navigate=${navigate} />` + "`" + `;
-  } else {
-    content = html` + "`" + `<${ServicesPage} navigate=${navigate} services=${services} stats=${stats} />` + "`" + `;
+  const activePath = '/' + (segments[0] || '');
+
+  function renderPage() {
+    if (segments[0] === 'requests' && segments[1]) {
+      return html'<${RequestDetailPage} id=${segments[1]} showToast=${showToast} />';
+    }
+    switch(activePath) {
+      case '/requests': return html'<${RequestsPage} sse=${sse} showToast=${showToast} />';
+      case '/dynamodb': return html'<${DynamoDBPage} showToast=${showToast} />';
+      case '/resources': return html'<${ResourcesPage} services=${services} />';
+      case '/lambda': return html'<${LambdaPage} sse=${sse} />';
+      case '/iam': return html'<${IAMPage} showToast=${showToast} />';
+      case '/mail': return html'<${MailPage} />';
+      case '/topology': return html'<${TopologyPage} />';
+      default: return html'<${ServicesPage} services=${services} stats=${stats} health=${health} />';
+    }
   }
 
-  return html` + "`" + `
-    <div id="app" style="display:flex;flex-direction:column;height:100vh">
-      <div class="header">
-        <div class="header-brand">
-          ${Icons.cloud}
-          cloud<span>mock</span>
+  return html'
+    <div class="layout">
+      <header class="header">
+        <div class="header-logo">
+          ${icons.cloud}
+          <span>cloudmock</span>
         </div>
-        <div class="header-right">
-          <div class="sse-badge" id="sse-badge">
-            <div class="sse-dot ${connected ? 'connected' : 'disconnected'}" id="sse-dot"></div>
-            <span id="sse-text">${connected ? 'Connected' : 'Disconnected'}</span>
-          </div>
-          <div id="health-badge" class="sse-badge">
-            <div class="sse-dot ${services.length > 0 ? 'connected' : ''}" id="health-dot"></div>
-            <span id="health-text">${services.every(s => s.healthy) ? 'Healthy' : 'Degraded'}</span>
-          </div>
-          <div class="cmd-k-hint" onClick=${() => setPaletteOpen(true)}>
-            ${Icons.search}
-            <kbd>${navigator.platform.includes('Mac') ? 'Cmd+K' : 'Ctrl+K'}</kbd>
-          </div>
+        <div class="header-spacer" />
+        <div class="header-badge" id="health-badge">
+          <span class="dot ${health && health.status === 'healthy' ? 'dot-green' : 'dot-yellow'}" id="health-dot"></span>
+          <span>${health ? (health.status === 'healthy' ? 'Healthy' : 'Degraded') : '...'}</span>
         </div>
-      </div>
-      <div class="body-layout">
-        <${Sidebar} route=${route} navigate=${navigate} emailCount=${emailCount} />
-        <main class="main-content">
-          ${content}
+        <div class="header-badge" id="sse-badge">
+          <span class="dot ${sse.connected ? 'dot-green' : 'dot-red'}" id="sse-dot"></span>
+          <span>${sse.connected ? 'Connected' : 'Disconnected'}</span>
+        </div>
+        <button class="cmd-k-btn" onclick=${() => setPaletteOpen(true)}>
+          ${icons.search} Search <kbd>Cmd+K</kbd>
+        </button>
+      </header>
+
+      <div class="body-wrap">
+        <nav class="sidebar">
+          ${navItems.map(item => html'
+            <a class="nav-item ${activePath === item.id ? 'active' : ''}"
+               href=${'#' + item.id}
+               onclick=${(e) => { e.preventDefault(); location.hash = item.id; }}>
+              ${icons[item.icon]}
+              <span>${item.label}</span>
+              ${item.badge ? html'<span class="nav-badge">${item.badge}</span>' : null}
+            </a>
+          ')}
+          <div class="nav-divider" />
+          <div class="nav-footer">
+            <div>v0.1.0</div>
+            <div>${services.length} services</div>
+          </div>
+        </nav>
+
+        <main class="main">
+          ${renderPage()}
         </main>
       </div>
-      <${CommandPalette} open=${paletteOpen} onClose=${() => setPaletteOpen(false)} navigate=${navigate} services=${services} />
+
+      ${paletteOpen && html'<${CommandPalette} services=${services} onClose=${() => setPaletteOpen(false)} />'}
+      <${Toast} message=${toast} />
     </div>
-  ` + "`" + `;
+  ';
 }
 
-render(html` + "`" + `<${App} />` + "`" + `, document.getElementById('app'));
+// ─── Services Page ─────────────────────────────────────────────
+function ServicesPage({ services, stats, health }) {
+  const [search, setSearch] = useState('');
+
+  const filtered = useMemo(() => {
+    if (!search) return services;
+    const q = search.toLowerCase();
+    return services.filter(s => s.name.toLowerCase().includes(q));
+  }, [services, search]);
+
+  const totalRequests = useMemo(() => {
+    if (!stats || !stats.services) return 0;
+    return Object.values(stats.services).reduce((sum, s) => sum + (s.total || 0), 0);
+  }, [stats]);
+
+  const healthyCount = useMemo(() => {
+    if (!health || !health.services) return 0;
+    return Object.values(health.services).filter(Boolean).length;
+  }, [health]);
+
+  return html'
+    <div>
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="page-title">Services</h1>
+          <p class="page-desc">Registered AWS service mocks</p>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-label">Total Services</div>
+          <div class="stat-value">${services.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Total Requests</div>
+          <div class="stat-value">${totalRequests.toLocaleString()}</div>
+          <div class="stat-sub">Requests/min tracked in /api/stats</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Healthy</div>
+          <div class="stat-value">${healthyCount} / ${services.length}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Uptime</div>
+          <div class="stat-value">100%%</div>
+        </div>
+      </div>
+
+      <div class="mb-4">
+        <input class="input input-search" style="width:320px" placeholder="Filter services..."
+               value=${search} onInput=${(e) => setSearch(e.target.value)} />
+      </div>
+
+      <div class="services-grid">
+        ${filtered.map(svc => {
+          const tier = svc.action_count > 5 ? 'T1' : 'T2';
+          return html'
+            <div class="svc-card" onclick=${() => location.hash = '/resources?service=' + svc.name}>
+              <div class="svc-card-head">
+                <span class="svc-card-name">${svc.name}</span>
+                <span class="svc-card-tier ${tier === 'T1' ? 'tier-t1' : 'tier-t2'}">${tier}</span>
+                <div class="svc-card-status">
+                  <span class="dot ${svc.healthy ? 'dot-green' : 'dot-red'}"></span>
+                  ${svc.healthy ? 'Healthy' : 'Unhealthy'}
+                </div>
+              </div>
+              <div class="svc-card-meta">
+                <span>${svc.action_count} actions</span>
+              </div>
+            </div>
+          ';
+        })}
+      </div>
+    </div>
+  ';
+}
+
+// ─── Requests Page ─────────────────────────────────────────────
+function RequestsPage({ sse, showToast }) {
+  const [requests, setRequests] = useState([]);
+  const [expanded, setExpanded] = useState(null);
+  const [drawer, setDrawer] = useState(null);
+  const [svcFilter, setSvcFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [textFilter, setTextFilter] = useState('');
+  const [services, setServices] = useState([]);
+  const [detailTab, setDetailTab] = useState('overview');
+
+  useEffect(() => {
+    api('/api/requests?limit=200').then(setRequests).catch(() => {});
+    api('/api/services').then(s => setServices(s.map(x => x.name).sort())).catch(() => {});
+  }, []);
+
+  // Merge SSE events
+  useEffect(() => {
+    if (sse.events.length === 0) return;
+    const latest = sse.events[0];
+    if (latest && latest.type === 'request' && latest.data) {
+      setRequests(prev => [latest.data, ...prev].slice(0, 500));
+    }
+  }, [sse.events]);
+
+  const filtered = useMemo(() => {
+    return requests.filter(r => {
+      if (svcFilter && r.service !== svcFilter) return false;
+      if (statusFilter) {
+        const s = String(r.status);
+        if (statusFilter === '2xx' && !s.startsWith('2')) return false;
+        if (statusFilter === '4xx' && !s.startsWith('4')) return false;
+        if (statusFilter === '5xx' && !s.startsWith('5')) return false;
+      }
+      if (textFilter) {
+        const q = textFilter.toLowerCase();
+        const haystack = (r.service + ' ' + r.action + ' ' + r.method + ' ' + (r.id || '')).toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [requests, svcFilter, statusFilter, textFilter]);
+
+  function toggleExpand(id) {
+    setExpanded(prev => prev === id ? null : id);
+  }
+
+  function openDrawer(e, req) {
+    e.stopPropagation();
+    setDrawer(req);
+  }
+
+  function replayRequest(id) {
+    api('/api/requests/' + id + '/replay', { method: 'POST' })
+      .then(() => showToast('Request replayed'))
+      .catch(() => showToast('Replay failed'));
+  }
+
+  function renderDetail(req, tab) {
+    if (!req) return null;
+    switch(tab) {
+      case 'request':
+        return html'
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="section-title" style="margin:0">Request Body</span>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.request_body || req.body || '', null, 2)); showToast('Copied'); }}>
+                ${icons.copy} Copy
+              </button>
+            </div>
+            <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(req.request_body || req.body || '(empty)') }}></div>
+          </div>
+        ';
+      case 'response':
+        return html'
+          <div>
+            <div class="flex items-center justify-between mb-4">
+              <span class="section-title" style="margin:0">Response Body</span>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.response_body || '', null, 2)); showToast('Copied'); }}>
+                ${icons.copy} Copy
+              </button>
+            </div>
+            <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(req.response_body || '(empty)') }}></div>
+          </div>
+        ';
+      case 'timing':
+        return html'
+          <div>
+            <table>
+              <tbody>
+                <tr><td style="font-weight:600;width:150px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        ';
+      default:
+        return html'
+          <div>
+            <table>
+              <tbody>
+                <tr><td style="font-weight:600;width:150px">Method</td><td>${req.method || 'POST'}</td></tr>
+                <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
+                <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
+                <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
+                <tr><td style="font-weight:600">Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
+                <tr><td style="font-weight:600">Request ID</td><td class="font-mono text-sm">${req.id || ''}</td></tr>
+                <tr><td style="font-weight:600">Time</td><td>${req.timestamp || req.time || ''}</td></tr>
+              </tbody>
+            </table>
+          </div>
+        ';
+    }
+  }
+
+  return html'
+    <div>
+      <div class="flex items-center justify-between mb-6">
+        <div>
+          <h1 class="page-title">Request Log</h1>
+          <p class="page-desc">All API requests to cloudmock services</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" onclick=${() => api('/api/requests?limit=200').then(setRequests)}>
+          ${icons.refresh} Refresh
+        </button>
+      </div>
+
+      <div class="filters-bar">
+        <select class="select" id="service-filter" value=${svcFilter}
+                onchange=${(e) => setSvcFilter(e.target.value)}>
+          <option value="">All Services</option>
+          ${services.map(s => html'<option value=${s}>${s}</option>')}
+        </select>
+        <select class="select" value=${statusFilter}
+                onchange=${(e) => setStatusFilter(e.target.value)}>
+          <option value="">All Status</option>
+          <option value="2xx">2xx Success</option>
+          <option value="4xx">4xx Client Error</option>
+          <option value="5xx">5xx Server Error</option>
+        </select>
+        <input class="input input-search" placeholder="Search requests..."
+               value=${textFilter} onInput=${(e) => setTextFilter(e.target.value)} />
+        <span class="text-sm text-muted ml-auto">${filtered.length} requests</span>
+      </div>
+
+      <div class="card">
+        <div class="table-wrap">
+          <table id="requests-table">
+            <thead>
+              <tr>
+                <th style="width:100px">Time</th>
+                <th>Service</th>
+                <th>Action</th>
+                <th style="width:80px">Status</th>
+                <th style="width:80px">Latency</th>
+                <th style="width:40px"></th>
+              </tr>
+            </thead>
+            <tbody id="requests-tbody">
+              ${filtered.length === 0 ? html'
+                <tr><td colspan="6" class="empty-state">No requests recorded yet</td></tr>
+              ' : filtered.map(req => html'
+                <${Fragment} key=${req.id || Math.random()}>
+                  <tr class="clickable ${expanded === req.id ? 'expanded' : ''}"
+                      onclick=${() => toggleExpand(req.id)}>
+                    <td class="font-mono text-sm">${fmtTime(req.timestamp || req.time)}</td>
+                    <td><span style="font-weight:600">${req.service}</span></td>
+                    <td class="font-mono text-sm">${req.action}</td>
+                    <td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td>
+                    <td class="font-mono text-sm">${fmtDuration(req.latency_ms || req.duration_ms)}</td>
+                    <td>
+                      <button class="btn-icon btn-sm btn-ghost" title="Open in drawer"
+                              onclick=${(e) => openDrawer(e, req)}>
+                        ${icons.expand}
+                      </button>
+                    </td>
+                  </tr>
+                  ${expanded === req.id && html'
+                    <tr>
+                      <td colspan="6" style="padding:0">
+                        <div class="req-expand">
+                          <div class="req-expand-inner">
+                            <div class="tabs" style="padding:0 16px">
+                              ${['overview','request','response','timing'].map(t => html'
+                                <button class="tab ${detailTab === t ? 'active' : ''}"
+                                        onclick=${() => setDetailTab(t)}>
+                                  ${t.charAt(0).toUpperCase() + t.slice(1)}
+                                </button>
+                              ')}
+                            </div>
+                            <div class="req-expand-body">
+                              ${renderDetail(req, detailTab)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  '}
+                <//>
+              ')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      ${drawer && html'
+        <div class="drawer-backdrop" onclick=${() => setDrawer(null)}>
+          <div class="drawer" onclick=${(e) => e.stopPropagation()}>
+            <div class="drawer-header">
+              <h3 style="font-size:16px;font-weight:700">Request Detail</h3>
+              <div class="flex gap-2">
+                <button class="btn btn-sm btn-ghost" onclick=${() => replayRequest(drawer.id)}>
+                  ${icons.play} Replay
+                </button>
+                <a class="btn btn-sm btn-secondary" href=${'#/requests/' + drawer.id}
+                   style="text-decoration:none;color:white">
+                  Full Page
+                </a>
+                <button class="btn-icon btn-sm btn-ghost" onclick=${() => setDrawer(null)}>
+                  ${icons.x}
+                </button>
+              </div>
+            </div>
+            <div class="drawer-body">
+              <div class="tabs">
+                ${['overview','request','response','timing'].map(t => html'
+                  <button class="tab ${detailTab === t ? 'active' : ''}"
+                          onclick=${() => setDetailTab(t)}>
+                    ${t.charAt(0).toUpperCase() + t.slice(1)}
+                  </button>
+                ')}
+              </div>
+              ${renderDetail(drawer, detailTab)}
+            </div>
+          </div>
+        </div>
+      '}
+    </div>
+  ';
+}
+
+// ─── Request Detail Page ───────────────────────────────────────
+function RequestDetailPage({ id, showToast }) {
+  const [req, setReq] = useState(null);
+  const [tab, setTab] = useState('overview');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setLoading(true);
+    api('/api/requests/' + id).then(r => { setReq(r); setLoading(false); }).catch(() => setLoading(false));
+  }, [id]);
+
+  if (loading) return html'<div class="empty-state">Loading...</div>';
+  if (!req) return html'<div class="empty-state">Request not found</div>';
+
+  function renderBody(body, label) {
+    return html'
+      <div>
+        <div class="flex items-center justify-between mb-4">
+          <span class="section-title" style="margin:0">${label}</span>
+          <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(body || '', null, 2)); showToast('Copied'); }}>
+            ${icons.copy} Copy
+          </button>
+        </div>
+        <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(body || '(empty)') }}></div>
+      </div>
+    ';
+  }
+
+  return html'
+    <div>
+      <div class="flex items-center gap-3 mb-6">
+        <a href="#/requests" class="btn btn-ghost btn-sm">Back</a>
+        <div>
+          <h1 class="page-title">${req.service} / ${req.action}</h1>
+          <p class="page-desc font-mono">${id}</p>
+        </div>
+        <div class="ml-auto">
+          <span class="status-pill ${statusClass(req.status)}" style="font-size:16px;padding:4px 14px">${req.status}</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="tabs" style="padding:0 20px">
+          ${['overview','request','response','timing'].map(t => html'
+            <button class="tab ${tab === t ? 'active' : ''}" onclick=${() => setTab(t)}>
+              ${t.charAt(0).toUpperCase() + t.slice(1)}
+            </button>
+          ')}
+        </div>
+        <div class="card-body">
+          ${tab === 'overview' && html'
+            <table>
+              <tbody>
+                <tr><td style="font-weight:600;width:160px">Method</td><td>${req.method || 'POST'}</td></tr>
+                <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
+                <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
+                <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
+                <tr><td style="font-weight:600">Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
+              </tbody>
+            </table>
+          '}
+          ${tab === 'request' && renderBody(req.request_body || req.body, 'Request Body')}
+          ${tab === 'response' && renderBody(req.response_body, 'Response Body')}
+          ${tab === 'timing' && html'
+            <table>
+              <tbody>
+                <tr><td style="font-weight:600;width:160px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
+              </tbody>
+            </table>
+          '}
+        </div>
+      </div>
+    </div>
+  ';
+}
+
+// ─── DynamoDB Page ─────────────────────────────────────────────
+function DynamoDBPage({ showToast }) {
+  const [tables, setTables] = useState([]);
+  const [selectedTable, setSelectedTable] = useState(null);
+  const [tableDesc, setTableDesc] = useState(null);
+  const [items, setItems] = useState([]);
+  const [itemCount, setItemCount] = useState(0);
+  const [page, setPage] = useState(0);
+  const [lastKeys, setLastKeys] = useState([]);
+  const [tableSearch, setTableSearch] = useState('');
+  const [activeTab, setActiveTab] = useState('browse');
+  const [editModal, setEditModal] = useState(null);
+  const [createModal, setCreateModal] = useState(false);
+  const [createTableModal, setCreateTableModal] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [queryMode, setQueryMode] = useState('scan');
+  const [queryExpr, setQueryExpr] = useState('');
+  const [filterExpr, setFilterExpr] = useState('');
+  const [exprAttrValues, setExprAttrValues] = useState('{}');
+  const [queryResults, setQueryResults] = useState(null);
+  const [newTableName, setNewTableName] = useState('');
+  const [newTablePK, setNewTablePK] = useState('id');
+  const [newTablePKType, setNewTablePKType] = useState('S');
+  const [newTableSK, setNewTableSK] = useState('');
+  const [newTableSKType, setNewTableSKType] = useState('S');
+  const [itemJson, setItemJson] = useState('{}');
+  const PAGE_SIZE = 25;
+
+  function loadTables() {
+    ddbRequest('ListTables', {}).then(r => {
+      setTables(r.TableNames || []);
+    }).catch(() => {});
+  }
+
+  useEffect(() => { loadTables(); }, []);
+
+  function selectTable(name) {
+    setSelectedTable(name);
+    setPage(0);
+    setLastKeys([]);
+    setActiveTab('browse');
+    ddbRequest('DescribeTable', { TableName: name }).then(r => {
+      setTableDesc(r.Table);
+    }).catch(() => {});
+    scanItems(name, null);
+  }
+
+  function scanItems(tableName, exclusiveStartKey) {
+    const params = { TableName: tableName, Limit: PAGE_SIZE };
+    if (exclusiveStartKey) params.ExclusiveStartKey = exclusiveStartKey;
+    ddbRequest('Scan', params).then(r => {
+      setItems(r.Items || []);
+      setItemCount(r.Count || 0);
+      if (r.LastEvaluatedKey) {
+        setLastKeys(prev => [...prev, r.LastEvaluatedKey]);
+      }
+    }).catch(() => setItems([]));
+  }
+
+  function nextPage() {
+    const lastKey = lastKeys[page];
+    if (!lastKey) return;
+    setPage(p => p + 1);
+    scanItems(selectedTable, lastKey);
+  }
+
+  function prevPage() {
+    if (page <= 0) return;
+    const newPage = page - 1;
+    setPage(newPage);
+    if (newPage === 0) {
+      scanItems(selectedTable, null);
+    } else {
+      scanItems(selectedTable, lastKeys[newPage - 1]);
+    }
+  }
+
+  function deleteItem(item) {
+    if (!tableDesc) return;
+    const key = {};
+    tableDesc.KeySchema.forEach(k => {
+      key[k.AttributeName] = item[k.AttributeName];
+    });
+    ddbRequest('DeleteItem', { TableName: selectedTable, Key: key }).then(() => {
+      showToast('Item deleted');
+      scanItems(selectedTable, null);
+      setPage(0);
+      setLastKeys([]);
+      setEditModal(null);
+    }).catch(() => showToast('Delete failed'));
+  }
+
+  function saveItem(jsonStr) {
+    try {
+      const item = JSON.parse(jsonStr);
+      ddbRequest('PutItem', { TableName: selectedTable, Item: item }).then(() => {
+        showToast('Item saved');
+        scanItems(selectedTable, null);
+        setPage(0);
+        setLastKeys([]);
+        setEditModal(null);
+        setCreateModal(false);
+      }).catch(() => showToast('Save failed'));
+    } catch(e) {
+      showToast('Invalid JSON');
+    }
+  }
+
+  function createTable() {
+    const params = {
+      TableName: newTableName,
+      KeySchema: [{ AttributeName: newTablePK, KeyType: 'HASH' }],
+      AttributeDefinitions: [{ AttributeName: newTablePK, AttributeType: newTablePKType }],
+      BillingMode: 'PAY_PER_REQUEST',
+    };
+    if (newTableSK) {
+      params.KeySchema.push({ AttributeName: newTableSK, KeyType: 'RANGE' });
+      params.AttributeDefinitions.push({ AttributeName: newTableSK, AttributeType: newTableSKType });
+    }
+    ddbRequest('CreateTable', params).then(() => {
+      showToast('Table created');
+      loadTables();
+      setCreateTableModal(false);
+      setNewTableName('');
+      setNewTablePK('id');
+      setNewTableSK('');
+    }).catch(() => showToast('Create table failed'));
+  }
+
+  function deleteTable(name) {
+    ddbRequest('DeleteTable', { TableName: name }).then(() => {
+      showToast('Table deleted');
+      loadTables();
+      if (selectedTable === name) {
+        setSelectedTable(null);
+        setItems([]);
+        setTableDesc(null);
+      }
+      setDeleteConfirm(null);
+    }).catch(() => showToast('Delete table failed'));
+  }
+
+  function runQuery() {
+    let params = { TableName: selectedTable, Limit: PAGE_SIZE };
+    try {
+      if (exprAttrValues && exprAttrValues !== '{}') {
+        params.ExpressionAttributeValues = JSON.parse(exprAttrValues);
+      }
+    } catch(e) { showToast('Invalid expression attribute values JSON'); return; }
+
+    if (queryMode === 'query') {
+      if (!queryExpr) { showToast('Key condition expression required'); return; }
+      params.KeyConditionExpression = queryExpr;
+      if (filterExpr) params.FilterExpression = filterExpr;
+      ddbRequest('Query', params).then(r => {
+        setQueryResults(r.Items || []);
+      }).catch(e => showToast('Query failed'));
+    } else {
+      if (filterExpr) params.FilterExpression = filterExpr;
+      ddbRequest('Scan', params).then(r => {
+        setQueryResults(r.Items || []);
+      }).catch(e => showToast('Scan failed'));
+    }
+  }
+
+  const filteredTables = useMemo(() => {
+    if (!tableSearch) return tables;
+    const q = tableSearch.toLowerCase();
+    return tables.filter(t => t.toLowerCase().includes(q));
+  }, [tables, tableSearch]);
+
+  const columns = useMemo(() => {
+    if (!items || items.length === 0) return [];
+    const cols = new Set();
+    items.forEach(item => Object.keys(item).forEach(k => cols.add(k)));
+    // Put key attributes first
+    const keyAttrs = tableDesc ? tableDesc.KeySchema.map(k => k.AttributeName) : [];
+    const sorted = [...keyAttrs.filter(k => cols.has(k)), ...[...cols].filter(k => !keyAttrs.includes(k)).sort()];
+    return sorted;
+  }, [items, tableDesc]);
+
+  function formatDDBValue(val) {
+    if (!val) return '';
+    if (val.S !== undefined) return val.S;
+    if (val.N !== undefined) return val.N;
+    if (val.BOOL !== undefined) return String(val.BOOL);
+    if (val.NULL) return 'null';
+    if (val.L) return JSON.stringify(val.L);
+    if (val.M) return JSON.stringify(val.M);
+    if (val.SS) return val.SS.join(', ');
+    if (val.NS) return val.NS.join(', ');
+    return JSON.stringify(val);
+  }
+
+  return html'
+    <div class="ddb-layout">
+      <div class="ddb-sidebar">
+        <div class="ddb-sidebar-header">
+          <div class="flex items-center justify-between mb-4">
+            <span style="font-weight:700;font-size:15px">Tables</span>
+            <button class="btn btn-primary btn-sm" onclick=${() => setCreateTableModal(true)}>
+              ${icons.plus} New
+            </button>
+          </div>
+          <input class="input input-search w-full" placeholder="Filter tables..."
+                 value=${tableSearch} onInput=${(e) => setTableSearch(e.target.value)} style="height:32px;font-size:13px" />
+        </div>
+        <div class="ddb-sidebar-list">
+          ${filteredTables.length === 0 ? html'
+            <div style="padding:24px;text-align:center;color:var(--n400);font-size:13px">No tables found</div>
+          ' : filteredTables.map(t => html'
+            <div class="ddb-table-item ${selectedTable === t ? 'active' : ''}"
+                 onclick=${() => selectTable(t)}>
+              <span class="name">${t}</span>
+            </div>
+          ')}
+        </div>
+      </div>
+
+      <div class="ddb-main">
+        ${!selectedTable ? html'
+          <div class="empty-state">
+            ${icons.database}
+            <div>Select a table to browse items</div>
+          </div>
+        ' : html'
+          <div>
+            <div class="ddb-header">
+              <div>
+                <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">${selectedTable}</h2>
+                ${tableDesc && html'
+                  <div class="ddb-key-schema">
+                    ${tableDesc.KeySchema.map(k => html'
+                      <span>${k.AttributeName} (${k.KeyType})</span>
+                    ')}
+                    <span style="color:var(--n400)">${tableDesc.ItemCount || 0} items</span>
+                  </div>
+                '}
+              </div>
+              <div class="flex gap-2">
+                <button class="btn btn-primary btn-sm" onclick=${() => {
+                  const template = {};
+                  if (tableDesc) {
+                    tableDesc.KeySchema.forEach(k => {
+                      const attrDef = tableDesc.AttributeDefinitions.find(a => a.AttributeName === k.AttributeName);
+                      const type = attrDef ? attrDef.AttributeType : 'S';
+                      template[k.AttributeName] = { [type]: '' };
+                    });
+                  }
+                  setItemJson(JSON.stringify(template, null, 2));
+                  setCreateModal(true);
+                }}>
+                  ${icons.plus} New Item
+                </button>
+                <button class="btn btn-ghost btn-sm" onclick=${() => scanItems(selectedTable, null)}>
+                  ${icons.refresh} Refresh
+                </button>
+                <button class="btn btn-danger btn-sm" onclick=${() => setDeleteConfirm(selectedTable)}>
+                  ${icons.trash} Delete Table
+                </button>
+              </div>
+            </div>
+
+            <div class="tabs">
+              <button class="tab ${activeTab === 'browse' ? 'active' : ''}" onclick=${() => setActiveTab('browse')}>Browse Items</button>
+              <button class="tab ${activeTab === 'query' ? 'active' : ''}" onclick=${() => setActiveTab('query')}>Query / Scan</button>
+              <button class="tab ${activeTab === 'info' ? 'active' : ''}" onclick=${() => setActiveTab('info')}>Table Info</button>
+            </div>
+
+            ${activeTab === 'browse' && html'
+              <div>
+                <div class="card">
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr>
+                          ${columns.map(c => html'<th>${c}</th>')}
+                          <th style="width:40px"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${items.length === 0 ? html'
+                          <tr><td colspan=${columns.length + 1} class="empty-state">No items</td></tr>
+                        ' : items.map((item, idx) => html'
+                          <tr class="clickable" onclick=${() => {
+                            setItemJson(JSON.stringify(item, null, 2));
+                            setEditModal(item);
+                          }}>
+                            ${columns.map(c => html'
+                              <td class="font-mono text-sm truncate" style="max-width:250px">${formatDDBValue(item[c])}</td>
+                            ')}
+                            <td>
+                              <button class="btn-icon btn-sm btn-ghost" title="Edit"
+                                      onclick=${(e) => { e.stopPropagation(); setItemJson(JSON.stringify(item, null, 2)); setEditModal(item); }}>
+                                ${icons.expand}
+                              </button>
+                            </td>
+                          </tr>
+                        ')}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div class="pagination">
+                  <button onclick=${prevPage} disabled=${page === 0}>Previous</button>
+                  <span class="page-info">Page ${page + 1}</span>
+                  <button onclick=${nextPage} disabled=${!lastKeys[page]}>Next</button>
+                </div>
+              </div>
+            '}
+
+            ${activeTab === 'query' && html'
+              <div>
+                <div class="card" style="margin-bottom:16px">
+                  <div class="card-body">
+                    <div class="flex gap-3 mb-4">
+                      <button class="btn btn-sm ${queryMode === 'query' ? 'btn-secondary' : 'btn-ghost'}"
+                              onclick=${() => setQueryMode('query')}>Query</button>
+                      <button class="btn btn-sm ${queryMode === 'scan' ? 'btn-secondary' : 'btn-ghost'}"
+                              onclick=${() => setQueryMode('scan')}>Scan</button>
+                    </div>
+                    ${queryMode === 'query' && html'
+                      <div class="mb-4">
+                        <div class="label">Key Condition Expression</div>
+                        <input class="input w-full" placeholder="pk = :pk AND sk BEGINS_WITH :prefix"
+                               value=${queryExpr} onInput=${(e) => setQueryExpr(e.target.value)} />
+                      </div>
+                    '}
+                    <div class="mb-4">
+                      <div class="label">Filter Expression</div>
+                      <input class="input w-full" placeholder="attribute_exists(name)"
+                             value=${filterExpr} onInput=${(e) => setFilterExpr(e.target.value)} />
+                    </div>
+                    <div class="mb-4">
+                      <div class="label">Expression Attribute Values (JSON)</div>
+                      <textarea class="textarea" style="min-height:80px" value=${exprAttrValues}
+                                onInput=${(e) => setExprAttrValues(e.target.value)}></textarea>
+                    </div>
+                    <div class="flex gap-2">
+                      <button class="btn btn-primary btn-sm" onclick=${runQuery}>
+                        ${icons.play} Run ${queryMode === 'query' ? 'Query' : 'Scan'}
+                      </button>
+                      ${queryResults && html'
+                        <button class="btn btn-ghost btn-sm" onclick=${() => {
+                          copyToClipboard(JSON.stringify(queryResults, null, 2));
+                          showToast('Exported to clipboard');
+                        }}>Export JSON</button>
+                      '}
+                    </div>
+                  </div>
+                </div>
+
+                ${queryResults && html'
+                  <div class="card">
+                    <div class="card-header">
+                      <span style="font-weight:600">${queryResults.length} results</span>
+                    </div>
+                    <div class="card-body">
+                      <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(queryResults) }}></div>
+                    </div>
+                  </div>
+                '}
+              </div>
+            '}
+
+            ${activeTab === 'info' && tableDesc && html'
+              <div class="card">
+                <div class="card-body">
+                  <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(tableDesc) }}></div>
+                </div>
+              </div>
+            '}
+          </div>
+        '}
+      </div>
+
+      ${editModal && html'
+        <div class="modal-backdrop" onclick=${() => setEditModal(null)}>
+          <div class="modal modal-lg" onclick=${(e) => e.stopPropagation()}>
+            <div class="modal-header">
+              <h3>Edit Item</h3>
+              <button class="btn-icon btn-sm btn-ghost" onclick=${() => setEditModal(null)}>${icons.x}</button>
+            </div>
+            <div class="modal-body">
+              <textarea class="textarea" style="min-height:300px" value=${itemJson}
+                        onInput=${(e) => setItemJson(e.target.value)}></textarea>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-danger btn-sm" onclick=${() => deleteItem(editModal)}>Delete</button>
+              <button class="btn btn-ghost btn-sm" onclick=${() => setEditModal(null)}>Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick=${() => saveItem(itemJson)}>Save</button>
+            </div>
+          </div>
+        </div>
+      '}
+
+      ${createModal && html'
+        <div class="modal-backdrop" onclick=${() => setCreateModal(false)}>
+          <div class="modal modal-lg" onclick=${(e) => e.stopPropagation()}>
+            <div class="modal-header">
+              <h3>New Item</h3>
+              <button class="btn-icon btn-sm btn-ghost" onclick=${() => setCreateModal(false)}>${icons.x}</button>
+            </div>
+            <div class="modal-body">
+              <textarea class="textarea" style="min-height:300px" value=${itemJson}
+                        onInput=${(e) => setItemJson(e.target.value)}></textarea>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost btn-sm" onclick=${() => setCreateModal(false)}>Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick=${() => saveItem(itemJson)}>Create</button>
+            </div>
+          </div>
+        </div>
+      '}
+
+      ${createTableModal && html'
+        <div class="modal-backdrop" onclick=${() => setCreateTableModal(false)}>
+          <div class="modal modal-md" onclick=${(e) => e.stopPropagation()}>
+            <div class="modal-header">
+              <h3>Create Table</h3>
+              <button class="btn-icon btn-sm btn-ghost" onclick=${() => setCreateTableModal(false)}>${icons.x}</button>
+            </div>
+            <div class="modal-body">
+              <div class="label">Table Name</div>
+              <input class="input w-full mb-4" value=${newTableName}
+                     onInput=${(e) => setNewTableName(e.target.value)} placeholder="my-table" />
+
+              <div class="label">Partition Key</div>
+              <div class="field-row mb-4">
+                <input class="input" value=${newTablePK}
+                       onInput=${(e) => setNewTablePK(e.target.value)} placeholder="id" />
+                <select class="select" value=${newTablePKType}
+                        onchange=${(e) => setNewTablePKType(e.target.value)}>
+                  <option value="S">String</option>
+                  <option value="N">Number</option>
+                  <option value="B">Binary</option>
+                </select>
+              </div>
+
+              <div class="label">Sort Key (optional)</div>
+              <div class="field-row">
+                <input class="input" value=${newTableSK}
+                       onInput=${(e) => setNewTableSK(e.target.value)} placeholder="sk" />
+                <select class="select" value=${newTableSKType}
+                        onchange=${(e) => setNewTableSKType(e.target.value)}>
+                  <option value="S">String</option>
+                  <option value="N">Number</option>
+                  <option value="B">Binary</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost btn-sm" onclick=${() => setCreateTableModal(false)}>Cancel</button>
+              <button class="btn btn-primary btn-sm" onclick=${createTable} disabled=${!newTableName}>Create Table</button>
+            </div>
+          </div>
+        </div>
+      '}
+
+      ${deleteConfirm && html'
+        <div class="modal-backdrop" onclick=${() => setDeleteConfirm(null)}>
+          <div class="modal modal-sm" onclick=${(e) => e.stopPropagation()}>
+            <div class="modal-header">
+              <h3>Delete Table</h3>
+              <button class="btn-icon btn-sm btn-ghost" onclick=${() => setDeleteConfirm(null)}>${icons.x}</button>
+            </div>
+            <div class="modal-body">
+              <p>Are you sure you want to delete <strong>${deleteConfirm}</strong>? This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+              <button class="btn btn-ghost btn-sm" onclick=${() => setDeleteConfirm(null)}>Cancel</button>
+              <button class="btn btn-danger btn-sm" onclick=${() => deleteTable(deleteConfirm)}>Delete</button>
+            </div>
+          </div>
+        </div>
+      '}
+    </div>
+  ';
+}
+
+// ─── Resources Page ────────────────────────────────────────────
+function ResourcesPage({ services }) {
+  const [selected, setSelected] = useState(null);
+  const [resources, setResources] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.hash.split('?')[1] || '');
+    const svc = params.get('service');
+    if (svc) selectService(svc);
+  }, []);
+
+  function selectService(name) {
+    setSelected(name);
+    setLoading(true);
+    api('/api/resources/' + name).then(r => {
+      setResources(r.resources);
+      setLoading(false);
+    }).catch(() => { setResources(null); setLoading(false); });
+  }
+
+  return html'
+    <div>
+      <div class="mb-6">
+        <h1 class="page-title">Resource Explorer</h1>
+        <p class="page-desc">Browse resources across all AWS services</p>
+      </div>
+
+      <div class="flex gap-4" style="height:calc(100vh - var(--header-height) - 120px)">
+        <div style="width:220px;flex-shrink:0;overflow-y:auto">
+          <div class="card" style="height:100%%">
+            <div class="card-body" style="padding:8px">
+              ${services.map(svc => html'
+                <div class="nav-item ${selected === svc.name ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+                     onclick=${() => selectService(svc.name)}>
+                  <span>${svc.name}</span>
+                </div>
+              ')}
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1;overflow-y:auto">
+          ${!selected ? html'
+            <div class="empty-state">Select a service to browse resources</div>
+          ' : loading ? html'
+            <div class="empty-state">Loading...</div>
+          ' : html'
+            <div class="card">
+              <div class="card-header">
+                <h3 style="font-weight:700">${selected} Resources</h3>
+              </div>
+              <div class="card-body">
+                <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(resources) }}></div>
+              </div>
+            </div>
+          '}
+        </div>
+      </div>
+    </div>
+  ';
+}
+
+// ─── Lambda Page ───────────────────────────────────────────────
+function LambdaPage({ sse }) {
+  const [logs, setLogs] = useState([]);
+  const [functions, setFunctions] = useState([]);
+  const [selected, setSelected] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    loadLogs('');
+  }, []);
+
+  function loadLogs(fn) {
+    const params = new URLSearchParams();
+    if (fn) params.set('function', fn);
+    params.set('limit', '100');
+    api('/api/lambda/logs?' + params.toString()).then(r => {
+      setLogs(r || []);
+      const fns = [...new Set((r || []).map(l => l.function_name).filter(Boolean))].sort();
+      setFunctions(fns);
+    }).catch(() => {});
+  }
+
+  // SSE for live lambda logs
+  useEffect(() => {
+    if (sse.events.length === 0) return;
+    const latest = sse.events[0];
+    if (latest && latest.type === 'lambda_log' && latest.data) {
+      setLogs(prev => [latest.data, ...prev].slice(0, 500));
+    }
+  }, [sse.events]);
+
+  function selectFunction(fn) {
+    setSelected(fn);
+    loadLogs(fn);
+  }
+
+  const filtered = useMemo(() => {
+    if (!search) return logs;
+    const q = search.toLowerCase();
+    return logs.filter(l => (l.message || '').toLowerCase().includes(q) || (l.function_name || '').toLowerCase().includes(q));
+  }, [logs, search]);
+
+  return html'
+    <div>
+      <div class="mb-6">
+        <h1 class="page-title">Lambda Logs</h1>
+        <p class="page-desc">Function execution logs and metrics</p>
+      </div>
+
+      <div class="flex gap-4" style="height:calc(100vh - var(--header-height) - 120px)">
+        <div style="width:220px;flex-shrink:0">
+          <div class="card" style="height:100%%">
+            <div class="card-header" style="padding:12px 16px">
+              <span style="font-weight:600;font-size:14px">Functions</span>
+            </div>
+            <div class="card-body" style="padding:4px 8px;overflow-y:auto" id="lambda-filter">
+              <div class="nav-item ${!selected ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+                   onclick=${() => selectFunction('')}>All Functions</div>
+              ${functions.map(fn => html'
+                <div class="nav-item ${selected === fn ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+                     onclick=${() => selectFunction(fn)}>
+                  <span class="truncate">${fn}</span>
+                </div>
+              ')}
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+          <div class="filters-bar">
+            <input class="input input-search" placeholder="Search logs..." style="flex:1"
+                   value=${search} onInput=${(e) => setSearch(e.target.value)} />
+            <button class="btn btn-ghost btn-sm" onclick=${() => loadLogs(selected)}>
+              ${icons.refresh} Refresh
+            </button>
+          </div>
+          <div class="card" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+            <div class="table-wrap" style="flex:1;overflow-y:auto">
+              <table id="lambda-table">
+                <thead>
+                  <tr>
+                    <th style="width:100px">Time</th>
+                    <th style="width:180px">Function</th>
+                    <th style="width:120px">Request ID</th>
+                    <th>Message</th>
+                  </tr>
+                </thead>
+                <tbody id="lambda-tbody">
+                  ${filtered.length === 0 ? html'
+                    <tr><td colspan="4" class="empty-state">No logs</td></tr>
+                  ' : filtered.map(l => html'
+                    <tr class="${l.stream === 'stderr' ? 'stderr' : ''}">
+                      <td class="font-mono text-sm">${fmtTime(l.timestamp || l.time)}</td>
+                      <td class="truncate" style="max-width:180px">${l.function_name || ''}</td>
+                      <td class="font-mono text-sm truncate" style="max-width:120px">${l.request_id || ''}</td>
+                      <td class="font-mono text-sm ${l.stream === 'stderr' ? 'stderr' : ''}" style="white-space:pre-wrap">${l.message || ''}</td>
+                    </tr>
+                  ')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ';
+}
+
+// ─── IAM Page ──────────────────────────────────────────────────
+function IAMPage({ showToast }) {
+  const [principal, setPrincipal] = useState('');
+  const [action, setAction] = useState('');
+  const [resource, setResource] = useState('');
+  const [result, setResult] = useState(null);
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  function evaluate() {
+    if (!principal || !action || !resource) {
+      showToast('All fields are required');
+      return;
+    }
+    setLoading(true);
+    fetch(ADMIN + '/api/iam/evaluate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ principal, action, resource }),
+    }).then(r => r.json()).then(r => {
+      setResult(r);
+      setHistory(prev => [{ principal, action, resource, decision: r.decision, time: new Date().toISOString() }, ...prev].slice(0, 50));
+      setLoading(false);
+    }).catch(() => { showToast('Evaluation failed'); setLoading(false); });
+  }
+
+  return html'
+    <div>
+      <div class="mb-6">
+        <h1 class="page-title">IAM Debugger</h1>
+        <p class="page-desc">Evaluate IAM policies against principals and resources</p>
+      </div>
+
+      <div class="flex gap-4">
+        <div style="flex:1">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-weight:700">Policy Evaluation</h3>
+            </div>
+            <div class="card-body">
+              <div class="mb-4">
+                <div class="label">Principal ARN</div>
+                <input class="input w-full" placeholder="arn:aws:iam::123456789012:user/admin"
+                       value=${principal} onInput=${(e) => setPrincipal(e.target.value)} />
+              </div>
+              <div class="mb-4">
+                <div class="label">Action</div>
+                <input class="input w-full" placeholder="s3:GetObject"
+                       value=${action} onInput=${(e) => setAction(e.target.value)} />
+              </div>
+              <div class="mb-4">
+                <div class="label">Resource ARN</div>
+                <input class="input w-full" placeholder="arn:aws:s3:::my-bucket/*"
+                       value=${resource} onInput=${(e) => setResource(e.target.value)} />
+              </div>
+              <button class="btn btn-primary" onclick=${evaluate} disabled=${loading}>
+                ${loading ? 'Evaluating...' : 'Evaluate'}
+              </button>
+
+              ${result && html'
+                <div class="iam-result ${result.decision === 'ALLOW' ? 'iam-allow' : 'iam-deny'}">
+                  ${result.decision}
+                </div>
+                ${result.reason && html'<p class="text-sm text-muted mb-4">${result.reason}</p>'}
+                ${result.matched_statement && html'
+                  <div>
+                    <div class="section-title">Matched Statement</div>
+                    <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(result.matched_statement) }}></div>
+                  </div>
+                '}
+              '}
+            </div>
+          </div>
+        </div>
+
+        <div style="width:360px">
+          <div class="card">
+            <div class="card-header">
+              <h3 style="font-weight:700">History</h3>
+            </div>
+            <div class="card-body" style="max-height:500px;overflow-y:auto">
+              ${history.length === 0 ? html'
+                <div class="text-sm text-muted" style="text-align:center;padding:24px">No evaluations yet</div>
+              ' : history.map(h => html'
+                <div style="padding:8px 0;border-bottom:1px solid var(--n100);font-size:13px">
+                  <div class="flex items-center gap-2">
+                    <span class="status-pill ${h.decision === 'ALLOW' ? 'status-2xx' : 'status-5xx'}" style="font-size:11px">${h.decision}</span>
+                    <span class="font-mono">${h.action}</span>
+                  </div>
+                  <div class="text-muted truncate" style="margin-top:2px">${h.resource}</div>
+                </div>
+              ')}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  ';
+}
+
+// ─── Mail Page ─────────────────────────────────────────────────
+function MailPage() {
+  const [emails, setEmails] = useState([]);
+  const [selected, setSelected] = useState(null);
+  const [detail, setDetail] = useState(null);
+
+  useEffect(() => {
+    api('/api/ses/emails').then(setEmails).catch(() => {});
+  }, []);
+
+  function viewEmail(email) {
+    setSelected(email.message_id);
+    api('/api/ses/emails/' + email.message_id).then(setDetail).catch(() => {});
+  }
+
+  return html'
+    <div>
+      <div class="mb-6">
+        <h1 class="page-title">SES Mailbox</h1>
+        <p class="page-desc">Captured email messages from /api/ses/emails</p>
+      </div>
+
+      <div class="flex gap-4">
+        <div style="flex:1">
+          ${emails.length === 0 ? html'
+            <div class="card">
+              <div class="empty-state" style="padding:48px">No emails captured yet</div>
+            </div>
+          ' : html'
+            <div class="mail-list">
+              ${emails.map(e => html'
+                <div class="mail-row ${selected === e.message_id ? 'expanded' : ''}"
+                     onclick=${() => viewEmail(e)}>
+                  <div class="mail-from truncate">${e.source || 'Unknown'}</div>
+                  <div class="mail-subject truncate">${e.subject || '(no subject)'}</div>
+                  <div class="mail-date">${e.timestamp ? fmtTime(e.timestamp) : ''}</div>
+                </div>
+              ')}
+            </div>
+          '}
+        </div>
+
+        ${detail && html'
+          <div style="width:45%%;flex-shrink:0">
+            <div class="card">
+              <div class="card-header">
+                <div style="flex:1">
+                  <h3 style="font-weight:700;font-size:16px">${detail.subject || '(no subject)'}</h3>
+                  <div class="text-sm text-muted mt-4">
+                    From: ${detail.source || ''} | To: ${(detail.to_addresses || []).join(', ')}
+                  </div>
+                </div>
+                <button class="btn-icon btn-sm btn-ghost" onclick=${() => { setDetail(null); setSelected(null); }}>${icons.x}</button>
+              </div>
+              <div class="card-body">
+                ${detail.html_body ? html'
+                  <div dangerouslySetInnerHTML=${{ __html: detail.html_body }}></div>
+                ' : html'
+                  <pre style="white-space:pre-wrap;font-size:14px">${detail.text_body || detail.body || '(empty)'}</pre>
+                '}
+              </div>
+            </div>
+          </div>
+        '}
+      </div>
+    </div>
+  ';
+}
+
+// ─── Topology Page ─────────────────────────────────────────────
+function TopologyPage() {
+  const [topology, setTopology] = useState(null);
+  const svgRef = useRef(null);
+
+  useEffect(() => {
+    api('/api/topology').then(setTopology).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!topology || !svgRef.current) return;
+    renderTopologySVG(svgRef.current, topology);
+  }, [topology]);
+
+  return html'
+    <div>
+      <div class="mb-6">
+        <h1 class="page-title">Service Topology</h1>
+        <p class="page-desc">Connections between AWS service mocks</p>
+      </div>
+      <div class="card topology-container">
+        <svg ref=${svgRef}></svg>
+      </div>
+    </div>
+  ';
+}
+
+function renderTopologySVG(svg, data) {
+  if (!data || !data.nodes || data.nodes.length === 0) {
+    svg.innerHTML = '<text x="50%%" y="50%%" text-anchor="middle" fill="#94A3B8" font-family="Figtree" font-size="16">No topology data</text>';
+    return;
+  }
+
+  const nodes = data.nodes;
+  const edges = data.edges || [];
+  const W = svg.clientWidth || 900;
+  const H = svg.clientHeight || 600;
+
+  // Simple force-directed layout (basic grid fallback)
+  const cols = Math.ceil(Math.sqrt(nodes.length));
+  const cellW = W / (cols + 1);
+  const cellH = H / (Math.ceil(nodes.length / cols) + 1);
+
+  const positions = {};
+  nodes.forEach((node, i) => {
+    const row = Math.floor(i / cols);
+    const col = i %% cols;
+    positions[node.id] = {
+      x: cellW * (col + 1),
+      y: cellH * (row + 1),
+    };
+  });
+
+  let svgContent = '<defs><marker id="arrowhead" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#94A3B8" /></marker></defs>';
+
+  // Edges
+  edges.forEach(edge => {
+    const s = positions[edge.source];
+    const t = positions[edge.target];
+    if (!s || !t) return;
+    svgContent += '<line x1="' + s.x + '" y1="' + s.y + '" x2="' + t.x + '" y2="' + t.y + '" stroke="#CBD5E1" stroke-width="1.5" marker-end="url(#arrowhead)" />';
+    const mx = (s.x + t.x) / 2;
+    const my = (s.y + t.y) / 2;
+    svgContent += '<text x="' + mx + '" y="' + (my - 6) + '" text-anchor="middle" font-size="10" fill="#94A3B8" font-family="Figtree">' + (edge.label || '') + '</text>';
+  });
+
+  // Nodes
+  nodes.forEach(node => {
+    const p = positions[node.id];
+    svgContent += '<g>';
+    svgContent += '<rect x="' + (p.x - 50) + '" y="' + (p.y - 18) + '" width="100" height="36" rx="8" fill="#0A1F44" stroke="#097FF5" stroke-width="1.5" />';
+    svgContent += '<text x="' + p.x + '" y="' + (p.y + 5) + '" text-anchor="middle" font-size="12" fill="white" font-family="Figtree" font-weight="600">' + node.name + '</text>';
+    svgContent += '</g>';
+  });
+
+  svg.innerHTML = svgContent;
+}
+
+// ─── Command Palette ───────────────────────────────────────────
+function CommandPalette({ services, onClose }) {
+  const [query, setQuery] = useState('');
+  const [activeIdx, setActiveIdx] = useState(0);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (inputRef.current) inputRef.current.focus();
+  }, []);
+
+  const commands = useMemo(() => {
+    const items = [
+      { label: 'Services', desc: 'View all services', action: () => { location.hash = '/'; onClose(); } },
+      { label: 'Requests', desc: 'Request log', action: () => { location.hash = '/requests'; onClose(); } },
+      { label: 'DynamoDB', desc: 'Table browser', action: () => { location.hash = '/dynamodb'; onClose(); } },
+      { label: 'Resources', desc: 'Resource explorer', action: () => { location.hash = '/resources'; onClose(); } },
+      { label: 'Lambda Logs', desc: 'Function logs', action: () => { location.hash = '/lambda'; onClose(); } },
+      { label: 'IAM Debugger', desc: 'Policy evaluation', action: () => { location.hash = '/iam'; onClose(); } },
+      { label: 'Mail', desc: 'SES emails', action: () => { location.hash = '/mail'; onClose(); } },
+      { label: 'Topology', desc: 'Service map', action: () => { location.hash = '/topology'; onClose(); } },
+      { label: 'Reset All Services', desc: 'Clear all state', action: () => {
+        api('/api/reset', { method: 'POST' }).then(() => { onClose(); location.reload(); });
+      }},
+    ];
+    (services || []).forEach(svc => {
+      items.push({ label: svc.name, desc: 'Service', action: () => { location.hash = '/resources?service=' + svc.name; onClose(); } });
+    });
+    if (!query) return items;
+    const q = query.toLowerCase();
+    return items.filter(i => i.label.toLowerCase().includes(q) || i.desc.toLowerCase().includes(q));
+  }, [query, services]);
+
+  function handleKeyDown(e) {
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIdx(i => Math.min(i + 1, commands.length - 1)); }
+    if (e.key === 'ArrowUp') { e.preventDefault(); setActiveIdx(i => Math.max(i - 1, 0)); }
+    if (e.key === 'Enter' && commands[activeIdx]) { commands[activeIdx].action(); }
+    if (e.key === 'Escape') { onClose(); }
+  }
+
+  return html'
+    <div class="palette-backdrop" onclick=${onClose}>
+      <div class="palette" onclick=${(e) => e.stopPropagation()}>
+        <input class="palette-input" ref=${inputRef} placeholder="Search commands, services..."
+               value=${query} onInput=${(e) => { setQuery(e.target.value); setActiveIdx(0); }}
+               onKeyDown=${handleKeyDown} />
+        <div class="palette-results">
+          ${commands.map((cmd, i) => html'
+            <div class="palette-item ${i === activeIdx ? 'active' : ''}"
+                 onclick=${cmd.action}
+                 onMouseEnter=${() => setActiveIdx(i)}>
+              <span class="label">${cmd.label}</span>
+              <span class="desc">${cmd.desc}</span>
+            </div>
+          ')}
+          ${commands.length === 0 && html'
+            <div style="padding:24px;text-align:center;color:var(--n400);font-size:14px">No results</div>
+          '}
+        </div>
+      </div>
+    </div>
+  ';
+}
+
+// ─── Mount ─────────────────────────────────────────────────────
+render(html'<${App} />', document.getElementById('app'));
 </script>
 </body>
-</html>`
+</html>
+`

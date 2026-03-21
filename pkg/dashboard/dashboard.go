@@ -5,6 +5,7 @@ package dashboard
 import (
 	"fmt"
 	"net/http"
+	"strings"
 )
 
 // Handler serves the cloudmock web dashboard as a self-contained SPA.
@@ -27,7 +28,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func buildHTML(adminPort int) string {
 	adminBase := fmt.Sprintf("http://localhost:%d", adminPort)
-	return fmt.Sprintf(htmlTemplate, adminBase)
+	result := fmt.Sprintf(htmlTemplate, adminBase)
+	// Go raw strings can't contain backticks, so the template uses ‹› as
+	// placeholders for JS template literal backticks. Replace them here.
+	result = strings.ReplaceAll(result, "\u2039", "`") // ‹ → `
+	result = strings.ReplaceAll(result, "\u203a", "`") // › → `
+	return result
 }
 
 // htmlTemplate is the complete SPA. The single %%s verb is replaced with the
@@ -580,34 +586,41 @@ function parseRoute(hash) {
   return { path, segments };
 }
 
+// ─── SVG Helper ────────────────────────────────────────────────
+// HTM tagged templates need backticks, but Go raw strings also use backticks.
+// So we use a helper that creates SVG elements from innerHTML strings.
+function svg(svgHtml) {
+  return h('span', { dangerouslySetInnerHTML: { __html: svgHtml }, style: 'display:inline-flex;align-items:center;' });
+}
+
 // ─── SVG Icons ─────────────────────────────────────────────────
 const icons = {
-  cloud: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>',
-  services: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>',
-  requests: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>',
-  database: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>',
-  resources: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>',
-  lambda: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>',
-  shield: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>',
-  mail: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>',
-  topology: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><line x1="6" y1="9" x2="6" y2="21"></line><path d="M9 6h6"></path><path d="M6 21a3 3 0 0 0 3-3V9"></path></svg>',
-  expand: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>',
-  x: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>',
-  chevDown: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>',
-  chevRight: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>',
-  search: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>',
-  plus: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>',
-  trash: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>',
-  copy: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>',
-  play: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>',
-  refresh: html'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>',
+  cloud: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path></svg>'),
+  services: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>'),
+  requests: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>'),
+  database: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>'),
+  resources: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>'),
+  lambda: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>'),
+  shield: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>'),
+  mail: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>'),
+  topology: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="18" r="3"></circle><circle cx="6" cy="6" r="3"></circle><circle cx="18" cy="6" r="3"></circle><line x1="6" y1="9" x2="6" y2="21"></line><path d="M9 6h6"></path><path d="M6 21a3 3 0 0 0 3-3V9"></path></svg>'),
+  expand: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="15 3 21 3 21 9"></polyline><polyline points="9 21 3 21 3 15"></polyline><line x1="21" y1="3" x2="14" y2="10"></line><line x1="3" y1="21" x2="10" y2="14"></line></svg>'),
+  x: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>'),
+  chevDown: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="6 9 12 15 18 9"></polyline></svg>'),
+  chevRight: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="9 18 15 12 9 6"></polyline></svg>'),
+  search: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>'),
+  plus: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>'),
+  trash: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>'),
+  copy: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>'),
+  play: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>'),
+  refresh: svg('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>'),
 };
 
 // ─── Toast ─────────────────────────────────────────────────────
 let toastTimer = null;
 function Toast({ message }) {
   if (!message) return null;
-  return html'<div class="toast">${message}</div>';
+  return html‹<div class="toast">${message}</div>›;
 }
 
 // ─── App ───────────────────────────────────────────────────────
@@ -672,21 +685,21 @@ function App() {
 
   function renderPage() {
     if (segments[0] === 'requests' && segments[1]) {
-      return html'<${RequestDetailPage} id=${segments[1]} showToast=${showToast} />';
+      return html‹<${RequestDetailPage} id=${segments[1]} showToast=${showToast} />›;
     }
     switch(activePath) {
-      case '/requests': return html'<${RequestsPage} sse=${sse} showToast=${showToast} />';
-      case '/dynamodb': return html'<${DynamoDBPage} showToast=${showToast} />';
-      case '/resources': return html'<${ResourcesPage} services=${services} />';
-      case '/lambda': return html'<${LambdaPage} sse=${sse} />';
-      case '/iam': return html'<${IAMPage} showToast=${showToast} />';
-      case '/mail': return html'<${MailPage} />';
-      case '/topology': return html'<${TopologyPage} />';
-      default: return html'<${ServicesPage} services=${services} stats=${stats} health=${health} />';
+      case '/requests': return html‹<${RequestsPage} sse=${sse} showToast=${showToast} />›;
+      case '/dynamodb': return html‹<${DynamoDBPage} showToast=${showToast} />›;
+      case '/resources': return html‹<${ResourcesPage} services=${services} />›;
+      case '/lambda': return html‹<${LambdaPage} sse=${sse} />›;
+      case '/iam': return html‹<${IAMPage} showToast=${showToast} />›;
+      case '/mail': return html‹<${MailPage} />›;
+      case '/topology': return html‹<${TopologyPage} />›;
+      default: return html‹<${ServicesPage} services=${services} stats=${stats} health=${health} />›;
     }
   }
 
-  return html'
+  return html‹
     <div class="layout">
       <header class="header">
         <div class="header-logo">
@@ -695,7 +708,7 @@ function App() {
         </div>
         <div class="header-spacer" />
         <div class="header-badge" id="health-badge">
-          <span class="dot ${health && health.status === 'healthy' ? 'dot-green' : 'dot-yellow'}" id="health-dot"></span>
+          <span class="dot ${health && health.status === ›healthy' ? 'dot-green' : 'dot-yellow'}" id="health-dot"></span>
           <span>${health ? (health.status === 'healthy' ? 'Healthy' : 'Degraded') : '...'}</span>
         </div>
         <div class="header-badge" id="sse-badge">
@@ -709,13 +722,13 @@ function App() {
 
       <div class="body-wrap">
         <nav class="sidebar">
-          ${navItems.map(item => html'
-            <a class="nav-item ${activePath === item.id ? 'active' : ''}"
+          ${navItems.map(item => html‹
+            <a class="nav-item ${activePath === item.id ? ›active' : ''}"
                href=${'#' + item.id}
                onclick=${(e) => { e.preventDefault(); location.hash = item.id; }}>
               ${icons[item.icon]}
               <span>${item.label}</span>
-              ${item.badge ? html'<span class="nav-badge">${item.badge}</span>' : null}
+              ${item.badge ? html‹<span class="nav-badge">${item.badge}</span>› : null}
             </a>
           ')}
           <div class="nav-divider" />
@@ -730,7 +743,7 @@ function App() {
         </main>
       </div>
 
-      ${paletteOpen && html'<${CommandPalette} services=${services} onClose=${() => setPaletteOpen(false)} />'}
+      ${paletteOpen && html‹<${CommandPalette} services=${services} onClose=${() => setPaletteOpen(false)} />›}
       <${Toast} message=${toast} />
     </div>
   ';
@@ -756,7 +769,7 @@ function ServicesPage({ services, stats, health }) {
     return Object.values(health.services).filter(Boolean).length;
   }, [health]);
 
-  return html'
+  return html‹
     <div>
       <div class="flex items-center justify-between mb-6">
         <div>
@@ -792,9 +805,9 @@ function ServicesPage({ services, stats, health }) {
 
       <div class="services-grid">
         ${filtered.map(svc => {
-          const tier = svc.action_count > 5 ? 'T1' : 'T2';
-          return html'
-            <div class="svc-card" onclick=${() => location.hash = '/resources?service=' + svc.name}>
+          const tier = svc.action_count > 5 ? ›T1' : 'T2';
+          return html‹
+            <div class="svc-card" onclick=${() => location.hash = ›/resources?service=' + svc.name}>
               <div class="svc-card-head">
                 <span class="svc-card-name">${svc.name}</span>
                 <span class="svc-card-tier ${tier === 'T1' ? 'tier-t1' : 'tier-t2'}">${tier}</span>
@@ -876,11 +889,11 @@ function RequestsPage({ sse, showToast }) {
     if (!req) return null;
     switch(tab) {
       case 'request':
-        return html'
+        return html‹
           <div>
             <div class="flex items-center justify-between mb-4">
               <span class="section-title" style="margin:0">Request Body</span>
-              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.request_body || req.body || '', null, 2)); showToast('Copied'); }}>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.request_body || req.body || ›', null, 2)); showToast('Copied'); }}>
                 ${icons.copy} Copy
               </button>
             </div>
@@ -888,11 +901,11 @@ function RequestsPage({ sse, showToast }) {
           </div>
         ';
       case 'response':
-        return html'
+        return html‹
           <div>
             <div class="flex items-center justify-between mb-4">
               <span class="section-title" style="margin:0">Response Body</span>
-              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.response_body || '', null, 2)); showToast('Copied'); }}>
+              <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(req.response_body || ›', null, 2)); showToast('Copied'); }}>
                 ${icons.copy} Copy
               </button>
             </div>
@@ -900,22 +913,22 @@ function RequestsPage({ sse, showToast }) {
           </div>
         ';
       case 'timing':
-        return html'
+        return html‹
           <div>
             <table>
               <tbody>
                 <tr><td style="font-weight:600;width:150px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
-                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ›'}</td></tr>
               </tbody>
             </table>
           </div>
         ';
       default:
-        return html'
+        return html‹
           <div>
             <table>
               <tbody>
-                <tr><td style="font-weight:600;width:150px">Method</td><td>${req.method || 'POST'}</td></tr>
+                <tr><td style="font-weight:600;width:150px">Method</td><td>${req.method || ›POST'}</td></tr>
                 <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
                 <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
                 <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
@@ -929,14 +942,14 @@ function RequestsPage({ sse, showToast }) {
     }
   }
 
-  return html'
+  return html‹
     <div>
       <div class="flex items-center justify-between mb-6">
         <div>
           <h1 class="page-title">Request Log</h1>
           <p class="page-desc">All API requests to cloudmock services</p>
         </div>
-        <button class="btn btn-ghost btn-sm" onclick=${() => api('/api/requests?limit=200').then(setRequests)}>
+        <button class="btn btn-ghost btn-sm" onclick=${() => api(›/api/requests?limit=200').then(setRequests)}>
           ${icons.refresh} Refresh
         </button>
       </div>
@@ -945,7 +958,7 @@ function RequestsPage({ sse, showToast }) {
         <select class="select" id="service-filter" value=${svcFilter}
                 onchange=${(e) => setSvcFilter(e.target.value)}>
           <option value="">All Services</option>
-          ${services.map(s => html'<option value=${s}>${s}</option>')}
+          ${services.map(s => html‹<option value=${s}>${s}</option>›)}
         </select>
         <select class="select" value=${statusFilter}
                 onchange=${(e) => setStatusFilter(e.target.value)}>
@@ -973,11 +986,11 @@ function RequestsPage({ sse, showToast }) {
               </tr>
             </thead>
             <tbody id="requests-tbody">
-              ${filtered.length === 0 ? html'
+              ${filtered.length === 0 ? html‹
                 <tr><td colspan="6" class="empty-state">No requests recorded yet</td></tr>
-              ' : filtered.map(req => html'
+              › : filtered.map(req => html‹
                 <${Fragment} key=${req.id || Math.random()}>
-                  <tr class="clickable ${expanded === req.id ? 'expanded' : ''}"
+                  <tr class="clickable ${expanded === req.id ? ›expanded' : ''}"
                       onclick=${() => toggleExpand(req.id)}>
                     <td class="font-mono text-sm">${fmtTime(req.timestamp || req.time)}</td>
                     <td><span style="font-weight:600">${req.service}</span></td>
@@ -991,14 +1004,14 @@ function RequestsPage({ sse, showToast }) {
                       </button>
                     </td>
                   </tr>
-                  ${expanded === req.id && html'
+                  ${expanded === req.id && html‹
                     <tr>
                       <td colspan="6" style="padding:0">
                         <div class="req-expand">
                           <div class="req-expand-inner">
                             <div class="tabs" style="padding:0 16px">
-                              ${['overview','request','response','timing'].map(t => html'
-                                <button class="tab ${detailTab === t ? 'active' : ''}"
+                              ${[›overview','request','response','timing'].map(t => html‹
+                                <button class="tab ${detailTab === t ? ›active' : ''}"
                                         onclick=${() => setDetailTab(t)}>
                                   ${t.charAt(0).toUpperCase() + t.slice(1)}
                                 </button>
@@ -1019,7 +1032,7 @@ function RequestsPage({ sse, showToast }) {
         </div>
       </div>
 
-      ${drawer && html'
+      ${drawer && html‹
         <div class="drawer-backdrop" onclick=${() => setDrawer(null)}>
           <div class="drawer" onclick=${(e) => e.stopPropagation()}>
             <div class="drawer-header">
@@ -1028,7 +1041,7 @@ function RequestsPage({ sse, showToast }) {
                 <button class="btn btn-sm btn-ghost" onclick=${() => replayRequest(drawer.id)}>
                   ${icons.play} Replay
                 </button>
-                <a class="btn btn-sm btn-secondary" href=${'#/requests/' + drawer.id}
+                <a class="btn btn-sm btn-secondary" href=${›#/requests/' + drawer.id}
                    style="text-decoration:none;color:white">
                   Full Page
                 </a>
@@ -1039,8 +1052,8 @@ function RequestsPage({ sse, showToast }) {
             </div>
             <div class="drawer-body">
               <div class="tabs">
-                ${['overview','request','response','timing'].map(t => html'
-                  <button class="tab ${detailTab === t ? 'active' : ''}"
+                ${['overview','request','response','timing'].map(t => html‹
+                  <button class="tab ${detailTab === t ? ›active' : ''}"
                           onclick=${() => setDetailTab(t)}>
                     ${t.charAt(0).toUpperCase() + t.slice(1)}
                   </button>
@@ -1066,15 +1079,15 @@ function RequestDetailPage({ id, showToast }) {
     api('/api/requests/' + id).then(r => { setReq(r); setLoading(false); }).catch(() => setLoading(false));
   }, [id]);
 
-  if (loading) return html'<div class="empty-state">Loading...</div>';
-  if (!req) return html'<div class="empty-state">Request not found</div>';
+  if (loading) return html‹<div class="empty-state">Loading...</div>›;
+  if (!req) return html‹<div class="empty-state">Request not found</div>›;
 
   function renderBody(body, label) {
-    return html'
+    return html‹
       <div>
         <div class="flex items-center justify-between mb-4">
           <span class="section-title" style="margin:0">${label}</span>
-          <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(body || '', null, 2)); showToast('Copied'); }}>
+          <button class="copy-btn" onclick=${() => { copyToClipboard(JSON.stringify(body || ›', null, 2)); showToast('Copied'); }}>
             ${icons.copy} Copy
           </button>
         </div>
@@ -1083,7 +1096,7 @@ function RequestDetailPage({ id, showToast }) {
     ';
   }
 
-  return html'
+  return html‹
     <div>
       <div class="flex items-center gap-3 mb-6">
         <a href="#/requests" class="btn btn-ghost btn-sm">Back</a>
@@ -1098,17 +1111,17 @@ function RequestDetailPage({ id, showToast }) {
 
       <div class="card">
         <div class="tabs" style="padding:0 20px">
-          ${['overview','request','response','timing'].map(t => html'
-            <button class="tab ${tab === t ? 'active' : ''}" onclick=${() => setTab(t)}>
+          ${[›overview','request','response','timing'].map(t => html‹
+            <button class="tab ${tab === t ? ›active' : ''}" onclick=${() => setTab(t)}>
               ${t.charAt(0).toUpperCase() + t.slice(1)}
             </button>
           ')}
         </div>
         <div class="card-body">
-          ${tab === 'overview' && html'
+          ${tab === 'overview' && html‹
             <table>
               <tbody>
-                <tr><td style="font-weight:600;width:160px">Method</td><td>${req.method || 'POST'}</td></tr>
+                <tr><td style="font-weight:600;width:160px">Method</td><td>${req.method || ›POST'}</td></tr>
                 <tr><td style="font-weight:600">Service</td><td>${req.service}</td></tr>
                 <tr><td style="font-weight:600">Action</td><td class="font-mono">${req.action}</td></tr>
                 <tr><td style="font-weight:600">Status</td><td><span class="status-pill ${statusClass(req.status)}">${req.status}</span></td></tr>
@@ -1119,11 +1132,11 @@ function RequestDetailPage({ id, showToast }) {
           '}
           ${tab === 'request' && renderBody(req.request_body || req.body, 'Request Body')}
           ${tab === 'response' && renderBody(req.response_body, 'Response Body')}
-          ${tab === 'timing' && html'
+          ${tab === 'timing' && html‹
             <table>
               <tbody>
                 <tr><td style="font-weight:600;width:160px">Total Latency</td><td>${fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
-                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ''}</td></tr>
+                <tr><td style="font-weight:600">Timestamp</td><td class="font-mono">${req.timestamp || req.time || ›'}</td></tr>
               </tbody>
             </table>
           '}
@@ -1327,7 +1340,7 @@ function DynamoDBPage({ showToast }) {
     return JSON.stringify(val);
   }
 
-  return html'
+  return html‹
     <div class="ddb-layout">
       <div class="ddb-sidebar">
         <div class="ddb-sidebar-header">
@@ -1341,10 +1354,10 @@ function DynamoDBPage({ showToast }) {
                  value=${tableSearch} onInput=${(e) => setTableSearch(e.target.value)} style="height:32px;font-size:13px" />
         </div>
         <div class="ddb-sidebar-list">
-          ${filteredTables.length === 0 ? html'
+          ${filteredTables.length === 0 ? html›
             <div style="padding:24px;text-align:center;color:var(--n400);font-size:13px">No tables found</div>
-          ' : filteredTables.map(t => html'
-            <div class="ddb-table-item ${selectedTable === t ? 'active' : ''}"
+          ' : filteredTables.map(t => html‹
+            <div class="ddb-table-item ${selectedTable === t ? ›active' : ''}"
                  onclick=${() => selectTable(t)}>
               <span class="name">${t}</span>
             </div>
@@ -1353,21 +1366,21 @@ function DynamoDBPage({ showToast }) {
       </div>
 
       <div class="ddb-main">
-        ${!selectedTable ? html'
+        ${!selectedTable ? html‹
           <div class="empty-state">
             ${icons.database}
             <div>Select a table to browse items</div>
           </div>
-        ' : html'
+        › : html‹
           <div>
             <div class="ddb-header">
               <div>
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">${selectedTable}</h2>
-                ${tableDesc && html'
+                ${tableDesc && html›
                   <div class="ddb-key-schema">
-                    ${tableDesc.KeySchema.map(k => html'
+                    ${tableDesc.KeySchema.map(k => html‹
                       <span>${k.AttributeName} (${k.KeyType})</span>
-                    ')}
+                    ›)}
                     <span style="color:var(--n400)">${tableDesc.ItemCount || 0} items</span>
                   </div>
                 '}
@@ -1402,26 +1415,26 @@ function DynamoDBPage({ showToast }) {
               <button class="tab ${activeTab === 'info' ? 'active' : ''}" onclick=${() => setActiveTab('info')}>Table Info</button>
             </div>
 
-            ${activeTab === 'browse' && html'
+            ${activeTab === 'browse' && html‹
               <div>
                 <div class="card">
                   <div class="table-wrap">
                     <table>
                       <thead>
                         <tr>
-                          ${columns.map(c => html'<th>${c}</th>')}
+                          ${columns.map(c => html›<th>${c}</th>')}
                           <th style="width:40px"></th>
                         </tr>
                       </thead>
                       <tbody>
-                        ${items.length === 0 ? html'
+                        ${items.length === 0 ? html‹
                           <tr><td colspan=${columns.length + 1} class="empty-state">No items</td></tr>
-                        ' : items.map((item, idx) => html'
+                        › : items.map((item, idx) => html‹
                           <tr class="clickable" onclick=${() => {
                             setItemJson(JSON.stringify(item, null, 2));
                             setEditModal(item);
                           }}>
-                            ${columns.map(c => html'
+                            ${columns.map(c => html›
                               <td class="font-mono text-sm truncate" style="max-width:250px">${formatDDBValue(item[c])}</td>
                             ')}
                             <td>
@@ -1444,23 +1457,23 @@ function DynamoDBPage({ showToast }) {
               </div>
             '}
 
-            ${activeTab === 'query' && html'
+            ${activeTab === 'query' && html‹
               <div>
                 <div class="card" style="margin-bottom:16px">
                   <div class="card-body">
                     <div class="flex gap-3 mb-4">
-                      <button class="btn btn-sm ${queryMode === 'query' ? 'btn-secondary' : 'btn-ghost'}"
+                      <button class="btn btn-sm ${queryMode === ›query' ? 'btn-secondary' : 'btn-ghost'}"
                               onclick=${() => setQueryMode('query')}>Query</button>
                       <button class="btn btn-sm ${queryMode === 'scan' ? 'btn-secondary' : 'btn-ghost'}"
                               onclick=${() => setQueryMode('scan')}>Scan</button>
                     </div>
-                    ${queryMode === 'query' && html'
+                    ${queryMode === 'query' && html‹
                       <div class="mb-4">
                         <div class="label">Key Condition Expression</div>
                         <input class="input w-full" placeholder="pk = :pk AND sk BEGINS_WITH :prefix"
                                value=${queryExpr} onInput=${(e) => setQueryExpr(e.target.value)} />
                       </div>
-                    '}
+                    ›}
                     <div class="mb-4">
                       <div class="label">Filter Expression</div>
                       <input class="input w-full" placeholder="attribute_exists(name)"
@@ -1475,17 +1488,17 @@ function DynamoDBPage({ showToast }) {
                       <button class="btn btn-primary btn-sm" onclick=${runQuery}>
                         ${icons.play} Run ${queryMode === 'query' ? 'Query' : 'Scan'}
                       </button>
-                      ${queryResults && html'
+                      ${queryResults && html‹
                         <button class="btn btn-ghost btn-sm" onclick=${() => {
                           copyToClipboard(JSON.stringify(queryResults, null, 2));
-                          showToast('Exported to clipboard');
+                          showToast(›Exported to clipboard');
                         }}>Export JSON</button>
                       '}
                     </div>
                   </div>
                 </div>
 
-                ${queryResults && html'
+                ${queryResults && html‹
                   <div class="card">
                     <div class="card-header">
                       <span style="font-weight:600">${queryResults.length} results</span>
@@ -1494,22 +1507,22 @@ function DynamoDBPage({ showToast }) {
                       <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(queryResults) }}></div>
                     </div>
                   </div>
-                '}
+                ›}
               </div>
             '}
 
-            ${activeTab === 'info' && tableDesc && html'
+            ${activeTab === 'info' && tableDesc && html‹
               <div class="card">
                 <div class="card-body">
                   <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(tableDesc) }}></div>
                 </div>
               </div>
-            '}
+            ›}
           </div>
         '}
       </div>
 
-      ${editModal && html'
+      ${editModal && html‹
         <div class="modal-backdrop" onclick=${() => setEditModal(null)}>
           <div class="modal modal-lg" onclick=${(e) => e.stopPropagation()}>
             <div class="modal-header">
@@ -1527,9 +1540,9 @@ function DynamoDBPage({ showToast }) {
             </div>
           </div>
         </div>
-      '}
+      ›}
 
-      ${createModal && html'
+      ${createModal && html‹
         <div class="modal-backdrop" onclick=${() => setCreateModal(false)}>
           <div class="modal modal-lg" onclick=${(e) => e.stopPropagation()}>
             <div class="modal-header">
@@ -1546,9 +1559,9 @@ function DynamoDBPage({ showToast }) {
             </div>
           </div>
         </div>
-      '}
+      ›}
 
-      ${createTableModal && html'
+      ${createTableModal && html‹
         <div class="modal-backdrop" onclick=${() => setCreateTableModal(false)}>
           <div class="modal modal-md" onclick=${(e) => e.stopPropagation()}>
             <div class="modal-header">
@@ -1590,9 +1603,9 @@ function DynamoDBPage({ showToast }) {
             </div>
           </div>
         </div>
-      '}
+      ›}
 
-      ${deleteConfirm && html'
+      ${deleteConfirm && html‹
         <div class="modal-backdrop" onclick=${() => setDeleteConfirm(null)}>
           <div class="modal modal-sm" onclick=${(e) => e.stopPropagation()}>
             <div class="modal-header">
@@ -1608,7 +1621,7 @@ function DynamoDBPage({ showToast }) {
             </div>
           </div>
         </div>
-      '}
+      ›}
     </div>
   ';
 }
@@ -1634,7 +1647,7 @@ function ResourcesPage({ services }) {
     }).catch(() => { setResources(null); setLoading(false); });
   }
 
-  return html'
+  return html‹
     <div>
       <div class="mb-6">
         <h1 class="page-title">Resource Explorer</h1>
@@ -1645,7 +1658,7 @@ function ResourcesPage({ services }) {
         <div style="width:220px;flex-shrink:0;overflow-y:auto">
           <div class="card" style="height:100%%">
             <div class="card-body" style="padding:8px">
-              ${services.map(svc => html'
+              ${services.map(svc => html›
                 <div class="nav-item ${selected === svc.name ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
                      onclick=${() => selectService(svc.name)}>
                   <span>${svc.name}</span>
@@ -1656,11 +1669,11 @@ function ResourcesPage({ services }) {
         </div>
 
         <div style="flex:1;overflow-y:auto">
-          ${!selected ? html'
+          ${!selected ? html‹
             <div class="empty-state">Select a service to browse resources</div>
-          ' : loading ? html'
+          › : loading ? html‹
             <div class="empty-state">Loading...</div>
-          ' : html'
+          › : html‹
             <div class="card">
               <div class="card-header">
                 <h3 style="font-weight:700">${selected} Resources</h3>
@@ -1669,7 +1682,7 @@ function ResourcesPage({ services }) {
                 <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(resources) }}></div>
               </div>
             </div>
-          '}
+          ›}
         </div>
       </div>
     </div>
@@ -1718,7 +1731,7 @@ function LambdaPage({ sse }) {
     return logs.filter(l => (l.message || '').toLowerCase().includes(q) || (l.function_name || '').toLowerCase().includes(q));
   }, [logs, search]);
 
-  return html'
+  return html‹
     <div>
       <div class="mb-6">
         <h1 class="page-title">Lambda Logs</h1>
@@ -1732,10 +1745,10 @@ function LambdaPage({ sse }) {
               <span style="font-weight:600;font-size:14px">Functions</span>
             </div>
             <div class="card-body" style="padding:4px 8px;overflow-y:auto" id="lambda-filter">
-              <div class="nav-item ${!selected ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+              <div class="nav-item ${!selected ? ›active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
                    onclick=${() => selectFunction('')}>All Functions</div>
-              ${functions.map(fn => html'
-                <div class="nav-item ${selected === fn ? 'active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
+              ${functions.map(fn => html‹
+                <div class="nav-item ${selected === fn ? ›active' : ''}" style="border-radius:var(--radius-md);border-left:none;padding:8px 12px"
                      onclick=${() => selectFunction(fn)}>
                   <span class="truncate">${fn}</span>
                 </div>
@@ -1764,10 +1777,10 @@ function LambdaPage({ sse }) {
                   </tr>
                 </thead>
                 <tbody id="lambda-tbody">
-                  ${filtered.length === 0 ? html'
+                  ${filtered.length === 0 ? html‹
                     <tr><td colspan="4" class="empty-state">No logs</td></tr>
-                  ' : filtered.map(l => html'
-                    <tr class="${l.stream === 'stderr' ? 'stderr' : ''}">
+                  › : filtered.map(l => html‹
+                    <tr class="${l.stream === ›stderr' ? 'stderr' : ''}">
                       <td class="font-mono text-sm">${fmtTime(l.timestamp || l.time)}</td>
                       <td class="truncate" style="max-width:180px">${l.function_name || ''}</td>
                       <td class="font-mono text-sm truncate" style="max-width:120px">${l.request_id || ''}</td>
@@ -1810,7 +1823,7 @@ function IAMPage({ showToast }) {
     }).catch(() => { showToast('Evaluation failed'); setLoading(false); });
   }
 
-  return html'
+  return html‹
     <div>
       <div class="mb-6">
         <h1 class="page-title">IAM Debugger</h1>
@@ -1840,20 +1853,20 @@ function IAMPage({ showToast }) {
                        value=${resource} onInput=${(e) => setResource(e.target.value)} />
               </div>
               <button class="btn btn-primary" onclick=${evaluate} disabled=${loading}>
-                ${loading ? 'Evaluating...' : 'Evaluate'}
+                ${loading ? ›Evaluating...' : 'Evaluate'}
               </button>
 
-              ${result && html'
-                <div class="iam-result ${result.decision === 'ALLOW' ? 'iam-allow' : 'iam-deny'}">
+              ${result && html‹
+                <div class="iam-result ${result.decision === ›ALLOW' ? 'iam-allow' : 'iam-deny'}">
                   ${result.decision}
                 </div>
-                ${result.reason && html'<p class="text-sm text-muted mb-4">${result.reason}</p>'}
-                ${result.matched_statement && html'
+                ${result.reason && html‹<p class="text-sm text-muted mb-4">${result.reason}</p>›}
+                ${result.matched_statement && html‹
                   <div>
                     <div class="section-title">Matched Statement</div>
                     <div class="json-view" dangerouslySetInnerHTML=${{ __html: syntaxHighlight(result.matched_statement) }}></div>
                   </div>
-                '}
+                ›}
               '}
             </div>
           </div>
@@ -1865,12 +1878,12 @@ function IAMPage({ showToast }) {
               <h3 style="font-weight:700">History</h3>
             </div>
             <div class="card-body" style="max-height:500px;overflow-y:auto">
-              ${history.length === 0 ? html'
+              ${history.length === 0 ? html‹
                 <div class="text-sm text-muted" style="text-align:center;padding:24px">No evaluations yet</div>
-              ' : history.map(h => html'
+              › : history.map(h => html‹
                 <div style="padding:8px 0;border-bottom:1px solid var(--n100);font-size:13px">
                   <div class="flex items-center gap-2">
-                    <span class="status-pill ${h.decision === 'ALLOW' ? 'status-2xx' : 'status-5xx'}" style="font-size:11px">${h.decision}</span>
+                    <span class="status-pill ${h.decision === ›ALLOW' ? 'status-2xx' : 'status-5xx'}" style="font-size:11px">${h.decision}</span>
                     <span class="font-mono">${h.action}</span>
                   </div>
                   <div class="text-muted truncate" style="margin-top:2px">${h.resource}</div>
@@ -1899,7 +1912,7 @@ function MailPage() {
     api('/api/ses/emails/' + email.message_id).then(setDetail).catch(() => {});
   }
 
-  return html'
+  return html‹
     <div>
       <div class="mb-6">
         <h1 class="page-title">SES Mailbox</h1>
@@ -1908,13 +1921,13 @@ function MailPage() {
 
       <div class="flex gap-4">
         <div style="flex:1">
-          ${emails.length === 0 ? html'
+          ${emails.length === 0 ? html›
             <div class="card">
               <div class="empty-state" style="padding:48px">No emails captured yet</div>
             </div>
-          ' : html'
+          ' : html‹
             <div class="mail-list">
-              ${emails.map(e => html'
+              ${emails.map(e => html›
                 <div class="mail-row ${selected === e.message_id ? 'expanded' : ''}"
                      onclick=${() => viewEmail(e)}>
                   <div class="mail-from truncate">${e.source || 'Unknown'}</div>
@@ -1926,12 +1939,12 @@ function MailPage() {
           '}
         </div>
 
-        ${detail && html'
+        ${detail && html‹
           <div style="width:45%%;flex-shrink:0">
             <div class="card">
               <div class="card-header">
                 <div style="flex:1">
-                  <h3 style="font-weight:700;font-size:16px">${detail.subject || '(no subject)'}</h3>
+                  <h3 style="font-weight:700;font-size:16px">${detail.subject || ›(no subject)'}</h3>
                   <div class="text-sm text-muted mt-4">
                     From: ${detail.source || ''} | To: ${(detail.to_addresses || []).join(', ')}
                   </div>
@@ -1939,10 +1952,10 @@ function MailPage() {
                 <button class="btn-icon btn-sm btn-ghost" onclick=${() => { setDetail(null); setSelected(null); }}>${icons.x}</button>
               </div>
               <div class="card-body">
-                ${detail.html_body ? html'
+                ${detail.html_body ? html‹
                   <div dangerouslySetInnerHTML=${{ __html: detail.html_body }}></div>
-                ' : html'
-                  <pre style="white-space:pre-wrap;font-size:14px">${detail.text_body || detail.body || '(empty)'}</pre>
+                › : html‹
+                  <pre style="white-space:pre-wrap;font-size:14px">${detail.text_body || detail.body || ›(empty)'}</pre>
                 '}
               </div>
             </div>
@@ -1967,7 +1980,7 @@ function TopologyPage() {
     renderTopologySVG(svgRef.current, topology);
   }, [topology]);
 
-  return html'
+  return html‹
     <div>
       <div class="mb-6">
         <h1 class="page-title">Service Topology</h1>
@@ -1977,7 +1990,7 @@ function TopologyPage() {
         <svg ref=${svgRef}></svg>
       </div>
     </div>
-  ';
+  ›;
 }
 
 function renderTopologySVG(svg, data) {
@@ -2070,14 +2083,14 @@ function CommandPalette({ services, onClose }) {
     if (e.key === 'Escape') { onClose(); }
   }
 
-  return html'
+  return html‹
     <div class="palette-backdrop" onclick=${onClose}>
       <div class="palette" onclick=${(e) => e.stopPropagation()}>
         <input class="palette-input" ref=${inputRef} placeholder="Search commands, services..."
                value=${query} onInput=${(e) => { setQuery(e.target.value); setActiveIdx(0); }}
                onKeyDown=${handleKeyDown} />
         <div class="palette-results">
-          ${commands.map((cmd, i) => html'
+          ${commands.map((cmd, i) => html›
             <div class="palette-item ${i === activeIdx ? 'active' : ''}"
                  onclick=${cmd.action}
                  onMouseEnter=${() => setActiveIdx(i)}>
@@ -2085,9 +2098,9 @@ function CommandPalette({ services, onClose }) {
               <span class="desc">${cmd.desc}</span>
             </div>
           ')}
-          ${commands.length === 0 && html'
+          ${commands.length === 0 && html‹
             <div style="padding:24px;text-align:center;color:var(--n400);font-size:14px">No results</div>
-          '}
+          ›}
         </div>
       </div>
     </div>
@@ -2095,7 +2108,7 @@ function CommandPalette({ services, onClose }) {
 }
 
 // ─── Mount ─────────────────────────────────────────────────────
-render(html'<${App} />', document.getElementById('app'));
+render(html‹<${App} />›, document.getElementById('app'));
 </script>
 </body>
 </html>

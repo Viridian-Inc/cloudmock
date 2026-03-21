@@ -9,13 +9,18 @@ import (
 
 // DynamoDBService is the cloudmock implementation of the AWS DynamoDB API.
 type DynamoDBService struct {
-	store *TableStore
+	store    *TableStore
+	ttlDone  chan struct{}
 }
 
 // New returns a new DynamoDBService for the given AWS account ID and region.
 func New(accountID, region string) *DynamoDBService {
+	store := NewTableStore(accountID, region)
+	done := make(chan struct{})
+	store.startTTLReaper(done)
 	return &DynamoDBService{
-		store: NewTableStore(accountID, region),
+		store:   store,
+		ttlDone: done,
 	}
 }
 
@@ -39,6 +44,11 @@ func (s *DynamoDBService) Actions() []service.Action {
 		{Name: "BatchWriteItem", Method: http.MethodPost, IAMAction: "dynamodb:BatchWriteItem"},
 		{Name: "TransactWriteItems", Method: http.MethodPost, IAMAction: "dynamodb:TransactWriteItems"},
 		{Name: "TransactGetItems", Method: http.MethodPost, IAMAction: "dynamodb:TransactGetItems"},
+		{Name: "DescribeStream", Method: http.MethodPost, IAMAction: "dynamodb:DescribeStream"},
+		{Name: "GetShardIterator", Method: http.MethodPost, IAMAction: "dynamodb:GetShardIterator"},
+		{Name: "GetRecords", Method: http.MethodPost, IAMAction: "dynamodb:GetRecords"},
+		{Name: "UpdateTimeToLive", Method: http.MethodPost, IAMAction: "dynamodb:UpdateTimeToLive"},
+		{Name: "DescribeTimeToLive", Method: http.MethodPost, IAMAction: "dynamodb:DescribeTimeToLive"},
 	}
 }
 
@@ -104,6 +114,16 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleTransactWriteItems(ctx, s.store)
 	case "TransactGetItems":
 		return handleTransactGetItems(ctx, s.store)
+	case "DescribeStream":
+		return handleDescribeStream(ctx, s.store)
+	case "GetShardIterator":
+		return handleGetShardIterator(ctx, s.store)
+	case "GetRecords":
+		return handleGetRecords(ctx, s.store)
+	case "UpdateTimeToLive":
+		return handleUpdateTimeToLive(ctx, s.store)
+	case "DescribeTimeToLive":
+		return handleDescribeTimeToLive(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

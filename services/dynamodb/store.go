@@ -32,7 +32,7 @@ func (s *TableStore) tableARN(name string) string {
 }
 
 // CreateTable creates a new table. Returns ResourceInUseException if it already exists.
-func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attrDefs []AttributeDefinition, billingMode string, pt *ProvisionedThroughput, gsis []GSI, lsis []LSI) (*Table, *service.AWSError) {
+func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attrDefs []AttributeDefinition, billingMode string, pt *ProvisionedThroughput, gsis []GSI, lsis []LSI, streamSpec *StreamSpecification) (*Table, *service.AWSError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -69,6 +69,12 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		GSIItems:              gsiItems,
 		LSIItems:              lsiItems,
 	}
+
+	if streamSpec != nil && streamSpec.StreamEnabled {
+		tableARN := s.tableARN(name)
+		table.Stream = newStream(tableARN, name, streamSpec.StreamViewType)
+	}
+
 	s.tables[name] = table
 	return table, nil
 }
@@ -142,15 +148,22 @@ func (s *TableStore) putItemLocked(tableName string, item Item) *service.AWSErro
 	// Replace existing item with same key, or append.
 	for i, existing := range table.Items {
 		if table.keyMatchesItem(item, existing) {
+			oldImage := copyItem(existing)
 			table.deindexItem(existing)
 			table.Items[i] = item
 			table.indexItem(item)
+			if table.Stream != nil {
+				table.Stream.appendRecord("MODIFY", oldImage, copyItem(item))
+			}
 			return nil
 		}
 	}
 	table.Items = append(table.Items, item)
 	table.ItemCount = int64(len(table.Items))
 	table.indexItem(item)
+	if table.Stream != nil {
+		table.Stream.appendRecord("INSERT", nil, copyItem(item))
+	}
 	return nil
 }
 
@@ -192,9 +205,13 @@ func (s *TableStore) deleteItemLocked(tableName string, key Item) *service.AWSEr
 
 	for i, item := range table.Items {
 		if table.keyMatchesItem(key, item) {
+			oldImage := copyItem(item)
 			table.deindexItem(item)
 			table.Items = append(table.Items[:i], table.Items[i+1:]...)
 			table.ItemCount = int64(len(table.Items))
+			if table.Stream != nil {
+				table.Stream.appendRecord("REMOVE", oldImage, nil)
+			}
 			return nil
 		}
 	}
@@ -229,14 +246,26 @@ func (s *TableStore) updateItemLocked(tableName string, key Item, updateExpr str
 		target = copyItem(key)
 	}
 
+	// Capture old image before update.
+	var oldImage Item
+	if target != nil {
+		oldImage = copyItem(target)
+	}
+
 	target = parseUpdateExpression(target, updateExpr, exprNames, exprValues)
 
 	if idx >= 0 {
 		table.deindexItem(table.Items[idx])
 		table.Items[idx] = target
+		if table.Stream != nil {
+			table.Stream.appendRecord("MODIFY", oldImage, copyItem(target))
+		}
 	} else {
 		table.Items = append(table.Items, target)
 		table.ItemCount = int64(len(table.Items))
+		if table.Stream != nil {
+			table.Stream.appendRecord("INSERT", nil, copyItem(target))
+		}
 	}
 	table.indexItem(target)
 
@@ -564,6 +593,56 @@ func (s *TableStore) TransactGetItems(items []transactGetItem) ([]transactGetRes
 		}
 	}
 	return responses, nil
+}
+
+// UpdateTimeToLive sets or disables TTL for a table.
+func (s *TableStore) UpdateTimeToLive(tableName string, spec *TTLSpecification) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	table, awsErr := s.getTable(tableName)
+	if awsErr != nil {
+		return awsErr
+	}
+	table.TTL = spec
+	return nil
+}
+
+// DescribeTimeToLive returns the TTL configuration for a table.
+func (s *TableStore) DescribeTimeToLive(tableName string) (*TTLSpecification, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	table, awsErr := s.getTable(tableName)
+	if awsErr != nil {
+		return nil, awsErr
+	}
+	return table.TTL, nil
+}
+
+// GetStream returns the stream for a table, or nil if streams are not enabled.
+func (s *TableStore) GetStream(tableName string) (*Stream, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	table, awsErr := s.getTable(tableName)
+	if awsErr != nil {
+		return nil, awsErr
+	}
+	return table.Stream, nil
+}
+
+// GetStreamByARN returns the stream matching the given ARN, or nil.
+func (s *TableStore) GetStreamByARN(arn string) *Stream {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	for _, table := range s.tables {
+		if table.Stream != nil && table.Stream.arn == arn {
+			return table.Stream
+		}
+	}
+	return nil
 }
 
 func formatReasons(reasons []cancellationReason) string {

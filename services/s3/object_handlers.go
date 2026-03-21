@@ -34,6 +34,7 @@ func objectHeaders(w http.ResponseWriter, obj *Object) {
 }
 
 // handlePutObject reads the request body and stores an object.
+// If versioning is enabled on the bucket, a new version is created.
 func handlePutObject(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	bucket := extractBucketName(ctx)
 	key := extractObjectKey(ctx)
@@ -44,17 +45,27 @@ func handlePutObject(store *Store, ctx *service.RequestContext) (*service.Respon
 	}
 
 	contentType := ctx.RawRequest.Header.Get("Content-Type")
-	// ctx.Body was read by the gateway before calling HandleRequest.
-	objs.PutObject(key, ctx.Body, contentType, nil)
 
-	return &service.Response{
+	resp := &service.Response{
 		StatusCode: http.StatusOK,
 		Format:     service.FormatXML,
-	}, nil
+	}
+
+	if store.IsVersioningEnabled(bucket) {
+		obj := objs.PutObjectVersioned(key, ctx.Body, contentType, nil)
+		resp.Headers = map[string]string{
+			"x-amz-version-id": obj.VersionId,
+		}
+	} else {
+		objs.PutObject(key, ctx.Body, contentType, nil)
+	}
+
+	return resp, nil
 }
 
 // handleGetObject writes the object body directly to the ResponseWriter via
 // RawBody so that the gateway skips XML/JSON marshaling.
+// Supports ?versionId=X to retrieve a specific version.
 func handleGetObject(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	bucket := extractBucketName(ctx)
 	key := extractObjectKey(ctx)
@@ -64,15 +75,25 @@ func handleGetObject(store *Store, ctx *service.RequestContext) (*service.Respon
 		return &service.Response{Format: service.FormatXML}, err
 	}
 
-	obj, err := objs.GetObject(key)
+	versionId := ctx.RawRequest.URL.Query().Get("versionId")
+
+	var obj *Object
+	if versionId != "" {
+		obj, err = objs.GetObjectVersion(key, versionId)
+	} else {
+		obj, err = objs.GetObject(key)
+	}
 	if err != nil {
 		return &service.Response{Format: service.FormatXML}, err
 	}
 
 	headers := map[string]string{
-		"ETag":          obj.ETag,
-		"Last-Modified": obj.LastModified.UTC().Format(http.TimeFormat),
+		"ETag":           obj.ETag,
+		"Last-Modified":  obj.LastModified.UTC().Format(http.TimeFormat),
 		"Content-Length": strconv.FormatInt(obj.Size, 10),
+	}
+	if obj.VersionId != "" {
+		headers["x-amz-version-id"] = obj.VersionId
 	}
 
 	return &service.Response{
@@ -84,6 +105,7 @@ func handleGetObject(store *Store, ctx *service.RequestContext) (*service.Respon
 }
 
 // handleDeleteObject removes an object and returns 204.
+// If versioning is enabled, creates a delete marker instead of actually deleting.
 func handleDeleteObject(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	bucket := extractBucketName(ctx)
 	key := extractObjectKey(ctx)
@@ -93,12 +115,22 @@ func handleDeleteObject(store *Store, ctx *service.RequestContext) (*service.Res
 		return &service.Response{Format: service.FormatXML}, err
 	}
 
-	objs.DeleteObject(key)
-
-	return &service.Response{
+	resp := &service.Response{
 		StatusCode: http.StatusNoContent,
 		Format:     service.FormatXML,
-	}, nil
+	}
+
+	if store.IsVersioningEnabled(bucket) {
+		versionId := objs.DeleteObjectVersioned(key)
+		resp.Headers = map[string]string{
+			"x-amz-version-id":    versionId,
+			"x-amz-delete-marker": "true",
+		}
+	} else {
+		objs.DeleteObject(key)
+	}
+
+	return resp, nil
 }
 
 // handleHeadObject returns object headers with no body.

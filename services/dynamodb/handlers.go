@@ -17,6 +17,7 @@ type createTableRequest struct {
 	ProvisionedThroughput  *ProvisionedThroughput  `json:"ProvisionedThroughput"`
 	GlobalSecondaryIndexes []GSI                   `json:"GlobalSecondaryIndexes"`
 	LocalSecondaryIndexes  []LSI                   `json:"LocalSecondaryIndexes"`
+	StreamSpecification    *StreamSpecification    `json:"StreamSpecification"`
 }
 
 type gsiDescription struct {
@@ -51,6 +52,9 @@ type tableDescription struct {
 	ProvisionedThroughput  *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
 	GlobalSecondaryIndexes []gsiDescription       `json:"GlobalSecondaryIndexes,omitempty"`
 	LocalSecondaryIndexes  []lsiDescription       `json:"LocalSecondaryIndexes,omitempty"`
+	StreamSpecification    *StreamSpecification   `json:"StreamSpecification,omitempty"`
+	LatestStreamArn        string                 `json:"LatestStreamArn,omitempty"`
+	LatestStreamLabel      string                 `json:"LatestStreamLabel,omitempty"`
 }
 
 type billingModeSummary struct {
@@ -323,6 +327,15 @@ func tableToDescription(t *Table, arn string) tableDescription {
 			IndexArn:       arn + "/index/" + lsi.IndexName,
 		})
 	}
+	if t.Stream != nil {
+		sd := t.Stream.describe()
+		desc.StreamSpecification = &StreamSpecification{
+			StreamEnabled:  true,
+			StreamViewType: sd.StreamViewType,
+		}
+		desc.LatestStreamArn = sd.StreamARN
+		desc.LatestStreamLabel = sd.StreamLabel
+	}
 	return desc
 }
 
@@ -342,7 +355,7 @@ func handleCreateTable(ctx *service.RequestContext, store *TableStore) (*service
 			"KeySchema is required.", http.StatusBadRequest))
 	}
 
-	table, awsErr := store.CreateTable(req.TableName, req.KeySchema, req.AttributeDefinitions, req.BillingMode, req.ProvisionedThroughput, req.GlobalSecondaryIndexes, req.LocalSecondaryIndexes)
+	table, awsErr := store.CreateTable(req.TableName, req.KeySchema, req.AttributeDefinitions, req.BillingMode, req.ProvisionedThroughput, req.GlobalSecondaryIndexes, req.LocalSecondaryIndexes, req.StreamSpecification)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}

@@ -53,6 +53,12 @@ func (s *S3Service) Actions() []service.Action {
 		{Name: "AbortMultipartUpload", Method: http.MethodDelete, IAMAction: "s3:AbortMultipartUpload"},
 		{Name: "ListMultipartUploads", Method: http.MethodGet, IAMAction: "s3:ListBucketMultipartUploads"},
 		{Name: "ListParts", Method: http.MethodGet, IAMAction: "s3:ListMultipartUploadParts"},
+		{Name: "PutBucketVersioning", Method: http.MethodPut, IAMAction: "s3:PutBucketVersioning"},
+		{Name: "GetBucketVersioning", Method: http.MethodGet, IAMAction: "s3:GetBucketVersioning"},
+		{Name: "ListObjectVersions", Method: http.MethodGet, IAMAction: "s3:ListBucketVersions"},
+		{Name: "PutBucketPolicy", Method: http.MethodPut, IAMAction: "s3:PutBucketPolicy"},
+		{Name: "GetBucketPolicy", Method: http.MethodGet, IAMAction: "s3:GetBucketPolicy"},
+		{Name: "DeleteBucketPolicy", Method: http.MethodDelete, IAMAction: "s3:DeleteBucketPolicy"},
 	}
 }
 
@@ -101,6 +107,9 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 
 	q := r.URL.Query()
 	_, hasUploads := q["uploads"]
+	_, hasVersioning := q["versioning"]
+	_, hasVersions := q["versions"]
+	_, hasPolicy := q["policy"]
 	uploadId := q.Get("uploadId")
 	partNumber := q.Get("partNumber")
 
@@ -109,6 +118,18 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		// GET /bucket?uploads → ListMultipartUploads
 		if isBucketPath && hasUploads {
 			return handleListMultipartUploads(s.store, ctx)
+		}
+		// GET /bucket?versioning → GetBucketVersioning
+		if isBucketPath && !isObjectPath && hasVersioning {
+			return handleGetBucketVersioning(s.store, ctx)
+		}
+		// GET /bucket?versions → ListObjectVersions
+		if isBucketPath && !isObjectPath && hasVersions {
+			return handleListObjectVersions(s.store, ctx)
+		}
+		// GET /bucket?policy → GetBucketPolicy
+		if isBucketPath && !isObjectPath && hasPolicy {
+			return handleGetBucketPolicy(s.store, ctx)
 		}
 		// GET /bucket/key?uploadId=X → ListParts
 		if isObjectPath && uploadId != "" {
@@ -119,7 +140,7 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 			return handleListBuckets(s.store, ctx)
 		}
 		if isObjectPath {
-			// GET /bucket/key → GetObject
+			// GET /bucket/key → GetObject (with optional ?versionId=X)
 			return handleGetObject(s.store, ctx)
 		}
 		// GET /bucket or GET /bucket?list-type=2 → ListObjectsV2
@@ -140,6 +161,14 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		}
 
 	case http.MethodPut:
+		// PUT /bucket?versioning → PutBucketVersioning
+		if isBucketPath && !isObjectPath && hasVersioning {
+			return handlePutBucketVersioning(s.store, ctx)
+		}
+		// PUT /bucket?policy → PutBucketPolicy
+		if isBucketPath && !isObjectPath && hasPolicy {
+			return handlePutBucketPolicy(s.store, ctx)
+		}
 		// PUT /bucket/key?partNumber=N&uploadId=X → UploadPart
 		if isObjectPath && uploadId != "" && partNumber != "" {
 			return handleUploadPart(s.store, ctx)
@@ -162,6 +191,10 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		}
 
 	case http.MethodDelete:
+		// DELETE /bucket?policy → DeleteBucketPolicy
+		if isBucketPath && !isObjectPath && hasPolicy {
+			return handleDeleteBucketPolicy(s.store, ctx)
+		}
 		// DELETE /bucket/key?uploadId=X → AbortMultipartUpload
 		if isObjectPath && uploadId != "" {
 			return handleAbortMultipartUpload(s.store, ctx)

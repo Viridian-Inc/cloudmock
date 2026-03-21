@@ -12,9 +12,11 @@ import (
 
 // Bucket holds metadata for a single S3 bucket plus its object store.
 type Bucket struct {
-	Name         string
-	CreationDate time.Time
-	Objects      *ObjectStore
+	Name             string
+	CreationDate     time.Time
+	Objects          *ObjectStore
+	VersioningStatus string // "", "Enabled", or "Suspended"
+	Policy           []byte // raw JSON policy, nil if unset
 }
 
 // Store is an in-memory store for S3 buckets and multipart uploads.
@@ -101,6 +103,93 @@ func (s *Store) bucketObjects(name string) (*ObjectStore, error) {
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
 	return b.Objects, nil
+}
+
+// getBucket returns the bucket for the given name, or an AWSError if not found.
+func (s *Store) getBucket(name string) (*Bucket, error) {
+	s.mu.RLock()
+	b, ok := s.buckets[name]
+	s.mu.RUnlock()
+	if !ok {
+		return nil, service.NewAWSError("NoSuchBucket",
+			"The specified bucket does not exist.", http.StatusNotFound)
+	}
+	return b, nil
+}
+
+// SetVersioning sets the versioning status for the named bucket.
+func (s *Store) SetVersioning(name, status string) error {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	b.VersioningStatus = status
+	s.mu.Unlock()
+	return nil
+}
+
+// GetVersioning returns the versioning status for the named bucket.
+func (s *Store) GetVersioning(name string) (string, error) {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return "", err
+	}
+	s.mu.RLock()
+	status := b.VersioningStatus
+	s.mu.RUnlock()
+	return status, nil
+}
+
+// SetBucketPolicy stores a raw JSON policy for the named bucket.
+func (s *Store) SetBucketPolicy(name string, policy []byte) error {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	b.Policy = policy
+	s.mu.Unlock()
+	return nil
+}
+
+// GetBucketPolicy returns the raw JSON policy for the named bucket.
+func (s *Store) GetBucketPolicy(name string) ([]byte, error) {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return nil, err
+	}
+	s.mu.RLock()
+	policy := b.Policy
+	s.mu.RUnlock()
+	if policy == nil {
+		return nil, service.NewAWSError("NoSuchBucketPolicy",
+			"The bucket policy does not exist.", http.StatusNotFound)
+	}
+	return policy, nil
+}
+
+// DeleteBucketPolicy removes the policy from the named bucket.
+func (s *Store) DeleteBucketPolicy(name string) error {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return err
+	}
+	s.mu.Lock()
+	b.Policy = nil
+	s.mu.Unlock()
+	return nil
+}
+
+// IsVersioningEnabled returns true if the named bucket has versioning enabled.
+func (s *Store) IsVersioningEnabled(name string) bool {
+	b, err := s.getBucket(name)
+	if err != nil {
+		return false
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return b.VersioningStatus == "Enabled"
 }
 
 // generateUploadID creates a unique upload ID.

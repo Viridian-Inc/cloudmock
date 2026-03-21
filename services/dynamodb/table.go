@@ -58,6 +58,8 @@ type Table struct {
 	LSIs                  []LSI
 	GSIItems              map[string][]Item // indexName → items
 	LSIItems              map[string][]Item // indexName → items
+	Stream                *Stream           // nil if streams not enabled
+	TTL                   *TTLSpecification // nil if TTL not configured
 }
 
 // hashKeyName returns the attribute name of the HASH key.

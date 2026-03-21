@@ -6,7 +6,9 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
@@ -86,13 +88,39 @@ func main() {
 	// Tier 2 stub services
 	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)
 
+	requestLog := gateway.NewRequestLog(1000)
+	requestStats := gateway.NewRequestStats()
+
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
+	loggedGW := gateway.LoggingMiddleware(gw, requestLog, requestStats)
+
+	// Admin API
+	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
+	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
+	go func() {
+		log.Printf("cloudmock admin API starting on %s", adminAddr)
+		if err := http.ListenAndServe(adminAddr, adminAPI); err != nil {
+			log.Printf("admin API exited: %v", err)
+		}
+	}()
+
+	// Dashboard
+	if cfg.Dashboard.Enabled {
+		dashboardHandler := dashboard.New(cfg.Admin.Port)
+		dashAddr := fmt.Sprintf(":%d", cfg.Dashboard.Port)
+		go func() {
+			log.Printf("cloudmock dashboard starting on %s", dashAddr)
+			if err := http.ListenAndServe(dashAddr, dashboardHandler); err != nil {
+				log.Printf("dashboard exited: %v", err)
+			}
+		}()
+	}
 
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)
 	log.Printf("cloudmock gateway starting on %s (region=%s, account=%s, iam_mode=%s, services=%d)",
 		addr, cfg.Region, cfg.AccountID, cfg.IAM.Mode, len(registry.List()))
 
-	if err := http.ListenAndServe(addr, gw); err != nil {
+	if err := http.ListenAndServe(addr, loggedGW); err != nil {
 		log.Fatalf("gateway exited: %v", err)
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/neureaux/cloudmock/pkg/config"
+	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -15,6 +16,8 @@ type Gateway struct {
 	cfg      *config.Config
 	registry *routing.Registry
 	mux      *http.ServeMux
+	store    *iampkg.Store
+	engine   *iampkg.Engine
 }
 
 // New creates a Gateway with routes pre-registered.
@@ -29,6 +32,14 @@ func New(cfg *config.Config, registry *routing.Registry) *Gateway {
 	g.mux.HandleFunc("/_cloudmock/services", g.handleServices)
 	g.mux.HandleFunc("/", g.handleAWSRequest)
 
+	return g
+}
+
+// NewWithIAM creates a Gateway with IAM store and engine for authentication/authorization.
+func NewWithIAM(cfg *config.Config, registry *routing.Registry, store *iampkg.Store, engine *iampkg.Engine) *Gateway {
+	g := New(cfg, registry)
+	g.store = store
+	g.engine = engine
 	return g
 }
 
@@ -112,14 +123,20 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		Service:    svcName,
 	}
 
-	// 5. If IAM mode is "none", assign root CallerIdentity.
-	if g.cfg.IAM.Mode == "none" {
-		ctx.Identity = &service.CallerIdentity{
-			AccountID:   g.cfg.AccountID,
-			ARN:         fmt.Sprintf("arn:aws:iam::%s:root", g.cfg.AccountID),
-			UserID:      g.cfg.AccountID,
-			AccessKeyID: g.cfg.IAM.RootAccessKey,
-			IsRoot:      true,
+	// 5. Authenticate request.
+	identity, authErr := g.authenticateRequest(r)
+	if authErr != nil {
+		_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
+		return
+	}
+	ctx.Identity = identity
+
+	// Authorize request.
+	if g.engine != nil {
+		iamAction := svcName + ":" + action
+		if authzErr := g.authorizeRequest(identity, iamAction, "*"); authzErr != nil {
+			_ = service.WriteErrorResponse(w, authzErr, service.FormatJSON)
+			return
 		}
 	}
 

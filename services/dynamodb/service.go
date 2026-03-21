@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -41,6 +42,34 @@ func (s *DynamoDBService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *DynamoDBService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for DynamoDB table resources.
+func (s *DynamoDBService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "dynamodb",
+			ResourceType:  "aws_dynamodb_table",
+			TerraformType: "cloudmock_dynamodb_table",
+			AWSType:       "AWS::DynamoDB::Table",
+			CreateAction:  "CreateTable",
+			ReadAction:    "DescribeTable",
+			DeleteAction:  "DeleteTable",
+			ListAction:    "ListTables",
+			ImportID:      "table_name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "table_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "billing_mode", Type: "string", Default: "PROVISIONED"},
+				{Name: "read_capacity", Type: "int"},
+				{Name: "write_capacity", Type: "int"},
+				{Name: "hash_key", Type: "string", Required: true, ForceNew: true},
+				{Name: "range_key", Type: "string", ForceNew: true},
+				{Name: "attribute", Type: "set", Required: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming DynamoDB request to the appropriate handler.
 func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {

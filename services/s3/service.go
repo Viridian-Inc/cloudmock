@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -51,6 +52,30 @@ func (s *S3Service) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *S3Service) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for S3 bucket resources.
+func (s *S3Service) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "s3",
+			ResourceType:  "aws_s3_bucket",
+			TerraformType: "cloudmock_s3_bucket",
+			AWSType:       "AWS::S3::Bucket",
+			CreateAction:  "CreateBucket",
+			ReadAction:    "HeadBucket",
+			DeleteAction:  "DeleteBucket",
+			ListAction:    "ListBuckets",
+			ImportID:      "bucket",
+			Attributes: []schema.AttributeSchema{
+				{Name: "bucket", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "region", Type: "string", Computed: true},
+				{Name: "acl", Type: "string", Default: "private"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming S3 request to the appropriate handler.
 func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {

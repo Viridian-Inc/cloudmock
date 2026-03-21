@@ -3,6 +3,7 @@ package ec2
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -137,6 +138,102 @@ func (s *EC2Service) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *EC2Service) HealthCheck() error { return nil }
+
+// ResourceSchemas returns schemas for EC2 VPC, Subnet, SecurityGroup, and Instance resources.
+func (s *EC2Service) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "ec2",
+			ResourceType:  "aws_vpc",
+			TerraformType: "cloudmock_ec2_vpc",
+			AWSType:       "AWS::EC2::VPC",
+			CreateAction:  "CreateVpc",
+			ReadAction:    "DescribeVpcs",
+			DeleteAction:  "DeleteVpc",
+			UpdateAction:  "ModifyVpcAttribute",
+			ImportID:      "vpc_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "vpc_id", Type: "string", Computed: true},
+				{Name: "cidr_block", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "enable_dns_support", Type: "bool", Default: true},
+				{Name: "enable_dns_hostnames", Type: "bool", Default: false},
+				{Name: "is_default", Type: "bool", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "ec2",
+			ResourceType:  "aws_subnet",
+			TerraformType: "cloudmock_ec2_subnet",
+			AWSType:       "AWS::EC2::Subnet",
+			CreateAction:  "CreateSubnet",
+			ReadAction:    "DescribeSubnets",
+			DeleteAction:  "DeleteSubnet",
+			ImportID:      "subnet_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "subnet_id", Type: "string", Computed: true},
+				{Name: "vpc_id", Type: "string", Required: true, ForceNew: true, RefTo: "cloudmock_ec2_vpc.vpc_id"},
+				{Name: "cidr_block", Type: "string", Required: true, ForceNew: true},
+				{Name: "availability_zone", Type: "string", ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "map_public_ip_on_launch", Type: "bool", Default: false},
+				{Name: "tags", Type: "map"},
+			},
+			References: []schema.ResourceRef{
+				{FromAttr: "vpc_id", ToResource: "cloudmock_ec2_vpc", ToAttr: "vpc_id"},
+			},
+		},
+		{
+			ServiceName:   "ec2",
+			ResourceType:  "aws_security_group",
+			TerraformType: "cloudmock_ec2_security_group",
+			AWSType:       "AWS::EC2::SecurityGroup",
+			CreateAction:  "CreateSecurityGroup",
+			ReadAction:    "DescribeSecurityGroups",
+			DeleteAction:  "DeleteSecurityGroup",
+			ImportID:      "security_group_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "security_group_id", Type: "string", Computed: true},
+				{Name: "group_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "description", Type: "string", Required: true, ForceNew: true},
+				{Name: "vpc_id", Type: "string", ForceNew: true, RefTo: "cloudmock_ec2_vpc.vpc_id"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "ingress", Type: "set"},
+				{Name: "egress", Type: "set"},
+				{Name: "tags", Type: "map"},
+			},
+			References: []schema.ResourceRef{
+				{FromAttr: "vpc_id", ToResource: "cloudmock_ec2_vpc", ToAttr: "vpc_id"},
+			},
+		},
+		{
+			ServiceName:   "ec2",
+			ResourceType:  "aws_instance",
+			TerraformType: "cloudmock_ec2_instance",
+			AWSType:       "AWS::EC2::Instance",
+			CreateAction:  "RunInstances",
+			ReadAction:    "DescribeInstances",
+			DeleteAction:  "TerminateInstances",
+			ImportID:      "instance_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "instance_id", Type: "string", Computed: true},
+				{Name: "ami", Type: "string", Required: true, ForceNew: true},
+				{Name: "instance_type", Type: "string", Required: true},
+				{Name: "subnet_id", Type: "string", ForceNew: true, RefTo: "cloudmock_ec2_subnet.subnet_id"},
+				{Name: "vpc_security_group_ids", Type: "set"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "private_ip", Type: "string", Computed: true},
+				{Name: "public_ip", Type: "string", Computed: true},
+				{Name: "instance_state", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+			References: []schema.ResourceRef{
+				{FromAttr: "subnet_id", ToResource: "cloudmock_ec2_subnet", ToAttr: "subnet_id"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming EC2 request to the appropriate handler.
 // EC2 uses form-encoded POST bodies; the Action may appear in the query string

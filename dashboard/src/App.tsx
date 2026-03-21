@@ -83,7 +83,7 @@ export function App() {
       case '/lambda': return <LambdaPage sse={sse} />;
       case '/iam': return <IAMPage showToast={showToast} />;
       case '/mail': return <MailPage />;
-      case '/topology': return <TopologyPage />;
+      case '/topology': return <TopologyPage sse={sse} />;
       default: return <ServicesPage services={services} stats={stats} health={health} />;
     }
   }

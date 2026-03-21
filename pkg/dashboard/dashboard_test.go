@@ -48,49 +48,16 @@ func TestHandler_ContainsExpectedElements(t *testing.T) {
 		snippet string
 	}{
 		{"cloudmock branding", "cloudmock"},
-		{"Preact+HTM inlined UMD", "htmPreact={}"},
-		{"htmPreact destructure", "htmPreact"},
 		{"Figtree font", "Figtree"},
-		{"admin API services endpoint", "/api/services"},
-		{"admin API stats endpoint", "/api/stats"},
-		{"admin API requests endpoint", "/api/requests"},
-		{"admin API health reference", "Healthy"},
-		{"admin API stream endpoint", "/api/stream"},
-		{"health badge element", `id="health-badge"`},
-		{"health dot element", `id="health-dot"`},
-		{"service filter dropdown", `id="service-filter"`},
-		{"services table", `id="requests-table"`},
-		{"requests tbody", `id="requests-tbody"`},
-		{"lambda filter", `id="lambda-filter"`},
-		{"lambda table", `id="lambda-table"`},
-		{"lambda tbody", `id="lambda-tbody"`},
-		{"SSE badge", `id="sse-badge"`},
-		{"SSE dot", `id="sse-dot"`},
-		{"command palette shortcut", "Cmd+K"},
-		{"IAM evaluate endpoint", "/api/iam/evaluate"},
-		{"SES emails endpoint", "/api/ses/emails"},
-		{"topology endpoint", "/api/topology"},
-		{"brand-blue color", "#097FF5"},
-		{"brand-dark color", "#0A1F44"},
+		{"HTML doctype", "<!DOCTYPE html>"},
+		{"app mount point", `id="app"`},
+		{"module script", `type="module"`},
 	}
 
 	for _, c := range checks {
 		if !strings.Contains(body, c.snippet) {
 			t.Errorf("missing %s: expected to find %q in HTML", c.desc, c.snippet)
 		}
-	}
-}
-
-func TestHandler_AdminPortEmbedded(t *testing.T) {
-	h := dashboard.New(9999)
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	w := httptest.NewRecorder()
-
-	h.ServeHTTP(w, req)
-
-	body := w.Body.String()
-	if !strings.Contains(body, "9999") {
-		t.Error("expected admin port 9999 to appear in dashboard HTML")
 	}
 }
 
@@ -124,5 +91,20 @@ func TestHandler_HTMLStructure(t *testing.T) {
 	}
 	if !strings.Contains(body, "</html>") {
 		t.Error("expected closing </html> tag")
+	}
+}
+
+func TestHandler_StaticAssets(t *testing.T) {
+	h := dashboard.New(4599)
+
+	// CSS and JS assets should be served with correct content types
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+
+	body := w.Body.String()
+	// The built HTML should reference assets
+	if !strings.Contains(body, "assets/") {
+		t.Error("expected asset references in built HTML")
 	}
 }

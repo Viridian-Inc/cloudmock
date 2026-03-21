@@ -27,7 +27,14 @@ Thumbs.db
 
 # Build directories
 dist/
+!pkg/dashboard/dist/
 build/
+
+# Node
+node_modules/
+
+# Gateway binary (built artifact)
+/gateway
 
 # Vendor
 vendor/

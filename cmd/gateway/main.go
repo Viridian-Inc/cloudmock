@@ -32,6 +32,7 @@ import (
 	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
 	stssvc "github.com/neureaux/cloudmock/services/sts"
 	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
+	"github.com/neureaux/cloudmock/services/stubs"
 )
 
 func main() {
@@ -81,6 +82,9 @@ func main() {
 	registry.Register(rdssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(apigwsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cfnsvc.New(cfg.AccountID, cfg.Region))
+
+	// Tier 2 stub services
+	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 

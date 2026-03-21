@@ -13,6 +13,7 @@ import { ExportMenu } from './dynamodb/ExportMenu';
 import { ImportMenu } from './dynamodb/ImportMenu';
 import { BatchWrite } from './dynamodb/BatchWrite';
 import { AccessPatterns } from './dynamodb/AccessPatterns';
+import { AccessPatternsTable } from './dynamodb/AccessPatternsTable';
 import { PartiQL } from './dynamodb/PartiQL';
 import { Terminal } from './dynamodb/Terminal';
 import { DDBContext, ddbReducer, initialState, loadPersistedState, usePersistState } from './dynamodb/store';
@@ -127,7 +128,7 @@ function DynamoDBCore({ showToast }: DynamoDBPageProps) {
     dispatch({ type: 'CLOSE_TAB', index });
   }
 
-  function setContentTab(tab: 'items' | 'query' | 'scan' | 'sql' | 'terminal' | 'info') {
+  function setContentTab(tab: 'items' | 'query' | 'scan' | 'patterns' | 'sql' | 'terminal' | 'info') {
     if (activeTabIndex >= 0) {
       dispatch({ type: 'UPDATE_TAB', index: activeTabIndex, patch: { activeSubTab: tab } });
     }
@@ -317,10 +318,11 @@ function DynamoDBCore({ showToast }: DynamoDBPageProps) {
     }
   }
 
-  const contentTabs: { key: 'items' | 'query' | 'scan' | 'sql' | 'terminal' | 'info'; label: string; shortcut?: string }[] = [
+  const contentTabs: { key: 'items' | 'query' | 'scan' | 'patterns' | 'sql' | 'terminal' | 'info'; label: string; shortcut?: string }[] = [
     { key: 'items', label: 'Items' },
     { key: 'query', label: 'Query' },
     { key: 'scan', label: 'Scan' },
+    { key: 'patterns', label: 'Access Patterns' },
     { key: 'sql', label: 'SQL' },
     { key: 'terminal', label: 'Terminal', shortcut: 'Ctrl+T' },
     { key: 'info', label: 'Table Info' },
@@ -475,6 +477,14 @@ function DynamoDBCore({ showToast }: DynamoDBPageProps) {
                 initialIndexName={currentTab.queryInitialIndex}
                 initialPkValue={currentTab.queryInitialPk}
                 tabIndex={activeTabIndex}
+              />
+            )}
+
+            {activeSubTab === 'patterns' && tableDesc && (
+              <AccessPatternsTable
+                tableName={selectedTable}
+                tableDesc={tableDesc}
+                showToast={showToast}
               />
             )}
 

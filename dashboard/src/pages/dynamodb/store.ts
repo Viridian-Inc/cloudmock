@@ -6,7 +6,7 @@ import { DDBItem, TableDescription, FilterCondition } from './types';
 export interface TabState {
   tableName: string;
   items: DDBItem[];
-  activeSubTab: 'items' | 'query' | 'scan' | 'sql' | 'terminal' | 'info';
+  activeSubTab: 'items' | 'query' | 'scan' | 'patterns' | 'sql' | 'terminal' | 'info';
   page: number;
   pageSize: number;
   lastEvaluatedKeys: (Record<string, any> | null)[];

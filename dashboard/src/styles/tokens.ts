@@ -1,14 +1,32 @@
 export const colors = {
+  // Brand
   brandBlue: '#097FF5',
-  brandDark: '#0A1F44',
+  brandBlueHover: '#0872dd',
+  brandBlue50: '#e6f2ff',
   primaryGreen: '#029662',
+  primaryGreenHover: '#028757',
+  primaryGreen50: '#e6f7f1',
   accentCyan: '#7CCEF2',
+  accentCyan300: '#7ccef2',
   error: '#FF4E5E',
+  error50: '#ffe9eb',
   warning: '#FF9A4B',
+  warning50: '#fff4eb',
   brandYellow: '#FEC307',
-  n50: '#F8FAFC', n100: '#F1F5F9', n200: '#E2E8F0', n300: '#CBD5E1',
-  n400: '#94A3B8', n500: '#64748B', n600: '#475569', n700: '#334155',
-  n800: '#1E293B', n900: '#0F172A',
+  brandDark: '#0A1F44',
+
+  // Bright success for indicators
+  successBright: '#42FF8B',
+
+  // Neutrals
+  n50: '#f8fafc', n100: '#f1f5f9', n200: '#e2e8f0', n300: '#cbd5e1',
+  n400: '#94a3b8', n500: '#64748b', n600: '#475569', n700: '#334155',
+  n800: '#1e293b', n900: '#0f172a',
+
+  // Dark mode surfaces
+  darkRoot: '#06060a',
+  darkSurface: '#181721',
+  darkSurface2: '#1e1d2b',
 };
 
 export const fonts = {

@@ -16,6 +16,8 @@ interface TopoNode {
   color: string;
   requests: number;
   active: boolean;
+  expandedHeight?: number;
+  resources?: any[];
 }
 
 interface TopoEdge {
@@ -415,9 +417,11 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [pulsing, setPulsing] = useState<Map<string, number>>(new Map());
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showAll, setShowAll] = useState(false);
+  const [viewMode, setViewMode] = useState<'collapsed' | 'expanded'>('collapsed');
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [nodeResources, setNodeResources] = useState<Record<string, any[]>>({});
   const [loadingResources, setLoadingResources] = useState<Set<string>>(new Set());
+  const [allResourcesLoaded, setAllResourcesLoaded] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -487,6 +491,45 @@ export function TopologyPage({ sse }: TopologyPageProps) {
 
     return () => clearTimeout(timer);
   }, [sse.events.length]);
+
+  // Fetch all resources when switching to expanded mode
+  useEffect(() => {
+    if (viewMode !== 'expanded') return;
+    if (allResourcesLoaded) return;
+
+    const activeNodeNames = nodes.filter(n => n.active && n.id !== 'Client Apps').map(n => n.id);
+    let cancelled = false;
+
+    async function fetchAll() {
+      for (const name of activeNodeNames) {
+        if (cancelled) break;
+        if (name in nodeResources) continue;
+        setLoadingResources(prev => new Set([...prev, name]));
+        try {
+          const res = await api(`/api/resources/${encodeURIComponent(name)}`);
+          if (!cancelled) {
+            setNodeResources(prev => ({ ...prev, [name]: res.resources || [] }));
+          }
+        } catch {
+          if (!cancelled) {
+            setNodeResources(prev => ({ ...prev, [name]: [] }));
+          }
+        } finally {
+          if (!cancelled) {
+            setLoadingResources(prev => {
+              const next = new Set(prev);
+              next.delete(name);
+              return next;
+            });
+          }
+        }
+      }
+      if (!cancelled) setAllResourcesLoaded(true);
+    }
+
+    fetchAll();
+    return () => { cancelled = true; };
+  }, [viewMode, nodes]);
 
   // Zoom handler
   const onWheel = useCallback((e: WheelEvent) => {
@@ -585,18 +628,72 @@ export function TopologyPage({ sse }: TopologyPageProps) {
     location.hash = `/resources?service=${encodeURIComponent(serviceName)}&resource=${encodeURIComponent(id)}`;
   }
 
+  // In expanded mode, compute per-node expanded heights
+  const expandedNodeHeights = useMemo(() => {
+    const map: Record<string, number> = {};
+    if (viewMode === 'expanded') {
+      for (const node of filteredNodes) {
+        const resources = nodeResources[node.id] || [];
+        const SUB_NODE_H = 22;
+        const PADDING = 16;
+        const HEADER = NODE_H;
+        if (resources.length > 0) {
+          map[node.id] = HEADER + resources.length * SUB_NODE_H + PADDING;
+        } else {
+          map[node.id] = NODE_H;
+        }
+      }
+    }
+    return map;
+  }, [viewMode, filteredNodes, nodeResources]);
+
+  // In expanded mode, adjust Y positions so nodes don't overlap
+  const adjustedNodes = useMemo(() => {
+    if (viewMode !== 'expanded') return filteredNodes;
+
+    // Group by layer
+    const layerGroups = new Map<number, typeof filteredNodes>();
+    for (const n of filteredNodes) {
+      const arr = layerGroups.get(n.layer) || [];
+      arr.push(n);
+      layerGroups.set(n.layer, arr);
+    }
+
+    const result: typeof filteredNodes = [];
+    for (const [_layer, group] of layerGroups) {
+      // Sort by original Y
+      const sorted = [...group].sort((a, b) => a.y - b.y);
+      let currentY = sorted[0]?.y ?? 60;
+      for (const node of sorted) {
+        const h = expandedNodeHeights[node.id] || NODE_H;
+        result.push({ ...node, y: currentY, expandedHeight: h });
+        currentY += h + 20; // 20px gap
+      }
+    }
+    return result;
+  }, [viewMode, filteredNodes, expandedNodeHeights]);
+
   // SVG dimensions
   const svgW = 1200;
-  const svgH = 750;
+  const maxNodeBottom = useMemo(() => {
+    let max = 0;
+    for (const n of adjustedNodes) {
+      const h = (viewMode === 'expanded' ? (expandedNodeHeights[n.id] || NODE_H) : NODE_H);
+      max = Math.max(max, n.y + h + 60);
+    }
+    return max;
+  }, [adjustedNodes, viewMode, expandedNodeHeights]);
+  const svgH = Math.max(750, maxNodeBottom);
 
-  // Lookup positions
+  // Lookup positions (use adjustedNodes in expanded mode)
+  const renderNodes = viewMode === 'expanded' ? adjustedNodes : filteredNodes;
   const nodePos = useMemo(() => {
     const map: Record<string, { cx: number; cy: number }> = {};
-    for (const n of filteredNodes) {
+    for (const n of renderNodes) {
       map[n.id] = { cx: nodeX(n.layer) + NODE_W / 2, cy: n.y + NODE_H / 2 };
     }
     return map;
-  }, [filteredNodes]);
+  }, [renderNodes]);
 
   // Unique categories present
   const presentCategories = useMemo(() => {
@@ -608,9 +705,9 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   // Unique layers present for headers
   const presentLayers = useMemo(() => {
     const layers = new Set<number>();
-    filteredNodes.forEach(n => layers.add(n.layer));
+    renderNodes.forEach(n => layers.add(n.layer));
     return Array.from(layers).sort();
-  }, [filteredNodes]);
+  }, [renderNodes]);
 
   // Minimap computation
   const minimapW = 180;
@@ -626,7 +723,18 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           <h1 class="page-title">Service Topology</h1>
           <p class="page-desc">Service dependency map with live traffic</p>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:700px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:780px">
+          {/* Expanded / Collapsed toggle */}
+          <div class="topo-view-toggle">
+            <button
+              class={viewMode === 'collapsed' ? 'active' : ''}
+              onClick={() => { setViewMode('collapsed'); setExpandedNode(null); }}
+            >Collapsed</button>
+            <button
+              class={viewMode === 'expanded' ? 'active' : ''}
+              onClick={() => setViewMode('expanded')}
+            >Expanded</button>
+          </div>
           <label
             style={{
               display: 'inline-flex',
@@ -814,7 +922,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             })}
 
             {/* Nodes */}
-            {filteredNodes.map(node => {
+            {renderNodes.map(node => {
               const x = nodeX(node.layer);
               const y = node.y;
               const isPulsing = pulsing.has(node.id);
@@ -823,6 +931,11 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const isClient = node.id === 'Client Apps';
               const fillOpacity = node.active ? 0.15 : 0.06;
               const borderColor = node.active ? node.color : '#CBD5E1';
+              const isExpanded = viewMode === 'expanded';
+              const resources = isExpanded ? (nodeResources[node.id] || []) : [];
+              const totalH = isExpanded && resources.length > 0
+                ? (expandedNodeHeights[node.id] || NODE_H)
+                : NODE_H;
 
               return (
                 <g
@@ -846,7 +959,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                       x={x - 4}
                       y={y - 4}
                       width={NODE_W + 8}
-                      height={NODE_H + 8}
+                      height={totalH + 8}
                       rx={NODE_RX + 2}
                       fill={node.color}
                       opacity="0.25"
@@ -856,17 +969,17 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     </rect>
                   )}
 
-                  {/* Node rect */}
+                  {/* Node rect (full height in expanded mode) */}
                   <rect
                     x={x}
                     y={y}
                     width={NODE_W}
-                    height={NODE_H}
+                    height={totalH}
                     rx={NODE_RX}
                     fill={`${node.color}${Math.round(fillOpacity * 255).toString(16).padStart(2, '0')}`}
                     stroke={borderColor}
                     stroke-width={isHovered ? 2.5 : 1.5}
-                    style={{ transition: 'stroke-width 0.15s' }}
+                    style={{ transition: 'all 0.3s ease' }}
                   />
 
                   {/* Service icon */}
@@ -919,6 +1032,82 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     </>
                   )}
 
+                  {/* Expanded: sub-nodes for each resource */}
+                  {isExpanded && resources.length > 0 && (
+                    <g>
+                      {/* Divider line between header and resources */}
+                      <line
+                        x1={x + 8}
+                        y1={y + NODE_H}
+                        x2={x + NODE_W - 8}
+                        y2={y + NODE_H}
+                        stroke={borderColor}
+                        stroke-width="0.5"
+                        opacity="0.5"
+                      />
+                      {resources.map((r: any, i: number) => {
+                        const rName = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
+                        const subY = y + NODE_H + 4 + i * 22;
+                        const subW = NODE_W - 16;
+                        const subH = 18;
+                        return (
+                          <g
+                            key={i}
+                            onClick={(e: MouseEvent) => {
+                              e.stopPropagation();
+                              navigateToResource(node.id, r);
+                            }}
+                            style={{ cursor: 'pointer' }}
+                          >
+                            <rect
+                              x={x + 8}
+                              y={subY}
+                              width={subW}
+                              height={subH}
+                              rx={4}
+                              fill={`${node.color}10`}
+                              stroke={`${node.color}40`}
+                              stroke-width="0.8"
+                            />
+                            <circle
+                              cx={x + 17}
+                              cy={subY + subH / 2}
+                              r="3"
+                              fill={node.color}
+                              opacity="0.6"
+                            />
+                            <text
+                              x={x + 24}
+                              y={subY + subH / 2 + 1}
+                              dominant-baseline="central"
+                              font-size="9"
+                              font-family="var(--font-mono)"
+                              fill="#475569"
+                              style={{ pointerEvents: 'none' }}
+                            >
+                              {rName.length > 18 ? rName.slice(0, 17) + '\u2026' : rName}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </g>
+                  )}
+
+                  {/* Loading indicator in expanded mode */}
+                  {isExpanded && loadingResources.has(node.id) && (
+                    <text
+                      x={x + NODE_W / 2}
+                      y={y + NODE_H + 16}
+                      text-anchor="middle"
+                      font-size="9"
+                      font-family="var(--font-sans)"
+                      fill="#94A3B8"
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      Loading...
+                    </text>
+                  )}
+
                   {/* Tooltip on hover */}
                   {isHovered && (
                     <g style={{ pointerEvents: 'none' }}>
@@ -950,7 +1139,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         font-family="var(--font-sans)"
                         fill="#94A3B8"
                       >
-                        {node.category} | {node.requests} req{node.active ? '' : ' (inactive)'}
+                        {node.category} | {node.requests} req | {(nodeResources[node.id] || []).length} resources
                       </text>
                     </g>
                   )}
@@ -958,8 +1147,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               );
             })}
 
-            {/* Expanded resource panels */}
-            {expandedNode && (() => {
+            {/* Expanded resource panels (collapsed mode only) */}
+            {viewMode === 'collapsed' && expandedNode && (() => {
               const node = filteredNodes.find(n => n.id === expandedNode);
               if (!node) return null;
               const x = nodeX(node.layer);
@@ -1047,16 +1236,17 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             />
             {/* Minimap nodes */}
             <g transform={`scale(${minimapScale})`}>
-              {filteredNodes.map(node => {
+              {renderNodes.map(node => {
                 const mx = nodeX(node.layer);
                 const my = node.y;
+                const mh = viewMode === 'expanded' ? (expandedNodeHeights[node.id] || NODE_H) : NODE_H;
                 return (
                   <rect
                     key={`mm-${node.id}`}
                     x={mx}
                     y={my}
                     width={NODE_W}
-                    height={NODE_H}
+                    height={mh}
                     rx={2}
                     fill={node.color}
                     opacity={node.active ? 0.7 : 0.3}

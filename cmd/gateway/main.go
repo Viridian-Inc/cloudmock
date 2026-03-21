@@ -16,6 +16,7 @@ import (
 	dynamodbsvc "github.com/neureaux/cloudmock/services/dynamodb"
 	ebsvc "github.com/neureaux/cloudmock/services/eventbridge"
 	ecrsvc "github.com/neureaux/cloudmock/services/ecr"
+	ecssvc "github.com/neureaux/cloudmock/services/ecs"
 	firehosesvc "github.com/neureaux/cloudmock/services/firehose"
 	kinesissvc "github.com/neureaux/cloudmock/services/kinesis"
 	kmssvc "github.com/neureaux/cloudmock/services/kms"
@@ -70,6 +71,7 @@ func main() {
 	registry.Register(kinesissvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(r53svc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ecrsvc.New(cfg.AccountID, cfg.Region))
+	registry.Register(ecssvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(cognitosvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(ebsvc.New(cfg.AccountID, cfg.Region))
 	registry.Register(sfnsvc.New(cfg.AccountID, cfg.Region))

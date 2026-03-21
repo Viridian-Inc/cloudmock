@@ -835,3 +835,707 @@ func TestEC2_UnknownAction(t *testing.T) {
 		t.Fatalf("unknown action: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
+
+// ============================================================
+// helpers for IGW/NAT/RT tests
+// ============================================================
+
+func mustCreateIGW(t *testing.T, handler http.Handler) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "CreateInternetGateway", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateInternetGateway: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		InternetGateway struct {
+			InternetGatewayId string `xml:"internetGatewayId"`
+		} `xml:"internetGateway"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("CreateInternetGateway unmarshal: %v\nbody: %s", err, w.Body.String())
+	}
+	if resp.InternetGateway.InternetGatewayId == "" {
+		t.Fatalf("CreateInternetGateway: internetGatewayId empty\nbody: %s", w.Body.String())
+	}
+	return resp.InternetGateway.InternetGatewayId
+}
+
+func mustCreateNatGateway(t *testing.T, handler http.Handler, subnetId, allocId string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "CreateNatGateway", url.Values{
+		"SubnetId":     {subnetId},
+		"AllocationId": {allocId},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateNatGateway: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		NatGateway struct {
+			NatGatewayId string `xml:"natGatewayId"`
+		} `xml:"natGateway"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("CreateNatGateway unmarshal: %v\nbody: %s", err, w.Body.String())
+	}
+	if resp.NatGateway.NatGatewayId == "" {
+		t.Fatalf("CreateNatGateway: natGatewayId empty\nbody: %s", w.Body.String())
+	}
+	return resp.NatGateway.NatGatewayId
+}
+
+func mustCreateRouteTable(t *testing.T, handler http.Handler, vpcId string) string {
+	t.Helper()
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "CreateRouteTable", url.Values{
+		"VpcId": {vpcId},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateRouteTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	var resp struct {
+		RouteTable struct {
+			RouteTableId string `xml:"routeTableId"`
+		} `xml:"routeTable"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("CreateRouteTable unmarshal: %v\nbody: %s", err, w.Body.String())
+	}
+	if resp.RouteTable.RouteTableId == "" {
+		t.Fatalf("CreateRouteTable: routeTableId empty\nbody: %s", w.Body.String())
+	}
+	return resp.RouteTable.RouteTableId
+}
+
+// ---- Test 8: IGW lifecycle ----
+
+func TestEC2_InternetGatewayLifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	// CreateInternetGateway.
+	igwId := mustCreateIGW(t, handler)
+	if !strings.HasPrefix(igwId, "igw-") {
+		t.Errorf("CreateInternetGateway: expected igw- prefix, got %s", igwId)
+	}
+
+	// DescribeInternetGateways — should appear.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeInternetGateways", url.Values{
+			"InternetGatewayId.1": {igwId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeInternetGateways: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), igwId) {
+			t.Errorf("DescribeInternetGateways: expected %s\nbody: %s", igwId, w.Body.String())
+		}
+	}
+
+	// DeleteInternetGateway while not attached should succeed.
+	igw2Id := mustCreateIGW(t, handler)
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteInternetGateway", url.Values{
+			"InternetGatewayId": {igw2Id},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteInternetGateway (detached): expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// AttachInternetGateway.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "AttachInternetGateway", url.Values{
+			"InternetGatewayId": {igwId},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("AttachInternetGateway: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// DescribeInternetGateways filtered by attachment.vpc-id.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeInternetGateways", url.Values{
+			"Filter.1.Name":    {"attachment.vpc-id"},
+			"Filter.1.Value.1": {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeInternetGateways vpc filter: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, igwId) {
+			t.Errorf("DescribeInternetGateways vpc filter: expected %s\nbody: %s", igwId, body)
+		}
+		if !strings.Contains(body, "<state>attached</state>") {
+			t.Errorf("DescribeInternetGateways: expected state=attached\nbody: %s", body)
+		}
+	}
+
+	// Second attach to same VPC should fail.
+	{
+		igw3Id := mustCreateIGW(t, handler)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "AttachInternetGateway", url.Values{
+			"InternetGatewayId": {igw3Id},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("AttachInternetGateway: second attach to same VPC should fail")
+		}
+		if !strings.Contains(w.Body.String(), "AlreadyAssociated") {
+			t.Errorf("AttachInternetGateway: expected AlreadyAssociated\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DeleteInternetGateway while attached should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteInternetGateway", url.Values{
+			"InternetGatewayId": {igwId},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("DeleteInternetGateway while attached: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "DependencyViolation") {
+			t.Errorf("DeleteInternetGateway while attached: expected DependencyViolation\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DetachInternetGateway.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DetachInternetGateway", url.Values{
+			"InternetGatewayId": {igwId},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DetachInternetGateway: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Now delete should succeed.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteInternetGateway", url.Values{
+			"InternetGatewayId": {igwId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteInternetGateway after detach: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Detach a non-attached IGW should return Gateway.NotAttached.
+	{
+		igw4Id := mustCreateIGW(t, handler)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DetachInternetGateway", url.Values{
+			"InternetGatewayId": {igw4Id},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("DetachInternetGateway not attached: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "Gateway.NotAttached") {
+			t.Errorf("DetachInternetGateway not attached: expected Gateway.NotAttached\nbody: %s", w.Body.String())
+		}
+	}
+}
+
+// ---- Test 9: NAT Gateway lifecycle ----
+
+func TestEC2_NatGatewayLifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+
+	// CreateNatGateway.
+	natId := mustCreateNatGateway(t, handler, subnetId, "eipalloc-abc123")
+	if !strings.HasPrefix(natId, "nat-") {
+		t.Errorf("CreateNatGateway: expected nat- prefix, got %s", natId)
+	}
+
+	// DescribeNatGateways — by ID.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeNatGateways", url.Values{
+			"NatGatewayId.1": {natId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeNatGateways: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, natId) {
+			t.Errorf("DescribeNatGateways: expected %s\nbody: %s", natId, body)
+		}
+		if !strings.Contains(body, "<state>available</state>") {
+			t.Errorf("DescribeNatGateways: expected state=available\nbody: %s", body)
+		}
+		if !strings.Contains(body, subnetId) {
+			t.Errorf("DescribeNatGateways: expected subnetId\nbody: %s", body)
+		}
+		if !strings.Contains(body, vpcId) {
+			t.Errorf("DescribeNatGateways: expected vpcId\nbody: %s", body)
+		}
+	}
+
+	// DescribeNatGateways — filter by subnet-id.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeNatGateways", url.Values{
+			"Filter.1.Name":    {"subnet-id"},
+			"Filter.1.Value.1": {subnetId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeNatGateways subnet filter: expected 200, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), natId) {
+			t.Errorf("DescribeNatGateways subnet filter: expected %s\nbody: %s", natId, w.Body.String())
+		}
+	}
+
+	// DeleteNatGateway.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteNatGateway", url.Values{
+			"NatGatewayId": {natId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteNatGateway: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		if !strings.Contains(w.Body.String(), "<state>deleted</state>") {
+			t.Errorf("DeleteNatGateway: expected state=deleted in response\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DescribeNatGateways after delete — filter by state=deleted.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeNatGateways", url.Values{
+			"Filter.1.Name":    {"state"},
+			"Filter.1.Value.1": {"deleted"},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeNatGateways state filter: expected 200, got %d", w.Code)
+		}
+		if !strings.Contains(w.Body.String(), natId) {
+			t.Errorf("DescribeNatGateways deleted: expected %s\nbody: %s", natId, w.Body.String())
+		}
+	}
+
+	// CreateNatGateway for non-existent subnet should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateNatGateway", url.Values{
+			"SubnetId":     {"subnet-nonexistent000001"},
+			"AllocationId": {"eipalloc-xyz"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("CreateNatGateway non-existent subnet: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidSubnetID.NotFound") {
+			t.Errorf("CreateNatGateway non-existent subnet: expected InvalidSubnetID.NotFound\nbody: %s", w.Body.String())
+		}
+	}
+}
+
+// ---- Test 10: Route Table lifecycle ----
+
+func TestEC2_RouteTableLifecycle(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+
+	// CreateRouteTable.
+	rtbId := mustCreateRouteTable(t, handler, vpcId)
+	if !strings.HasPrefix(rtbId, "rtb-") {
+		t.Errorf("CreateRouteTable: expected rtb- prefix, got %s", rtbId)
+	}
+
+	// DescribeRouteTables — local route should be present.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DescribeRouteTables: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		body := w.Body.String()
+		if !strings.Contains(body, rtbId) {
+			t.Errorf("DescribeRouteTables: expected %s\nbody: %s", rtbId, body)
+		}
+		if !strings.Contains(body, "<gatewayId>local</gatewayId>") {
+			t.Errorf("DescribeRouteTables: expected local route\nbody: %s", body)
+		}
+		if !strings.Contains(body, "10.0.0.0/16") {
+			t.Errorf("DescribeRouteTables: expected VPC CIDR in local route\nbody: %s", body)
+		}
+	}
+
+	// CreateRoute via IGW.
+	igwId := mustCreateIGW(t, handler)
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "AttachInternetGateway", url.Values{
+			"InternetGatewayId": {igwId},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("AttachInternetGateway: %d %s", w.Code, w.Body.String())
+		}
+	}
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"GatewayId":            {igwId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("CreateRoute IGW: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// CreateRoute via NAT Gateway.
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+	natId := mustCreateNatGateway(t, handler, subnetId, "eipalloc-001")
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"192.168.0.0/16"},
+			"NatGatewayId":         {natId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("CreateRoute NAT: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// DescribeRouteTables — verify both routes present.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		body := w.Body.String()
+		if !strings.Contains(body, "0.0.0.0/0") {
+			t.Errorf("DescribeRouteTables: expected default route\nbody: %s", body)
+		}
+		if !strings.Contains(body, igwId) {
+			t.Errorf("DescribeRouteTables: expected igwId in route\nbody: %s", body)
+		}
+		if !strings.Contains(body, "192.168.0.0/16") {
+			t.Errorf("DescribeRouteTables: expected NAT route destination\nbody: %s", body)
+		}
+		if !strings.Contains(body, natId) {
+			t.Errorf("DescribeRouteTables: expected natId in route\nbody: %s", body)
+		}
+	}
+
+	// DeleteRoute — remove the NAT route.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"192.168.0.0/16"},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteRoute: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Verify route is gone.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		if strings.Contains(w.Body.String(), "192.168.0.0/16") {
+			t.Errorf("DescribeRouteTables: NAT route should be deleted\nbody: %s", w.Body.String())
+		}
+	}
+
+	// Delete local (CreateRouteTable) route should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"10.0.0.0/16"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("DeleteRoute local: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidParameterValue") {
+			t.Errorf("DeleteRoute local: expected InvalidParameterValue\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DeleteRouteTable — should succeed (no subnet associations).
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteRouteTable", url.Values{
+			"RouteTableId": {rtbId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteRouteTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+}
+
+// ---- Test 11: Route Table associations ----
+
+func TestEC2_RouteTableAssociations(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	subnetId := mustCreateSubnet(t, handler, vpcId, "10.0.1.0/24")
+	rtbId := mustCreateRouteTable(t, handler, vpcId)
+
+	// AssociateRouteTable.
+	var assocId string
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "AssociateRouteTable", url.Values{
+			"RouteTableId": {rtbId},
+			"SubnetId":     {subnetId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("AssociateRouteTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+		var resp struct {
+			AssociationId string `xml:"associationId"`
+		}
+		if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+			t.Fatalf("AssociateRouteTable unmarshal: %v", err)
+		}
+		if !strings.HasPrefix(resp.AssociationId, "rtbassoc-") {
+			t.Errorf("AssociateRouteTable: expected rtbassoc- prefix, got %s", resp.AssociationId)
+		}
+		assocId = resp.AssociationId
+	}
+
+	// DescribeRouteTables — association should appear.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		body := w.Body.String()
+		if !strings.Contains(body, assocId) {
+			t.Errorf("DescribeRouteTables: expected assocId %s\nbody: %s", assocId, body)
+		}
+		if !strings.Contains(body, subnetId) {
+			t.Errorf("DescribeRouteTables: expected subnetId in association\nbody: %s", body)
+		}
+	}
+
+	// DeleteRouteTable while associated should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteRouteTable", url.Values{
+			"RouteTableId": {rtbId},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("DeleteRouteTable with associations: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "DependencyViolation") {
+			t.Errorf("DeleteRouteTable with associations: expected DependencyViolation\nbody: %s", w.Body.String())
+		}
+	}
+
+	// DisassociateRouteTable.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DisassociateRouteTable", url.Values{
+			"AssociationId": {assocId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DisassociateRouteTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// After disassociation the association ID should be gone.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		if strings.Contains(w.Body.String(), assocId) {
+			t.Errorf("DescribeRouteTables: assocId should be gone after disassociation\nbody: %s", w.Body.String())
+		}
+	}
+
+	// Now delete should succeed.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DeleteRouteTable", url.Values{
+			"RouteTableId": {rtbId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DeleteRouteTable after disassoc: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+}
+
+// ---- Test 12: CreateRoute target validation ----
+
+func TestEC2_CreateRouteTargetValidation(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	rtbId := mustCreateRouteTable(t, handler, vpcId)
+
+	// CreateRoute with nonexistent IGW should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"GatewayId":            {"igw-doesnotexist0001"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("CreateRoute nonexistent IGW: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidGatewayID.NotFound") {
+			t.Errorf("CreateRoute nonexistent IGW: expected InvalidGatewayID.NotFound\nbody: %s", w.Body.String())
+		}
+	}
+
+	// CreateRoute with nonexistent NAT GW should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"NatGatewayId":         {"nat-doesnotexist00001"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("CreateRoute nonexistent NAT GW: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidNatGatewayID.NotFound") {
+			t.Errorf("CreateRoute nonexistent NAT GW: expected InvalidNatGatewayID.NotFound\nbody: %s", w.Body.String())
+		}
+	}
+
+	// CreateRoute with no target should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("CreateRoute no target: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "MissingParameter") {
+			t.Errorf("CreateRoute no target: expected MissingParameter\nbody: %s", w.Body.String())
+		}
+	}
+
+	// ReplaceRoute with nonexistent destination should fail.
+	{
+		igwId := mustCreateIGW(t, handler)
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "ReplaceRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"1.2.3.0/24"},
+			"GatewayId":            {igwId},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("ReplaceRoute nonexistent dest: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidRoute.NotFound") {
+			t.Errorf("ReplaceRoute nonexistent dest: expected InvalidRoute.NotFound\nbody: %s", w.Body.String())
+		}
+	}
+
+	// CreateRoute on nonexistent route table should fail.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {"rtb-nonexistent000001"},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"GatewayId":            {"igw-fake"},
+		}))
+		if w.Code == http.StatusOK {
+			t.Error("CreateRoute nonexistent RTB: expected error, got 200")
+		}
+		if !strings.Contains(w.Body.String(), "InvalidRouteTableID.NotFound") {
+			t.Errorf("CreateRoute nonexistent RTB: expected InvalidRouteTableID.NotFound\nbody: %s", w.Body.String())
+		}
+	}
+}
+
+// ---- Test 13: ReplaceRoute updates an existing route ----
+
+func TestEC2_ReplaceRoute(t *testing.T) {
+	handler := newEC2Gateway(t)
+	vpcId := mustCreateVpc(t, handler, "10.0.0.0/16")
+	rtbId := mustCreateRouteTable(t, handler, vpcId)
+	igw1Id := mustCreateIGW(t, handler)
+	igw2Id := mustCreateIGW(t, handler)
+
+	// Attach both IGWs would fail (only 1 per VPC) — attach only igw1.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "AttachInternetGateway", url.Values{
+			"InternetGatewayId": {igw1Id},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("AttachInternetGateway igw1: %d %s", w.Code, w.Body.String())
+		}
+	}
+	// Detach igw1, attach igw2 so both exist as valid IGWs.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DetachInternetGateway", url.Values{
+			"InternetGatewayId": {igw1Id},
+			"VpcId":             {vpcId},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("DetachInternetGateway igw1: %d %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Add a route pointing to igw1.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "CreateRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"GatewayId":            {igw1Id},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("CreateRoute: %d %s", w.Code, w.Body.String())
+		}
+	}
+
+	// ReplaceRoute — point 0.0.0.0/0 to igw2 instead.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "ReplaceRoute", url.Values{
+			"RouteTableId":         {rtbId},
+			"DestinationCidrBlock": {"0.0.0.0/0"},
+			"GatewayId":            {igw2Id},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("ReplaceRoute: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		}
+	}
+
+	// Verify route now points to igw2.
+	{
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", url.Values{
+			"RouteTableId.1": {rtbId},
+		}))
+		body := w.Body.String()
+		if !strings.Contains(body, igw2Id) {
+			t.Errorf("ReplaceRoute: expected igw2Id in route\nbody: %s", body)
+		}
+	}
+}

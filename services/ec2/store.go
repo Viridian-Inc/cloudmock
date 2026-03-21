@@ -37,6 +37,49 @@ type RouteTable struct {
 	RouteTableId string
 	VpcId        string
 	IsMain       bool
+	Routes       []Route
+	Tags         map[string]string
+}
+
+// Route represents a single entry in a route table.
+type Route struct {
+	DestinationCidrBlock string
+	GatewayId            string // igw-*, local, or vpce-*
+	NatGatewayId         string
+	VpcEndpointId        string
+	State                string // active
+	Origin               string // CreateRoute or CreateRouteTable
+}
+
+// RouteTableAssociation links a subnet to a route table.
+type RouteTableAssociation struct {
+	AssociationId string
+	RouteTableId  string
+	SubnetId      string
+	Main          bool
+}
+
+// InternetGateway represents an EC2 internet gateway.
+type InternetGateway struct {
+	IgwId       string
+	Attachments []IGWAttachment
+	Tags        map[string]string
+}
+
+// IGWAttachment records a VPC attached to an internet gateway.
+type IGWAttachment struct {
+	VpcId string
+	State string // attached
+}
+
+// NatGateway represents an EC2 NAT gateway.
+type NatGateway struct {
+	NatGatewayId string
+	SubnetId     string
+	VpcId        string
+	AllocationId string
+	State        string // available, deleted
+	Tags         map[string]string
 }
 
 // SGRule represents a single inbound or outbound security group rule.
@@ -68,26 +111,32 @@ type NetworkACL struct {
 
 // Store manages all EC2 resources.
 type Store struct {
-	mu             sync.RWMutex
-	vpcs           map[string]*VPC
-	subnets        map[string]*Subnet
-	routeTables    map[string]*RouteTable
-	securityGroups map[string]*SecurityGroup
-	networkACLs    map[string]*NetworkACL
-	accountID      string
-	region         string
+	mu                    sync.RWMutex
+	vpcs                  map[string]*VPC
+	subnets               map[string]*Subnet
+	routeTables           map[string]*RouteTable
+	routeTableAssociations map[string]*RouteTableAssociation
+	securityGroups        map[string]*SecurityGroup
+	networkACLs           map[string]*NetworkACL
+	internetGateways      map[string]*InternetGateway
+	natGateways           map[string]*NatGateway
+	accountID             string
+	region                string
 }
 
 // NewStore returns a new Store for the given account and region.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		vpcs:           make(map[string]*VPC),
-		subnets:        make(map[string]*Subnet),
-		routeTables:    make(map[string]*RouteTable),
-		securityGroups: make(map[string]*SecurityGroup),
-		networkACLs:    make(map[string]*NetworkACL),
-		accountID:      accountID,
-		region:         region,
+		vpcs:                  make(map[string]*VPC),
+		subnets:               make(map[string]*Subnet),
+		routeTables:           make(map[string]*RouteTable),
+		routeTableAssociations: make(map[string]*RouteTableAssociation),
+		securityGroups:        make(map[string]*SecurityGroup),
+		networkACLs:           make(map[string]*NetworkACL),
+		internetGateways:      make(map[string]*InternetGateway),
+		natGateways:           make(map[string]*NatGateway),
+		accountID:             accountID,
+		region:                region,
 	}
 }
 
@@ -118,11 +167,20 @@ func (s *Store) CreateVPC(cidrBlock string, enableDnsSupport, enableDnsHostnames
 	}
 	s.vpcs[vpc.VpcId] = vpc
 
-	// Auto-create default route table.
+	// Auto-create default route table with local route.
 	rt := &RouteTable{
 		RouteTableId: genID("rtb-"),
 		VpcId:        vpc.VpcId,
 		IsMain:       true,
+		Routes: []Route{
+			{
+				DestinationCidrBlock: cidrBlock,
+				GatewayId:            "local",
+				State:                "active",
+				Origin:               "CreateRouteTable",
+			},
+		},
+		Tags: make(map[string]string),
 	}
 	s.routeTables[rt.RouteTableId] = rt
 
@@ -208,6 +266,12 @@ func (s *Store) DeleteVPC(vpcId string) (string, bool) {
 	for id, rt := range s.routeTables {
 		if rt.VpcId == vpcId {
 			delete(s.routeTables, id)
+		}
+	}
+	for id, assoc := range s.routeTableAssociations {
+		rt, ok := s.routeTables[assoc.RouteTableId]
+		if ok && rt.VpcId == vpcId {
+			delete(s.routeTableAssociations, id)
 		}
 	}
 	for id, sg := range s.securityGroups {
@@ -564,6 +628,452 @@ func (s *Store) RevokeSecurityGroupEgress(groupId string, rules []SGRule) string
 	}
 	sg.EgressRules = updated
 	return ""
+}
+
+// ---- InternetGateway operations ----
+
+// CreateInternetGateway creates a new detached internet gateway.
+func (s *Store) CreateInternetGateway() *InternetGateway {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	igw := &InternetGateway{
+		IgwId:       genID("igw-"),
+		Attachments: []IGWAttachment{},
+		Tags:        make(map[string]string),
+	}
+	s.internetGateways[igw.IgwId] = igw
+	return igw
+}
+
+// AttachInternetGateway attaches an IGW to a VPC. Returns an error code string.
+// Empty string means success.
+func (s *Store) AttachInternetGateway(igwId, vpcId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	igw, ok := s.internetGateways[igwId]
+	if !ok {
+		return "igw_not_found"
+	}
+	if _, ok := s.vpcs[vpcId]; !ok {
+		return "vpc_not_found"
+	}
+	// IGW may only be attached to one VPC at a time.
+	if len(igw.Attachments) > 0 {
+		return "already_attached"
+	}
+	// VPC may only have one IGW.
+	for _, other := range s.internetGateways {
+		for _, att := range other.Attachments {
+			if att.VpcId == vpcId {
+				return "vpc_already_has_igw"
+			}
+		}
+	}
+	igw.Attachments = append(igw.Attachments, IGWAttachment{VpcId: vpcId, State: "attached"})
+	return ""
+}
+
+// DetachInternetGateway detaches an IGW from a VPC. Returns an error code string.
+func (s *Store) DetachInternetGateway(igwId, vpcId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	igw, ok := s.internetGateways[igwId]
+	if !ok {
+		return "igw_not_found"
+	}
+	if _, ok := s.vpcs[vpcId]; !ok {
+		return "vpc_not_found"
+	}
+	newAtts := igw.Attachments[:0:0]
+	found := false
+	for _, att := range igw.Attachments {
+		if att.VpcId == vpcId {
+			found = true
+			continue
+		}
+		newAtts = append(newAtts, att)
+	}
+	if !found {
+		return "not_attached"
+	}
+	igw.Attachments = newAtts
+	return ""
+}
+
+// DeleteInternetGateway deletes an IGW. Fails if still attached to a VPC.
+func (s *Store) DeleteInternetGateway(igwId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	igw, ok := s.internetGateways[igwId]
+	if !ok {
+		return "not_found"
+	}
+	if len(igw.Attachments) > 0 {
+		return "still_attached"
+	}
+	delete(s.internetGateways, igwId)
+	return ""
+}
+
+// ListInternetGateways returns IGWs filtered by IDs and/or attached VPC ID.
+func (s *Store) ListInternetGateways(ids []string, filterVpcId string) []*InternetGateway {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*InternetGateway, 0)
+	for _, igw := range s.internetGateways {
+		if idSet != nil {
+			if _, ok := idSet[igw.IgwId]; !ok {
+				continue
+			}
+		}
+		if filterVpcId != "" {
+			found := false
+			for _, att := range igw.Attachments {
+				if att.VpcId == filterVpcId {
+					found = true
+					break
+				}
+			}
+			if !found {
+				continue
+			}
+		}
+		result = append(result, igw)
+	}
+	return result
+}
+
+// ---- NatGateway operations ----
+
+// CreateNatGateway creates a new NAT gateway in the given subnet with the given
+// EIP allocation ID. Returns the gateway and an error code string.
+func (s *Store) CreateNatGateway(subnetId, allocationId string) (*NatGateway, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	sub, ok := s.subnets[subnetId]
+	if !ok {
+		return nil, "subnet_not_found"
+	}
+
+	nat := &NatGateway{
+		NatGatewayId: genID("nat-"),
+		SubnetId:     subnetId,
+		VpcId:        sub.VpcId,
+		AllocationId: allocationId,
+		State:        "available",
+		Tags:         make(map[string]string),
+	}
+	s.natGateways[nat.NatGatewayId] = nat
+	return nat, ""
+}
+
+// ListNatGateways returns NAT gateways filtered by IDs, subnet ID, VPC ID,
+// and/or state. Any empty filter is ignored.
+func (s *Store) ListNatGateways(ids []string, filterSubnetId, filterVpcId, filterState string) []*NatGateway {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*NatGateway, 0)
+	for _, nat := range s.natGateways {
+		if idSet != nil {
+			if _, ok := idSet[nat.NatGatewayId]; !ok {
+				continue
+			}
+		}
+		if filterSubnetId != "" && nat.SubnetId != filterSubnetId {
+			continue
+		}
+		if filterVpcId != "" && nat.VpcId != filterVpcId {
+			continue
+		}
+		if filterState != "" && nat.State != filterState {
+			continue
+		}
+		result = append(result, nat)
+	}
+	return result
+}
+
+// DeleteNatGateway sets a NAT gateway's state to deleted. Returns an error code.
+func (s *Store) DeleteNatGateway(natGatewayId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	nat, ok := s.natGateways[natGatewayId]
+	if !ok {
+		return "not_found"
+	}
+	nat.State = "deleted"
+	return ""
+}
+
+// ---- RouteTable operations ----
+
+// CreateRouteTable creates a new route table in the given VPC with a local route.
+func (s *Store) CreateRouteTable(vpcId string) (*RouteTable, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	vpc, ok := s.vpcs[vpcId]
+	if !ok {
+		return nil, "vpc_not_found"
+	}
+
+	rt := &RouteTable{
+		RouteTableId: genID("rtb-"),
+		VpcId:        vpcId,
+		IsMain:       false,
+		Routes: []Route{
+			{
+				DestinationCidrBlock: vpc.CidrBlock,
+				GatewayId:            "local",
+				State:                "active",
+				Origin:               "CreateRouteTable",
+			},
+		},
+		Tags: make(map[string]string),
+	}
+	s.routeTables[rt.RouteTableId] = rt
+	return rt, ""
+}
+
+// ListRouteTables returns route tables filtered by IDs and/or VPC ID.
+func (s *Store) ListRouteTables(ids []string, filterVpcId string) []*RouteTable {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var idSet map[string]struct{}
+	if len(ids) > 0 {
+		idSet = make(map[string]struct{}, len(ids))
+		for _, id := range ids {
+			idSet[id] = struct{}{}
+		}
+	}
+
+	result := make([]*RouteTable, 0)
+	for _, rt := range s.routeTables {
+		if idSet != nil {
+			if _, ok := idSet[rt.RouteTableId]; !ok {
+				continue
+			}
+		}
+		if filterVpcId != "" && rt.VpcId != filterVpcId {
+			continue
+		}
+		result = append(result, rt)
+	}
+	return result
+}
+
+// DeleteRouteTable deletes a route table. Fails if it has subnet associations.
+func (s *Store) DeleteRouteTable(rtbId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rt, ok := s.routeTables[rtbId]
+	if !ok {
+		return "not_found"
+	}
+	if rt.IsMain {
+		return "main_table"
+	}
+	// Check for subnet associations.
+	for _, assoc := range s.routeTableAssociations {
+		if assoc.RouteTableId == rtbId && !assoc.Main {
+			return "has_associations"
+		}
+	}
+	delete(s.routeTables, rtbId)
+	return ""
+}
+
+// CreateRoute adds a new route to a route table. Returns an error code string.
+// Validates that the gateway/NAT GW target exists.
+func (s *Store) CreateRoute(rtbId, destCidr, gatewayId, natGatewayId, vpcEndpointId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rt, ok := s.routeTables[rtbId]
+	if !ok {
+		return "rtb_not_found"
+	}
+
+	// Check for duplicate destination.
+	for _, r := range rt.Routes {
+		if r.DestinationCidrBlock == destCidr {
+			return "route_already_exists"
+		}
+	}
+
+	// Validate target exists.
+	if gatewayId != "" && gatewayId != "local" {
+		if _, ok := s.internetGateways[gatewayId]; !ok {
+			return "gateway_not_found"
+		}
+	}
+	if natGatewayId != "" {
+		nat, ok := s.natGateways[natGatewayId]
+		if !ok || nat.State == "deleted" {
+			return "nat_not_found"
+		}
+	}
+
+	route := Route{
+		DestinationCidrBlock: destCidr,
+		GatewayId:            gatewayId,
+		NatGatewayId:         natGatewayId,
+		VpcEndpointId:        vpcEndpointId,
+		State:                "active",
+		Origin:               "CreateRoute",
+	}
+	rt.Routes = append(rt.Routes, route)
+	return ""
+}
+
+// DeleteRoute removes a route by destination CIDR from a route table.
+func (s *Store) DeleteRoute(rtbId, destCidr string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rt, ok := s.routeTables[rtbId]
+	if !ok {
+		return "rtb_not_found"
+	}
+
+	newRoutes := rt.Routes[:0:0]
+	found := false
+	for _, r := range rt.Routes {
+		if r.DestinationCidrBlock == destCidr {
+			if r.Origin == "CreateRouteTable" {
+				return "local_route"
+			}
+			found = true
+			continue
+		}
+		newRoutes = append(newRoutes, r)
+	}
+	if !found {
+		return "route_not_found"
+	}
+	rt.Routes = newRoutes
+	return ""
+}
+
+// ReplaceRoute updates the target for an existing route destination.
+func (s *Store) ReplaceRoute(rtbId, destCidr, gatewayId, natGatewayId, vpcEndpointId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rt, ok := s.routeTables[rtbId]
+	if !ok {
+		return "rtb_not_found"
+	}
+
+	// Validate target exists.
+	if gatewayId != "" && gatewayId != "local" {
+		if _, ok := s.internetGateways[gatewayId]; !ok {
+			return "gateway_not_found"
+		}
+	}
+	if natGatewayId != "" {
+		nat, ok := s.natGateways[natGatewayId]
+		if !ok || nat.State == "deleted" {
+			return "nat_not_found"
+		}
+	}
+
+	for i, r := range rt.Routes {
+		if r.DestinationCidrBlock == destCidr {
+			rt.Routes[i].GatewayId = gatewayId
+			rt.Routes[i].NatGatewayId = natGatewayId
+			rt.Routes[i].VpcEndpointId = vpcEndpointId
+			return ""
+		}
+	}
+	return "route_not_found"
+}
+
+// AssociateRouteTable links a subnet to a route table. Returns the association
+// ID and an error code string.
+func (s *Store) AssociateRouteTable(rtbId, subnetId string) (string, string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.routeTables[rtbId]; !ok {
+		return "", "rtb_not_found"
+	}
+	if _, ok := s.subnets[subnetId]; !ok {
+		return "", "subnet_not_found"
+	}
+
+	// Check if subnet already associated with a route table.
+	for _, assoc := range s.routeTableAssociations {
+		if assoc.SubnetId == subnetId {
+			return "", "already_associated"
+		}
+	}
+
+	assocId := genID("rtbassoc-")
+	assoc := &RouteTableAssociation{
+		AssociationId: assocId,
+		RouteTableId:  rtbId,
+		SubnetId:      subnetId,
+		Main:          false,
+	}
+	s.routeTableAssociations[assocId] = assoc
+	return assocId, ""
+}
+
+// DisassociateRouteTable removes a subnet-to-route-table association.
+func (s *Store) DisassociateRouteTable(assocId string) string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	assoc, ok := s.routeTableAssociations[assocId]
+	if !ok {
+		return "not_found"
+	}
+	if assoc.Main {
+		return "main_association"
+	}
+	delete(s.routeTableAssociations, assocId)
+	return ""
+}
+
+// ListRouteTableAssociations returns all associations for a given route table.
+func (s *Store) ListRouteTableAssociations(rtbId string) []*RouteTableAssociation {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]*RouteTableAssociation, 0)
+	for _, assoc := range s.routeTableAssociations {
+		if assoc.RouteTableId == rtbId {
+			result = append(result, assoc)
+		}
+	}
+	return result
 }
 
 // ---- helpers ----

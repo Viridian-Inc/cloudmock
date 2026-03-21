@@ -38,6 +38,25 @@ func (s *EC2Service) Actions() []service.Action {
 		{Name: "AuthorizeSecurityGroupEgress", Method: http.MethodPost, IAMAction: "ec2:AuthorizeSecurityGroupEgress"},
 		{Name: "RevokeSecurityGroupIngress", Method: http.MethodPost, IAMAction: "ec2:RevokeSecurityGroupIngress"},
 		{Name: "RevokeSecurityGroupEgress", Method: http.MethodPost, IAMAction: "ec2:RevokeSecurityGroupEgress"},
+		// Internet Gateway
+		{Name: "CreateInternetGateway", Method: http.MethodPost, IAMAction: "ec2:CreateInternetGateway"},
+		{Name: "AttachInternetGateway", Method: http.MethodPost, IAMAction: "ec2:AttachInternetGateway"},
+		{Name: "DetachInternetGateway", Method: http.MethodPost, IAMAction: "ec2:DetachInternetGateway"},
+		{Name: "DeleteInternetGateway", Method: http.MethodPost, IAMAction: "ec2:DeleteInternetGateway"},
+		{Name: "DescribeInternetGateways", Method: http.MethodPost, IAMAction: "ec2:DescribeInternetGateways"},
+		// NAT Gateway
+		{Name: "CreateNatGateway", Method: http.MethodPost, IAMAction: "ec2:CreateNatGateway"},
+		{Name: "DescribeNatGateways", Method: http.MethodPost, IAMAction: "ec2:DescribeNatGateways"},
+		{Name: "DeleteNatGateway", Method: http.MethodPost, IAMAction: "ec2:DeleteNatGateway"},
+		// Route Table
+		{Name: "CreateRouteTable", Method: http.MethodPost, IAMAction: "ec2:CreateRouteTable"},
+		{Name: "DescribeRouteTables", Method: http.MethodPost, IAMAction: "ec2:DescribeRouteTables"},
+		{Name: "DeleteRouteTable", Method: http.MethodPost, IAMAction: "ec2:DeleteRouteTable"},
+		{Name: "CreateRoute", Method: http.MethodPost, IAMAction: "ec2:CreateRoute"},
+		{Name: "DeleteRoute", Method: http.MethodPost, IAMAction: "ec2:DeleteRoute"},
+		{Name: "ReplaceRoute", Method: http.MethodPost, IAMAction: "ec2:ReplaceRoute"},
+		{Name: "AssociateRouteTable", Method: http.MethodPost, IAMAction: "ec2:AssociateRouteTable"},
+		{Name: "DisassociateRouteTable", Method: http.MethodPost, IAMAction: "ec2:DisassociateRouteTable"},
 	}
 }
 
@@ -83,6 +102,41 @@ func (s *EC2Service) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleRevokeSecurityGroupIngress(ctx, s.store)
 	case "RevokeSecurityGroupEgress":
 		return handleRevokeSecurityGroupEgress(ctx, s.store)
+	// Internet Gateway
+	case "CreateInternetGateway":
+		return handleCreateInternetGateway(ctx, s.store)
+	case "AttachInternetGateway":
+		return handleAttachInternetGateway(ctx, s.store)
+	case "DetachInternetGateway":
+		return handleDetachInternetGateway(ctx, s.store)
+	case "DeleteInternetGateway":
+		return handleDeleteInternetGateway(ctx, s.store)
+	case "DescribeInternetGateways":
+		return handleDescribeInternetGateways(ctx, s.store)
+	// NAT Gateway
+	case "CreateNatGateway":
+		return handleCreateNatGateway(ctx, s.store)
+	case "DescribeNatGateways":
+		return handleDescribeNatGateways(ctx, s.store)
+	case "DeleteNatGateway":
+		return handleDeleteNatGateway(ctx, s.store)
+	// Route Table
+	case "CreateRouteTable":
+		return handleCreateRouteTable(ctx, s.store)
+	case "DescribeRouteTables":
+		return handleDescribeRouteTables(ctx, s.store)
+	case "DeleteRouteTable":
+		return handleDeleteRouteTable(ctx, s.store)
+	case "CreateRoute":
+		return handleCreateRoute(ctx, s.store)
+	case "DeleteRoute":
+		return handleDeleteRoute(ctx, s.store)
+	case "ReplaceRoute":
+		return handleReplaceRoute(ctx, s.store)
+	case "AssociateRouteTable":
+		return handleAssociateRouteTable(ctx, s.store)
+	case "DisassociateRouteTable":
+		return handleDisassociateRouteTable(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

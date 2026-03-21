@@ -92,6 +92,7 @@ const NAME_MAP: Record<string, string> = {
   'sns':               'SNS',
   'events':            'EventBridge',
   'eventbridge':       'EventBridge',
+  'monitoring':        'CloudWatch',
   'apigateway':        'API Gateway',
   'apigatewayv2':      'API Gateway',
   'execute-api':       'API Gateway',
@@ -135,18 +136,204 @@ const KNOWN_EDGES: { from: string; to: string; label: string }[] = [
   { from: 'CloudWatch',    to: 'SNS',               label: 'alarm actions' },
 ];
 
+// --- Service Icons (simple SVG paths centered at 0,0) ---
+
+function ServiceIcon({ service, x, y, color }: { service: string; x: number; y: number; color: string }) {
+  const s = 7; // half-size
+  const iconColor = color;
+
+  switch (service) {
+    case 'Lambda':
+      // Lambda symbol
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <path d={`M${-s} ${s} L0 ${-s} L${s} ${s} Z`} fill="none" stroke={iconColor} stroke-width="1.5" />
+          <text x="0" y="2" text-anchor="middle" font-size="8" font-weight="700" fill={iconColor} style={{ pointerEvents: 'none' }}>{'λ'}</text>
+        </g>
+      );
+    case 'DynamoDB':
+    case 'RDS':
+      // Database cylinder
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <ellipse cx="0" cy={-s + 2} rx={s} ry="3" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-s} y1={-s + 2} x2={-s} y2={s - 2} stroke={iconColor} stroke-width="1.3" />
+          <line x1={s} y1={-s + 2} x2={s} y2={s - 2} stroke={iconColor} stroke-width="1.3" />
+          <ellipse cx="0" cy={s - 2} rx={s} ry="3" fill="none" stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+    case 'S3':
+      // Bucket
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <path d={`M${-s} ${-s} L${-s + 2} ${s} L${s - 2} ${s} L${s} ${-s} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-s} y1={-s + 3} x2={s} y2={-s + 3} stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+    case 'SQS':
+      // Queue (stacked lines)
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="2" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-s + 2} y1={-2} x2={s - 2} y2={-2} stroke={iconColor} stroke-width="1.2" />
+          <line x1={-s + 2} y1="2" x2={s - 2} y2="2" stroke={iconColor} stroke-width="1.2" />
+        </g>
+      );
+    case 'SNS':
+      // Bell / notification
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <circle cx="0" cy="0" r={s} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <circle cx="0" cy="0" r="2" fill={iconColor} />
+          <line x1="0" y1={-s} x2={s - 1} y2={-s - 3} stroke={iconColor} stroke-width="1.2" />
+          <line x1="0" y1={-s} x2={-s + 1} y2={-s - 3} stroke={iconColor} stroke-width="1.2" />
+        </g>
+      );
+    case 'API Gateway':
+      // Gateway arrows
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <path d={`M${-s} 0 L0 ${-s} L${s} 0 L0 ${s} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-3} y1="0" x2="3" y2="0" stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+    case 'Cognito':
+    case 'IAM':
+    case 'STS':
+      // Shield / lock
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <path d={`M0 ${-s} L${s} ${-s + 3} L${s} ${s - 3} L0 ${s} L${-s} ${s - 3} L${-s} ${-s + 3} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <circle cx="0" cy="-1" r="2" fill="none" stroke={iconColor} stroke-width="1.2" />
+          <line x1="0" y1="1" x2="0" y2="4" stroke={iconColor} stroke-width="1.2" />
+        </g>
+      );
+    case 'CloudWatch':
+    case 'CloudWatch Logs':
+      // Chart / graph
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="1" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <polyline points={`${-s + 2},${s - 3} ${-2},0 ${2},${s - 5} ${s - 2},${-s + 3}`} fill="none" stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+    case 'EventBridge':
+      // Event bus
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <circle cx="0" cy="0" r={s} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-s} y1="0" x2={s} y2="0" stroke={iconColor} stroke-width="1" />
+          <line x1="0" y1={-s} x2="0" y2={s} stroke={iconColor} stroke-width="1" />
+        </g>
+      );
+    case 'SES':
+      // Envelope
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <rect x={-s} y={-s + 2} width={s * 2} height={s * 2 - 4} rx="1" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <polyline points={`${-s},${-s + 2} 0,2 ${s},${-s + 2}`} fill="none" stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+    case 'Secrets Manager':
+    case 'KMS':
+      // Key
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <circle cx={-2} cy={-2} r="3" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1="1" y1="1" x2={s} y2={s} stroke={iconColor} stroke-width="1.3" />
+          <line x1={s - 2} y1={s} x2={s} y2={s - 2} stroke={iconColor} stroke-width="1.2" />
+        </g>
+      );
+    case 'SSM':
+      // Settings gear (simplified)
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <circle cx="0" cy="0" r={s - 2} fill="none" stroke={iconColor} stroke-width="1.3" />
+          <circle cx="0" cy="0" r="2" fill={iconColor} />
+        </g>
+      );
+    case 'Step Functions':
+      // Flow nodes
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <circle cx={-3} cy={-3} r="2.5" fill="none" stroke={iconColor} stroke-width="1.2" />
+          <circle cx="3" cy="3" r="2.5" fill="none" stroke={iconColor} stroke-width="1.2" />
+          <line x1={-1} y1={-1} x2="1" y2="1" stroke={iconColor} stroke-width="1.2" />
+        </g>
+      );
+    case 'Client Apps':
+      // Browser window
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="2" fill="none" stroke={iconColor} stroke-width="1.3" />
+          <line x1={-s} y1={-s + 4} x2={s} y2={-s + 4} stroke={iconColor} stroke-width="1" />
+          <circle cx={-s + 3} cy={-s + 2} r="1" fill={iconColor} />
+        </g>
+      );
+    default:
+      // Generic box
+      return (
+        <g transform={`translate(${x},${y})`}>
+          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="3" fill="none" stroke={iconColor} stroke-width="1.3" />
+        </g>
+      );
+  }
+}
+
 // --- Layout ---
 
-const LAYER_X = [80, 280, 480, 700, 940];
-const NODE_W = 140;
-const NODE_H = 44;
+const LAYER_X = [80, 280, 480, 720, 960];
+const NODE_W = 160;
+const NODE_H = 48;
 const NODE_RX = 10;
+const V_GAP = 80; // vertical gap between nodes
 
-function buildLayout(activeNames: Set<string>, requestCounts: Map<string, number>): { nodes: TopoNode[]; edges: TopoEdge[] } {
+// Layer labels for category headers
+const LAYER_HEADERS: Record<number, string> = {
+  0: 'Client',
+  1: 'API',
+  2: 'Compute',
+  3: 'Data & Messaging',
+  4: 'Config & Monitoring',
+};
+
+function buildLayout(
+  activeNames: Set<string>,
+  requestCounts: Map<string, number>,
+  showAll: boolean,
+): { nodes: TopoNode[]; edges: TopoEdge[] } {
+  // Collect service names referenced by edges
+  const edgeServices = new Set<string>();
+  for (const e of KNOWN_EDGES) {
+    edgeServices.add(e.from);
+    edgeServices.add(e.to);
+  }
+
   // Always include Client Apps as entry point
   const included = new Set<string>(['Client Apps']);
-  for (const name of activeNames) {
-    included.add(name);
+
+  // Determine which services to include
+  for (const [name] of Object.entries(SERVICE_DEFS)) {
+    const hasRequests = (requestCounts.get(name) || 0) > 0;
+    const isEdgeMember = edgeServices.has(name);
+    const isActive = activeNames.has(name);
+
+    if (showAll) {
+      included.add(name);
+    } else if (hasRequests || (isActive && isEdgeMember)) {
+      included.add(name);
+    }
+  }
+
+  // If a service is included via requests, also include services connected by known edges
+  // so the dependency map makes sense
+  for (const e of KNOWN_EDGES) {
+    if (included.has(e.from) && edgeServices.has(e.to) && SERVICE_DEFS[e.to]) {
+      // only add the other end if it has requests or showAll
+      if (showAll || included.has(e.to)) {
+        // already handled
+      }
+    }
   }
 
   // Gather nodes per layer
@@ -174,8 +361,8 @@ function buildLayout(activeNames: Set<string>, requestCounts: Map<string, number
     const order = layerOrder[layer] || names;
     const sorted = order.filter(n => names.includes(n));
     const count = sorted.length;
-    const totalH = count * (NODE_H + 24) - 24;
-    const startY = Math.max(40, 300 - totalH / 2);
+    const totalH = count * (NODE_H + V_GAP) - V_GAP;
+    const startY = Math.max(60, 350 - totalH / 2);
 
     sorted.forEach((name, i) => {
       const def = SERVICE_DEFS[name]!;
@@ -184,7 +371,7 @@ function buildLayout(activeNames: Set<string>, requestCounts: Map<string, number
         label: name,
         category: def.category,
         layer: def.layer,
-        y: startY + i * (NODE_H + 24),
+        y: startY + i * (NODE_H + V_GAP),
         color: CATEGORY_COLORS[def.category] || '#94A3B8',
         requests: requestCounts.get(name) || 0,
         active: activeNames.has(name),
@@ -227,6 +414,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [enabledCategories, setEnabledCategories] = useState<Set<string>>(new Set(Object.keys(CATEGORY_COLORS)));
   const [pulsing, setPulsing] = useState<Map<string, number>>(new Map());
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [showAll, setShowAll] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -240,13 +428,14 @@ export function TopologyPage({ sse }: TopologyPageProps) {
     return () => clearInterval(iv);
   }, []);
 
-  // Process active services
+  // Process active services -- canonicalize and deduplicate
   const { activeNames, requestCounts } = useMemo(() => {
     const activeNames = new Set<string>();
     const requestCounts = new Map<string, number>();
 
     for (const svc of services) {
-      const canonical = NAME_MAP[svc.name?.toLowerCase()] || NAME_MAP[svc.name];
+      const key = svc.name?.toLowerCase?.() || svc.name || '';
+      const canonical = NAME_MAP[key] || NAME_MAP[svc.name];
       if (canonical && SERVICE_DEFS[canonical]) {
         activeNames.add(canonical);
       }
@@ -267,8 +456,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
 
   // Build layout
   const { nodes, edges } = useMemo(
-    () => buildLayout(activeNames, requestCounts),
-    [activeNames, requestCounts]
+    () => buildLayout(activeNames, requestCounts, showAll),
+    [activeNames, requestCounts, showAll]
   );
 
   // SSE live traffic pulse
@@ -363,8 +552,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   }
 
   // SVG dimensions
-  const svgW = 1100;
-  const svgH = 650;
+  const svgW = 1200;
+  const svgH = 750;
 
   // Lookup positions
   const nodePos = useMemo(() => {
@@ -382,6 +571,20 @@ export function TopologyPage({ sse }: TopologyPageProps) {
     return Array.from(cats);
   }, [nodes]);
 
+  // Unique layers present for headers
+  const presentLayers = useMemo(() => {
+    const layers = new Set<number>();
+    filteredNodes.forEach(n => layers.add(n.layer));
+    return Array.from(layers).sort();
+  }, [filteredNodes]);
+
+  // Minimap computation
+  const minimapW = 180;
+  const minimapH = 100;
+  const minimapScale = useMemo(() => {
+    return Math.min(minimapW / svgW, minimapH / svgH);
+  }, []);
+
   return (
     <div>
       <div class="mb-6 flex items-center justify-between">
@@ -389,7 +592,32 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           <h1 class="page-title">Service Topology</h1>
           <p class="page-desc">Service dependency map with live traffic</p>
         </div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;max-width:600px">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:700px">
+          <label
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+              padding: '3px 10px',
+              borderRadius: '12px',
+              border: '1.5px solid #64748B',
+              background: showAll ? '#64748B20' : 'transparent',
+              color: showAll ? '#64748B' : '#94A3B8',
+              fontSize: '11px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              userSelect: 'none',
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={showAll}
+              onChange={() => setShowAll(v => !v)}
+              style={{ width: '12px', height: '12px', margin: 0, cursor: 'pointer' }}
+            />
+            Show all
+          </label>
           {presentCategories.map(cat => (
             <button
               key={cat}
@@ -451,6 +679,28 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           <rect width={svgW} height={svgH} fill="url(#topo-grid)" />
 
           <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
+            {/* Layer / category headers */}
+            {presentLayers.map(layer => {
+              const lx = nodeX(layer);
+              const header = LAYER_HEADERS[layer] || '';
+              return header ? (
+                <text
+                  key={`header-${layer}`}
+                  x={lx + NODE_W / 2}
+                  y={30}
+                  text-anchor="middle"
+                  font-size="11"
+                  font-weight="700"
+                  font-family="var(--font-sans)"
+                  fill="#94A3B8"
+                  letter-spacing="0.5"
+                  style={{ textTransform: 'uppercase', pointerEvents: 'none' } as any}
+                >
+                  {header}
+                </text>
+              ) : null;
+            })}
+
             {/* Edges */}
             {filteredEdges.map((edge, i) => {
               const from = nodePos[edge.from];
@@ -471,7 +721,12 @@ export function TopologyPage({ sse }: TopologyPageProps) {
 
               const path = bezierPath(startX, startY, endX, endY);
               const midX = (startX + endX) / 2;
-              const midY = (startY + endY) / 2 - 8;
+              const midY = (startY + endY) / 2 - 10;
+
+              // Estimate label width
+              const labelText = edge.label || '';
+              const labelW = labelText.length * 5.5 + 8;
+              const labelH = 14;
 
               return (
                 <g key={`e-${i}`} style={{ opacity: dimmed ? 0.15 : 1, transition: 'opacity 0.2s' }}>
@@ -482,18 +737,31 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     stroke-width={highlighted ? 2 : 1.2}
                     marker-end={highlighted ? 'url(#topo-arrow-active)' : 'url(#topo-arrow)'}
                   />
-                  {edge.label && (
-                    <text
-                      x={midX}
-                      y={midY}
-                      text-anchor="middle"
-                      font-size="9"
-                      font-family="var(--font-sans)"
-                      fill={highlighted ? '#3B82F6' : '#94A3B8'}
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      {edge.label}
-                    </text>
+                  {labelText && (
+                    <>
+                      <rect
+                        x={midX - labelW / 2}
+                        y={midY - labelH / 2}
+                        width={labelW}
+                        height={labelH}
+                        rx={3}
+                        fill="white"
+                        stroke={highlighted ? '#3B82F6' : '#E2E8F0'}
+                        stroke-width="0.5"
+                      />
+                      <text
+                        x={midX}
+                        y={midY + 1}
+                        text-anchor="middle"
+                        dominant-baseline="central"
+                        font-size="8.5"
+                        font-family="var(--font-sans)"
+                        fill={highlighted ? '#3B82F6' : '#94A3B8'}
+                        style={{ pointerEvents: 'none' }}
+                      >
+                        {labelText}
+                      </text>
+                    </>
                   )}
                   {/* Animated dot for pulsing edges */}
                   {(pulsing.has(edge.from) || pulsing.has(edge.to)) && (
@@ -559,17 +827,17 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     style={{ transition: 'stroke-width 0.15s' }}
                   />
 
-                  {/* Category dot */}
-                  <circle
-                    cx={x + 14}
-                    cy={y + NODE_H / 2}
-                    r={4}
-                    fill={node.color}
+                  {/* Service icon */}
+                  <ServiceIcon
+                    service={node.id}
+                    x={x + 16}
+                    y={y + NODE_H / 2}
+                    color={node.color}
                   />
 
                   {/* Label */}
                   <text
-                    x={x + 26}
+                    x={x + 30}
                     y={y + NODE_H / 2 + 1}
                     dominant-baseline="central"
                     font-size="11.5"
@@ -585,20 +853,20 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                   {node.requests > 0 && (
                     <>
                       <rect
-                        x={x + NODE_W - 36}
-                        y={y + 6}
-                        width={30}
-                        height={16}
-                        rx={8}
+                        x={x + NODE_W - 40}
+                        y={y + 8}
+                        width={34}
+                        height={18}
+                        rx={9}
                         fill={node.color}
                         opacity="0.18"
                       />
                       <text
-                        x={x + NODE_W - 21}
-                        y={y + 14}
+                        x={x + NODE_W - 23}
+                        y={y + 17}
                         dominant-baseline="central"
                         text-anchor="middle"
-                        font-size="9"
+                        font-size="9.5"
                         font-weight="700"
                         font-family="var(--font-mono)"
                         fill={node.color}
@@ -613,17 +881,17 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                   {isHovered && (
                     <g style={{ pointerEvents: 'none' }}>
                       <rect
-                        x={x + NODE_W / 2 - 70}
-                        y={y - 44}
-                        width={140}
-                        height={36}
+                        x={x + NODE_W / 2 - 80}
+                        y={y - 48}
+                        width={160}
+                        height={40}
                         rx={6}
                         fill="#0F172A"
                         opacity="0.92"
                       />
                       <text
                         x={x + NODE_W / 2}
-                        y={y - 30}
+                        y={y - 33}
                         text-anchor="middle"
                         font-size="10"
                         font-weight="600"
@@ -634,7 +902,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                       </text>
                       <text
                         x={x + NODE_W / 2}
-                        y={y - 16}
+                        y={y - 18}
                         text-anchor="middle"
                         font-size="9"
                         font-family="var(--font-sans)"
@@ -647,6 +915,69 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                 </g>
               );
             })}
+          </g>
+
+          {/* Minimap */}
+          <g transform={`translate(${svgW - minimapW - 16}, ${svgH - minimapH - 16})`}>
+            {/* Minimap background */}
+            <rect
+              width={minimapW}
+              height={minimapH}
+              rx={4}
+              fill="white"
+              stroke="#E2E8F0"
+              stroke-width="1"
+              opacity="0.92"
+            />
+            {/* Minimap nodes */}
+            <g transform={`scale(${minimapScale})`}>
+              {filteredNodes.map(node => {
+                const mx = nodeX(node.layer);
+                const my = node.y;
+                return (
+                  <rect
+                    key={`mm-${node.id}`}
+                    x={mx}
+                    y={my}
+                    width={NODE_W}
+                    height={NODE_H}
+                    rx={2}
+                    fill={node.color}
+                    opacity={node.active ? 0.7 : 0.3}
+                  />
+                );
+              })}
+              {/* Minimap edges */}
+              {filteredEdges.map((edge, i) => {
+                const from = nodePos[edge.from];
+                const to = nodePos[edge.to];
+                if (!from || !to) return null;
+                return (
+                  <line
+                    key={`mme-${i}`}
+                    x1={from.cx}
+                    y1={from.cy}
+                    x2={to.cx}
+                    y2={to.cy}
+                    stroke="#CBD5E1"
+                    stroke-width="1"
+                    opacity="0.5"
+                  />
+                );
+              })}
+            </g>
+            {/* Viewport indicator */}
+            <rect
+              x={(-transform.x / transform.scale) * minimapScale}
+              y={(-transform.y / transform.scale) * minimapScale}
+              width={(svgW / transform.scale) * minimapScale}
+              height={(svgH / transform.scale) * minimapScale}
+              rx={2}
+              fill="none"
+              stroke="#3B82F6"
+              stroke-width="1.5"
+              opacity="0.6"
+            />
           </g>
         </svg>
       </div>

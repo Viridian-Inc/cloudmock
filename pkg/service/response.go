@@ -1,1 +1,57 @@
 package service
+
+import (
+	"encoding/json"
+	"encoding/xml"
+	"net/http"
+)
+
+// ResponseFormat indicates the wire format for a response.
+type ResponseFormat int
+
+const (
+	FormatXML  ResponseFormat = iota
+	FormatJSON ResponseFormat = iota
+)
+
+// Response holds the components of an HTTP response before it is written.
+type Response struct {
+	StatusCode int
+	Body       interface{}
+	Format     ResponseFormat
+	Headers    map[string]string
+}
+
+// WriteXMLResponse marshals body as XML and writes it with Content-Type text/xml.
+func WriteXMLResponse(w http.ResponseWriter, statusCode int, body interface{}) error {
+	data, err := xml.Marshal(body)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "text/xml")
+	w.WriteHeader(statusCode)
+	_, err = w.Write(data)
+	return err
+}
+
+// WriteJSONResponse marshals body as JSON and writes it with Content-Type application/x-amz-json-1.1.
+func WriteJSONResponse(w http.ResponseWriter, statusCode int, body interface{}) error {
+	data, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	w.WriteHeader(statusCode)
+	_, err = w.Write(data)
+	return err
+}
+
+// WriteErrorResponse writes an AWSError in the specified format.
+func WriteErrorResponse(w http.ResponseWriter, awsErr *AWSError, format ResponseFormat) error {
+	switch format {
+	case FormatJSON:
+		return WriteJSONResponse(w, awsErr.StatusCode(), awsErr)
+	default:
+		return WriteXMLResponse(w, awsErr.StatusCode(), awsErr)
+	}
+}

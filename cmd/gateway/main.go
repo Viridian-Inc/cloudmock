@@ -38,6 +38,7 @@ import (
 	sqssvc "github.com/neureaux/cloudmock/services/sqs"
 	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
 	stssvc "github.com/neureaux/cloudmock/services/sts"
+	iamsvc "github.com/neureaux/cloudmock/services/iam"
 	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
 	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
 	"github.com/neureaux/cloudmock/services/stubs"
@@ -90,6 +91,9 @@ func main() {
 	registry.Register(s3svc.NewWithBus(bus))
 
 	registry.Register(stssvc.New(cfg.AccountID))
+
+	// IAM service — always eager, shares engine and store with the gateway auth layer.
+	registry.Register(iamsvc.New(cfg.AccountID, engine, store))
 
 	// Tier 1 services that may be eager or lazy depending on profile.
 	registerOrDefer := func(name string, factory func() service.Service) service.Service {

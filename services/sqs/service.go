@@ -2,6 +2,7 @@ package sqs
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -57,9 +58,19 @@ func (s *SQSService) EnqueueDirect(queueName, messageBody string) bool {
 }
 
 // HandleRequest routes an incoming SQS request to the appropriate handler.
-// SQS uses form-encoded bodies; the Action may appear in the query string
-// (already parsed into ctx.Params) or in the form-encoded body.
+// It supports both query/form-encoded (XML) and JSON protocol formats.
+// JSON protocol is detected via Content-Type: application/x-amz-json-* or
+// the presence of an X-Amz-Target header.
 func (s *SQSService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
+	// Detect JSON protocol.
+	contentType := ctx.RawRequest.Header.Get("Content-Type")
+	isJSON := strings.Contains(contentType, "application/x-amz-json") ||
+		ctx.RawRequest.Header.Get("X-Amz-Target") != ""
+
+	if isJSON {
+		return s.handleJSON(ctx)
+	}
+
 	action := ctx.Action
 	if action == "" {
 		form := parseForm(ctx)

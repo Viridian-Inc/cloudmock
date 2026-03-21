@@ -1,0 +1,44 @@
+policies:
+  - name: ec2-required-tags
+    resource: ec2
+    description: |
+      Ensure EC2 instances have required tags (Environment, Owner, Project).
+    filters:
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+        - "tag:Project": absent
+    actions:
+      - type: notify
+        subject: "EC2 instance missing required tags"
+        violation_desc: "Instance is missing one or more required tags."
+        action_desc: "Add Environment, Owner, and Project tags to the instance."
+
+  - name: s3-required-tags
+    resource: s3
+    description: |
+      Ensure S3 buckets have required tags.
+    filters:
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+    actions:
+      - type: notify
+        subject: "S3 bucket missing required tags"
+        violation_desc: "Bucket is missing required tags."
+        action_desc: "Add Environment and Owner tags to the bucket."
+
+  - name: rds-required-tags
+    resource: rds
+    description: |
+      Ensure RDS instances have required tags.
+    filters:
+      - or:
+        - "tag:Environment": absent
+        - "tag:Owner": absent
+        - "tag:Project": absent
+    actions:
+      - type: notify
+        subject: "RDS instance missing required tags"
+        violation_desc: "RDS instance is missing required tags."
+        action_desc: "Add Environment, Owner, and Project tags."

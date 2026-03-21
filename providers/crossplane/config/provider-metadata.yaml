@@ -1,0 +1,140 @@
+# Upjet provider metadata for cloudmock.
+# This file configures how terraform-provider-cloudmock resources are mapped
+# to Crossplane Managed Resources.
+apiVersion: meta.upjet.crossplane.io/v1alpha1
+kind: ProviderMetadata
+metadata:
+  name: provider-cloudmock
+spec:
+  # Terraform provider source and version.
+  terraform:
+    providerSource: neureaux/cloudmock
+    providerVersion: ">=0.1.0"
+
+  # Root API group for all generated CRDs.
+  rootGroup: cloudmock.neureaux.io
+
+  # Resource configuration overrides.
+  resources:
+    # S3
+    cloudmock_s3_bucket:
+      apiGroup: s3
+      kind: Bucket
+      shortNames: ["s3bucket"]
+
+    # DynamoDB
+    cloudmock_dynamodb_table:
+      apiGroup: dynamodb
+      kind: Table
+      shortNames: ["ddbtable"]
+
+    # EC2 - VPC
+    cloudmock_vpc:
+      apiGroup: ec2
+      kind: VPC
+      shortNames: ["vpc"]
+
+    cloudmock_subnet:
+      apiGroup: ec2
+      kind: Subnet
+      shortNames: ["subnet"]
+
+    cloudmock_security_group:
+      apiGroup: ec2
+      kind: SecurityGroup
+      shortNames: ["sg"]
+
+    cloudmock_instance:
+      apiGroup: ec2
+      kind: Instance
+      shortNames: ["inst"]
+
+    cloudmock_eip:
+      apiGroup: ec2
+      kind: EIP
+      shortNames: ["eip"]
+
+    cloudmock_internet_gateway:
+      apiGroup: ec2
+      kind: InternetGateway
+      shortNames: ["igw"]
+
+    cloudmock_nat_gateway:
+      apiGroup: ec2
+      kind: NATGateway
+      shortNames: ["natgw"]
+
+    cloudmock_route_table:
+      apiGroup: ec2
+      kind: RouteTable
+      shortNames: ["rt"]
+
+    # SQS
+    cloudmock_sqs_queue:
+      apiGroup: sqs
+      kind: Queue
+      shortNames: ["sqsqueue"]
+
+    # SNS
+    cloudmock_sns_topic:
+      apiGroup: sns
+      kind: Topic
+      shortNames: ["snstopic"]
+
+    # Lambda
+    cloudmock_lambda_function:
+      apiGroup: lambda
+      kind: Function
+      shortNames: ["fn"]
+
+    # KMS
+    cloudmock_kms_key:
+      apiGroup: kms
+      kind: Key
+      shortNames: ["kmskey"]
+
+    # Secrets Manager
+    cloudmock_secret:
+      apiGroup: secretsmanager
+      kind: Secret
+      shortNames: ["secret"]
+
+    # SSM
+    cloudmock_ssm_parameter:
+      apiGroup: ssm
+      kind: Parameter
+      shortNames: ["param"]
+
+    # RDS
+    cloudmock_rds_instance:
+      apiGroup: rds
+      kind: DBInstance
+      shortNames: ["rds"]
+
+    # ECR
+    cloudmock_ecr_repository:
+      apiGroup: ecr
+      kind: Repository
+      shortNames: ["ecr"]
+
+    # ECS
+    cloudmock_ecs_cluster:
+      apiGroup: ecs
+      kind: Cluster
+      shortNames: ["ecscluster"]
+
+    cloudmock_ecs_service:
+      apiGroup: ecs
+      kind: Service
+      shortNames: ["ecssvc"]
+
+    cloudmock_ecs_task_definition:
+      apiGroup: ecs
+      kind: TaskDefinition
+      shortNames: ["taskdef"]
+
+    # Cognito
+    cloudmock_cognito_user_pool:
+      apiGroup: cognito
+      kind: UserPool
+      shortNames: ["userpool"]

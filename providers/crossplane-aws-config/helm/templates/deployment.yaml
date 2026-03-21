@@ -1,0 +1,102 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-cloudmock
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: cloudmock
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: cloudmock
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cloudmock
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: cloudmock
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: CLOUDMOCK_REGION
+              value: {{ .Values.cloudmock.region | quote }}
+            - name: CLOUDMOCK_ACCOUNT_ID
+              value: {{ .Values.cloudmock.accountId | quote }}
+            - name: CLOUDMOCK_GATEWAY_PORT
+              value: {{ .Values.cloudmock.gatewayPort | quote }}
+            - name: CLOUDMOCK_ADMIN_PORT
+              value: {{ .Values.cloudmock.adminPort | quote }}
+            - name: CLOUDMOCK_IAM_MODE
+              value: {{ .Values.cloudmock.iamMode | quote }}
+            {{- if .Values.cloudmock.dashboard.enabled }}
+            - name: CLOUDMOCK_DASHBOARD_ENABLED
+              value: "true"
+            - name: CLOUDMOCK_DASHBOARD_PORT
+              value: {{ .Values.cloudmock.dashboard.port | quote }}
+            {{- end }}
+          ports:
+            - name: gateway
+              containerPort: {{ .Values.cloudmock.gatewayPort }}
+              protocol: TCP
+            - name: admin
+              containerPort: {{ .Values.cloudmock.adminPort }}
+              protocol: TCP
+            {{- if .Values.cloudmock.dashboard.enabled }}
+            - name: dashboard
+              containerPort: {{ .Values.cloudmock.dashboard.port }}
+              protocol: TCP
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /_cloudmock/health
+              port: gateway
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /_cloudmock/health
+              port: gateway
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-cloudmock
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: cloudmock
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.port }}
+      targetPort: gateway
+      protocol: TCP
+      name: gateway
+    - port: {{ .Values.service.adminPort }}
+      targetPort: admin
+      protocol: TCP
+      name: admin
+  selector:
+    app.kubernetes.io/name: cloudmock
+    app.kubernetes.io/instance: {{ .Release.Name }}

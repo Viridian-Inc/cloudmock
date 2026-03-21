@@ -1,0 +1,43 @@
+policies:
+  - name: sg-open-ingress
+    resource: security-group
+    description: |
+      Find security groups with unrestricted ingress (0.0.0.0/0).
+    filters:
+      - type: ingress
+        Cidr:
+          value: "0.0.0.0/0"
+    actions:
+      - type: notify
+        subject: "Security group has open ingress"
+        violation_desc: "Security group allows inbound traffic from any IP."
+        action_desc: "Restrict ingress rules to specific IP ranges."
+
+  - name: sg-unrestricted-ssh
+    resource: security-group
+    description: |
+      Find security groups allowing SSH (port 22) from 0.0.0.0/0.
+    filters:
+      - type: ingress
+        Cidr:
+          value: "0.0.0.0/0"
+        Ports: [22]
+    actions:
+      - type: notify
+        subject: "SSH open to the world"
+        violation_desc: "Security group allows SSH from any IP address."
+        action_desc: "Restrict port 22 to specific trusted IP ranges."
+
+  - name: default-vpc-in-use
+    resource: vpc
+    description: |
+      Detect usage of the default VPC.
+    filters:
+      - type: value
+        key: IsDefault
+        value: true
+    actions:
+      - type: notify
+        subject: "Default VPC is in use"
+        violation_desc: "Workloads should run in custom VPCs with proper segmentation."
+        action_desc: "Migrate resources to a custom VPC."

@@ -1,0 +1,32 @@
+{{- if .Values.crossplane.providerConfig.enabled }}
+# Static credentials for cloudmock (test/test).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ .Values.crossplane.providerConfig.name }}-creds
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: |
+    [default]
+    aws_access_key_id = test
+    aws_secret_access_key = test
+---
+# ProviderConfig pointing provider-aws at the cloudmock service.
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: {{ .Values.crossplane.providerConfig.name }}
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: {{ .Values.crossplane.providerConfig.name }}-creds
+      key: credentials
+  endpoint:
+    url:
+      static: http://{{ .Release.Name }}-cloudmock.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port }}
+    hostnameImmutable: true
+    services: ["*"]
+{{- end }}

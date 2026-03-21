@@ -1,0 +1,46 @@
+policies:
+  - name: iam-root-access-keys
+    resource: iam-user
+    description: |
+      Check that the root account does not have active access keys.
+    filters:
+      - type: value
+        key: UserName
+        value: "root"
+      - type: credential
+        key: access_keys.active
+        value: true
+    actions:
+      - type: notify
+        subject: "Root account has active access keys"
+        violation_desc: "The root user should never have access keys."
+        action_desc: "Delete root access keys and use IAM users or roles."
+
+  - name: iam-unused-credentials
+    resource: iam-user
+    description: |
+      Identify IAM users with credentials unused for 90+ days.
+    filters:
+      - type: credential
+        key: access_keys.last_used
+        value_type: age
+        value: 90
+        op: gte
+    actions:
+      - type: notify
+        subject: "IAM user has unused credentials"
+        violation_desc: "Access keys have not been used in over 90 days."
+        action_desc: "Deactivate or delete unused access keys."
+
+  - name: iam-no-mfa
+    resource: iam-user
+    description: |
+      Find IAM users without MFA enabled.
+    filters:
+      - type: mfa-device
+        value: []
+    actions:
+      - type: notify
+        subject: "IAM user has no MFA device"
+        violation_desc: "User does not have multi-factor authentication enabled."
+        action_desc: "Enable MFA for the IAM user."

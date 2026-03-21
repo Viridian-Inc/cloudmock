@@ -1,0 +1,46 @@
+# ProviderConfig for the official Crossplane AWS provider (provider-aws)
+# pointed at a cloudmock gateway instance.
+#
+# This allows you to use the standard AWS CRDs (e.g., s3.aws.upbound.io/Bucket)
+# while targeting cloudmock instead of real AWS.
+#
+# Prerequisites:
+#   1. Install provider-aws in your Crossplane cluster
+#   2. Deploy cloudmock (see helm/ directory or docker-compose.yml)
+#   3. Apply this ProviderConfig
+#
+# Usage:
+#   kubectl apply -f provider-config.yaml
+---
+apiVersion: aws.upbound.io/v1beta1
+kind: ProviderConfig
+metadata:
+  name: cloudmock
+spec:
+  credentials:
+    source: Secret
+    secretRef:
+      namespace: crossplane-system
+      name: cloudmock-creds
+      key: credentials
+  endpoint:
+    # URL of the cloudmock gateway.
+    # If running in-cluster via the Helm chart, use the service name.
+    url:
+      static: http://cloudmock.cloudmock-system.svc.cluster.local:4566
+    # Override all AWS service endpoints to point at cloudmock.
+    hostnameImmutable: true
+    services: ["*"]
+---
+# Static AWS credentials for cloudmock (test/test).
+apiVersion: v1
+kind: Secret
+metadata:
+  name: cloudmock-creds
+  namespace: crossplane-system
+type: Opaque
+stringData:
+  credentials: |
+    [default]
+    aws_access_key_id = test
+    aws_secret_access_key = test

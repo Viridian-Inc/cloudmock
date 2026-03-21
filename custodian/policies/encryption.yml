@@ -1,0 +1,42 @@
+policies:
+  - name: kms-key-rotation
+    resource: kms-key
+    description: |
+      Ensure KMS customer-managed keys have automatic rotation enabled.
+    filters:
+      - type: key-rotation-status
+        key: KeyRotationEnabled
+        value: false
+    actions:
+      - type: notify
+        subject: "KMS key rotation not enabled"
+        violation_desc: "Customer-managed KMS key does not have automatic rotation."
+        action_desc: "Enable automatic key rotation for the KMS key."
+
+  - name: dynamodb-encryption
+    resource: dynamodb-table
+    description: |
+      Ensure DynamoDB tables use KMS encryption (not default).
+    filters:
+      - type: value
+        key: "SSEDescription.SSEType"
+        value: absent
+    actions:
+      - type: notify
+        subject: "DynamoDB table missing KMS encryption"
+        violation_desc: "Table does not have customer-managed KMS encryption."
+        action_desc: "Enable SSE with a customer-managed KMS key."
+
+  - name: rds-storage-encrypted
+    resource: rds
+    description: |
+      Ensure RDS instances have storage encryption enabled.
+    filters:
+      - type: value
+        key: StorageEncrypted
+        value: false
+    actions:
+      - type: notify
+        subject: "RDS instance storage not encrypted"
+        violation_desc: "RDS instance does not have storage encryption enabled."
+        action_desc: "Enable storage encryption (requires instance recreation for unencrypted instances)."

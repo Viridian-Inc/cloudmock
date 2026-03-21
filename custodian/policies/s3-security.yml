@@ -1,0 +1,44 @@
+policies:
+  - name: s3-no-public-access
+    resource: s3
+    description: |
+      Flag S3 buckets that may have public access enabled.
+      Works with cloudmock when AWS_ENDPOINT_URL is set to the gateway.
+    filters:
+      - type: value
+        key: "Name"
+        value: "^public-"
+        op: regex
+    actions:
+      - type: notify
+        subject: "S3 bucket may have public access"
+        violation_desc: "Bucket name suggests public access configuration."
+        action_desc: "Enable S3 Block Public Access on this bucket."
+
+  - name: s3-versioning-disabled
+    resource: s3
+    description: |
+      Identify S3 buckets without versioning enabled.
+    filters:
+      - type: value
+        key: "Versioning.Status"
+        value: absent
+    actions:
+      - type: notify
+        subject: "S3 bucket versioning is not enabled"
+        violation_desc: "Bucket does not have versioning enabled."
+        action_desc: "Enable versioning to protect against accidental data loss."
+
+  - name: s3-no-encryption
+    resource: s3
+    description: |
+      Identify S3 buckets without default encryption configured.
+    filters:
+      - type: value
+        key: "ServerSideEncryptionConfiguration"
+        value: absent
+    actions:
+      - type: notify
+        subject: "S3 bucket has no default encryption"
+        violation_desc: "Bucket does not have server-side encryption configured."
+        action_desc: "Enable default encryption with SSE-S3 or SSE-KMS."

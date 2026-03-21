@@ -1,0 +1,48 @@
+policies:
+  - name: eip-unused
+    resource: network-addr
+    description: |
+      Find Elastic IPs that are not associated with a running instance.
+      Unassociated EIPs incur hourly charges.
+    filters:
+      - type: value
+        key: AssociationId
+        value: absent
+    actions:
+      - type: notify
+        subject: "Unused Elastic IP detected"
+        violation_desc: "Elastic IP is not associated with any instance."
+        action_desc: "Release the Elastic IP if no longer needed."
+
+  - name: ec2-stopped-instances
+    resource: ec2
+    description: |
+      Find EC2 instances that have been stopped for more than 30 days.
+    filters:
+      - type: instance-state
+        value: stopped
+      - type: value
+        key: "StateTransitionReason"
+        value_type: age
+        value: 30
+        op: gte
+    actions:
+      - type: notify
+        subject: "EC2 instance stopped for over 30 days"
+        violation_desc: "Stopped instances still incur EBS storage charges."
+        action_desc: "Terminate the instance or create an AMI and terminate."
+
+  - name: lambda-high-memory
+    resource: lambda
+    description: |
+      Find Lambda functions with memory over 1024 MB that may be over-provisioned.
+    filters:
+      - type: value
+        key: MemorySize
+        value: 1024
+        op: gt
+    actions:
+      - type: notify
+        subject: "Lambda function may be over-provisioned"
+        violation_desc: "Function has more than 1024 MB memory allocated."
+        action_desc: "Review function memory usage and right-size if possible."

@@ -1,0 +1,56 @@
+policies:
+  - name: cloudtrail-enabled
+    resource: account
+    description: |
+      Ensure at least one CloudTrail trail is active for API auditing.
+    filters:
+      - type: check-cloudtrail
+        global-events: true
+        running: true
+    actions:
+      - type: notify
+        subject: "CloudTrail is not enabled"
+        violation_desc: "No active CloudTrail trail found for the account."
+        action_desc: "Create a CloudTrail trail to log all management events."
+
+  - name: vpc-flow-logs
+    resource: vpc
+    description: |
+      Ensure all VPCs have flow logs enabled.
+    filters:
+      - not:
+        - type: flow-logs
+          enabled: true
+    actions:
+      - type: notify
+        subject: "VPC flow logs not enabled"
+        violation_desc: "VPC does not have flow logs capturing network traffic."
+        action_desc: "Enable VPC Flow Logs to a CloudWatch Logs group or S3 bucket."
+
+  - name: s3-access-logging
+    resource: s3
+    description: |
+      Ensure S3 buckets have access logging enabled.
+    filters:
+      - type: value
+        key: "Logging.TargetBucket"
+        value: absent
+    actions:
+      - type: notify
+        subject: "S3 access logging not enabled"
+        violation_desc: "Bucket does not have server access logging configured."
+        action_desc: "Enable server access logging to a dedicated logging bucket."
+
+  - name: secrets-rotation
+    resource: secrets-manager
+    description: |
+      Ensure Secrets Manager secrets have automatic rotation configured.
+    filters:
+      - type: value
+        key: RotationEnabled
+        value: false
+    actions:
+      - type: notify
+        subject: "Secret rotation not enabled"
+        violation_desc: "Secret does not have automatic rotation configured."
+        action_desc: "Configure automatic rotation with a Lambda rotation function."

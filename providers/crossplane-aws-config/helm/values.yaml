@@ -1,0 +1,53 @@
+# Default values for cloudmock Helm chart.
+
+# Number of replicas. cloudmock is stateful (in-memory), so typically 1.
+replicaCount: 1
+
+image:
+  repository: ghcr.io/neureaux/cloudmock
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# cloudmock configuration.
+cloudmock:
+  # AWS region to emulate.
+  region: us-east-1
+  # AWS account ID to emulate.
+  accountId: "000000000000"
+  # Gateway port (main AWS API endpoint).
+  gatewayPort: 4566
+  # Admin API port.
+  adminPort: 4599
+  # IAM enforcement mode: none, log, enforce.
+  iamMode: none
+  # Enable the web dashboard.
+  dashboard:
+    enabled: false
+    port: 4580
+
+service:
+  type: ClusterIP
+  port: 4566
+  adminPort: 4599
+
+# Resource limits.
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Node selector, tolerations, and affinity.
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Create a ProviderConfig for Crossplane's provider-aws.
+crossplane:
+  # Whether to create the ProviderConfig resource.
+  providerConfig:
+    enabled: true
+    # Name of the ProviderConfig resource.
+    name: cloudmock

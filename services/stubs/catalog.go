@@ -6,7 +6,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/stub"
 )
 
-// AllModels returns ServiceModels for all 74 Tier 2 AWS services.
+// AllModels returns ServiceModels for all 73 Tier 2 AWS services.
 func AllModels() []*stub.ServiceModel {
 	var models []*stub.ServiceModel
 
@@ -182,29 +182,7 @@ func queryServices() []*stub.ServiceModel {
 				"cluster": rt("Cluster", "JobFlowId", "arn:aws:elasticmapreduce:{region}:{account}:cluster/{id}", []stub.Field{optStr("Name")}),
 			},
 		},
-		// 9. EC2
-		{
-			ServiceName: "ec2",
-			Protocol:    "query",
-			Actions: map[string]stub.Action{
-				"RunInstances":           createAction("RunInstances", "instance", "InstanceId", []stub.Field{reqStr("ImageId"), reqStr("InstanceType")}, []stub.Field{optStr("ImageId"), optStr("InstanceType")}),
-				"DescribeInstances":      listAction("DescribeInstances", "instance"),
-				"TerminateInstances":     deleteAction("TerminateInstances", "instance", "InstanceId"),
-				"CreateVpc":              createAction("CreateVpc", "vpc", "VpcId", []stub.Field{reqStr("CidrBlock")}, []stub.Field{optStr("CidrBlock")}),
-				"DescribeVpcs":           listAction("DescribeVpcs", "vpc"),
-				"CreateSecurityGroup":    createAction("CreateSecurityGroup", "sg", "GroupId", []stub.Field{reqStr("GroupName"), reqStr("Description")}, []stub.Field{optStr("GroupName")}),
-				"DescribeSecurityGroups": listAction("DescribeSecurityGroups", "sg"),
-				"CreateSubnet":           createAction("CreateSubnet", "subnet", "SubnetId", []stub.Field{reqStr("VpcId"), reqStr("CidrBlock")}, []stub.Field{optStr("VpcId"), optStr("CidrBlock")}),
-				"DescribeSubnets":        listAction("DescribeSubnets", "subnet"),
-			},
-			ResourceTypes: map[string]stub.ResourceType{
-				"instance": rt("Instance", "InstanceId", "arn:aws:ec2:{region}:{account}:instance/{id}", []stub.Field{optStr("ImageId"), optStr("InstanceType")}),
-				"vpc":      rt("Vpc", "VpcId", "arn:aws:ec2:{region}:{account}:vpc/{id}", []stub.Field{optStr("CidrBlock")}),
-				"sg":       rt("SecurityGroup", "GroupId", "arn:aws:ec2:{region}:{account}:security-group/{id}", []stub.Field{optStr("GroupName"), optStr("Description")}),
-				"subnet":   rt("Subnet", "SubnetId", "arn:aws:ec2:{region}:{account}:subnet/{id}", []stub.Field{optStr("VpcId"), optStr("CidrBlock")}),
-			},
-		},
-		// 10. Shield
+		// 10. Shield (was 10, EC2 moved to Tier 1)
 		{
 			ServiceName: "shield",
 			Protocol:    "query",

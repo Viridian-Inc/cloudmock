@@ -2531,3 +2531,96 @@ func TestEC2_DescribeInstancesTagFilter(t *testing.T) {
 		t.Errorf("DescribeInstances tag filter: %s should be excluded\nbody: %s", instId2, filterBody)
 	}
 }
+
+// ---- Default VPC tests ----
+
+// TestEC2_DefaultVPC_ExistsOnStartup verifies that DescribeVpcs returns a default
+// VPC without any prior CreateVpc call.
+func TestEC2_DefaultVPC_ExistsOnStartup(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "DescribeVpcs", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeVpcs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	if !strings.Contains(body, "172.31.0.0/16") {
+		t.Errorf("DescribeVpcs: expected default VPC CIDR 172.31.0.0/16\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<isDefault>true</isDefault>") {
+		t.Errorf("DescribeVpcs: expected isDefault=true for default VPC\nbody: %s", body)
+	}
+}
+
+// TestEC2_DefaultVPC_Has3Subnets verifies that the default VPC has 3 subnets.
+func TestEC2_DefaultVPC_Has3Subnets(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	// Find the default VPC ID.
+	wv := httptest.NewRecorder()
+	handler.ServeHTTP(wv, ec2Req(t, "DescribeVpcs", nil))
+	if wv.Code != http.StatusOK {
+		t.Fatalf("DescribeVpcs: expected 200, got %d\nbody: %s", wv.Code, wv.Body.String())
+	}
+	vpcBody := wv.Body.String()
+	if !strings.Contains(vpcBody, "172.31.0.0/16") {
+		t.Fatalf("default VPC not found\nbody: %s", vpcBody)
+	}
+
+	// Describe all subnets and verify the 3 default ones are present.
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, ec2Req(t, "DescribeSubnets", nil))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("DescribeSubnets: expected 200, got %d\nbody: %s", ws.Code, ws.Body.String())
+	}
+	subBody := ws.Body.String()
+
+	defaultSubnets := []string{"172.31.0.0/20", "172.31.16.0/20", "172.31.32.0/20"}
+	for _, cidr := range defaultSubnets {
+		if !strings.Contains(subBody, cidr) {
+			t.Errorf("DescribeSubnets: expected default subnet CIDR %s\nbody: %s", cidr, subBody)
+		}
+	}
+}
+
+// TestEC2_DefaultVPC_HasAttachedIGW verifies that an internet gateway is attached to
+// the default VPC.
+func TestEC2_DefaultVPC_HasAttachedIGW(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "DescribeInternetGateways", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeInternetGateways: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	if !strings.Contains(body, "igw-") {
+		t.Errorf("DescribeInternetGateways: expected at least one IGW\nbody: %s", body)
+	}
+	if !strings.Contains(body, "<state>attached</state>") {
+		t.Errorf("DescribeInternetGateways: expected attached IGW\nbody: %s", body)
+	}
+}
+
+// TestEC2_DefaultVPC_RouteTableHasIGWRoute verifies that the default VPC's main
+// route table has a route to the internet gateway (0.0.0.0/0).
+func TestEC2_DefaultVPC_RouteTableHasIGWRoute(t *testing.T) {
+	handler := newEC2Gateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ec2Req(t, "DescribeRouteTables", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeRouteTables: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+
+	if !strings.Contains(body, "0.0.0.0/0") {
+		t.Errorf("DescribeRouteTables: expected 0.0.0.0/0 IGW route\nbody: %s", body)
+	}
+	if !strings.Contains(body, "igw-") {
+		t.Errorf("DescribeRouteTables: expected igw- target in route table\nbody: %s", body)
+	}
+}

@@ -15,6 +15,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
+	ec2svc "github.com/neureaux/cloudmock/services/ec2"
 	cfnsvc "github.com/neureaux/cloudmock/services/cloudformation"
 	cwsvc "github.com/neureaux/cloudmock/services/cloudwatch"
 	logssvc "github.com/neureaux/cloudmock/services/cloudwatchlogs"
@@ -115,6 +116,8 @@ func main() {
 
 	// Wire cross-service integrations via event bus
 	integration.WireIntegrations(bus, registry, cfg.AccountID, cfg.Region)
+
+	registry.Register(ec2svc.New(cfg.AccountID, cfg.Region))
 
 	// Tier 2 stub services
 	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)

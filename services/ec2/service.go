@@ -12,9 +12,49 @@ type EC2Service struct {
 }
 
 // New returns a new EC2Service for the given AWS account ID and region.
+// It automatically creates the default VPC (172.31.0.0/16) with 3 subnets,
+// a default route table, security group, NACL, and an attached internet gateway.
 func New(accountID, region string) *EC2Service {
-	return &EC2Service{
+	svc := &EC2Service{
 		store: NewStore(accountID, region),
+	}
+	svc.createDefaultVPC(region)
+	return svc
+}
+
+// createDefaultVPC seeds the store with the AWS default VPC resources.
+func (s *EC2Service) createDefaultVPC(region string) {
+	// Create the default VPC (172.31.0.0/16).
+	vpc, err := s.store.CreateVPC("172.31.0.0/16", true, true)
+	if err != nil {
+		return
+	}
+	vpc.IsDefault = true
+
+	// Create the internet gateway and attach it to the default VPC.
+	igw := s.store.CreateInternetGateway()
+	s.store.AttachInternetGateway(igw.IgwId, vpc.VpcId)
+
+	// Add a default route (0.0.0.0/0 → IGW) to the main route table.
+	rts := s.store.ListRouteTables(nil, vpc.VpcId)
+	if len(rts) > 0 {
+		s.store.CreateRoute(rts[0].RouteTableId, "0.0.0.0/0", igw.IgwId, "", "")
+	}
+
+	// Create 3 default subnets across availability zones.
+	azSubnets := []struct {
+		cidr string
+		az   string
+	}{
+		{"172.31.0.0/20", region + "a"},
+		{"172.31.16.0/20", region + "b"},
+		{"172.31.32.0/20", region + "c"},
+	}
+	for _, s2 := range azSubnets {
+		sub, _ := s.store.CreateSubnet(vpc.VpcId, s2.cidr, s2.az)
+		if sub != nil {
+			sub.MapPublicIpOnLaunch = true
+		}
 	}
 }
 

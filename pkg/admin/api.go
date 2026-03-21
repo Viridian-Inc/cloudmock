@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/services/lambda"
 	"github.com/neureaux/cloudmock/services/ses"
 )
@@ -72,6 +74,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/ses/emails", a.handleSESEmails)
 	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
+	a.mux.HandleFunc("/api/resources/", a.handleResources)
 
 	return a
 }
@@ -565,6 +568,201 @@ func (a *API) handleTopology(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, TopologyResponse{Nodes: nodes, Edges: edges})
+}
+
+// ResourcesResponse is the response body for the /api/resources/:service endpoint.
+type ResourcesResponse struct {
+	Service   string      `json:"service"`
+	Resources interface{} `json:"resources"`
+}
+
+// listActions maps service name → action used to enumerate resources.
+// Empty string means the service uses REST-based routing with no Action parameter.
+var listActions = map[string]string{
+	"s3":             "", // REST GET /
+	"dynamodb":       "ListTables",
+	"sqs":            "ListQueues",
+	"sns":            "ListTopics",
+	"cognito-idp":    "ListUserPools",
+	"lambda":         "", // REST GET /2015-03-31/functions
+	"kms":            "ListKeys",
+	"secretsmanager": "ListSecrets",
+	"ssm":            "DescribeParameters",
+	"ec2":            "DescribeVpcs",
+	"rds":            "DescribeDBInstances",
+	"ecs":            "ListClusters",
+	"ecr":            "DescribeRepositories",
+	"route53":        "", // REST GET /2013-04-01/hostedzone
+	"monitoring":     "DescribeAlarms",
+	"events":         "ListEventBuses",
+	"states":         "ListStateMachines",
+	"cloudformation": "ListStacks",
+	"logs":           "DescribeLogGroups",
+	"ses":            "ListIdentities",
+	"kinesis":        "ListStreams",
+	"firehose":       "ListDeliveryStreams",
+	"sts":            "GetCallerIdentity",
+}
+
+// jsonServices is the set of services that use the X-Amz-Target / JSON protocol.
+var jsonServices = map[string]bool{
+	"dynamodb":       true,
+	"kms":            true,
+	"secretsmanager": true,
+	"ssm":            true,
+	"cognito-idp":    true,
+	"ecs":            true,
+	"ecr":            true,
+	"events":         true,
+	"states":         true,
+	"kinesis":        true,
+	"firehose":       true,
+	"logs":           true,
+}
+
+// amzTargetPrefix maps service name → X-Amz-Target prefix (e.g. "DynamoDB_20120810").
+var amzTargetPrefix = map[string]string{
+	"dynamodb":       "DynamoDB_20120810",
+	"kms":            "TrentService",
+	"secretsmanager": "secretsmanager",
+	"ssm":            "AmazonSSM",
+	"cognito-idp":    "AWSCognitoIdentityProviderService",
+	"ecs":            "AmazonEC2ContainerServiceV20141113",
+	"ecr":            "AmazonEC2ContainerRegistry_V20150921",
+	"events":         "AmazonEventBridgeV2",
+	"states":         "AWSStepFunctions",
+	"kinesis":        "Kinesis_20131202",
+	"firehose":       "Firehose_20150804",
+	"logs":           "Logs_20140328",
+}
+
+// restServices is the set of services that use REST path-based routing.
+var restServices = map[string]bool{
+	"s3":      true,
+	"lambda":  true,
+	"route53": true,
+}
+
+// handleResources handles GET /api/resources/:service — lists resources for a service
+// by making an internal call to the service's HandleRequest method.
+func (a *API) handleResources(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	serviceName := strings.TrimPrefix(r.URL.Path, "/api/resources/")
+	// Strip any trailing path segments — only the service name is accepted.
+	if idx := strings.Index(serviceName, "/"); idx >= 0 {
+		serviceName = serviceName[:idx]
+	}
+	if serviceName == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	svc, err := a.registry.Lookup(serviceName)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	action, actionKnown := listActions[serviceName]
+	if !actionKnown {
+		// Service is registered but we don't have a list action for it; return empty.
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		return
+	}
+
+	ctx, fakeReq := buildListRequestContext(a.cfg, serviceName, action)
+
+	// For REST services, override the RawRequest path.
+	if restServices[serviceName] {
+		fakeReq = buildRESTRequest(serviceName)
+		ctx.RawRequest = fakeReq
+	}
+
+	resp, svcErr := svc.HandleRequest(ctx)
+	if svcErr != nil {
+		// Return empty resource list on service errors rather than propagating AWS errors.
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		return
+	}
+
+	if resp == nil || resp.Body == nil {
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		return
+	}
+
+	// Marshal the response body to JSON. Regardless of whether the underlying
+	// service uses XML or JSON protocol, the Body field is a Go struct that can
+	// be JSON-encoded for the dashboard.
+	writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: resp.Body})
+}
+
+// buildListRequestContext builds a service.RequestContext for the given list action.
+// It also returns the *http.Request embedded in the context.
+func buildListRequestContext(cfg *config.Config, serviceName, action string) (*service.RequestContext, *http.Request) {
+	var fakeReq *http.Request
+
+	if jsonServices[serviceName] {
+		// JSON protocol: action is parsed from X-Amz-Target.
+		fakeReq, _ = http.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("{}")))
+		prefix := amzTargetPrefix[serviceName]
+		if prefix == "" {
+			prefix = serviceName
+		}
+		fakeReq.Header.Set("X-Amz-Target", prefix+"."+action)
+		fakeReq.Header.Set("Content-Type", "application/x-amz-json-1.1")
+	} else {
+		// Query/form protocol: action is in the form body and ctx.Params.
+		formBody := "Action=" + action
+		if action != "" {
+			fakeReq, _ = http.NewRequest(http.MethodPost, "/", strings.NewReader(formBody))
+			fakeReq.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		} else {
+			fakeReq, _ = http.NewRequest(http.MethodGet, "/", nil)
+		}
+	}
+
+	params := map[string]string{}
+	if action != "" {
+		params["Action"] = action
+	}
+
+	ctx := &service.RequestContext{
+		Action:     action,
+		Region:     cfg.Region,
+		AccountID:  cfg.AccountID,
+		Service:    serviceName,
+		Identity:   &service.CallerIdentity{IsRoot: true, AccountID: cfg.AccountID},
+		Params:     params,
+		Body:       []byte("{}"),
+		RawRequest: fakeReq,
+	}
+
+	if !jsonServices[serviceName] && action != "" {
+		ctx.Body = []byte("Action=" + action)
+	}
+
+	return ctx, fakeReq
+}
+
+// buildRESTRequest constructs a path-appropriate *http.Request for REST services.
+func buildRESTRequest(serviceName string) *http.Request {
+	var path string
+	switch serviceName {
+	case "s3":
+		path = "/"
+	case "lambda":
+		path = "/2015-03-31/functions"
+	case "route53":
+		path = "/2013-04-01/hostedzone"
+	default:
+		path = "/"
+	}
+	req, _ := http.NewRequest(http.MethodGet, path, nil)
+	return req
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

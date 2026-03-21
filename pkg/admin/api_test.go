@@ -12,6 +12,8 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
+	ddbsvc "github.com/neureaux/cloudmock/services/dynamodb"
+	s3svc "github.com/neureaux/cloudmock/services/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -252,4 +254,58 @@ func TestMethodNotAllowed(t *testing.T) {
 		api.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusMethodNotAllowed, w.Code, "%s %s", tt.method, tt.path)
 	}
+}
+
+// newResourcesTestAPI creates an admin API with real S3 and DynamoDB services registered.
+func newResourcesTestAPI(t *testing.T) *admin.API {
+	t.Helper()
+	cfg := config.Default()
+	reg := routing.NewRegistry()
+
+	reg.Register(s3svc.New())
+	reg.Register(ddbsvc.New(cfg.AccountID, cfg.Region))
+
+	rl := gateway.NewRequestLog(100)
+	rs := gateway.NewRequestStats()
+	return admin.New(cfg, reg, rl, rs)
+}
+
+func TestResources_S3(t *testing.T) {
+	api := newResourcesTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/resources/s3", nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp admin.ResourcesResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "s3", resp.Service)
+	assert.NotNil(t, resp.Resources)
+}
+
+func TestResources_DynamoDB(t *testing.T) {
+	api := newResourcesTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/resources/dynamodb", nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var resp admin.ResourcesResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.Equal(t, "dynamodb", resp.Service)
+	assert.NotNil(t, resp.Resources)
+}
+
+func TestResources_NotFound(t *testing.T) {
+	api := newResourcesTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/resources/nonexistent", nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
 }

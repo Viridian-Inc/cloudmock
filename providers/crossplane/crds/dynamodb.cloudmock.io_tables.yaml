@@ -1,0 +1,115 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: tables.dynamodb.cloudmock.io
+    labels:
+        app.kubernetes.io/managed-by: cloudmock-crossplane
+spec:
+    group: dynamodb.cloudmock.io
+    names:
+        kind: Table
+        listKind: TableList
+        plural: tables
+        singular: table
+        shortNames:
+            - ddbtable
+    scope: Cluster
+    versions:
+        - name: v1alpha1
+          served: true
+          storage: true
+          schema:
+            openAPIV3Schema:
+                type: object
+                description: A Table is a managed resource that represents a AWS::DynamoDB::Table.
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        type: object
+                        properties:
+                            deletionPolicy:
+                                type: string
+                                description: DeletionPolicy specifies what happens to the resource when the CR is deleted.
+                                default: Delete
+                            forProvider:
+                                type: object
+                                description: Input parameters for the resource.
+                                properties:
+                                    attribute:
+                                        type: array
+                                        description: The attribute attribute.
+                                        items:
+                                            type: string
+                                    billing_mode:
+                                        type: string
+                                        description: The billing_mode attribute.
+                                        default: PROVISIONED
+                                    hash_key:
+                                        type: string
+                                        description: The hash_key attribute.
+                                    range_key:
+                                        type: string
+                                        description: The range_key attribute.
+                                    read_capacity:
+                                        type: integer
+                                        description: The read_capacity attribute.
+                                    table_name:
+                                        type: string
+                                        description: The table_name attribute.
+                                    tags:
+                                        type: object
+                                        description: The tags attribute.
+                                        additionalProperties:
+                                            type: string
+                                    write_capacity:
+                                        type: integer
+                                        description: The write_capacity attribute.
+                                required:
+                                    - table_name
+                                    - hash_key
+                                    - attribute
+                            providerConfigRef:
+                                type: object
+                                description: Reference to the ProviderConfig.
+                                properties:
+                                    name:
+                                        type: string
+                                        description: Name of the ProviderConfig.
+                                required:
+                                    - name
+                        required:
+                            - forProvider
+                    status:
+                        type: object
+                        properties:
+                            atProvider:
+                                type: object
+                                description: Observed state from the external resource.
+                                properties:
+                                    arn:
+                                        type: string
+                                        description: The arn attribute.
+                                    id:
+                                        type: string
+                                        description: The provider-assigned unique ID for this resource.
+                            conditions:
+                                type: array
+                                description: Conditions of the resource.
+                                items:
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+          additionalPrinterColumns:
+            - name: READY
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Ready')].status
+            - name: SYNCED
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Synced')].status
+            - name: AGE
+              type: date
+              jsonPath: .metadata.creationTimestamp

@@ -1,0 +1,106 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: subnets.ec2.cloudmock.io
+    labels:
+        app.kubernetes.io/managed-by: cloudmock-crossplane
+spec:
+    group: ec2.cloudmock.io
+    names:
+        kind: Subnet
+        listKind: SubnetList
+        plural: subnets
+        singular: subnet
+        shortNames:
+            - subnet
+    scope: Cluster
+    versions:
+        - name: v1alpha1
+          served: true
+          storage: true
+          schema:
+            openAPIV3Schema:
+                type: object
+                description: A Subnet is a managed resource that represents a AWS::EC2::Subnet.
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        type: object
+                        properties:
+                            deletionPolicy:
+                                type: string
+                                description: DeletionPolicy specifies what happens to the resource when the CR is deleted.
+                                default: Delete
+                            forProvider:
+                                type: object
+                                description: Input parameters for the resource.
+                                properties:
+                                    availability_zone:
+                                        type: string
+                                        description: The availability_zone attribute.
+                                    cidr_block:
+                                        type: string
+                                        description: The cidr_block attribute.
+                                    map_public_ip_on_launch:
+                                        type: boolean
+                                        description: The map_public_ip_on_launch attribute.
+                                        default: false
+                                    tags:
+                                        type: object
+                                        description: The tags attribute.
+                                        additionalProperties:
+                                            type: string
+                                    vpc_id:
+                                        type: string
+                                        description: The vpc_id attribute.
+                                required:
+                                    - vpc_id
+                                    - cidr_block
+                            providerConfigRef:
+                                type: object
+                                description: Reference to the ProviderConfig.
+                                properties:
+                                    name:
+                                        type: string
+                                        description: Name of the ProviderConfig.
+                                required:
+                                    - name
+                        required:
+                            - forProvider
+                    status:
+                        type: object
+                        properties:
+                            atProvider:
+                                type: object
+                                description: Observed state from the external resource.
+                                properties:
+                                    arn:
+                                        type: string
+                                        description: The arn attribute.
+                                    id:
+                                        type: string
+                                        description: The provider-assigned unique ID for this resource.
+                                    subnet_id:
+                                        type: string
+                                        description: The subnet_id attribute.
+                            conditions:
+                                type: array
+                                description: Conditions of the resource.
+                                items:
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+          additionalPrinterColumns:
+            - name: READY
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Ready')].status
+            - name: SYNCED
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Synced')].status
+            - name: AGE
+              type: date
+              jsonPath: .metadata.creationTimestamp

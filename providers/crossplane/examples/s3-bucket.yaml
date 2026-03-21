@@ -1,0 +1,13 @@
+apiVersion: s3.cloudmock.io/v1alpha1
+kind: Bucket
+metadata:
+  name: my-test-bucket
+spec:
+  forProvider:
+    bucket: my-test-bucket
+    acl: private
+    tags:
+      Environment: dev
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: cloudmock

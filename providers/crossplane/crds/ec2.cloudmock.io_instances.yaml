@@ -1,0 +1,116 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: instances.ec2.cloudmock.io
+    labels:
+        app.kubernetes.io/managed-by: cloudmock-crossplane
+spec:
+    group: ec2.cloudmock.io
+    names:
+        kind: Instance
+        listKind: InstanceList
+        plural: instances
+        singular: instance
+        shortNames:
+            - inst
+    scope: Cluster
+    versions:
+        - name: v1alpha1
+          served: true
+          storage: true
+          schema:
+            openAPIV3Schema:
+                type: object
+                description: A Instance is a managed resource that represents a AWS::EC2::Instance.
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        type: object
+                        properties:
+                            deletionPolicy:
+                                type: string
+                                description: DeletionPolicy specifies what happens to the resource when the CR is deleted.
+                                default: Delete
+                            forProvider:
+                                type: object
+                                description: Input parameters for the resource.
+                                properties:
+                                    ami:
+                                        type: string
+                                        description: The ami attribute.
+                                    instance_type:
+                                        type: string
+                                        description: The instance_type attribute.
+                                    subnet_id:
+                                        type: string
+                                        description: The subnet_id attribute.
+                                    tags:
+                                        type: object
+                                        description: The tags attribute.
+                                        additionalProperties:
+                                            type: string
+                                    vpc_security_group_ids:
+                                        type: array
+                                        description: The vpc_security_group_ids attribute.
+                                        items:
+                                            type: string
+                                required:
+                                    - ami
+                                    - instance_type
+                            providerConfigRef:
+                                type: object
+                                description: Reference to the ProviderConfig.
+                                properties:
+                                    name:
+                                        type: string
+                                        description: Name of the ProviderConfig.
+                                required:
+                                    - name
+                        required:
+                            - forProvider
+                    status:
+                        type: object
+                        properties:
+                            atProvider:
+                                type: object
+                                description: Observed state from the external resource.
+                                properties:
+                                    arn:
+                                        type: string
+                                        description: The arn attribute.
+                                    id:
+                                        type: string
+                                        description: The provider-assigned unique ID for this resource.
+                                    instance_id:
+                                        type: string
+                                        description: The instance_id attribute.
+                                    instance_state:
+                                        type: string
+                                        description: The instance_state attribute.
+                                    private_ip:
+                                        type: string
+                                        description: The private_ip attribute.
+                                    public_ip:
+                                        type: string
+                                        description: The public_ip attribute.
+                            conditions:
+                                type: array
+                                description: Conditions of the resource.
+                                items:
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+          additionalPrinterColumns:
+            - name: READY
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Ready')].status
+            - name: SYNCED
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Synced')].status
+            - name: AGE
+              type: date
+              jsonPath: .metadata.creationTimestamp

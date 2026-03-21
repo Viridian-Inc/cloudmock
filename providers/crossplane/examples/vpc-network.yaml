@@ -1,0 +1,76 @@
+# VPC Network Composition
+# Creates a VPC, Subnets, Internet Gateway, and Route Table.
+# Apply with: cloudmock-crossplane apply -f vpc-network.yaml --endpoint http://localhost:4566
+---
+apiVersion: ec2.cloudmock.io/v1alpha1
+kind: VPC
+metadata:
+  name: main-vpc
+spec:
+  forProvider:
+    cidr_block: "10.0.0.0/16"
+    enable_dns_support: true
+    enable_dns_hostnames: true
+    tags:
+      Name: main-vpc
+      Environment: dev
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: cloudmock
+---
+apiVersion: ec2.cloudmock.io/v1alpha1
+kind: Subnet
+metadata:
+  name: public-subnet-a
+spec:
+  forProvider:
+    vpc_id: main-vpc
+    cidr_block: "10.0.1.0/24"
+    availability_zone: us-east-1a
+    map_public_ip_on_launch: true
+    tags:
+      Name: public-subnet-a
+      Environment: dev
+  providerConfigRef:
+    name: cloudmock
+---
+apiVersion: ec2.cloudmock.io/v1alpha1
+kind: Subnet
+metadata:
+  name: private-subnet-a
+spec:
+  forProvider:
+    vpc_id: main-vpc
+    cidr_block: "10.0.2.0/24"
+    availability_zone: us-east-1a
+    tags:
+      Name: private-subnet-a
+      Environment: dev
+  providerConfigRef:
+    name: cloudmock
+---
+apiVersion: ec2.cloudmock.io/v1alpha1
+kind: InternetGateway
+metadata:
+  name: main-igw
+spec:
+  forProvider:
+    vpc_id: main-vpc
+    tags:
+      Name: main-igw
+      Environment: dev
+  providerConfigRef:
+    name: cloudmock
+---
+apiVersion: ec2.cloudmock.io/v1alpha1
+kind: RouteTable
+metadata:
+  name: public-rt
+spec:
+  forProvider:
+    vpc_id: main-vpc
+    tags:
+      Name: public-rt
+      Environment: dev
+  providerConfigRef:
+    name: cloudmock

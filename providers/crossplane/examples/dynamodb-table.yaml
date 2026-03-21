@@ -1,0 +1,14 @@
+apiVersion: dynamodb.cloudmock.io/v1alpha1
+kind: Table
+metadata:
+  name: my-table
+spec:
+  forProvider:
+    table_name: my-table
+    hash_key: id
+    billing_mode: PAY_PER_REQUEST
+    tags:
+      Environment: dev
+      ManagedBy: crossplane
+  providerConfigRef:
+    name: cloudmock

@@ -1,0 +1,99 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+    name: buckets.s3.cloudmock.io
+    labels:
+        app.kubernetes.io/managed-by: cloudmock-crossplane
+spec:
+    group: s3.cloudmock.io
+    names:
+        kind: Bucket
+        listKind: BucketList
+        plural: buckets
+        singular: bucket
+        shortNames:
+            - s3bucket
+    scope: Cluster
+    versions:
+        - name: v1alpha1
+          served: true
+          storage: true
+          schema:
+            openAPIV3Schema:
+                type: object
+                description: A Bucket is a managed resource that represents a AWS::S3::Bucket.
+                properties:
+                    apiVersion:
+                        type: string
+                    kind:
+                        type: string
+                    metadata:
+                        type: object
+                    spec:
+                        type: object
+                        properties:
+                            deletionPolicy:
+                                type: string
+                                description: DeletionPolicy specifies what happens to the resource when the CR is deleted.
+                                default: Delete
+                            forProvider:
+                                type: object
+                                description: Input parameters for the resource.
+                                properties:
+                                    acl:
+                                        type: string
+                                        description: The acl attribute.
+                                        default: private
+                                    bucket:
+                                        type: string
+                                        description: The bucket attribute.
+                                    tags:
+                                        type: object
+                                        description: The tags attribute.
+                                        additionalProperties:
+                                            type: string
+                                required:
+                                    - bucket
+                            providerConfigRef:
+                                type: object
+                                description: Reference to the ProviderConfig.
+                                properties:
+                                    name:
+                                        type: string
+                                        description: Name of the ProviderConfig.
+                                required:
+                                    - name
+                        required:
+                            - forProvider
+                    status:
+                        type: object
+                        properties:
+                            atProvider:
+                                type: object
+                                description: Observed state from the external resource.
+                                properties:
+                                    arn:
+                                        type: string
+                                        description: The arn attribute.
+                                    id:
+                                        type: string
+                                        description: The provider-assigned unique ID for this resource.
+                                    region:
+                                        type: string
+                                        description: The region attribute.
+                            conditions:
+                                type: array
+                                description: Conditions of the resource.
+                                items:
+                                    type: object
+                                    x-kubernetes-preserve-unknown-fields: true
+          additionalPrinterColumns:
+            - name: READY
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Ready')].status
+            - name: SYNCED
+              type: string
+              jsonPath: .status.conditions[?(@.type=='Synced')].status
+            - name: AGE
+              type: date
+              jsonPath: .metadata.creationTimestamp

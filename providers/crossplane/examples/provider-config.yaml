@@ -1,0 +1,12 @@
+apiVersion: cloudmock.io/v1alpha1
+kind: ProviderConfig
+metadata:
+  name: cloudmock
+spec:
+  endpoint: http://localhost:4566
+  credentials:
+    source: Static
+    static:
+      accessKey: test
+      secretKey: test
+  region: us-east-1

@@ -1,0 +1,570 @@
+{
+  "config": {
+    "variables": {
+      "accessKey": {
+        "default": "test",
+        "description": "The access key for authenticating with cloudmock.",
+        "type": "string"
+      },
+      "endpoint": {
+        "default": "http://localhost:4566",
+        "description": "The cloudmock gateway endpoint URL.",
+        "type": "string"
+      },
+      "region": {
+        "default": "us-east-1",
+        "description": "The AWS region for credential scope.",
+        "type": "string"
+      },
+      "secretKey": {
+        "default": "test",
+        "description": "The secret key for authenticating with cloudmock.",
+        "secret": true,
+        "type": "string"
+      }
+    }
+  },
+  "description": "A Pulumi provider for cloudmock — local AWS service emulation.",
+  "displayName": "CloudMock",
+  "homepage": "https://github.com/neureaux/cloudmock",
+  "keywords": [
+    "pulumi",
+    "cloudmock",
+    "aws",
+    "mock",
+    "testing"
+  ],
+  "language": {
+    "go": {
+      "importBasePath": "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock"
+    },
+    "nodejs": {
+      "packageName": "@neureaux/pulumi-cloudmock"
+    },
+    "python": {
+      "packageName": "neureaux_pulumi_cloudmock"
+    }
+  },
+  "license": "Apache-2.0",
+  "name": "cloudmock",
+  "provider": {
+    "inputProperties": {
+      "accessKey": {
+        "default": "test",
+        "description": "The access key for authenticating with cloudmock.",
+        "type": "string"
+      },
+      "endpoint": {
+        "default": "http://localhost:4566",
+        "description": "The cloudmock gateway endpoint URL.",
+        "type": "string"
+      },
+      "region": {
+        "default": "us-east-1",
+        "description": "The AWS region for credential scope.",
+        "type": "string"
+      },
+      "secretKey": {
+        "default": "test",
+        "description": "The secret key for authenticating with cloudmock.",
+        "secret": true,
+        "type": "string"
+      }
+    }
+  },
+  "publisher": "neureaux",
+  "repository": "https://github.com/neureaux/cloudmock",
+  "resources": {
+    "cloudmock:dynamodb:Table": {
+      "description": "Manages a AWS::DynamoDB::Table resource in cloudmock.",
+      "inputProperties": {
+        "attribute": {
+          "description": "The attribute attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "billing_mode": {
+          "default": "PROVISIONED",
+          "description": "The billing_mode attribute.",
+          "type": "string"
+        },
+        "hash_key": {
+          "description": "The hash_key attribute.",
+          "type": "string"
+        },
+        "range_key": {
+          "description": "The range_key attribute.",
+          "type": "string"
+        },
+        "read_capacity": {
+          "description": "The read_capacity attribute.",
+          "type": "integer"
+        },
+        "table_name": {
+          "description": "The table_name attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "write_capacity": {
+          "description": "The write_capacity attribute.",
+          "type": "integer"
+        }
+      },
+      "properties": {
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "attribute": {
+          "description": "The attribute attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "billing_mode": {
+          "default": "PROVISIONED",
+          "description": "The billing_mode attribute.",
+          "type": "string"
+        },
+        "hash_key": {
+          "description": "The hash_key attribute.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "range_key": {
+          "description": "The range_key attribute.",
+          "type": "string"
+        },
+        "read_capacity": {
+          "description": "The read_capacity attribute.",
+          "type": "integer"
+        },
+        "table_name": {
+          "description": "The table_name attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "write_capacity": {
+          "description": "The write_capacity attribute.",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "table_name",
+        "hash_key",
+        "attribute"
+      ],
+      "requiredInputs": [
+        "table_name",
+        "hash_key",
+        "attribute"
+      ]
+    },
+    "cloudmock:ec2:Instance": {
+      "description": "Manages a AWS::EC2::Instance resource in cloudmock.",
+      "inputProperties": {
+        "ami": {
+          "description": "The ami attribute.",
+          "type": "string"
+        },
+        "instance_type": {
+          "description": "The instance_type attribute.",
+          "type": "string"
+        },
+        "subnet_id": {
+          "description": "The subnet_id attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_security_group_ids": {
+          "description": "The vpc_security_group_ids attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "properties": {
+        "ami": {
+          "description": "The ami attribute.",
+          "type": "string"
+        },
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "instance_id": {
+          "description": "The instance_id attribute.",
+          "type": "string"
+        },
+        "instance_state": {
+          "description": "The instance_state attribute.",
+          "type": "string"
+        },
+        "instance_type": {
+          "description": "The instance_type attribute.",
+          "type": "string"
+        },
+        "private_ip": {
+          "description": "The private_ip attribute.",
+          "type": "string"
+        },
+        "public_ip": {
+          "description": "The public_ip attribute.",
+          "type": "string"
+        },
+        "subnet_id": {
+          "description": "The subnet_id attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_security_group_ids": {
+          "description": "The vpc_security_group_ids attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "ami",
+        "instance_type"
+      ],
+      "requiredInputs": [
+        "ami",
+        "instance_type"
+      ]
+    },
+    "cloudmock:ec2:SecurityGroup": {
+      "description": "Manages a AWS::EC2::SecurityGroup resource in cloudmock.",
+      "inputProperties": {
+        "description": {
+          "description": "The description attribute.",
+          "type": "string"
+        },
+        "egress": {
+          "description": "The egress attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "group_name": {
+          "description": "The group_name attribute.",
+          "type": "string"
+        },
+        "ingress": {
+          "description": "The ingress attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_id": {
+          "description": "The vpc_id attribute.",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "description": {
+          "description": "The description attribute.",
+          "type": "string"
+        },
+        "egress": {
+          "description": "The egress attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "group_name": {
+          "description": "The group_name attribute.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "ingress": {
+          "description": "The ingress attribute.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "security_group_id": {
+          "description": "The security_group_id attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_id": {
+          "description": "The vpc_id attribute.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "group_name",
+        "description"
+      ],
+      "requiredInputs": [
+        "group_name",
+        "description"
+      ]
+    },
+    "cloudmock:ec2:Subnet": {
+      "description": "Manages a AWS::EC2::Subnet resource in cloudmock.",
+      "inputProperties": {
+        "availability_zone": {
+          "description": "The availability_zone attribute.",
+          "type": "string"
+        },
+        "cidr_block": {
+          "description": "The cidr_block attribute.",
+          "type": "string"
+        },
+        "map_public_ip_on_launch": {
+          "default": false,
+          "description": "The map_public_ip_on_launch attribute.",
+          "type": "boolean"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_id": {
+          "description": "The vpc_id attribute.",
+          "type": "string"
+        }
+      },
+      "properties": {
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "availability_zone": {
+          "description": "The availability_zone attribute.",
+          "type": "string"
+        },
+        "cidr_block": {
+          "description": "The cidr_block attribute.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "map_public_ip_on_launch": {
+          "default": false,
+          "description": "The map_public_ip_on_launch attribute.",
+          "type": "boolean"
+        },
+        "subnet_id": {
+          "description": "The subnet_id attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_id": {
+          "description": "The vpc_id attribute.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "vpc_id",
+        "cidr_block"
+      ],
+      "requiredInputs": [
+        "vpc_id",
+        "cidr_block"
+      ]
+    },
+    "cloudmock:ec2:Vpc": {
+      "description": "Manages a AWS::EC2::VPC resource in cloudmock.",
+      "inputProperties": {
+        "cidr_block": {
+          "description": "The cidr_block attribute.",
+          "type": "string"
+        },
+        "enable_dns_hostnames": {
+          "default": false,
+          "description": "The enable_dns_hostnames attribute.",
+          "type": "boolean"
+        },
+        "enable_dns_support": {
+          "default": true,
+          "description": "The enable_dns_support attribute.",
+          "type": "boolean"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "cidr_block": {
+          "description": "The cidr_block attribute.",
+          "type": "string"
+        },
+        "enable_dns_hostnames": {
+          "default": false,
+          "description": "The enable_dns_hostnames attribute.",
+          "type": "boolean"
+        },
+        "enable_dns_support": {
+          "default": true,
+          "description": "The enable_dns_support attribute.",
+          "type": "boolean"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "is_default": {
+          "description": "The is_default attribute.",
+          "type": "boolean"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        },
+        "vpc_id": {
+          "description": "The vpc_id attribute.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "cidr_block"
+      ],
+      "requiredInputs": [
+        "cidr_block"
+      ]
+    },
+    "cloudmock:s3:Bucket": {
+      "description": "Manages a AWS::S3::Bucket resource in cloudmock.",
+      "inputProperties": {
+        "acl": {
+          "default": "private",
+          "description": "The acl attribute.",
+          "type": "string"
+        },
+        "bucket": {
+          "description": "The bucket attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        }
+      },
+      "properties": {
+        "acl": {
+          "default": "private",
+          "description": "The acl attribute.",
+          "type": "string"
+        },
+        "arn": {
+          "description": "The arn attribute.",
+          "type": "string"
+        },
+        "bucket": {
+          "description": "The bucket attribute.",
+          "type": "string"
+        },
+        "id": {
+          "description": "The provider-assigned unique ID for this resource.",
+          "type": "string"
+        },
+        "region": {
+          "description": "The region attribute.",
+          "type": "string"
+        },
+        "tags": {
+          "additionalProperties": {
+            "$ref": "pulumi.json#/Any"
+          },
+          "description": "The tags attribute.",
+          "type": "object"
+        }
+      },
+      "required": [
+        "bucket"
+      ],
+      "requiredInputs": [
+        "bucket"
+      ]
+    }
+  },
+  "version": "0.1.0"
+}

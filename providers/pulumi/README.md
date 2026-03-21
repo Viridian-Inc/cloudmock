@@ -1,8 +1,7 @@
 # Pulumi Provider for cloudmock
 
-This directory contains the scaffold for a Pulumi provider that bridges
-`terraform-provider-cloudmock` to Pulumi using
-[pulumi-terraform-bridge](https://github.com/pulumi/pulumi-terraform-bridge).
+A native Pulumi provider for cloudmock that implements the gRPC ResourceProvider
+protocol directly, without requiring `pulumi-terraform-bridge`.
 
 ## Architecture
 
@@ -10,64 +9,32 @@ This directory contains the scaffold for a Pulumi provider that bridges
 providers/pulumi/
 ├── cmd/
 │   └── pulumi-resource-cloudmock/
-│       └── main.go              # Provider binary entrypoint
-├── provider.go                  # tfbridge configuration (resource mappings)
+│       └── main.go                  # Provider binary entrypoint
+├── internal/
+│   ├── provider.go                  # Pulumi provider protocol implementation
+│   ├── pulumirpc.go                 # Hand-written gRPC service definitions
+│   ├── schema_gen.go                # Pulumi schema generation from registry
+│   ├── crud.go                      # HTTP client for cloudmock gateway
+│   ├── codec.go                     # Hybrid proto/JSON codec
+│   └── provider_test.go             # Tests (22 tests)
+├── provider.go                      # Resource token mappings (reference)
+├── schema.json                      # Generated Pulumi package schema
 └── README.md
 ```
 
-The provider works by wrapping the existing Terraform provider
-(`providers/terraform/`) with Pulumi's tfbridge SDK. This gives you native
-Pulumi resources for every Terraform resource that cloudmock supports.
-
-## Prerequisites
-
-- Go 1.22+
-- Pulumi CLI (`brew install pulumi`)
-- The following Go modules (add to `go.mod`):
-
-```
-go get github.com/pulumi/pulumi-terraform-bridge/v3@latest
-go get github.com/pulumi/pulumi/sdk/v3@latest
-```
+The provider communicates with cloudmock's gateway using the same HTTP client
+approach as the Terraform provider, supporting JSON, query, and REST protocols.
 
 ## Building
 
-1. **Uncomment the code** in `provider.go` and `cmd/pulumi-resource-cloudmock/main.go`.
+```bash
+go build -o bin/pulumi-resource-cloudmock ./providers/pulumi/cmd/pulumi-resource-cloudmock/
+```
 
-2. **Add dependencies:**
-   ```bash
-   cd /path/to/cloudmock
-   go get github.com/pulumi/pulumi-terraform-bridge/v3@latest
-   go get github.com/pulumi/pulumi/sdk/v3@latest
-   go mod tidy
-   ```
-
-3. **Build the provider binary:**
-   ```bash
-   go build -o bin/pulumi-resource-cloudmock ./providers/pulumi/cmd/pulumi-resource-cloudmock/
-   ```
-
-4. **Install locally:**
-   ```bash
-   cp bin/pulumi-resource-cloudmock ~/.pulumi/bin/
-   ```
-
-## Generating SDKs
-
-Once the provider binary is built, generate language-specific SDKs:
+## Installing
 
 ```bash
-# Generate Node.js SDK
-pulumi package gen-sdk bin/pulumi-resource-cloudmock --language nodejs
-
-# Generate Python SDK
-pulumi package gen-sdk bin/pulumi-resource-cloudmock --language python
-
-# Generate Go SDK
-pulumi package gen-sdk bin/pulumi-resource-cloudmock --language go
-
-# Generate .NET SDK
-pulumi package gen-sdk bin/pulumi-resource-cloudmock --language dotnet
+cp bin/pulumi-resource-cloudmock ~/.pulumi/bin/
 ```
 
 ## Usage
@@ -82,9 +49,9 @@ const bucket = new cloudmock.s3.Bucket("my-bucket", {
 });
 
 const table = new cloudmock.dynamodb.Table("my-table", {
-    name: "users",
+    tableName: "users",
     hashKey: "id",
-    attributes: [{ name: "id", type: "S" }],
+    attribute: ["id"],
 });
 ```
 
@@ -94,7 +61,7 @@ const table = new cloudmock.dynamodb.Table("my-table", {
 import neureaux_pulumi_cloudmock as cloudmock
 
 bucket = cloudmock.s3.Bucket("my-bucket", bucket="my-test-bucket")
-table = cloudmock.dynamodb.Table("my-table", name="users", hash_key="id")
+table = cloudmock.dynamodb.Table("my-table", table_name="users", hash_key="id")
 ```
 
 ### Go
@@ -113,8 +80,8 @@ bucket, _ := s3.NewBucket(ctx, "my-bucket", &s3.BucketArgs{
 |-------------|----------------------|-------------------------|
 | `endpoint`  | `CLOUDMOCK_ENDPOINT` | `http://localhost:4566` |
 | `region`    | `AWS_REGION`         | `us-east-1`             |
-| `accessKey` | —                    | `test`                  |
-| `secretKey` | —                    | `test`                  |
+| `accessKey` | --                   | `test`                  |
+| `secretKey` | --                   | `test`                  |
 
 ```bash
 pulumi config set cloudmock:endpoint http://localhost:4566
@@ -122,15 +89,55 @@ pulumi config set cloudmock:endpoint http://localhost:4566
 
 ## Resource Mapping
 
-Resources are organized by AWS service module:
+Resources are organized by AWS service module using the token format
+`cloudmock:<service>:<Resource>`:
 
 | Terraform Type              | Pulumi Type                |
 |----------------------------|----------------------------|
 | `cloudmock_s3_bucket`      | `cloudmock:s3:Bucket`      |
 | `cloudmock_dynamodb_table` | `cloudmock:dynamodb:Table`  |
-| `cloudmock_vpc`            | `cloudmock:ec2:Vpc`        |
+| `cloudmock_ec2_vpc`        | `cloudmock:ec2:Vpc`        |
+| `cloudmock_ec2_subnet`     | `cloudmock:ec2:Subnet`     |
 | `cloudmock_lambda_function`| `cloudmock:lambda:Function` |
 | `cloudmock_sqs_queue`      | `cloudmock:sqs:Queue`      |
 
-Any resources added to the Terraform provider are automatically available
-in Pulumi through the dynamic mapping in `provider.go`.
+New resources added to the schema registry are automatically available.
+
+## Generating SDKs
+
+Once the provider binary is built, generate language-specific SDKs:
+
+```bash
+pulumi package gen-sdk bin/pulumi-resource-cloudmock --language nodejs
+pulumi package gen-sdk bin/pulumi-resource-cloudmock --language python
+pulumi package gen-sdk bin/pulumi-resource-cloudmock --language go
+pulumi package gen-sdk bin/pulumi-resource-cloudmock --language dotnet
+```
+
+## Regenerating schema.json
+
+```bash
+WRITE_SCHEMA=1 go test ./providers/pulumi/internal/ -run TestGenerateSchemaJSON_WriteFile -v
+```
+
+## Testing
+
+```bash
+go test ./providers/pulumi/internal/ -v
+```
+
+## Design Notes
+
+This provider implements Pulumi's gRPC `ResourceProvider` protocol natively
+rather than using `pulumi-terraform-bridge`. This avoids the bridge's heavy
+dependency tree while still providing full CRUD resource management.
+
+Key design decisions:
+- **Hand-written gRPC types**: The `pulumirpc.go` file contains Go struct
+  definitions that match Pulumi's protobuf service, avoiding the need for
+  protoc code generation or the full Pulumi SDK.
+- **Schema generation**: The Pulumi package schema is generated dynamically
+  from the cloudmock schema registry, so new resources are automatically
+  picked up.
+- **Shared CRUD layer**: The HTTP client in `crud.go` uses the same protocol
+  dispatch (JSON/query/REST) as the Terraform provider.

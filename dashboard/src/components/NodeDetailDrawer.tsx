@@ -2,7 +2,7 @@ import { useState, useEffect } from 'preact/hooks';
 import { Drawer } from './Drawer';
 import { StatusBadge } from './StatusBadge';
 import { JsonView } from './JsonView';
-import { getNodeRequests, getNodeTraces, getNodeResources, getStats, getMetrics } from '../api';
+import { getNodeRequests, getNodeTraces, getNodeResources, getStats, getMetrics, api } from '../api';
 import { fmtTime, fmtDuration } from '../utils';
 
 interface TopoNode {
@@ -152,12 +152,26 @@ function OverviewTab({ reqCount, errorRate, avgLatency, inbound, outbound }: {
 }
 
 function RequestsTab({ requests }: { requests: any[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [detail, setDetail] = useState<any>(null);
+
+  function toggleExpand(id: string) {
+    if (expanded === id) {
+      setExpanded(null);
+      setDetail(null);
+    } else {
+      setExpanded(id);
+      setDetail(null);
+      api(`/api/requests/${id}`).then(setDetail).catch(() => {});
+    }
+  }
+
   if (requests.length === 0) {
     return <div style={{ textAlign: 'center', padding: 32, color: '#94A3B8' }}>No recent requests</div>;
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: 400 }}>
+    <div style={{ overflow: 'auto', maxHeight: 500 }}>
       <table class="table" style={{ fontSize: 12, width: '100%' }}>
         <thead>
           <tr>
@@ -169,16 +183,25 @@ function RequestsTab({ requests }: { requests: any[] }) {
         </thead>
         <tbody>
           {requests.map((r: any) => (
-            <tr
-              key={r.id}
-              style={{ cursor: 'pointer' }}
-              onClick={() => { location.hash = `/requests/${r.id}`; }}
-            >
-              <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(r.timestamp)}</td>
-              <td>{r.action}</td>
-              <td><StatusBadge code={r.status} /></td>
-              <td>{fmtDuration(r.latency_ms)}</td>
-            </tr>
+            <>
+              <tr
+                key={r.id}
+                style={{ cursor: 'pointer', background: expanded === r.id ? '#F1F5F9' : undefined }}
+                onClick={() => toggleExpand(r.id)}
+              >
+                <td style={{ whiteSpace: 'nowrap' }}>{fmtTime(r.timestamp)}</td>
+                <td>{r.action}</td>
+                <td><StatusBadge code={r.status} /></td>
+                <td>{fmtDuration(r.latency_ms)}</td>
+              </tr>
+              {expanded === r.id && (
+                <tr key={`${r.id}-detail`}>
+                  <td colSpan={4} style={{ padding: 0 }}>
+                    <RequestInlineDetail req={detail || r} />
+                  </td>
+                </tr>
+              )}
+            </>
           ))}
         </tbody>
       </table>
@@ -186,13 +209,76 @@ function RequestsTab({ requests }: { requests: any[] }) {
   );
 }
 
+function RequestInlineDetail({ req }: { req: any }) {
+  const [tab, setTab] = useState<'overview' | 'request' | 'response'>('overview');
+
+  const tabStyle = (active: boolean) => ({
+    padding: '4px 10px',
+    fontSize: 11,
+    fontWeight: active ? 600 : 400,
+    color: active ? '#3B82F6' : '#64748B',
+    background: active ? '#EFF6FF' : 'none',
+    border: '1px solid ' + (active ? '#BFDBFE' : '#E2E8F0'),
+    borderRadius: 4,
+    cursor: 'pointer' as const,
+  });
+
+  return (
+    <div style={{ padding: 12, background: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+        <button style={tabStyle(tab === 'overview')} onClick={() => setTab('overview')}>Overview</button>
+        <button style={tabStyle(tab === 'request')} onClick={() => setTab('request')}>Request</button>
+        <button style={tabStyle(tab === 'response')} onClick={() => setTab('response')}>Response</button>
+      </div>
+
+      {tab === 'overview' && (
+        <div style={{ fontSize: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 16px' }}>
+          <div><span style={{ color: '#94A3B8' }}>Service:</span> {req.service}</div>
+          <div><span style={{ color: '#94A3B8' }}>Action:</span> {req.action}</div>
+          <div><span style={{ color: '#94A3B8' }}>Method:</span> {req.method}</div>
+          <div><span style={{ color: '#94A3B8' }}>Path:</span> <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11 }}>{req.path}</span></div>
+          <div><span style={{ color: '#94A3B8' }}>Status:</span> <StatusBadge code={req.status} /></div>
+          <div><span style={{ color: '#94A3B8' }}>Latency:</span> {fmtDuration(req.latency_ms)}</div>
+          {req.error && <div style={{ gridColumn: '1/3', color: '#EF4444' }}>Error: {req.error}</div>}
+        </div>
+      )}
+
+      {tab === 'request' && (
+        <div style={{ maxHeight: 200, overflow: 'auto' }}>
+          {req.request_body ? <JsonView data={tryParse(req.request_body)} /> : <span style={{ color: '#94A3B8' }}>No request body</span>}
+        </div>
+      )}
+
+      {tab === 'response' && (
+        <div style={{ maxHeight: 200, overflow: 'auto' }}>
+          {req.response_body ? <JsonView data={tryParse(req.response_body)} /> : <span style={{ color: '#94A3B8' }}>No response body</span>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function TracesTab({ traces }: { traces: any[] }) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const [timeline, setTimeline] = useState<any[]>([]);
+
+  function toggleExpand(traceId: string) {
+    if (expanded === traceId) {
+      setExpanded(null);
+      setTimeline([]);
+    } else {
+      setExpanded(traceId);
+      setTimeline([]);
+      api(`/api/traces/${traceId}/timeline`).then(setTimeline).catch(() => {});
+    }
+  }
+
   if (traces.length === 0) {
     return <div style={{ textAlign: 'center', padding: 32, color: '#94A3B8' }}>No recent traces</div>;
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: 400 }}>
+    <div style={{ overflow: 'auto', maxHeight: 500 }}>
       <table class="table" style={{ fontSize: 12, width: '100%' }}>
         <thead>
           <tr>
@@ -204,25 +290,76 @@ function TracesTab({ traces }: { traces: any[] }) {
         </thead>
         <tbody>
           {traces.map((t: any) => (
-            <tr
-              key={t.trace_id}
-              style={{ cursor: 'pointer' }}
-              onClick={() => { location.hash = `/traces`; }}
-            >
-              <td>{t.root_action || t.root_service}</td>
-              <td>{t.span_count}</td>
-              <td>{fmtDuration(t.duration_ms)}</td>
-              <td>
-                {t.has_error ? (
-                  <span style={{ color: '#EF4444', fontWeight: 600 }}>Error</span>
-                ) : (
-                  <StatusBadge code={t.status_code} />
-                )}
-              </td>
-            </tr>
+            <>
+              <tr
+                key={t.trace_id}
+                style={{ cursor: 'pointer', background: expanded === t.trace_id ? '#F1F5F9' : undefined }}
+                onClick={() => toggleExpand(t.trace_id)}
+              >
+                <td>{t.root_action || t.root_service}</td>
+                <td>{t.span_count}</td>
+                <td>{fmtDuration(t.duration_ms)}</td>
+                <td>
+                  {t.has_error ? (
+                    <span style={{ color: '#EF4444', fontWeight: 600 }}>Error</span>
+                  ) : (
+                    <StatusBadge code={t.status_code} />
+                  )}
+                </td>
+              </tr>
+              {expanded === t.trace_id && (
+                <tr key={`${t.trace_id}-detail`}>
+                  <td colSpan={4} style={{ padding: 0 }}>
+                    <TraceInlineDetail spans={timeline} totalMs={t.duration_ms} />
+                  </td>
+                </tr>
+              )}
+            </>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+function TraceInlineDetail({ spans, totalMs }: { spans: any[]; totalMs: number }) {
+  if (spans.length === 0) {
+    return <div style={{ padding: 12, color: '#94A3B8', fontSize: 12 }}>Loading timeline...</div>;
+  }
+
+  const maxMs = totalMs || Math.max(...spans.map(s => (s.start_offset_ms || 0) + (s.duration_ms || 0)), 1);
+
+  return (
+    <div style={{ padding: 12, background: '#F8FAFC', borderTop: '1px solid #E2E8F0' }}>
+      <div style={{ fontSize: 11, color: '#94A3B8', marginBottom: 8 }}>Waterfall ({spans.length} spans, {fmtDuration(totalMs)})</div>
+      {spans.map((s: any, i: number) => {
+        const left = ((s.start_offset_ms || 0) / maxMs) * 100;
+        const width = Math.max(((s.duration_ms || 0) / maxMs) * 100, 1);
+        const indent = (s.depth || 0) * 12;
+        const color = s.error ? '#EF4444' : s.status_code >= 400 ? '#F59E0B' : '#3B82F6';
+
+        return (
+          <div key={i} style={{ display: 'flex', alignItems: 'center', marginBottom: 3, fontSize: 11 }}>
+            <div style={{ width: 120, flexShrink: 0, paddingLeft: indent, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {s.service}/{s.action}
+            </div>
+            <div style={{ flex: 1, height: 14, background: '#E2E8F0', borderRadius: 2, position: 'relative' }}>
+              <div style={{
+                position: 'absolute',
+                left: `${left}%`,
+                width: `${width}%`,
+                height: '100%',
+                background: color,
+                borderRadius: 2,
+                opacity: 0.8,
+              }} />
+            </div>
+            <div style={{ width: 50, textAlign: 'right', flexShrink: 0, color: '#64748B', fontSize: 10 }}>
+              {fmtDuration(s.duration_ms)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -292,6 +429,10 @@ function ConnectionsTab({ inbound, outbound, nodeMap, onSelectNode }: {
       )}
     </div>
   );
+}
+
+function tryParse(s: string): any {
+  try { return JSON.parse(s); } catch { return s; }
 }
 
 function ResourceTab({ resources }: { resources: any }) {

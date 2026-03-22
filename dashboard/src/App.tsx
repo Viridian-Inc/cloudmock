@@ -19,6 +19,8 @@ import { TopologyPage } from './pages/Topology';
 import { S3BrowserPage } from './pages/S3Browser';
 import { SQSBrowserPage } from './pages/SQSBrowser';
 import { CognitoBrowserPage } from './pages/CognitoBrowser';
+import { DebugAssistantPage, useDebugErrorCount } from './pages/DebugAssistant';
+import { TracesPage } from './pages/Traces';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -31,6 +33,7 @@ export function App() {
   const [health, setHealth] = useState<any>(null);
   const [toast, setToast] = useState('');
   const [mailCount, setMailCount] = useState(0);
+  const debugErrorCount = useDebugErrorCount();
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -69,6 +72,7 @@ export function App() {
     { id: '/', label: 'Home', icon: 'home' },
     { id: '/services', label: 'Services', icon: 'services' },
     { id: '/requests', label: 'Requests', icon: 'requests' },
+    { id: '/traces', label: 'Traces', icon: 'traces' },
     { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
     { id: '/s3', label: 'S3', icon: 'bucket' },
     { id: '/sqs', label: 'SQS', icon: 'queue' },
@@ -78,6 +82,7 @@ export function App() {
     { id: '/iam', label: 'IAM', icon: 'shield' },
     { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
     { id: '/topology', label: 'Topology', icon: 'topology' },
+    { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
   ];
 
   function renderPage() {
@@ -87,6 +92,7 @@ export function App() {
     switch (activePath) {
       case '/services': return <ServicesPage services={services} stats={stats} health={health} />;
       case '/requests': return <RequestsPage sse={sse} showToast={showToast} />;
+      case '/traces': return <TracesPage showToast={showToast} />;
       case '/dynamodb': return <DynamoDBPage showToast={showToast} />;
       case '/s3': return <S3BrowserPage showToast={showToast} />;
       case '/sqs': return <SQSBrowserPage showToast={showToast} />;
@@ -96,6 +102,7 @@ export function App() {
       case '/iam': return <IAMPage showToast={showToast} />;
       case '/mail': return <MailPage />;
       case '/topology': return <TopologyPage sse={sse} />;
+      case '/debug': return <DebugAssistantPage showToast={showToast} />;
       default: return <HomePage sse={sse} showToast={showToast} />;
     }
   }

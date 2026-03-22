@@ -196,12 +196,46 @@ export function QueueIcon(p: IconProps) {
   </Icon>;
 }
 
+export function TracesIcon(p: IconProps) {
+  return <Icon {...p}>
+    <line x1="6" y1="3" x2="6" y2="15" />
+    <circle cx="18" cy="6" r="3" />
+    <circle cx="18" cy="18" r="3" />
+    <path d="M6 7a5 5 0 0 0 5 5h3.5a5 5 0 0 1 5 5" />
+    <path d="M6 7a5 5 0 0 1 5-5h3.5a5 5 0 0 0 3.5 1.5" />
+  </Icon>;
+}
+
+export function DownloadIcon(p: IconProps) {
+  return <Icon width="16" height="16" {...p}>
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+    <polyline points="7 10 12 15 17 10" />
+    <line x1="12" y1="15" x2="12" y2="3" />
+  </Icon>;
+}
+
 export function UsersIcon(p: IconProps) {
   return <Icon {...p}>
     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
     <circle cx="9" cy="7" r="4" />
     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </Icon>;
+}
+
+export function BugIcon(p: IconProps) {
+  return <Icon {...p}>
+    <path d="M8 2l1.88 1.88" />
+    <path d="M14.12 3.88 16 2" />
+    <path d="M9 7.13v-1a3.003 3.003 0 1 1 6 0v1" />
+    <path d="M12 20c-3.3 0-6-2.7-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3c0 3.3-2.7 6-6 6z" />
+    <path d="M12 20v-9" />
+    <path d="M6.53 9C4.6 8.8 3 7.1 3 5" />
+    <path d="M6 13H2" />
+    <path d="M3 21c0-2.1 1.7-3.9 3.8-4" />
+    <path d="M20.97 5c0 2.1-1.6 3.8-3.5 4" />
+    <path d="M22 13h-4" />
+    <path d="M17.2 17c2.1.1 3.8 1.9 3.8 4" />
   </Icon>;
 }
 
@@ -219,4 +253,6 @@ export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
   bucket: BucketIcon,
   queue: QueueIcon,
   users: UsersIcon,
+  traces: TracesIcon,
+  bug: BugIcon,
 };

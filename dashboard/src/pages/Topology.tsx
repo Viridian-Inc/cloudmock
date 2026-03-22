@@ -686,6 +686,200 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
 
+// --- Map View: Resource Groups ---
+
+interface MapResource {
+  name: string;
+  service: string;    // API service name for resource lookup
+  icon: string;
+}
+
+interface MapGroup {
+  id: string;
+  label: string;
+  color: string;
+  resources: MapResource[];
+}
+
+const MAP_GROUPS: MapGroup[] = [
+  {
+    id: 'client',
+    label: 'Client Layer',
+    color: '#6366F1',
+    resources: [
+      { name: 'Expo App', service: 'Expo App', icon: '\u{1F4F1}' },
+      { name: 'Admin Portal', service: 'Admin Portal', icon: '\u{1F5A5}' },
+      { name: 'Client Portal', service: 'Client Portal', icon: '\u{1F310}' },
+    ],
+  },
+  {
+    id: 'api',
+    label: 'API Layer',
+    color: '#06B6D4',
+    resources: [
+      { name: 'BFF Service', service: 'BFF Service', icon: '\u{1F500}' },
+      { name: 'GraphQL Server', service: 'GraphQL Server', icon: '\u{1F4E1}' },
+      { name: 'API Gateway', service: 'API Gateway', icon: '\u{1F6AA}' },
+    ],
+  },
+  {
+    id: 'auth',
+    label: 'Auth & Identity',
+    color: '#8B5CF6',
+    resources: [
+      { name: 'Cognito User Pool', service: 'Cognito', icon: '\u{1F510}' },
+      { name: 'Cognito App Client', service: 'Cognito', icon: '\u{1F511}' },
+      { name: 'IAM Roles', service: 'IAM', icon: '\u{1F464}' },
+    ],
+  },
+  {
+    id: 'compute',
+    label: 'Compute',
+    color: '#3B82F6',
+    resources: [
+      { name: 'attendance-handler', service: 'Lambda', icon: '\u03BB' },
+      { name: 'order-handler', service: 'Lambda', icon: '\u03BB' },
+      { name: 'membership-handler', service: 'Lambda', icon: '\u03BB' },
+      { name: 'notification-handler', service: 'Lambda', icon: '\u03BB' },
+      { name: 'stream-sync', service: 'Lambda', icon: '\u03BB' },
+      { name: 'Calendar Service', service: 'Calendar Service', icon: '\u{1F4C5}' },
+    ],
+  },
+  {
+    id: 'data-core',
+    label: 'Data \u2014 Core Domain',
+    color: '#10B981',
+    resources: [
+      { name: 'enterprise', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'membership', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'resource', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'resourceMembership', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'session', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'attendance', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'order', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'calendar', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'userMetadata', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'data-features',
+    label: 'Data \u2014 Features',
+    color: '#10B981',
+    resources: [
+      { name: 'featureFlag', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'notification', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'webhook', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'webhookDelivery', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'apiKey', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'attendancePolicy', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'userGroup', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'invitation', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'classTemplate', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'report', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'data-admin',
+    label: 'Data \u2014 Admin',
+    color: '#10B981',
+    resources: [
+      { name: 'release', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'deployment', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'rolloutStage', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'healthMetrics', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'auditLog', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'approval', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'analytics', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'analyticsConsent', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'data-integrations',
+    label: 'Data \u2014 Integrations',
+    color: '#10B981',
+    resources: [
+      { name: 'integration', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'lmsIntegration', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'lmsCourseMapping', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'lmsSyncLog', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'dispute', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'dataRequest', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'data-facilities',
+    label: 'Data \u2014 Facilities',
+    color: '#10B981',
+    resources: [
+      { name: 'seatingChart', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'seatPreferenceRequest', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'building', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'roomBlueprint', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'data-identity',
+    label: 'Data \u2014 Identity',
+    color: '#10B981',
+    resources: [
+      { name: 'identityProvider', service: 'DynamoDB', icon: '\u{1F4CA}' },
+      { name: 'customDomain', service: 'DynamoDB', icon: '\u{1F4CA}' },
+    ],
+  },
+  {
+    id: 'messaging',
+    label: 'Messaging',
+    color: '#F97316',
+    resources: [
+      { name: 'entity_lifecycle-queue', service: 'SQS', icon: '\u{1F4E8}' },
+      { name: 'attendance-queue', service: 'SQS', icon: '\u{1F4E8}' },
+      { name: 'order-queue', service: 'SQS', icon: '\u{1F4E8}' },
+      { name: 'push notifications topic', service: 'SNS', icon: '\u{1F4E2}' },
+      { name: 'EventBridge default bus', service: 'EventBridge', icon: '\u{1F4E1}' },
+    ],
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    color: '#F59E0B',
+    resources: [
+      { name: 'S3 buckets', service: 'S3', icon: '\u{1F4E6}' },
+      { name: 'calendar_db (PostgreSQL)', service: 'RDS', icon: '\u{1F5C4}' },
+    ],
+  },
+  {
+    id: 'security',
+    label: 'Security',
+    color: '#EF4444',
+    resources: [
+      { name: 'KMS encryption keys', service: 'KMS', icon: '\u{1F510}' },
+      { name: 'LMS credentials', service: 'Secrets Manager', icon: '\u{1F511}' },
+      { name: 'Stripe keys', service: 'Secrets Manager', icon: '\u{1F511}' },
+    ],
+  },
+  {
+    id: 'monitoring',
+    label: 'Monitoring',
+    color: '#EC4899',
+    resources: [
+      { name: 'Lambda log groups', service: 'CloudWatch Logs', icon: '\u{1F4CB}' },
+      { name: 'CloudWatch Alarms', service: 'CloudWatch', icon: '\u{1F514}' },
+    ],
+  },
+];
+
+const MAP_FLOWS: { from: string; to: string; label: string }[] = [
+  { from: 'Client', to: 'API Layer', label: 'HTTP/WS' },
+  { from: 'API Layer', to: 'Compute', label: 'invoke' },
+  { from: 'API Layer', to: 'Auth', label: 'verify' },
+  { from: 'Compute', to: 'Core Data', label: 'read/write' },
+  { from: 'Compute', to: 'Messaging', label: 'events' },
+  { from: 'Compute', to: 'Storage', label: 'files' },
+  { from: 'Compute', to: 'Security', label: 'secrets' },
+  { from: 'Messaging', to: 'Compute', label: 'triggers' },
+  { from: 'Monitoring', to: 'Messaging', label: 'alarms' },
+];
+
 // --- Component ---
 
 export function TopologyPage({ sse }: TopologyPageProps) {
@@ -696,7 +890,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [pulsing, setPulsing] = useState<Map<string, number>>(new Map());
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [showAll, setShowAll] = useState(false);
-  const [viewMode, setViewMode] = useState<'collapsed' | 'expanded'>('collapsed');
+  const [viewMode, setViewMode] = useState<'collapsed' | 'expanded' | 'map'>('collapsed');
   const [expandedNode, setExpandedNode] = useState<string | null>(null);
   const [nodeResources, setNodeResources] = useState<Record<string, any[]>>({});
   const [loadingResources, setLoadingResources] = useState<Set<string>>(new Set());
@@ -773,7 +967,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
 
   // Fetch all resources when switching to expanded mode
   useEffect(() => {
-    if (viewMode !== 'expanded') return;
+    if (viewMode !== 'expanded' && viewMode !== 'map') return;
     if (allResourcesLoaded) return;
 
     const activeNodeNames = nodes.filter(n => n.active && n.id !== 'Client Apps').map(n => n.id);
@@ -989,6 +1183,10 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               class={viewMode === 'expanded' ? 'active' : ''}
               onClick={() => setViewMode('expanded')}
             >Expanded</button>
+            <button
+              class={viewMode === 'map' ? 'active' : ''}
+              onClick={() => setViewMode('map')}
+            >Map</button>
           </div>
           <label
             style={{
@@ -1045,6 +1243,123 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           ))}
         </div>
       </div>
+      {viewMode === 'map' ? (
+        <div class="card" style="position:relative;overflow:hidden">
+          {/* SVG arrow overlay */}
+          <svg class="topo-map-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1">
+            <defs>
+              <marker id="map-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="var(--n400)" />
+              </marker>
+            </defs>
+            {/* Render flow arrows between group cards using data-group-id positions */}
+            {MAP_FLOWS.map((flow, i) => {
+              // Map group labels to approximate positions based on grid layout
+              // Groups are in a 3-column CSS grid, each ~33% width
+              const groupIndex: Record<string, number> = {};
+              MAP_GROUPS.forEach((g, idx) => { groupIndex[g.label] = idx; });
+              const fromIdx = groupIndex[flow.from];
+              const toIdx = groupIndex[flow.to];
+              if (fromIdx === undefined || toIdx === undefined) return null;
+
+              // Calculate approximate center positions
+              const cols = 3;
+              const colW = 33.3;
+              const rowH = 220; // approximate row height
+              const fromCol = fromIdx % cols;
+              const fromRow = Math.floor(fromIdx / cols);
+              const toCol = toIdx % cols;
+              const toRow = Math.floor(toIdx / cols);
+
+              const x1 = (fromCol + 0.5) * colW;
+              const y1 = 60 + fromRow * rowH + 40;
+              const x2 = (toCol + 0.5) * colW;
+              const y2 = 60 + toRow * rowH + 40;
+
+              // Offset start/end so arrows don't overlap cards
+              const dx = x2 - x1;
+              const dy = y2 - y1;
+              const len = Math.sqrt(dx * dx + dy * dy) || 1;
+              const offsetPx = 3; // percent offset
+              const sx = x1 + (dx / len) * offsetPx;
+              const sy = y1 + (dy / len) * offsetPx;
+              const ex = x2 - (dx / len) * offsetPx;
+              const ey = y2 - (dy / len) * offsetPx;
+
+              // Control point for curve
+              const mx = (sx + ex) / 2;
+              const my = (sy + ey) / 2 - 2;
+
+              return (
+                <g key={i} opacity="0.6">
+                  <path
+                    d={`M ${sx}% ${sy} Q ${mx}% ${my} ${ex}% ${ey}`}
+                    fill="none"
+                    stroke="var(--n300)"
+                    stroke-width="1.5"
+                    stroke-dasharray="6 3"
+                    marker-end="url(#map-arrow)"
+                  />
+                  <text
+                    x={`${mx}%`}
+                    y={my - 6}
+                    text-anchor="middle"
+                    font-size="9"
+                    fill="var(--n400)"
+                    font-family="var(--font-sans)"
+                  >
+                    {flow.label}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
+          {/* Data flow legend */}
+          <div class="topo-map-flows">
+            <span class="topo-map-flow-label">Data Flow</span>
+            {MAP_FLOWS.map((flow, i) => (
+              <span key={i} class="topo-map-flow">
+                {flow.from}
+                <span class="topo-map-flow-arrow">{'\u2192'}</span>
+                {flow.to}
+                <span style="color:var(--n400);font-size:10px">({flow.label})</span>
+              </span>
+            ))}
+          </div>
+          {/* Resource group cards */}
+          <div class="topo-map" style="position:relative;z-index:2">
+            {MAP_GROUPS.map(group => (
+              <div key={group.id} class="topo-map-group">
+                <div class="topo-map-group-header" style={{ borderBottomColor: group.color + '40' }}>
+                  <span class="topo-map-dot" style={{ background: group.color }} />
+                  <span style={{ color: group.color }}>{group.label}</span>
+                  <span class="topo-map-count">{group.resources.length}</span>
+                </div>
+                <div class="topo-map-resources">
+                  {group.resources.map((res, i) => (
+                    <span
+                      key={i}
+                      class="topo-map-chip"
+                      style={{
+                        background: group.color + '14',
+                        color: group.color,
+                      }}
+                      onClick={() => {
+                        const svc = res.service;
+                        const name = res.name;
+                        location.hash = `/resources?service=${encodeURIComponent(svc)}&resource=${encodeURIComponent(name)}`;
+                      }}
+                    >
+                      <span class="topo-map-chip-icon">{res.icon}</span>
+                      {res.name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : (
       <div class="card topology-container" style="position:relative;overflow:hidden">
         {/* biome-ignore lint: internal dashboard SVG */}
         <svg
@@ -1640,6 +1955,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           </g>
         </svg>
       </div>
+      )}
     </div>
   );
 }

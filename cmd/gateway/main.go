@@ -284,6 +284,23 @@ func main() {
 		}()
 	}
 
+	// Proxy mode: start the virtual-host reverse proxy and the DNS server
+	// for *.local.autotend.io on a non-privileged port.
+	if os.Getenv("CLOUDMOCK_PROXY") == "true" || os.Getenv("CLOUDMOCK_PROXY") == "1" {
+		routes := gateway.DefaultAutotendRoutes()
+		certs, certsErr := gateway.EnsureCerts()
+		if certsErr != nil {
+			log.Printf("proxy: TLS certs unavailable (%v) — starting HTTP only", certsErr)
+			certs = nil
+		}
+		gateway.StartProxy(routes, certs)
+
+		// Built-in DNS server resolves *.local.autotend.io → 127.0.0.1 on a
+		// non-privileged port. To point macOS at it, run once:
+		//   sudo cloudmock-dns auto
+		go gateway.StartDNSServer(15353, "local.autotend.io")
+	}
+
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)
 	log.Printf("cloudmock gateway starting on %s (region=%s, account=%s, iam_mode=%s, services=%d)",
 		addr, cfg.Region, cfg.AccountID, cfg.IAM.Mode, len(registry.List()))

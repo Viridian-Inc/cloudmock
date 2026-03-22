@@ -69,7 +69,7 @@ func EnsureCerts() (*CertPair, error) {
 	}
 
 	// Generate new certs
-	log.Printf("certs: generating self-signed CA and certificate for *.local.autotend.io")
+	log.Printf("certs: generating self-signed CA and certificate for *.local.autotend.io and *.autotend.localhost")
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("cannot create cert directory: %w", err)
@@ -114,6 +114,9 @@ func EnsureCerts() (*CertPair, error) {
 		DNSNames: []string{
 			"local.autotend.io",
 			"*.local.autotend.io",
+			"autotend.localhost",
+			"*.autotend.localhost",
+			"localhost",
 		},
 		IPAddresses: []net.IP{net.ParseIP("127.0.0.1")},
 		NotBefore:   time.Now().Add(-1 * time.Hour),

@@ -26,8 +26,31 @@ type ProxyServer struct {
 
 // DefaultAutotendRoutes returns the standard routing table for autotend
 // local development. Order matters — more specific paths must come first.
+//
+// Two sets of domains are supported simultaneously:
+//   - *.localhost domains (RFC 6761 — zero config, all browsers resolve these to 127.0.0.1)
+//   - *.local.autotend.io (requires one-time DNS setup via: sudo cloudmock-dns auto)
 func DefaultAutotendRoutes() []ProxyRoute {
 	return []ProxyRoute{
+		// ---- .localhost domains (RFC 6761, zero config) ----
+
+		// Subdomain routes
+		{Host: "bff.autotend.localhost", Backend: "http://localhost:3202"},
+		{Host: "api.autotend.localhost", Backend: "http://localhost:4566"},
+		{Host: "auth.autotend.localhost", Backend: "http://localhost:4566"},
+		{Host: "dashboard.autotend.localhost", Backend: "http://localhost:4500"},
+		{Host: "admin.autotend.localhost", Backend: "http://localhost:4599"},
+
+		// Path-based routes on the main .localhost domain (most specific first)
+		{Host: "autotend.localhost", Path: "/bff/", Backend: "http://localhost:3202"},
+		{Host: "autotend.localhost", Path: "/v1/", Backend: "http://localhost:3202"},
+		{Host: "autotend.localhost", Path: "/health", Backend: "http://localhost:3202"},
+		{Host: "autotend.localhost", Path: "/graphql", Backend: "http://localhost:4000"},
+		{Host: "autotend.localhost", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
+		{Host: "autotend.localhost", Path: "/", Backend: "http://localhost:4500"},
+
+		// ---- local.autotend.io domains (requires DNS setup) ----
+
 		// Subdomain routes (match entire host)
 		{Host: "bff.local.autotend.io", Path: "", Backend: "http://localhost:3202"},
 		{Host: "api.local.autotend.io", Path: "", Backend: "http://localhost:4566"},
@@ -186,7 +209,7 @@ func StartProxy(routes []ProxyRoute, tlsCert *CertPair) {
 				return
 			}
 		}
-		log.Printf("proxy: listening on http://local.autotend.io%s", addr)
+		log.Printf("proxy: listening on http://autotend.localhost%s (and http://local.autotend.io%s)", addr, addr)
 		if err := http.Serve(ln, proxy); err != nil {
 			log.Printf("proxy HTTP exited: %v", err)
 		}
@@ -208,7 +231,7 @@ func StartProxy(routes []ProxyRoute, tlsCert *CertPair) {
 				}
 			}
 			tlsLn := tls.NewListener(ln, tlsConfig)
-			log.Printf("proxy: listening on https://local.autotend.io%s", addr)
+			log.Printf("proxy: listening on https://autotend.localhost%s (and https://local.autotend.io%s)", addr, addr)
 			if err := http.Serve(tlsLn, proxy); err != nil {
 				log.Printf("proxy HTTPS exited: %v", err)
 			}

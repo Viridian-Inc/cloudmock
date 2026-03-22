@@ -518,6 +518,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const [pulsingNodes, setPulsingNodes] = useState<Map<string, number>>(new Map());
+  const [packets, setPackets] = useState<{id: number; edgeIdx: number; timestamp: number}[]>([]);
+  const packetId = useRef(0);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
@@ -542,7 +544,21 @@ export function TopologyPage({ sse }: TopologyPageProps) {
       return next;
     });
 
-    // Clear pulse after 1.5s
+    // Spawn packets on edges that involve this service
+    if (topoData) {
+      const now = Date.now();
+      const newPackets: {id: number; edgeIdx: number; timestamp: number}[] = [];
+      topoData.edges.forEach((e, idx) => {
+        if (e.target.startsWith(svcName + ':') || e.source.startsWith(svcName + ':')) {
+          newPackets.push({ id: ++packetId.current, edgeIdx: idx, timestamp: now });
+        }
+      });
+      if (newPackets.length > 0) {
+        setPackets(prev => [...prev, ...newPackets].slice(-30)); // keep max 30 active
+      }
+    }
+
+    // Clear pulse + packets after 1.5s
     const timer = setTimeout(() => {
       setPulsingNodes(prev => {
         const next = new Map(prev);
@@ -552,7 +568,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
         }
         return next;
       });
-    }, 1500);
+      setPackets(prev => prev.filter(p => Date.now() - p.timestamp < 2000));
+    }, 2000);
     return () => clearTimeout(timer);
   }, [sse?.events?.length, topoData]);
 
@@ -894,8 +911,19 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const midX = (startX + endX) / 2;
               const midY = (startY + endY) / 2 - 6;
 
-              const labelText = edge.label || '';
-              const labelW = labelText.length * 5 + 10;
+              // Build label with latency info
+              const avgMs = (edge as any).avgLatencyMs || 0;
+              const callCount = (edge as any).callCount || 0;
+              const latencyStr = avgMs > 0
+                ? avgMs < 1 ? '<1ms' : avgMs < 1000 ? `${Math.round(avgMs)}ms` : `${(avgMs/1000).toFixed(1)}s`
+                : '';
+              const labelText = latencyStr
+                ? `${edge.label || ''} ${latencyStr}`
+                : (edge.label || '');
+              const labelW = labelText.length * 5 + 12;
+
+              // Thicker lines for more traffic
+              const baseWidth = callCount > 50 ? 2.5 : callCount > 10 ? 1.8 : callCount > 0 ? 1.2 : 0.8;
 
               return (
                 <g
@@ -908,7 +936,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     d={path}
                     fill="none"
                     stroke={edgeColor}
-                    stroke-width={highlighted ? 2 : 1}
+                    stroke-width={highlighted ? baseWidth + 1 : baseWidth}
                     stroke-dasharray={isDashed ? '5 3' : 'none'}
                     marker-end={highlighted ? 'url(#topo-arrow-active)' : 'url(#topo-arrow)'}
                   />
@@ -959,11 +987,45 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         font-family="var(--font-sans)"
                         fill="white"
                       >
-                        {edge.label || edge.type} ({edge.discovered})
+                        {edge.label || edge.type}{callCount > 0 ? ` \u00B7 ${callCount} calls \u00B7 avg ${latencyStr}` : ''} ({edge.discovered})
                       </text>
                     </g>
                   )}
                 </g>
+              );
+            })}
+
+            {/* Animated packets (Packet Tracer style) */}
+            {packets.map(pkt => {
+              const edge = edges[pkt.edgeIdx];
+              if (!edge) return null;
+              const from = nodePos.get(edge.source);
+              const to = nodePos.get(edge.target);
+              if (!from || !to) return null;
+              const dx = to.cx - from.cx;
+              const dy = to.cy - from.cy;
+              const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+              const sx = from.cx + (dx / dist) * (RES_W / 2 + 3);
+              const sy = from.cy + (dy / dist) * (RES_H / 2 + 2);
+              const ex = to.cx - (dx / dist) * (RES_W / 2 + 3);
+              const ey = to.cy - (dy / dist) * (RES_H / 2 + 2);
+              const pth = bezierPath(sx, sy, ex, ey);
+              const groupColor = groupColorMap.get(edge.source.split(':')[0] === 'external' ? 'API' : (topoData?.nodes.find(n => n.id === edge.source)?.group || '')) || '#3B82F6';
+              return (
+                <circle
+                  key={`pkt-${pkt.id}`}
+                  r={5}
+                  fill={groupColor}
+                  opacity={0.9}
+                  style={{ filter: `drop-shadow(0 0 4px ${groupColor})` }}
+                >
+                  <animateMotion
+                    dur="1.2s"
+                    repeatCount="1"
+                    fill="freeze"
+                    path={pth.replace('M ', 'M').replace(' C ', 'C')}
+                  />
+                </circle>
               );
             })}
 

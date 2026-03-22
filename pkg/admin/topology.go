@@ -3,6 +3,8 @@ package admin
 import (
 	"strings"
 	"time"
+
+	"github.com/neureaux/cloudmock/pkg/gateway"
 )
 
 // ---- Topology response types ----
@@ -18,11 +20,13 @@ type TopologyNodeV2 struct {
 
 // TopologyEdgeV2 describes a connection between resources.
 type TopologyEdgeV2 struct {
-	Source     string `json:"source"`
-	Target     string `json:"target"`
-	Type       string `json:"type"`       // "trigger", "read_write", "publish", "subscribe"
-	Label      string `json:"label"`
-	Discovered string `json:"discovered"` // "esm", "subscription", "rule", "traffic", "config", "alarm", "cfn"
+	Source       string  `json:"source"`
+	Target       string  `json:"target"`
+	Type         string  `json:"type"`         // "trigger", "read_write", "publish", "subscribe"
+	Label        string  `json:"label"`
+	Discovered   string  `json:"discovered"`   // "esm", "subscription", "rule", "traffic", "config", "alarm", "cfn"
+	AvgLatencyMs float64 `json:"avgLatencyMs"` // average latency in milliseconds (0 = unknown)
+	CallCount    int     `json:"callCount"`    // number of observed calls (0 = config-only)
 }
 
 // TopologyGroupV2 describes a visual grouping.
@@ -403,10 +407,56 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		}
 	}
 
+	// Enrich edges with latency stats from request log
+	if a.log != nil {
+		enrichEdgesWithLatency(edges, a.log)
+	}
+
 	return TopologyResponseV2{
 		Nodes:  nodes,
 		Edges:  edges,
 		Groups: topologyGroups,
+	}
+}
+
+// enrichEdgesWithLatency computes average latency and call count per service
+// from the request log and attaches them to matching edges.
+func enrichEdgesWithLatency(edges []TopologyEdgeV2, log *gateway.RequestLog) {
+	entries := log.Recent("", 1000)
+
+	// Compute per-service stats: average latency and call count
+	type svcStats struct {
+		totalLatency float64
+		count        int
+	}
+	stats := make(map[string]*svcStats)
+	for _, e := range entries {
+		svc := e.Service
+		if svc == "" {
+			continue
+		}
+		s, ok := stats[svc]
+		if !ok {
+			s = &svcStats{}
+			stats[svc] = s
+		}
+		s.totalLatency += float64(e.Latency.Milliseconds())
+		s.count++
+	}
+
+	// Apply stats to edges whose target matches a service
+	for i := range edges {
+		edge := &edges[i]
+		// Extract service name from target node ID (e.g., "dynamodb:enterprise" → "dynamodb")
+		targetSvc := ""
+		if idx := strings.Index(edge.Target, ":"); idx > 0 {
+			targetSvc = edge.Target[:idx]
+		}
+
+		if s, ok := stats[targetSvc]; ok && s.count > 0 {
+			edge.AvgLatencyMs = s.totalLatency / float64(s.count)
+			edge.CallCount = s.count
+		}
 	}
 }
 

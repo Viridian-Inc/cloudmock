@@ -312,25 +312,40 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	// 11. Known external edges
 	addEdge("external:bff-service", "cognito:user-pool", "invoke", "verify tokens", "config")
 	addEdge("external:graphql-server", "cognito:user-pool", "invoke", "verify tokens", "config")
+
+	// GraphQL server → specific tables it resolves
+	gqlTables := []string{"enterprise", "membership", "session", "attendance"}
+	for _, t := range gqlTables {
+		if dynamoTables[t] {
+			addEdge("external:graphql-server", "dynamodb:"+t, "read_write", "resolver", "config")
+		}
+	}
 	addEdge("external:calendar-service", "rds:databases", "read_write", "calendar DB", "config")
 
-	// BFF -> DynamoDB (all core tables)
-	for t := range dynamoTables {
-		addEdge("external:bff-service", "dynamodb:"+t, "read_write", "read/write", "config")
+	// BFF -> specific DynamoDB tables it directly queries (core domain tables)
+	bffTables := []string{
+		"enterprise", "membership", "resource", "resourceMembership",
+		"session", "attendance", "order", "calendar", "userMetadata",
+		"featureFlag", "notification", "seatingChart", "building",
+		"roomBlueprint", "seatPreferenceRequest", "dispute", "dataRequest",
+		"integration", "colorPreference",
+	}
+	for _, t := range bffTables {
+		if dynamoTables[t] {
+			addEdge("external:bff-service", "dynamodb:"+t, "read_write", "query", "config")
+		}
 	}
 
-	// BFF -> SQS
+	// BFF -> SQS (entity lifecycle queue for domain events)
 	for q := range sqsQueues {
-		addEdge("external:bff-service", "sqs:"+q, "publish", "send events", "config")
+		if strings.Contains(q, "entity") || strings.Contains(q, "lifecycle") {
+			addEdge("external:bff-service", "sqs:"+q, "publish", "domain events", "config")
+		}
 	}
 
-	// BFF -> SNS
-	for t := range snsTopics {
-		addEdge("external:bff-service", "sns:"+t, "publish", "publish", "config")
-	}
-
-	// BFF -> S3, Secrets
-	addEdge("external:bff-service", "secrets:store", "invoke", "credentials", "config")
+	// BFF -> specific services
+	addEdge("external:bff-service", "secrets:store", "invoke", "LMS credentials", "config")
+	addEdge("external:bff-service", "cognito:user-pool", "invoke", "verify tokens", "config")
 
 	// Plugin edges
 	addEdge("external:bff-service", "plugin:stripe", "invoke", "payments", "config")
@@ -340,20 +355,53 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	addEdge("external:bff-service", "plugin:posthog", "invoke", "analytics", "config")
 	addEdge("external:bff-service", "plugin:cloudflare", "invoke", "DNS", "config")
 
-	// Lambda -> various services
+	// Lambda -> specific resources (inferred from function name → table name conventions)
+	// Only create edges where the function name maps to a known resource
 	for fn := range lambdaFunctions {
-		addEdge("lambda:"+fn, "secrets:store", "invoke", "get secrets", "config")
+		// attendance-handler → attendance table
+		baseName := strings.TrimSuffix(fn, "-handler")
+		if dynamoTables[baseName] {
+			addEdge("lambda:"+fn, "dynamodb:"+baseName, "read_write", "read/write", "config")
+		}
+		// stream-sync → reads from all stream-enabled tables
+		if strings.Contains(fn, "stream") || strings.Contains(fn, "sync") {
+			// Only connect to core tables that have streams
+			for _, t := range []string{"membership", "enterprise", "session", "attendance"} {
+				if dynamoTables[t] {
+					addEdge("dynamodb:"+t, "lambda:"+fn, "trigger", "DDB stream", "config")
+				}
+			}
+		}
+		// notification-handler → SNS + SES
+		if strings.Contains(fn, "notification") {
+			for t := range snsTopics {
+				addEdge("lambda:"+fn, "sns:"+t, "publish", "notify", "config")
+			}
+			addEdge("lambda:"+fn, "ses:email", "invoke", "send email", "config")
+		}
+		// order-handler → order queue + stripe
+		if strings.Contains(fn, "order") {
+			for q := range sqsQueues {
+				if strings.Contains(q, "order") {
+					addEdge("lambda:"+fn, "sqs:"+q, "publish", "order events", "config")
+				}
+			}
+		}
 	}
 
-	// API Gateway -> Lambda
-	if len(lambdaFunctions) > 0 {
-		for fn := range lambdaFunctions {
+	// API Gateway -> specific Lambda functions that are HTTP handlers
+	for fn := range lambdaFunctions {
+		if strings.HasSuffix(fn, "-handler") {
 			addEdge("apigw:apis", "lambda:"+fn, "trigger", "proxy", "config")
 		}
 	}
 
-	// CloudWatch -> SNS
-	addEdge("cloudwatch:alarms", "sns:alarm-topic", "publish", "alarm actions", "config")
+	// CloudWatch -> SNS (only if alarm topic exists)
+	for t := range snsTopics {
+		if strings.Contains(t, "alarm") {
+			addEdge("cloudwatch:alarms", "sns:"+t, "publish", "alarm actions", "config")
+		}
+	}
 
 	return TopologyResponseV2{
 		Nodes:  nodes,

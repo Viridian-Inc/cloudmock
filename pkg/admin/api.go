@@ -45,6 +45,7 @@ type API struct {
 	lambdaLogs  *lambda.LogBuffer
 	iamEngine   *iam.Engine
 	sesStore    *ses.Store
+	traceStore  *gateway.TraceStore
 	mux         *http.ServeMux
 }
 
@@ -75,6 +76,8 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
+	a.mux.HandleFunc("/api/traces", a.handleTraces)
+	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
 
 	return a
 }
@@ -705,6 +708,84 @@ func buildRESTRequest(serviceName string) *http.Request {
 	}
 	req, _ := http.NewRequest(http.MethodGet, path, nil)
 	return req
+}
+
+// SetTraceStore sets the trace store for the admin API.
+func (a *API) SetTraceStore(ts *gateway.TraceStore) {
+	a.traceStore = ts
+}
+
+// handleTraces returns recent traces.
+func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if a.traceStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	svcFilter := r.URL.Query().Get("service")
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 {
+			limit = n
+		}
+	}
+
+	var hasErrorFilter *bool
+	if ef := r.URL.Query().Get("error"); ef == "true" {
+		v := true
+		hasErrorFilter = &v
+	} else if ef == "false" {
+		v := false
+		hasErrorFilter = &v
+	}
+
+	traces := a.traceStore.Recent(svcFilter, hasErrorFilter, limit)
+	writeJSON(w, http.StatusOK, traces)
+}
+
+// handleTraceByID returns a single trace or its timeline.
+func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/traces/")
+	parts := strings.SplitN(path, "/", 2)
+	traceID := parts[0]
+
+	if traceID == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	if a.traceStore == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	// /api/traces/:traceId/timeline
+	if len(parts) == 2 && parts[1] == "timeline" {
+		spans := a.traceStore.Timeline(traceID)
+		if spans == nil {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, spans)
+		return
+	}
+
+	trace := a.traceStore.Get(traceID)
+	if trace == nil {
+		http.NotFound(w, r)
+		return
+	}
+	writeJSON(w, http.StatusOK, trace)
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

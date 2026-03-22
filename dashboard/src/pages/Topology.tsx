@@ -1023,7 +1023,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     dur="1.2s"
                     repeatCount="1"
                     fill="freeze"
-                    path={pth.replace('M ', 'M').replace(' C ', 'C')}
+                    {...{ path: pth.replace('M ', 'M').replace(' C ', 'C') } as any}
                   />
                 </circle>
               );

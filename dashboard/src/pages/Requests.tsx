@@ -119,6 +119,7 @@ export function RequestsPage({ sse, showToast }: RequestsPageProps) {
                 <tr><td style="font-weight:600">Status</td><td><StatusBadge code={req.status} /></td></tr>
                 <tr><td style="font-weight:600">Latency</td><td>{fmtDuration(req.latency_ms || req.duration_ms)}</td></tr>
                 <tr><td style="font-weight:600">Request ID</td><td class="font-mono text-sm">{req.id || ''}</td></tr>
+                {req.trace_id && <tr><td style="font-weight:600">Trace</td><td><a href={`#/traces`} class="trace-link" style="color:var(--brand-blue);text-decoration:underline;cursor:pointer">View Trace</a></td></tr>}
                 <tr><td style="font-weight:600">Time</td><td>{req.timestamp || req.time || ''}</td></tr>
               </tbody>
             </table>

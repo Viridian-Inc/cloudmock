@@ -225,9 +225,11 @@ func main() {
 
 	requestLog := gateway.NewRequestLog(1000)
 	requestStats := gateway.NewRequestStats()
+	traceStore := gateway.NewTraceStore(500)
 
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
+	adminAPI.SetTraceStore(traceStore)
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -247,7 +249,10 @@ func main() {
 	if corsEnabled != "false" && corsEnabled != "0" {
 		handler = gateway.CORSMiddleware(handler)
 	}
-	loggedGW := gateway.LoggingMiddleware(handler, requestLog, requestStats, adminAPI.Broadcaster())
+	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
+		Broadcaster: adminAPI.Broadcaster(),
+		TraceStore:  traceStore,
+	})
 
 	var adminHandler http.Handler = adminAPI
 	if corsEnabled != "false" && corsEnabled != "0" {

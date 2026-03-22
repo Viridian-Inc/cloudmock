@@ -16,6 +16,8 @@ const maxBodyCapture = 10 * 1024
 // RequestEntry holds data about a single request processed by the gateway.
 type RequestEntry struct {
 	ID             string            `json:"id"`
+	TraceID        string            `json:"trace_id,omitempty"`
+	SpanID         string            `json:"span_id,omitempty"`
 	Timestamp      time.Time         `json:"timestamp"`
 	Service        string            `json:"service"`
 	Action         string            `json:"action"`
@@ -23,6 +25,7 @@ type RequestEntry struct {
 	Path           string            `json:"path"`
 	StatusCode     int               `json:"status_code"`
 	Latency        time.Duration     `json:"latency_ns"`
+	LatencyMs      float64           `json:"latency_ms"`
 	CallerID       string            `json:"caller_id"`
 	Error          string            `json:"error,omitempty"`
 	RequestHeaders map[string]string `json:"request_headers,omitempty"`
@@ -172,14 +175,43 @@ type RequestBroadcaster interface {
 	Broadcast(eventType string, data interface{})
 }
 
+// LoggingMiddlewareOpts holds optional dependencies for LoggingMiddleware.
+type LoggingMiddlewareOpts struct {
+	Broadcaster RequestBroadcaster
+	TraceStore  *TraceStore
+}
+
 // LoggingMiddleware wraps a gateway handler and records request data.
 func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, broadcasters ...RequestBroadcaster) http.Handler {
-	var broadcaster RequestBroadcaster
-	if len(broadcasters) > 0 {
-		broadcaster = broadcasters[0]
+	return LoggingMiddlewareWithOpts(next, log, stats, LoggingMiddlewareOpts{
+		Broadcaster: firstBroadcaster(broadcasters),
+	})
+}
+
+func firstBroadcaster(bb []RequestBroadcaster) RequestBroadcaster {
+	if len(bb) > 0 {
+		return bb[0]
 	}
+	return nil
+}
+
+// LoggingMiddlewareWithOpts wraps a gateway handler and records request data with full options.
+func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *RequestStats, opts LoggingMiddlewareOpts) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
+
+		// Extract or generate trace ID.
+		traceID := r.Header.Get("X-Cloudmock-Trace-Id")
+		if traceID == "" {
+			traceID = r.Header.Get("X-Amz-Trace-Id")
+		}
+		if traceID == "" {
+			traceID = GenerateTraceID()
+		}
+		spanID := GenerateSpanID()
+
+		// Set trace headers on the response so callers can correlate.
+		w.Header().Set("X-Cloudmock-Trace-Id", traceID)
 
 		// Capture request headers.
 		reqHeaders := make(map[string]string, len(r.Header))
@@ -210,12 +242,28 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, 
 		action := detectActionFromRequest(r)
 
 		latency := time.Since(start)
+		latencyMs := float64(latency.Nanoseconds()) / 1e6
 
 		id := time.Now().UnixNano()
 		counter := requestIDCounter.Add(1)
 
+		var errMsg string
+		if rec.statusCode >= 400 {
+			// Try to extract error from response body (first 200 chars)
+			body := rec.body.String()
+			if len(body) > 200 {
+				body = body[:200]
+			}
+			if rec.statusCode >= 400 {
+				errMsg = fmt.Sprintf("HTTP %d", rec.statusCode)
+			}
+			_ = body
+		}
+
 		entry := RequestEntry{
 			ID:             fmt.Sprintf("%d-%d", id, counter),
+			TraceID:        traceID,
+			SpanID:         spanID,
 			Timestamp:      start,
 			Service:        svcName,
 			Action:         action,
@@ -223,7 +271,9 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, 
 			Path:           r.URL.Path,
 			StatusCode:     rec.statusCode,
 			Latency:        latency,
+			LatencyMs:      latencyMs,
 			CallerID:       extractCallerID(r),
+			Error:          errMsg,
 			RequestHeaders: reqHeaders,
 			RequestBody:    reqBody,
 			ResponseBody:   rec.body.String(),
@@ -234,9 +284,29 @@ func LoggingMiddleware(next http.Handler, log *RequestLog, stats *RequestStats, 
 			stats.Increment(svcName)
 		}
 
+		// Store trace context.
+		if opts.TraceStore != nil {
+			endTime := time.Now()
+			trace := &TraceContext{
+				TraceID:    traceID,
+				SpanID:     spanID,
+				Service:    svcName,
+				Action:     action,
+				Method:     r.Method,
+				Path:       r.URL.Path,
+				StartTime:  start,
+				EndTime:    endTime,
+				Duration:   latency,
+				DurationMs: latencyMs,
+				StatusCode: rec.statusCode,
+				Error:      errMsg,
+			}
+			opts.TraceStore.Add(trace)
+		}
+
 		// Broadcast request event for SSE clients.
-		if broadcaster != nil {
-			broadcaster.Broadcast("request", entry)
+		if opts.Broadcaster != nil {
+			opts.Broadcaster.Broadcast("request", entry)
 		}
 	})
 }

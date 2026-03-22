@@ -517,8 +517,44 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [hoveredEdge, setHoveredEdge] = useState<number | null>(null);
   const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
+  const [pulsingNodes, setPulsingNodes] = useState<Map<string, number>>(new Map());
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
+
+  // Live SSE: pulse nodes when requests arrive
+  useEffect(() => {
+    if (!sse?.events?.length) return;
+    const latest = sse.events[0];
+    if (!latest?.data?.service) return;
+
+    // Find all nodes matching this service
+    const svcName = latest.data.service;
+    setPulsingNodes(prev => {
+      const next = new Map(prev);
+      // Pulse any node whose service matches
+      if (topoData) {
+        for (const n of topoData.nodes) {
+          if (n.service === svcName || n.id.startsWith(svcName + ':')) {
+            next.set(n.id, Date.now());
+          }
+        }
+      }
+      return next;
+    });
+
+    // Clear pulse after 1.5s
+    const timer = setTimeout(() => {
+      setPulsingNodes(prev => {
+        const next = new Map(prev);
+        const cutoff = Date.now() - 1400;
+        for (const [k, v] of next) {
+          if (v < cutoff) next.delete(k);
+        }
+        return next;
+      });
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [sse?.events?.length, topoData]);
 
   // Fetch topology data
   useEffect(() => {
@@ -940,6 +976,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const dimmed = dimmedByNode || dimmedByCluster;
               const truncated = n.label.length > 18 ? n.label.slice(0, 17) + '\u2026' : n.label;
 
+              const isPulsing = pulsingNodes.has(n.id);
+
               return (
                 <g
                   key={n.id}
@@ -955,6 +993,21 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     navigateToResource(n.service, n.label);
                   }}
                 >
+                  {/* Pulse glow on live traffic */}
+                  {isPulsing && (
+                    <rect
+                      x={n.x - 4}
+                      y={n.y - 4}
+                      width={RES_W + 8}
+                      height={RES_H + 8}
+                      rx={14}
+                      fill="none"
+                      stroke={groupColor}
+                      stroke-width="3"
+                      opacity="0.6"
+                      style={{ animation: 'topo-pulse 1.5s ease-out' }}
+                    />
+                  )}
                   {/* Shadow */}
                   <rect
                     x={n.x + 1}
@@ -971,9 +1024,9 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     width={RES_W}
                     height={RES_H}
                     rx={10}
-                    fill={isHovered ? `${groupColor}20` : 'white'}
-                    stroke={isHovered ? groupColor : `${groupColor}50`}
-                    stroke-width={isHovered ? 2.5 : 1.5}
+                    fill={isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
+                    stroke={isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
+                    stroke-width={isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }}
                   />
                   {/* Left color accent */}

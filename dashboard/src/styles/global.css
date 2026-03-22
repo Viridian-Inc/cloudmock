@@ -555,6 +555,12 @@ pre, code { font-family: var(--font-mono); }
   font-weight: 600;
 }
 
+@keyframes topo-pulse {
+  0% { opacity: 0.8; stroke-width: 3; }
+  50% { opacity: 0.4; stroke-width: 5; }
+  100% { opacity: 0; stroke-width: 8; }
+}
+
 /* --- Command Palette --- */
 .palette-backdrop {
   position: fixed; inset: 0; background: rgba(0,0,0,0.5); backdrop-filter: blur(4px);

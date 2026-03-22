@@ -64,17 +64,17 @@ interface PositionedGroup {
 
 // --- Constants ---
 
-const RES_W = 120;
-const RES_H = 28;
-const RES_GAP_X = 10;
-const RES_GAP_Y = 8;
-const COLS = 2;
-const CLUSTER_PAD_X = 14;
-const CLUSTER_PAD_Y = 14;
-const CLUSTER_HEADER = 28;
-const GROUP_GAP_X = 60;
-const GROUP_GAP_Y = 30;
-const LAYER_GAP = 80;
+const RES_W = 160;
+const RES_H = 44;
+const RES_GAP_X = 14;
+const RES_GAP_Y = 12;
+const COLS = 1;
+const CLUSTER_PAD_X = 16;
+const CLUSTER_PAD_Y = 16;
+const CLUSTER_HEADER = 32;
+const GROUP_GAP_X = 40;
+const GROUP_GAP_Y = 36;
+const LAYER_GAP = 100;
 
 // Group -> layer assignment (left to right)
 const GROUP_LAYERS: Record<string, number> = {
@@ -465,11 +465,10 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     y={g.y}
                     width={g.width}
                     height={g.height}
-                    rx={12}
-                    fill={`${g.color}08`}
-                    stroke={`${g.color}4D`}
-                    stroke-width="1.5"
-                    stroke-dasharray="6 3"
+                    rx={14}
+                    fill={`${g.color}0A`}
+                    stroke={`${g.color}30`}
+                    stroke-width="1"
                   />
                   {/* Colored top accent border */}
                   <rect
@@ -631,7 +630,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const dimmedByNode = hoveredNode && !connectedNodes.has(n.id);
               const dimmedByCluster = hoveredCluster && n.group !== hoveredCluster;
               const dimmed = dimmedByNode || dimmedByCluster;
-              const truncated = n.label.length > 14 ? n.label.slice(0, 13) + '\u2026' : n.label;
+              const truncated = n.label.length > 18 ? n.label.slice(0, 17) + '\u2026' : n.label;
 
               return (
                 <g
@@ -648,27 +647,61 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     navigateToResource(n.service, n.label);
                   }}
                 >
+                  {/* Shadow */}
+                  <rect
+                    x={n.x + 1}
+                    y={n.y + 2}
+                    width={RES_W}
+                    height={RES_H}
+                    rx={10}
+                    fill="rgba(0,0,0,0.06)"
+                  />
+                  {/* Node body */}
                   <rect
                     x={n.x}
                     y={n.y}
                     width={RES_W}
                     height={RES_H}
-                    rx={6}
-                    fill={isHovered ? `${groupColor}30` : `${groupColor}1A`}
-                    stroke={isHovered ? groupColor : `${groupColor}66`}
-                    stroke-width={isHovered ? 2 : 1}
+                    rx={10}
+                    fill={isHovered ? `${groupColor}20` : 'white'}
+                    stroke={isHovered ? groupColor : `${groupColor}50`}
+                    stroke-width={isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }}
                   />
+                  {/* Left color accent */}
+                  <rect
+                    x={n.x}
+                    y={n.y + 8}
+                    width={4}
+                    height={RES_H - 16}
+                    rx={2}
+                    fill={groupColor}
+                    opacity={isHovered ? 1 : 0.6}
+                  />
+                  {/* Resource name */}
                   <text
-                    x={n.x + 8}
-                    y={n.y + RES_H / 2 + 1}
+                    x={n.x + 14}
+                    y={n.y + RES_H / 2 - 4}
                     dominant-baseline="central"
-                    font-size="10"
-                    font-family="var(--font-mono)"
-                    fill="#334155"
+                    font-size="11.5"
+                    font-weight="600"
+                    font-family="var(--font-sans)"
+                    fill="#1E293B"
                     style={{ pointerEvents: 'none' }}
                   >
                     {truncated}
+                  </text>
+                  {/* Service type label */}
+                  <text
+                    x={n.x + 14}
+                    y={n.y + RES_H / 2 + 9}
+                    dominant-baseline="central"
+                    font-size="8.5"
+                    font-family="var(--font-sans)"
+                    fill="#94A3B8"
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {n.type}
                   </text>
 
                   {/* Tooltip on hover */}

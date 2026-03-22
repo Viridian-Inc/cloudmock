@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
 import { api } from '../api';
 import type { SSEState } from '../hooks/useSSE';
+import { NodeDetailDrawer } from '../components/NodeDetailDrawer';
 
 // Internal developer dashboard -- SVG content is generated programmatically
 // from our own service API data, not from user input.
@@ -514,6 +515,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [groupMode, setGroupMode] = useState<GroupMode>('service');
   const [showAll, setShowAll] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<number | null>(null);
   const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -1033,6 +1035,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             {layout.positionedNodes.map(n => {
               const groupColor = groupColorMap.get(n.group) || '#94A3B8';
               const isHovered = hoveredNode === n.id;
+              const isSelected = selectedNode?.id === n.id;
               const dimmedByNode = hoveredNode && !connectedNodes.has(n.id);
               const dimmedByCluster = hoveredCluster && n.group !== hoveredCluster;
               const dimmed = dimmedByNode || dimmedByCluster;
@@ -1052,7 +1055,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                   onMouseLeave={() => setHoveredNode(null)}
                   onClick={(e: MouseEvent) => {
                     e.stopPropagation();
-                    navigateToResource(n.service, n.label);
+                    const topoNode: TopoNode = { id: n.id, label: n.label, service: n.service, type: n.type, group: n.group };
+                    setSelectedNode(topoNode);
                   }}
                 >
                   {/* Pulse glow on live traffic */}
@@ -1086,9 +1090,9 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     width={RES_W}
                     height={RES_H}
                     rx={10}
-                    fill={isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
-                    stroke={isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
-                    stroke-width={isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
+                    fill={isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
+                    stroke={isSelected ? groupColor : isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
+                    stroke-width={isSelected ? 3 : isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }}
                   />
                   {/* Left color accent */}
@@ -1242,6 +1246,16 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           </g>
         </svg>
       </div>
+
+      {selectedNode && (
+        <NodeDetailDrawer
+          node={selectedNode}
+          edges={edges}
+          nodes={topoData ? topoData.nodes : []}
+          onClose={() => setSelectedNode(null)}
+          onSelectNode={(n) => setSelectedNode(n)}
+        />
+      )}
     </div>
   );
 }

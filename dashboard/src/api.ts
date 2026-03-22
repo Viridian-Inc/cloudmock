@@ -32,4 +32,24 @@ export async function getHomeData() {
   return { services, stats, health };
 }
 
+export function getNodeRequests(service: string, limit = 20) {
+  return api<any[]>(`/api/requests?service=${encodeURIComponent(service)}&limit=${limit}`);
+}
+
+export function getNodeTraces(service: string, limit = 10) {
+  return api<any[]>(`/api/traces?service=${encodeURIComponent(service)}&limit=${limit}`);
+}
+
+export function getNodeResources(service: string) {
+  return api<any>(`/api/resources/${encodeURIComponent(service)}`);
+}
+
+export function getStats() {
+  return api<Record<string, number>>('/api/stats');
+}
+
+export function getMetrics() {
+  return api<any>('/api/metrics');
+}
+
 export { ADMIN_BASE, GW_BASE };

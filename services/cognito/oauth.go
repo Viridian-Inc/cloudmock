@@ -92,11 +92,19 @@ func (s *CognitoService) handleOAuth(ctx *service.RequestContext) (*service.Resp
 // handleOIDCDiscovery returns the OIDC discovery document for a user pool.
 func (s *CognitoService) handleOIDCDiscovery(ctx *service.RequestContext, path string) (*service.Response, error) {
 	// Extract pool ID from path: /{poolId}/.well-known/openid-configuration
+	// If no pool ID in path (e.g. bare /.well-known/openid-configuration),
+	// fall back to the first available user pool for local dev convenience.
 	poolID := extractPoolIDFromPath(path)
 	if poolID == "" {
+		pools := s.store.ListUserPools(1)
+		if len(pools) > 0 {
+			poolID = pools[0].Id
+		}
+	}
+	if poolID == "" {
 		return &service.Response{Format: service.FormatJSON},
-			service.NewAWSError("InvalidParameterException",
-				"Could not determine user pool ID from path.", http.StatusBadRequest)
+			service.NewAWSError("ResourceNotFoundException",
+				"No user pools exist. Create one first.", http.StatusNotFound)
 	}
 
 	// Verify pool exists.
@@ -535,7 +543,12 @@ func extractPoolIDFromPath(path string) string {
 	if idx < 0 {
 		return ""
 	}
-	return path[:idx]
+	candidate := path[:idx]
+	// Pool IDs look like "us-east-1_aBcDeFgHi" — skip non-pool-ID path segments
+	if strings.HasPrefix(candidate, ".") || !strings.Contains(candidate, "_") {
+		return ""
+	}
+	return candidate
 }
 
 // poolIDFromIssuer extracts the pool ID from an issuer URL.

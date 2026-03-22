@@ -31,6 +31,19 @@ func DetectService(r *http.Request) string {
 		}
 	}
 
+	// Fall back to path-based detection for Cognito OAuth/OIDC endpoints.
+	path := r.URL.Path
+	if strings.Contains(path, "/.well-known/") || strings.HasPrefix(path, "/oauth2/") || strings.HasPrefix(path, "/login") || strings.HasPrefix(path, "/logout") || strings.HasPrefix(path, "/signup") {
+		return "cognito-idp"
+	}
+
+	// S3 path-style: /{bucket} or /{bucket}/{key}
+	if r.Method == http.MethodGet || r.Method == http.MethodPut || r.Method == http.MethodHead || r.Method == http.MethodDelete {
+		if path != "/" && !strings.HasPrefix(path, "/_") {
+			return "s3"
+		}
+	}
+
 	return ""
 }
 

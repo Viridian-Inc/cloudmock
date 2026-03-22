@@ -527,6 +527,33 @@ pre, code { font-family: var(--font-mono); }
 /* --- Topology --- */
 .topology-container { width: 100%; height: calc(100vh - var(--header-height) - 48px); }
 .topology-container svg { width: 100%; height: 100%; }
+.topo-tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 16px;
+  background: var(--n100);
+  padding: 4px;
+  border-radius: var(--radius-md);
+  width: fit-content;
+}
+.topo-tab {
+  padding: 6px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--n500);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.topo-tab:hover { color: var(--n700); }
+.topo-tab.active {
+  background: white;
+  color: var(--n900);
+  box-shadow: var(--shadow-sm);
+  font-weight: 600;
+}
 
 /* --- Command Palette --- */
 .palette-backdrop {

@@ -10,1006 +10,304 @@ import type { SSEState } from '../hooks/useSSE';
 interface TopoNode {
   id: string;
   label: string;
-  category: string;
-  layer: number;
-  y: number;
-  color: string;
-  requests: number;
-  active: boolean;
-  expandedHeight?: number;
-  resources?: any[];
+  service: string;
+  type: string;
+  group: string;
 }
 
 interface TopoEdge {
-  from: string;
-  to: string;
-  label?: string;
-  animated: boolean;
+  source: string;
+  target: string;
+  type: string;
+  label: string;
+  discovered: string;
 }
 
-// Expanded mode: each resource is its own node
-interface ResourceNode {
-  id: string;           // e.g. "Lambda::attendance-handler"
-  resourceName: string; // e.g. "attendance-handler"
-  service: string;      // e.g. "Lambda"
-  category: string;
-  layer: number;
+interface TopoGroup {
+  id: string;
+  label: string;
   color: string;
-  x: number;
-  y: number;
 }
 
-interface ResourceEdge {
-  from: string;  // ResourceNode id
-  to: string;    // ResourceNode id
-  label?: string;
-}
-
-interface ResourceCluster {
-  service: string;
-  category: string;
-  color: string;
-  layer: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  resourceCount: number;
+interface TopoData {
+  nodes: TopoNode[];
+  edges: TopoEdge[];
+  groups: TopoGroup[];
 }
 
 interface TopologyPageProps {
   sse: SSEState;
 }
 
+// --- Positioned types ---
+
+interface PositionedNode {
+  id: string;
+  label: string;
+  service: string;
+  type: string;
+  group: string;
+  x: number;
+  y: number;
+}
+
+interface PositionedGroup {
+  id: string;
+  label: string;
+  color: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  nodeCount: number;
+}
+
 // --- Constants ---
 
-const CATEGORY_COLORS: Record<string, string> = {
-  Client:     '#6366F1',
-  Compute:    '#3B82F6',
-  Auth:       '#8B5CF6',
-  Database:   '#10B981',
-  Storage:    '#F59E0B',
-  Messaging:  '#F97316',
-  API:        '#06B6D4',
-  Monitoring: '#EC4899',
-  Config:     '#6366F1',
-  Network:    '#14B8A6',
-  Infra:      '#64748B',
-  Email:      '#EF4444',
-  Streaming:  '#A855F7',
-  Other:      '#94A3B8',
+const RES_W = 120;
+const RES_H = 28;
+const RES_GAP_X = 10;
+const RES_GAP_Y = 8;
+const COLS = 2;
+const CLUSTER_PAD_X = 14;
+const CLUSTER_PAD_Y = 14;
+const CLUSTER_HEADER = 28;
+const GROUP_GAP_X = 60;
+const GROUP_GAP_Y = 30;
+const LAYER_GAP = 80;
+
+// Group -> layer assignment (left to right)
+const GROUP_LAYERS: Record<string, number> = {
+  Client:       0,
+  Plugins:      0,
+  API:          1,
+  Auth:         1,
+  Compute:      2,
+  'Core Data':  3,
+  Features:     3,
+  Admin:        3,
+  Integrations: 3,
+  Facilities:   3,
+  Messaging:    4,
+  Storage:      4,
+  Security:     5,
+  Monitoring:   5,
 };
 
-// Map service names to their category and layer
-const SERVICE_DEFS: Record<string, { category: string; layer: number }> = {
-  // External services (autotend local dev stack)
-  'Expo App':          { category: 'Client',     layer: 0 },
-  'BFF Service':       { category: 'Compute',    layer: 1 },
-  'GraphQL Server':    { category: 'API',        layer: 1 },
-  'Calendar Service':  { category: 'Compute',    layer: 1 },
-  // AWS services
-  'API Gateway':       { category: 'API',        layer: 2 },
-  'Cognito':           { category: 'Auth',       layer: 2 },
-  'Lambda':            { category: 'Compute',    layer: 3 },
-  'IAM':               { category: 'Auth',       layer: 3 },
-  'STS':               { category: 'Auth',       layer: 3 },
-  'DynamoDB':          { category: 'Database',   layer: 4 },
-  'SQS':               { category: 'Messaging',  layer: 4 },
-  'SNS':               { category: 'Messaging',  layer: 4 },
-  'EventBridge':       { category: 'Messaging',  layer: 4 },
-  'S3':                { category: 'Storage',    layer: 4 },
-  'SES':               { category: 'Email',      layer: 5 },
-  'Secrets Manager':   { category: 'Config',     layer: 5 },
-  'KMS':               { category: 'Config',     layer: 5 },
-  'SSM':               { category: 'Config',     layer: 5 },
-  'CloudWatch':        { category: 'Monitoring', layer: 5 },
-  'CloudWatch Logs':   { category: 'Monitoring', layer: 5 },
-  'RDS':               { category: 'Database',   layer: 4 },
-  'VPC (EC2)':         { category: 'Network',    layer: 5 },
-  'Route 53':          { category: 'Network',    layer: 5 },
-  'CloudFormation':    { category: 'Infra',      layer: 5 },
-  'ECS':               { category: 'Infra',      layer: 5 },
-  'ECR':               { category: 'Infra',      layer: 5 },
-  'Kinesis':           { category: 'Streaming',  layer: 5 },
-  'Firehose':          { category: 'Streaming',  layer: 5 },
-  'Step Functions':    { category: 'Other',      layer: 5 },
+// Vertical order within each layer
+const GROUP_ORDER: Record<string, number> = {
+  Client:       0,
+  Plugins:      1,
+  API:          0,
+  Auth:         1,
+  Compute:      0,
+  'Core Data':  0,
+  Features:     1,
+  Admin:        2,
+  Integrations: 3,
+  Facilities:   4,
+  Messaging:    0,
+  Storage:      1,
+  Security:     0,
+  Monitoring:   1,
 };
 
-// Canonical name mapping: API service name -> topology display name
-const NAME_MAP: Record<string, string> = {
-  'lambda':            'Lambda',
-  'cognito':           'Cognito',
-  'cognito-idp':       'Cognito',
-  'iam':               'IAM',
-  'sts':               'STS',
-  'dynamodb':          'DynamoDB',
-  'rds':               'RDS',
-  's3':                'S3',
-  'sqs':               'SQS',
-  'sns':               'SNS',
-  'events':            'EventBridge',
-  'eventbridge':       'EventBridge',
-  'monitoring':        'CloudWatch',
-  'apigateway':        'API Gateway',
-  'apigatewayv2':      'API Gateway',
-  'execute-api':       'API Gateway',
-  'cloudwatch':        'CloudWatch',
-  'logs':              'CloudWatch Logs',
-  'secretsmanager':    'Secrets Manager',
-  'ssm':               'SSM',
-  'kms':               'KMS',
-  'ses':               'SES',
-  'sesv2':             'SES',
-  'ec2':               'VPC (EC2)',
-  'route53':           'Route 53',
-  'cloudformation':    'CloudFormation',
-  'ecs':               'ECS',
-  'ecr':               'ECR',
-  'kinesis':           'Kinesis',
-  'firehose':          'Firehose',
-  'states':            'Step Functions',
-  'stepfunctions':     'Step Functions',
-};
+// --- Layout engine ---
 
-const KNOWN_EDGES: { from: string; to: string; label: string }[] = [
-  // Local services → AWS services
-  { from: 'Expo App',       to: 'BFF Service',       label: 'HTTP :3202' },
-  { from: 'Expo App',       to: 'GraphQL Server',    label: 'WS :4000' },
-  { from: 'Expo App',       to: 'Cognito',           label: 'auth' },
-  { from: 'BFF Service',    to: 'DynamoDB',          label: 'read/write' },
-  { from: 'BFF Service',    to: 'SQS',               label: 'send events' },
-  { from: 'BFF Service',    to: 'SNS',               label: 'notifications' },
-  { from: 'BFF Service',    to: 'S3',                label: 'file storage' },
-  { from: 'BFF Service',    to: 'Secrets Manager',   label: 'credentials' },
-  { from: 'BFF Service',    to: 'Cognito',           label: 'verify tokens' },
-  { from: 'GraphQL Server', to: 'DynamoDB',          label: 'resolvers' },
-  { from: 'Calendar Service', to: 'RDS',             label: 'calendar DB' },
-  { from: 'Calendar Service', to: 'DynamoDB',        label: 'events' },
-  // AWS service → AWS service
-  { from: 'API Gateway',    to: 'Lambda',            label: 'proxy' },
-  { from: 'API Gateway',    to: 'Cognito',           label: 'authorizer' },
-  { from: 'Lambda',         to: 'DynamoDB',          label: 'read/write' },
-  { from: 'Lambda',         to: 'SQS',               label: 'send messages' },
-  { from: 'Lambda',         to: 'SNS',               label: 'publish' },
-  { from: 'Lambda',         to: 'SES',               label: 'send email' },
-  { from: 'Lambda',         to: 'Secrets Manager',   label: 'get secrets' },
-  { from: 'Lambda',         to: 'KMS',               label: 'encrypt/decrypt' },
-  { from: 'Lambda',         to: 'S3',                label: 'read/write' },
-  { from: 'Lambda',        to: 'EventBridge',       label: 'put events' },
-  { from: 'Lambda',        to: 'IAM',               label: 'assume role' },
-  { from: 'DynamoDB',      to: 'Lambda',            label: 'streams trigger' },
-  { from: 'SQS',           to: 'Lambda',            label: 'event source' },
-  { from: 'SNS',           to: 'SQS',               label: 'fan-out' },
-  { from: 'EventBridge',   to: 'SQS',               label: 'rule target' },
-  { from: 'EventBridge',   to: 'Lambda',            label: 'rule target' },
-  { from: 'S3',            to: 'SQS',               label: 'event notification' },
-  { from: 'CloudWatch',    to: 'SNS',               label: 'alarm actions' },
-];
-
-// --- Expanded mode constants ---
-const RES_NODE_W = 140;
-const RES_NODE_H = 32;
-const RES_V_GAP = 40;  // vertical gap between resource nodes within a cluster
-const CLUSTER_PAD = 12;
-const CLUSTER_LABEL_H = 18;
-
-// Infer resource-level edges from naming conventions
-function inferResourceEdges(
-  resourcesByService: Record<string, any[]>,
-  serviceEdges: TopoEdge[],
-  activeServices: Set<string>,
-): ResourceEdge[] {
-  const edges: ResourceEdge[] = [];
-  const seen = new Set<string>();
-
-  function addEdge(from: string, to: string, label?: string) {
-    const key = `${from}->${to}`;
-    if (!seen.has(key)) {
-      seen.add(key);
-      edges.push({ from, to, label });
-    }
-  }
-
-  // Build lookup: resource name -> resource node id
-  const resourceLookup = new Map<string, { id: string; service: string }>();
-  for (const [svc, resources] of Object.entries(resourcesByService)) {
-    for (const r of resources) {
-      const name = r.name || r.id || (typeof r === 'string' ? r : '');
-      if (name) {
-        resourceLookup.set(`${svc}::${name}`, { id: `${svc}::${name}`, service: svc });
-      }
-    }
-  }
-
-  // For each service-level edge, try to resolve to resource-level
-  for (const sEdge of serviceEdges) {
-    const fromResources = resourcesByService[sEdge.from] || [];
-    const toResources = resourcesByService[sEdge.to] || [];
-
-    if (fromResources.length === 0 && toResources.length === 0) continue;
-
-    // Lambda -> DynamoDB: match by naming convention (handler prefix -> table name)
-    if (sEdge.from === 'Lambda' && sEdge.to === 'DynamoDB' && fromResources.length > 0 && toResources.length > 0) {
-      let matched = false;
-      for (const fn of fromResources) {
-        const fnName: string = fn.name || fn.id || '';
-        // Extract prefix: "attendance-handler" -> "attendance"
-        const prefix = fnName.replace(/[-_]?(handler|function|fn|processor|worker)$/i, '');
-        for (const table of toResources) {
-          const tableName: string = table.name || table.id || '';
-          if (tableName === prefix || tableName.startsWith(prefix + '-') || prefix.startsWith(tableName)) {
-            addEdge(`Lambda::${fnName}`, `DynamoDB::${tableName}`, 'read/write');
-            matched = true;
-          }
-        }
-      }
-      // If some lambdas had no match, check for shared tables (like "enterprise")
-      if (matched) continue;
-    }
-
-    // DynamoDB -> Lambda (streams): match by naming convention
-    if (sEdge.from === 'DynamoDB' && sEdge.to === 'Lambda' && fromResources.length > 0 && toResources.length > 0) {
-      let matched = false;
-      for (const fn of toResources) {
-        const fnName: string = fn.name || fn.id || '';
-        if (fnName.includes('stream') || fnName.includes('sync')) {
-          // Stream processor connects to all DynamoDB tables
-          for (const table of fromResources) {
-            const tableName: string = table.name || table.id || '';
-            addEdge(`DynamoDB::${tableName}`, `Lambda::${fnName}`, 'stream');
-            matched = true;
-          }
-        }
-      }
-      if (matched) continue;
-    }
-
-    // Lambda -> SQS: match by naming convention
-    if (sEdge.from === 'Lambda' && sEdge.to === 'SQS' && fromResources.length > 0 && toResources.length > 0) {
-      let matched = false;
-      for (const fn of fromResources) {
-        const fnName: string = fn.name || fn.id || '';
-        const prefix = fnName.replace(/[-_]?(handler|function|fn|processor|worker)$/i, '');
-        for (const q of toResources) {
-          const qName: string = q.name || q.id || '';
-          if (qName.includes(prefix) || prefix.includes(qName.replace(/-queue$/i, ''))) {
-            addEdge(`Lambda::${fnName}`, `SQS::${qName}`, 'send');
-            matched = true;
-          }
-        }
-      }
-      if (matched) continue;
-    }
-
-    // S3 -> SQS: connect all S3 buckets to SQS queues (event notifications)
-    if (sEdge.from === 'S3' && sEdge.to === 'SQS') {
-      for (const bucket of fromResources) {
-        const bName: string = bucket.name || bucket.id || '';
-        for (const q of toResources) {
-          const qName: string = q.name || q.id || '';
-          addEdge(`S3::${bName}`, `SQS::${qName}`, 'notification');
-        }
-      }
-      continue;
-    }
-
-    // Fallback: fan out from all source resources to all target resources
-    if (fromResources.length > 0 && toResources.length > 0) {
-      for (const fr of fromResources) {
-        const frName: string = fr.name || fr.id || '';
-        for (const tr of toResources) {
-          const trName: string = tr.name || tr.id || '';
-          addEdge(`${sEdge.from}::${frName}`, `${sEdge.to}::${trName}`, sEdge.label);
-        }
-      }
-    } else if (fromResources.length > 0) {
-      // Target service has no resources, draw from all source resources to the service placeholder
-      for (const fr of fromResources) {
-        const frName: string = fr.name || fr.id || '';
-        addEdge(`${sEdge.from}::${frName}`, `${sEdge.to}::__service__`, sEdge.label);
-      }
-    } else if (toResources.length > 0) {
-      // Source service has no resources, draw from service placeholder to all target resources
-      for (const tr of toResources) {
-        const trName: string = tr.name || tr.id || '';
-        addEdge(`${sEdge.from}::__service__`, `${sEdge.to}::${trName}`, sEdge.label);
-      }
-    }
-  }
-
-  return edges;
-}
-
-// Build expanded layout: each resource becomes its own node
-function buildExpandedLayout(
-  nodes: TopoNode[],
-  edges: TopoEdge[],
-  resourcesByService: Record<string, any[]>,
-): { resourceNodes: ResourceNode[]; resourceEdges: ResourceEdge[]; clusters: ResourceCluster[] } {
-  const resourceNodes: ResourceNode[] = [];
-  const clusters: ResourceCluster[] = [];
-
-  // Group nodes by layer
-  const layerGroups = new Map<number, TopoNode[]>();
-  for (const n of nodes) {
-    const arr = layerGroups.get(n.layer) || [];
+function layoutGraph(data: TopoData): {
+  positionedNodes: PositionedNode[];
+  positionedGroups: PositionedGroup[];
+} {
+  // Group nodes by their group field
+  const nodesByGroup = new Map<string, TopoNode[]>();
+  for (const n of data.nodes) {
+    const arr = nodesByGroup.get(n.group) || [];
     arr.push(n);
-    layerGroups.set(n.layer, arr);
+    nodesByGroup.set(n.group, arr);
   }
 
-  // For each service, create resource nodes
-  for (const [_layer, group] of layerGroups) {
-    const sorted = [...group].sort((a, b) => a.y - b.y);
-    let currentY = sorted[0]?.y ?? 60;
+  // Group info lookup
+  const groupInfo = new Map<string, TopoGroup>();
+  for (const g of data.groups) {
+    groupInfo.set(g.id, g);
+  }
 
-    for (const node of sorted) {
-      const resources = resourcesByService[node.id] || [];
-      const x = nodeX(node.layer);
+  // Organise groups by layer
+  const layerGroups = new Map<number, { group: TopoGroup; nodes: TopoNode[] }[]>();
+  for (const [gid, nodes] of nodesByGroup) {
+    const layer = GROUP_LAYERS[gid] ?? 3;
+    const arr = layerGroups.get(layer) || [];
+    const info = groupInfo.get(gid) || { id: gid, label: gid, color: '#94A3B8' };
+    arr.push({ group: info, nodes });
+    layerGroups.set(layer, arr);
+  }
 
-      if (resources.length === 0) {
-        // Service with no resources: create a single placeholder node
-        resourceNodes.push({
-          id: `${node.id}::__service__`,
-          resourceName: node.label,
-          service: node.id,
-          category: node.category,
-          layer: node.layer,
-          color: node.color,
-          x: x + CLUSTER_PAD,
-          y: currentY + CLUSTER_LABEL_H + CLUSTER_PAD,
-        });
-        const clusterH = CLUSTER_LABEL_H + CLUSTER_PAD * 2 + RES_NODE_H;
-        clusters.push({
-          service: node.id,
-          category: node.category,
-          color: node.color,
-          layer: node.layer,
-          x,
-          y: currentY,
-          width: RES_NODE_W + CLUSTER_PAD * 2,
-          height: clusterH,
-          resourceCount: 0,
-        });
-        currentY += clusterH + 20;
-      } else {
-        const clusterContentH = resources.length * RES_NODE_H + (resources.length - 1) * (RES_V_GAP - RES_NODE_H);
-        const clusterH = CLUSTER_LABEL_H + CLUSTER_PAD * 2 + clusterContentH;
+  // Sort within each layer by GROUP_ORDER
+  for (const [, arr] of layerGroups) {
+    arr.sort((a, b) => (GROUP_ORDER[a.group.id] ?? 99) - (GROUP_ORDER[b.group.id] ?? 99));
+  }
 
-        clusters.push({
-          service: node.id,
-          category: node.category,
-          color: node.color,
-          layer: node.layer,
-          x,
-          y: currentY,
-          width: RES_NODE_W + CLUSTER_PAD * 2,
-          height: clusterH,
-          resourceCount: resources.length,
-        });
+  const positionedNodes: PositionedNode[] = [];
+  const positionedGroups: PositionedGroup[] = [];
 
-        for (let i = 0; i < resources.length; i++) {
-          const r = resources[i];
-          const rName = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
-          resourceNodes.push({
-            id: `${node.id}::${rName}`,
-            resourceName: rName,
-            service: node.id,
-            category: node.category,
-            layer: node.layer,
-            color: node.color,
-            x: x + CLUSTER_PAD,
-            y: currentY + CLUSTER_LABEL_H + CLUSTER_PAD + i * RES_V_GAP,
-          });
-        }
-        currentY += clusterH + 20;
-      }
+  // First pass: compute cluster sizes
+  interface ClusterSize { width: number; height: number; nodeCount: number; }
+  const clusterSizes = new Map<string, ClusterSize>();
+  for (const [, arr] of layerGroups) {
+    for (const { group, nodes } of arr) {
+      const cols = Math.min(COLS, nodes.length);
+      const rows = Math.ceil(nodes.length / COLS);
+      const cw = Math.max(180, cols * RES_W + (cols - 1) * RES_GAP_X + CLUSTER_PAD_X * 2);
+      const ch = CLUSTER_HEADER + rows * RES_H + (rows - 1) * RES_GAP_Y + CLUSTER_PAD_Y * 2;
+      clusterSizes.set(group.id, { width: cw, height: ch, nodeCount: nodes.length });
     }
   }
 
-  // Build resource-level edges
-  const resourceEdges = inferResourceEdges(resourcesByService, edges, new Set(nodes.map(n => n.id)));
-
-  // Filter edges: only keep edges where both endpoints exist
-  const nodeIds = new Set(resourceNodes.map(n => n.id));
-  const validEdges = resourceEdges.filter(e => nodeIds.has(e.from) && nodeIds.has(e.to));
-
-  return { resourceNodes, resourceEdges: validEdges, clusters };
-}
-
-// --- Service Icons (simple SVG paths centered at 0,0) ---
-
-function ServiceIcon({ service, x, y, color }: { service: string; x: number; y: number; color: string }) {
-  const s = 7; // half-size
-  const iconColor = color;
-
-  switch (service) {
-    case 'Lambda':
-      // Lambda symbol
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <path d={`M${-s} ${s} L0 ${-s} L${s} ${s} Z`} fill="none" stroke={iconColor} stroke-width="1.5" />
-          <text x="0" y="2" text-anchor="middle" font-size="8" font-weight="700" fill={iconColor} style={{ pointerEvents: 'none' }}>{'λ'}</text>
-        </g>
-      );
-    case 'DynamoDB':
-    case 'RDS':
-      // Database cylinder
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <ellipse cx="0" cy={-s + 2} rx={s} ry="3" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-s} y1={-s + 2} x2={-s} y2={s - 2} stroke={iconColor} stroke-width="1.3" />
-          <line x1={s} y1={-s + 2} x2={s} y2={s - 2} stroke={iconColor} stroke-width="1.3" />
-          <ellipse cx="0" cy={s - 2} rx={s} ry="3" fill="none" stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-    case 'S3':
-      // Bucket
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <path d={`M${-s} ${-s} L${-s + 2} ${s} L${s - 2} ${s} L${s} ${-s} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-s} y1={-s + 3} x2={s} y2={-s + 3} stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-    case 'SQS':
-      // Queue (stacked lines)
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="2" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-s + 2} y1={-2} x2={s - 2} y2={-2} stroke={iconColor} stroke-width="1.2" />
-          <line x1={-s + 2} y1="2" x2={s - 2} y2="2" stroke={iconColor} stroke-width="1.2" />
-        </g>
-      );
-    case 'SNS':
-      // Bell / notification
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <circle cx="0" cy="0" r={s} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <circle cx="0" cy="0" r="2" fill={iconColor} />
-          <line x1="0" y1={-s} x2={s - 1} y2={-s - 3} stroke={iconColor} stroke-width="1.2" />
-          <line x1="0" y1={-s} x2={-s + 1} y2={-s - 3} stroke={iconColor} stroke-width="1.2" />
-        </g>
-      );
-    case 'API Gateway':
-      // Gateway arrows
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <path d={`M${-s} 0 L0 ${-s} L${s} 0 L0 ${s} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-3} y1="0" x2="3" y2="0" stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-    case 'Cognito':
-    case 'IAM':
-    case 'STS':
-      // Shield / lock
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <path d={`M0 ${-s} L${s} ${-s + 3} L${s} ${s - 3} L0 ${s} L${-s} ${s - 3} L${-s} ${-s + 3} Z`} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <circle cx="0" cy="-1" r="2" fill="none" stroke={iconColor} stroke-width="1.2" />
-          <line x1="0" y1="1" x2="0" y2="4" stroke={iconColor} stroke-width="1.2" />
-        </g>
-      );
-    case 'CloudWatch':
-    case 'CloudWatch Logs':
-      // Chart / graph
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="1" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <polyline points={`${-s + 2},${s - 3} ${-2},0 ${2},${s - 5} ${s - 2},${-s + 3}`} fill="none" stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-    case 'EventBridge':
-      // Event bus
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <circle cx="0" cy="0" r={s} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-s} y1="0" x2={s} y2="0" stroke={iconColor} stroke-width="1" />
-          <line x1="0" y1={-s} x2="0" y2={s} stroke={iconColor} stroke-width="1" />
-        </g>
-      );
-    case 'SES':
-      // Envelope
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <rect x={-s} y={-s + 2} width={s * 2} height={s * 2 - 4} rx="1" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <polyline points={`${-s},${-s + 2} 0,2 ${s},${-s + 2}`} fill="none" stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-    case 'Secrets Manager':
-    case 'KMS':
-      // Key
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <circle cx={-2} cy={-2} r="3" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1="1" y1="1" x2={s} y2={s} stroke={iconColor} stroke-width="1.3" />
-          <line x1={s - 2} y1={s} x2={s} y2={s - 2} stroke={iconColor} stroke-width="1.2" />
-        </g>
-      );
-    case 'SSM':
-      // Settings gear (simplified)
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <circle cx="0" cy="0" r={s - 2} fill="none" stroke={iconColor} stroke-width="1.3" />
-          <circle cx="0" cy="0" r="2" fill={iconColor} />
-        </g>
-      );
-    case 'Step Functions':
-      // Flow nodes
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <circle cx={-3} cy={-3} r="2.5" fill="none" stroke={iconColor} stroke-width="1.2" />
-          <circle cx="3" cy="3" r="2.5" fill="none" stroke={iconColor} stroke-width="1.2" />
-          <line x1={-1} y1={-1} x2="1" y2="1" stroke={iconColor} stroke-width="1.2" />
-        </g>
-      );
-    case 'Client Apps':
-      // Browser window
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="2" fill="none" stroke={iconColor} stroke-width="1.3" />
-          <line x1={-s} y1={-s + 4} x2={s} y2={-s + 4} stroke={iconColor} stroke-width="1" />
-          <circle cx={-s + 3} cy={-s + 2} r="1" fill={iconColor} />
-        </g>
-      );
-    default:
-      // Generic box
-      return (
-        <g transform={`translate(${x},${y})`}>
-          <rect x={-s} y={-s} width={s * 2} height={s * 2} rx="3" fill="none" stroke={iconColor} stroke-width="1.3" />
-        </g>
-      );
-  }
-}
-
-// --- Layout ---
-
-const LAYER_X = [60, 250, 440, 650, 880, 1100];
-const NODE_W = 160;
-const NODE_H = 48;
-const NODE_RX = 10;
-const V_GAP = 80; // vertical gap between nodes
-
-// Layer labels for category headers
-const LAYER_HEADERS: Record<number, string> = {
-  0: 'Client',
-  1: 'API',
-  2: 'Compute',
-  3: 'Data & Messaging',
-  4: 'Config & Monitoring',
-};
-
-function buildLayout(
-  activeNames: Set<string>,
-  requestCounts: Map<string, number>,
-  showAll: boolean,
-): { nodes: TopoNode[]; edges: TopoEdge[] } {
-  // Collect service names referenced by edges
-  const edgeServices = new Set<string>();
-  for (const e of KNOWN_EDGES) {
-    edgeServices.add(e.from);
-    edgeServices.add(e.to);
-  }
-
-  // Always include external services (autotend local dev stack)
-  const included = new Set<string>(['Expo App', 'BFF Service', 'GraphQL Server', 'Calendar Service']);
-
-  // Determine which services to include
-  for (const [name] of Object.entries(SERVICE_DEFS)) {
-    const hasRequests = (requestCounts.get(name) || 0) > 0;
-    const isEdgeMember = edgeServices.has(name);
-    const isActive = activeNames.has(name);
-
-    if (showAll) {
-      included.add(name);
-    } else if (hasRequests || (isActive && isEdgeMember)) {
-      included.add(name);
+  // Second pass: compute layer x offsets
+  const layers = Array.from(layerGroups.keys()).sort((a, b) => a - b);
+  const layerWidths = new Map<number, number>();
+  for (const layer of layers) {
+    let maxW = 0;
+    for (const { group } of layerGroups.get(layer)!) {
+      const sz = clusterSizes.get(group.id)!;
+      maxW = Math.max(maxW, sz.width);
     }
+    layerWidths.set(layer, maxW);
   }
 
-  // If a service is included via requests, also include services connected by known edges
-  // so the dependency map makes sense
-  for (const e of KNOWN_EDGES) {
-    if (included.has(e.from) && edgeServices.has(e.to) && SERVICE_DEFS[e.to]) {
-      // only add the other end if it has requests or showAll
-      if (showAll || included.has(e.to)) {
-        // already handled
-      }
-    }
+  // X positions per layer
+  const layerX = new Map<number, number>();
+  let currentX = 40;
+  for (const layer of layers) {
+    layerX.set(layer, currentX);
+    currentX += (layerWidths.get(layer) || 200) + LAYER_GAP;
   }
 
-  // Gather nodes per layer
-  const layerNodes: Map<number, string[]> = new Map();
-  for (const name of included) {
-    const def = SERVICE_DEFS[name];
-    if (!def) continue;
-    const arr = layerNodes.get(def.layer) || [];
-    arr.push(name);
-    layerNodes.set(def.layer, arr);
-  }
+  // Third pass: position clusters and nodes
+  for (const layer of layers) {
+    const groups = layerGroups.get(layer) || [];
+    let currentY = 40;
 
-  // Sort nodes within each layer for consistent ordering
-  const layerOrder: Record<number, string[]> = {
-    0: ['Expo App'],
-    1: ['BFF Service', 'GraphQL Server', 'Calendar Service'],
-    2: ['API Gateway', 'Cognito'],
-    3: ['Lambda', 'IAM', 'STS'],
-    4: ['DynamoDB', 'SQS', 'SNS', 'EventBridge', 'S3', 'RDS'],
-    5: ['SES', 'Secrets Manager', 'KMS', 'SSM', 'CloudWatch', 'CloudWatch Logs', 'VPC (EC2)', 'Route 53', 'CloudFormation', 'ECS', 'ECR', 'Kinesis', 'Firehose', 'Step Functions'],
-  };
+    for (const { group, nodes } of groups) {
+      const x = layerX.get(layer)!;
+      const sz = clusterSizes.get(group.id)!;
 
-  const nodes: TopoNode[] = [];
-
-  for (const [layer, names] of layerNodes) {
-    const order = layerOrder[layer] || names;
-    const sorted = order.filter(n => names.includes(n));
-    const count = sorted.length;
-    const totalH = count * (NODE_H + V_GAP) - V_GAP;
-    const startY = Math.max(60, 350 - totalH / 2);
-
-    sorted.forEach((name, i) => {
-      const def = SERVICE_DEFS[name]!;
-      nodes.push({
-        id: name,
-        label: name,
-        category: def.category,
-        layer: def.layer,
-        y: startY + i * (NODE_H + V_GAP),
-        color: CATEGORY_COLORS[def.category] || '#94A3B8',
-        requests: requestCounts.get(name) || 0,
-        active: activeNames.has(name),
+      positionedGroups.push({
+        id: group.id,
+        label: group.label,
+        color: group.color,
+        x,
+        y: currentY,
+        width: sz.width,
+        height: sz.height,
+        nodeCount: sz.nodeCount,
       });
-    });
+
+      // Position nodes in 2-column grid inside the cluster
+      for (let i = 0; i < nodes.length; i++) {
+        const col = i % COLS;
+        const row = Math.floor(i / COLS);
+        const nx = x + CLUSTER_PAD_X + col * (RES_W + RES_GAP_X);
+        const ny = currentY + CLUSTER_HEADER + CLUSTER_PAD_Y + row * (RES_H + RES_GAP_Y);
+
+        positionedNodes.push({
+          id: nodes[i].id,
+          label: nodes[i].label,
+          service: nodes[i].service,
+          type: nodes[i].type,
+          group: nodes[i].group,
+          x: nx,
+          y: ny,
+        });
+      }
+
+      currentY += sz.height + GROUP_GAP_Y;
+    }
   }
 
-  const nodeIds = new Set(nodes.map(n => n.id));
-
-  // Only include edges where both endpoints exist
-  const edges: TopoEdge[] = KNOWN_EDGES
-    .filter(e => nodeIds.has(e.from) && nodeIds.has(e.to))
-    .map(e => ({
-      from: e.from,
-      to: e.to,
-      label: e.label,
-      animated: false,
-    }));
-
-  return { nodes, edges };
+  return { positionedNodes, positionedGroups };
 }
 
 // --- SVG helpers ---
 
-function nodeX(layer: number) {
-  return LAYER_X[layer] || (80 + layer * 200);
-}
-
 function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
-  const dx = Math.abs(x2 - x1) * 0.5;
+  const dx = Math.abs(x2 - x1) * 0.45;
   return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
 }
-
-// --- Map View: Resource Groups ---
-
-interface MapResource {
-  name: string;
-  service: string;    // API service name for resource lookup
-  icon: string;
-}
-
-interface MapGroup {
-  id: string;
-  label: string;
-  color: string;
-  resources: MapResource[];
-}
-
-const MAP_GROUPS: MapGroup[] = [
-  {
-    id: 'client',
-    label: 'Client Layer',
-    color: '#6366F1',
-    resources: [
-      { name: 'Expo App', service: 'Expo App', icon: '\u{1F4F1}' },
-      { name: 'Admin Portal', service: 'Admin Portal', icon: '\u{1F5A5}' },
-      { name: 'Client Portal', service: 'Client Portal', icon: '\u{1F310}' },
-    ],
-  },
-  {
-    id: 'api',
-    label: 'API Layer',
-    color: '#06B6D4',
-    resources: [
-      { name: 'BFF Service', service: 'BFF Service', icon: '\u{1F500}' },
-      { name: 'GraphQL Server', service: 'GraphQL Server', icon: '\u{1F4E1}' },
-      { name: 'API Gateway', service: 'API Gateway', icon: '\u{1F6AA}' },
-    ],
-  },
-  {
-    id: 'auth',
-    label: 'Auth & Identity',
-    color: '#8B5CF6',
-    resources: [
-      { name: 'Cognito User Pool', service: 'Cognito', icon: '\u{1F510}' },
-      { name: 'Cognito App Client', service: 'Cognito', icon: '\u{1F511}' },
-      { name: 'IAM Roles', service: 'IAM', icon: '\u{1F464}' },
-    ],
-  },
-  {
-    id: 'compute',
-    label: 'Compute',
-    color: '#3B82F6',
-    resources: [
-      { name: 'attendance-handler', service: 'Lambda', icon: '\u03BB' },
-      { name: 'order-handler', service: 'Lambda', icon: '\u03BB' },
-      { name: 'membership-handler', service: 'Lambda', icon: '\u03BB' },
-      { name: 'notification-handler', service: 'Lambda', icon: '\u03BB' },
-      { name: 'stream-sync', service: 'Lambda', icon: '\u03BB' },
-      { name: 'Calendar Service', service: 'Calendar Service', icon: '\u{1F4C5}' },
-    ],
-  },
-  {
-    id: 'data-core',
-    label: 'Data \u2014 Core Domain',
-    color: '#10B981',
-    resources: [
-      { name: 'enterprise', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'membership', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'resource', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'resourceMembership', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'session', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'attendance', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'order', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'calendar', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'userMetadata', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'data-features',
-    label: 'Data \u2014 Features',
-    color: '#10B981',
-    resources: [
-      { name: 'featureFlag', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'notification', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'webhook', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'webhookDelivery', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'apiKey', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'attendancePolicy', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'userGroup', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'invitation', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'classTemplate', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'report', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'data-admin',
-    label: 'Data \u2014 Admin',
-    color: '#10B981',
-    resources: [
-      { name: 'release', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'deployment', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'rolloutStage', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'healthMetrics', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'auditLog', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'approval', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'analytics', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'analyticsConsent', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'data-integrations',
-    label: 'Data \u2014 Integrations',
-    color: '#10B981',
-    resources: [
-      { name: 'integration', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'lmsIntegration', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'lmsCourseMapping', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'lmsSyncLog', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'dispute', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'dataRequest', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'data-facilities',
-    label: 'Data \u2014 Facilities',
-    color: '#10B981',
-    resources: [
-      { name: 'seatingChart', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'seatPreferenceRequest', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'building', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'roomBlueprint', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'data-identity',
-    label: 'Data \u2014 Identity',
-    color: '#10B981',
-    resources: [
-      { name: 'identityProvider', service: 'DynamoDB', icon: '\u{1F4CA}' },
-      { name: 'customDomain', service: 'DynamoDB', icon: '\u{1F4CA}' },
-    ],
-  },
-  {
-    id: 'messaging',
-    label: 'Messaging',
-    color: '#F97316',
-    resources: [
-      { name: 'entity_lifecycle-queue', service: 'SQS', icon: '\u{1F4E8}' },
-      { name: 'attendance-queue', service: 'SQS', icon: '\u{1F4E8}' },
-      { name: 'order-queue', service: 'SQS', icon: '\u{1F4E8}' },
-      { name: 'push notifications topic', service: 'SNS', icon: '\u{1F4E2}' },
-      { name: 'EventBridge default bus', service: 'EventBridge', icon: '\u{1F4E1}' },
-    ],
-  },
-  {
-    id: 'storage',
-    label: 'Storage',
-    color: '#F59E0B',
-    resources: [
-      { name: 'S3 buckets', service: 'S3', icon: '\u{1F4E6}' },
-      { name: 'calendar_db (PostgreSQL)', service: 'RDS', icon: '\u{1F5C4}' },
-    ],
-  },
-  {
-    id: 'security',
-    label: 'Security',
-    color: '#EF4444',
-    resources: [
-      { name: 'KMS encryption keys', service: 'KMS', icon: '\u{1F510}' },
-      { name: 'LMS credentials', service: 'Secrets Manager', icon: '\u{1F511}' },
-      { name: 'Stripe keys', service: 'Secrets Manager', icon: '\u{1F511}' },
-    ],
-  },
-  {
-    id: 'monitoring',
-    label: 'Monitoring',
-    color: '#EC4899',
-    resources: [
-      { name: 'Lambda log groups', service: 'CloudWatch Logs', icon: '\u{1F4CB}' },
-      { name: 'CloudWatch Alarms', service: 'CloudWatch', icon: '\u{1F514}' },
-    ],
-  },
-];
-
-const MAP_FLOWS: { from: string; to: string; label: string }[] = [
-  { from: 'Client', to: 'API Layer', label: 'HTTP/WS' },
-  { from: 'API Layer', to: 'Compute', label: 'invoke' },
-  { from: 'API Layer', to: 'Auth', label: 'verify' },
-  { from: 'Compute', to: 'Core Data', label: 'read/write' },
-  { from: 'Compute', to: 'Messaging', label: 'events' },
-  { from: 'Compute', to: 'Storage', label: 'files' },
-  { from: 'Compute', to: 'Security', label: 'secrets' },
-  { from: 'Messaging', to: 'Compute', label: 'triggers' },
-  { from: 'Monitoring', to: 'Messaging', label: 'alarms' },
-];
 
 // --- Component ---
 
 export function TopologyPage({ sse }: TopologyPageProps) {
-  const [services, setServices] = useState<any[]>([]);
-  const [stats, setStats] = useState<any>(null);
+  const [topoData, setTopoData] = useState<TopoData | null>(null);
+  const [showAll, setShowAll] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
-  const [enabledCategories, setEnabledCategories] = useState<Set<string>>(new Set(Object.keys(CATEGORY_COLORS)));
-  const [pulsing, setPulsing] = useState<Map<string, number>>(new Map());
+  const [hoveredEdge, setHoveredEdge] = useState<number | null>(null);
+  const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
-  const [showAll, setShowAll] = useState(false);
-  const [viewMode, setViewMode] = useState<'collapsed' | 'expanded' | 'map'>('collapsed');
-  const [expandedNode, setExpandedNode] = useState<string | null>(null);
-  const [nodeResources, setNodeResources] = useState<Record<string, any[]>>({});
-  const [loadingResources, setLoadingResources] = useState<Set<string>>(new Set());
-  const [allResourcesLoaded, setAllResourcesLoaded] = useState(false);
   const svgRef = useRef<SVGSVGElement>(null);
   const dragging = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
 
-  // Fetch data
+  // Fetch topology data
   useEffect(() => {
-    api('/api/services').then(setServices).catch(() => {});
-    api('/api/stats').then(setStats).catch(() => {});
-    const iv = setInterval(() => {
-      api('/api/stats').then(setStats).catch(() => {});
-    }, 5000);
-    return () => clearInterval(iv);
+    api('/api/topology').then(data => {
+      setTopoData(data);
+    }).catch(() => {});
   }, []);
 
-  // Process active services -- canonicalize and deduplicate
-  const { activeNames, requestCounts } = useMemo(() => {
-    const activeNames = new Set<string>();
-    const requestCounts = new Map<string, number>();
+  // Layout
+  const layout = useMemo(() => {
+    if (!topoData) return null;
+    return layoutGraph(topoData);
+  }, [topoData]);
 
-    for (const svc of services) {
-      const key = svc.name?.toLowerCase?.() || svc.name || '';
-      const canonical = NAME_MAP[key] || NAME_MAP[svc.name];
-      if (canonical && SERVICE_DEFS[canonical]) {
-        activeNames.add(canonical);
-      }
+  // Node position lookup
+  const nodePos = useMemo(() => {
+    if (!layout) return new Map<string, { cx: number; cy: number }>();
+    const m = new Map<string, { cx: number; cy: number }>();
+    for (const n of layout.positionedNodes) {
+      m.set(n.id, { cx: n.x + RES_W / 2, cy: n.y + RES_H / 2 });
     }
+    return m;
+  }, [layout]);
 
-    if (stats?.services) {
-      for (const [key, val] of Object.entries(stats.services)) {
-        const canonical = NAME_MAP[key.toLowerCase()] || NAME_MAP[key];
-        if (canonical) {
-          const prev = requestCounts.get(canonical) || 0;
-          requestCounts.set(canonical, prev + ((val as any).total || 0));
-        }
-      }
-    }
-
-    return { activeNames, requestCounts };
-  }, [services, stats]);
-
-  // Build layout
-  const { nodes, edges } = useMemo(
-    () => buildLayout(activeNames, requestCounts, showAll),
-    [activeNames, requestCounts, showAll]
-  );
-
-  // SSE live traffic pulse
-  useEffect(() => {
-    if (!sse.events.length) return;
-    const latest = sse.events[0];
-    if (!latest?.data?.service) return;
-    const svcName = NAME_MAP[latest.data.service?.toLowerCase()] || latest.data.service;
-    if (!svcName) return;
-
-    setPulsing(prev => {
-      const next = new Map(prev);
-      next.set(svcName, Date.now());
-      return next;
+  // Connected edges and nodes for hover highlight
+  const connectedEdges = useMemo(() => {
+    if (!hoveredNode || !topoData) return new Set<number>();
+    const set = new Set<number>();
+    topoData.edges.forEach((e, i) => {
+      if (e.source === hoveredNode || e.target === hoveredNode) set.add(i);
     });
+    return set;
+  }, [hoveredNode, topoData]);
 
-    const timer = setTimeout(() => {
-      setPulsing(prev => {
-        const next = new Map(prev);
-        next.delete(svcName);
-        return next;
-      });
-    }, 1500);
+  const connectedNodes = useMemo(() => {
+    if (!hoveredNode || !topoData) return new Set<string>();
+    const set = new Set<string>([hoveredNode]);
+    topoData.edges.forEach(e => {
+      if (e.source === hoveredNode) set.add(e.target);
+      if (e.target === hoveredNode) set.add(e.source);
+    });
+    return set;
+  }, [hoveredNode, topoData]);
 
-    return () => clearTimeout(timer);
-  }, [sse.events.length]);
-
-  // Fetch all resources when switching to expanded mode
-  useEffect(() => {
-    if (viewMode !== 'expanded' && viewMode !== 'map') return;
-    if (allResourcesLoaded) return;
-
-    const activeNodeNames = nodes.filter(n => n.active && n.id !== 'Client Apps').map(n => n.id);
-    let cancelled = false;
-
-    async function fetchAll() {
-      for (const name of activeNodeNames) {
-        if (cancelled) break;
-        if (name in nodeResources) continue;
-        setLoadingResources(prev => new Set([...prev, name]));
-        try {
-          const res = await api(`/api/resources/${encodeURIComponent(name)}`);
-          if (!cancelled) {
-            setNodeResources(prev => ({ ...prev, [name]: res.resources || [] }));
-          }
-        } catch {
-          if (!cancelled) {
-            setNodeResources(prev => ({ ...prev, [name]: [] }));
-          }
-        } finally {
-          if (!cancelled) {
-            setLoadingResources(prev => {
-              const next = new Set(prev);
-              next.delete(name);
-              return next;
-            });
-          }
-        }
-      }
-      if (!cancelled) setAllResourcesLoaded(true);
+  // SVG dimensions
+  const { svgW, svgH } = useMemo(() => {
+    if (!layout) return { svgW: 1600, svgH: 900 };
+    let maxX = 0;
+    let maxY = 0;
+    for (const g of layout.positionedGroups) {
+      maxX = Math.max(maxX, g.x + g.width);
+      maxY = Math.max(maxY, g.y + g.height);
     }
-
-    fetchAll();
-    return () => { cancelled = true; };
-  }, [viewMode, nodes]);
+    return { svgW: Math.max(1600, maxX + 80), svgH: Math.max(900, maxY + 80) };
+  }, [layout]);
 
   // Zoom handler
   const onWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
     const delta = e.deltaY > 0 ? 0.9 : 1.1;
     setTransform(t => {
-      const newScale = Math.max(0.3, Math.min(3, t.scale * delta));
+      const newScale = Math.max(0.2, Math.min(3, t.scale * delta));
       return { ...t, scale: newScale };
     });
   }, []);
@@ -1029,165 +327,48 @@ export function TopologyPage({ sse }: TopologyPageProps) {
 
   const onMouseUp = useCallback(() => { dragging.current = null; }, []);
 
-  // Filter nodes by category
-  const filteredNodes = useMemo(
-    () => nodes.filter(n => enabledCategories.has(n.category)),
-    [nodes, enabledCategories]
-  );
-  const filteredNodeIds = useMemo(() => new Set(filteredNodes.map(n => n.id)), [filteredNodes]);
-
-  const filteredEdges = useMemo(
-    () => edges.filter(e => filteredNodeIds.has(e.from) && filteredNodeIds.has(e.to)),
-    [edges, filteredNodeIds]
-  );
-
-  // Connected edges for hover highlight
-  const connectedEdges = useMemo(() => {
-    if (!hoveredNode) return new Set<number>();
-    const set = new Set<number>();
-    filteredEdges.forEach((e, i) => {
-      if (e.from === hoveredNode || e.to === hoveredNode) set.add(i);
-    });
-    return set;
-  }, [hoveredNode, filteredEdges]);
-
-  const connectedNodes = useMemo(() => {
-    if (!hoveredNode) return new Set<string>();
-    const set = new Set<string>([hoveredNode]);
-    filteredEdges.forEach(e => {
-      if (e.from === hoveredNode) set.add(e.to);
-      if (e.to === hoveredNode) set.add(e.from);
-    });
-    return set;
-  }, [hoveredNode, filteredEdges]);
-
-  function toggleCategory(cat: string) {
-    setEnabledCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(cat)) next.delete(cat);
-      else next.add(cat);
-      return next;
-    });
+  function navigateToResource(service: string, resourceName: string) {
+    location.hash = `/resources?service=${encodeURIComponent(service)}&resource=${encodeURIComponent(resourceName)}`;
   }
 
-  async function handleNodeClick(serviceName: string) {
-    if (expandedNode === serviceName) {
-      setExpandedNode(null);
-      return;
-    }
-
-    setExpandedNode(serviceName);
-
-    // Fetch resources if not already cached or loading
-    if (!(serviceName in nodeResources) && !loadingResources.has(serviceName)) {
-      setLoadingResources(prev => new Set([...prev, serviceName]));
-      try {
-        const res = await api(`/api/resources/${encodeURIComponent(serviceName)}`);
-        setNodeResources(prev => ({ ...prev, [serviceName]: res.resources || [] }));
-      } catch {
-        setNodeResources(prev => ({ ...prev, [serviceName]: [] }));
-      } finally {
-        setLoadingResources(prev => {
-          const next = new Set(prev);
-          next.delete(serviceName);
-          return next;
-        });
-      }
-    }
-  }
-
-  function navigateToResource(serviceName: string, resource: any) {
-    const id = resource.name || resource.id || (typeof resource === 'string' ? resource : '');
-    location.hash = `/resources?service=${encodeURIComponent(serviceName)}&resource=${encodeURIComponent(id)}`;
-  }
-
-  // Expanded mode: build resource-level layout
-  const expandedLayout = useMemo(() => {
-    if (viewMode !== 'expanded') return null;
-    return buildExpandedLayout(filteredNodes, filteredEdges, nodeResources);
-  }, [viewMode, filteredNodes, filteredEdges, nodeResources]);
-
-  // Resource node position lookup for expanded mode edges
-  const resNodePos = useMemo(() => {
-    if (!expandedLayout) return {};
-    const map: Record<string, { cx: number; cy: number }> = {};
-    for (const rn of expandedLayout.resourceNodes) {
-      map[rn.id] = { cx: rn.x + RES_NODE_W / 2, cy: rn.y + RES_NODE_H / 2 };
-    }
-    return map;
-  }, [expandedLayout]);
-
-  // SVG dimensions
-  const svgW = 1400;
-  const maxNodeBottom = useMemo(() => {
-    let max = 0;
-    if (viewMode === 'expanded' && expandedLayout) {
-      for (const c of expandedLayout.clusters) {
-        max = Math.max(max, c.y + c.height + 60);
-      }
-    } else {
-      for (const n of filteredNodes) {
-        max = Math.max(max, n.y + NODE_H + 60);
-      }
-    }
-    return max;
-  }, [filteredNodes, viewMode, expandedLayout]);
-  const svgH = Math.max(750, maxNodeBottom);
-
-  // Lookup positions for collapsed mode
-  const renderNodes = filteredNodes;
-  const nodePos = useMemo(() => {
-    const map: Record<string, { cx: number; cy: number }> = {};
-    for (const n of renderNodes) {
-      map[n.id] = { cx: nodeX(n.layer) + NODE_W / 2, cy: n.y + NODE_H / 2 };
-    }
-    return map;
-  }, [renderNodes]);
-
-  // Unique categories present
-  const presentCategories = useMemo(() => {
-    const cats = new Set<string>();
-    nodes.forEach(n => cats.add(n.category));
-    return Array.from(cats);
-  }, [nodes]);
-
-  // Unique layers present for headers
-  const presentLayers = useMemo(() => {
-    const layers = new Set<number>();
-    renderNodes.forEach(n => layers.add(n.layer));
-    return Array.from(layers).sort();
-  }, [renderNodes]);
-
-  // Minimap computation
+  // Minimap
   const minimapW = 180;
-  const minimapH = 100;
+  const minimapH = 110;
   const minimapScale = useMemo(() => {
     return Math.min(minimapW / svgW, minimapH / svgH);
-  }, []);
+  }, [svgW, svgH]);
+
+  // Node lookup by id for group membership
+  const nodeGroupMap = useMemo(() => {
+    if (!layout) return new Map<string, string>();
+    const m = new Map<string, string>();
+    for (const n of layout.positionedNodes) {
+      m.set(n.id, n.group);
+    }
+    return m;
+  }, [layout]);
+
+  if (!topoData || !layout) {
+    return (
+      <div>
+        <div class="mb-6">
+          <h1 class="page-title">Service Topology</h1>
+          <p class="page-desc">Loading topology...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const edges = topoData.edges;
 
   return (
     <div>
       <div class="mb-6 flex items-center justify-between">
         <div>
           <h1 class="page-title">Service Topology</h1>
-          <p class="page-desc">Service dependency map with live traffic</p>
+          <p class="page-desc">Unified resource graph with {topoData.nodes.length} resources across {topoData.groups.length} groups</p>
         </div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;max-width:780px">
-          {/* Expanded / Collapsed toggle */}
-          <div class="topo-view-toggle">
-            <button
-              class={viewMode === 'collapsed' ? 'active' : ''}
-              onClick={() => { setViewMode('collapsed'); setExpandedNode(null); }}
-            >Collapsed</button>
-            <button
-              class={viewMode === 'expanded' ? 'active' : ''}
-              onClick={() => setViewMode('expanded')}
-            >Expanded</button>
-            <button
-              class={viewMode === 'map' ? 'active' : ''}
-              onClick={() => setViewMode('map')}
-            >Map</button>
-          </div>
           <label
             style={{
               display: 'inline-flex',
@@ -1213,153 +394,34 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             />
             Show all
           </label>
-          {presentCategories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => toggleCategory(cat)}
+          {/* Group legend chips */}
+          {topoData.groups.map(g => (
+            <span
+              key={g.id}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
                 gap: '4px',
                 padding: '3px 10px',
                 borderRadius: '12px',
-                border: `1.5px solid ${CATEGORY_COLORS[cat]}`,
-                background: enabledCategories.has(cat) ? CATEGORY_COLORS[cat] + '20' : 'transparent',
-                color: enabledCategories.has(cat) ? CATEGORY_COLORS[cat] : '#94A3B8',
+                border: `1.5px solid ${g.color}`,
+                background: `${g.color}20`,
+                color: g.color,
                 fontSize: '11px',
                 fontWeight: 600,
-                cursor: 'pointer',
                 fontFamily: 'var(--font-sans)',
-                opacity: enabledCategories.has(cat) ? 1 : 0.5,
-                transition: 'all 0.15s ease',
               }}
             >
-              <span style={{
-                width: '8px', height: '8px', borderRadius: '50%',
-                background: enabledCategories.has(cat) ? CATEGORY_COLORS[cat] : '#94A3B8',
-              }} />
-              {cat}
-            </button>
+              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: g.color }} />
+              {g.label}
+              <span style={{ fontSize: '9px', opacity: 0.7 }}>
+                ({(topoData.nodes.filter(n => n.group === g.id)).length})
+              </span>
+            </span>
           ))}
         </div>
       </div>
-      {viewMode === 'map' ? (
-        <div class="card" style="position:relative;overflow:hidden">
-          {/* SVG arrow overlay */}
-          <svg class="topo-map-arrows" style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:1">
-            <defs>
-              <marker id="map-arrow" viewBox="0 0 10 7" refX="10" refY="3.5" markerWidth="8" markerHeight="6" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="var(--n400)" />
-              </marker>
-            </defs>
-            {/* Render flow arrows between group cards using data-group-id positions */}
-            {MAP_FLOWS.map((flow, i) => {
-              // Map group labels to approximate positions based on grid layout
-              // Groups are in a 3-column CSS grid, each ~33% width
-              const groupIndex: Record<string, number> = {};
-              MAP_GROUPS.forEach((g, idx) => { groupIndex[g.label] = idx; });
-              const fromIdx = groupIndex[flow.from];
-              const toIdx = groupIndex[flow.to];
-              if (fromIdx === undefined || toIdx === undefined) return null;
 
-              // Calculate approximate center positions
-              const cols = 3;
-              const colW = 33.3;
-              const rowH = 220; // approximate row height
-              const fromCol = fromIdx % cols;
-              const fromRow = Math.floor(fromIdx / cols);
-              const toCol = toIdx % cols;
-              const toRow = Math.floor(toIdx / cols);
-
-              const x1 = (fromCol + 0.5) * colW;
-              const y1 = 60 + fromRow * rowH + 40;
-              const x2 = (toCol + 0.5) * colW;
-              const y2 = 60 + toRow * rowH + 40;
-
-              // Offset start/end so arrows don't overlap cards
-              const dx = x2 - x1;
-              const dy = y2 - y1;
-              const len = Math.sqrt(dx * dx + dy * dy) || 1;
-              const offsetPx = 3; // percent offset
-              const sx = x1 + (dx / len) * offsetPx;
-              const sy = y1 + (dy / len) * offsetPx;
-              const ex = x2 - (dx / len) * offsetPx;
-              const ey = y2 - (dy / len) * offsetPx;
-
-              // Control point for curve
-              const mx = (sx + ex) / 2;
-              const my = (sy + ey) / 2 - 2;
-
-              return (
-                <g key={i} opacity="0.6">
-                  <path
-                    d={`M ${sx}% ${sy} Q ${mx}% ${my} ${ex}% ${ey}`}
-                    fill="none"
-                    stroke="var(--n300)"
-                    stroke-width="1.5"
-                    stroke-dasharray="6 3"
-                    marker-end="url(#map-arrow)"
-                  />
-                  <text
-                    x={`${mx}%`}
-                    y={my - 6}
-                    text-anchor="middle"
-                    font-size="9"
-                    fill="var(--n400)"
-                    font-family="var(--font-sans)"
-                  >
-                    {flow.label}
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-          {/* Data flow legend */}
-          <div class="topo-map-flows">
-            <span class="topo-map-flow-label">Data Flow</span>
-            {MAP_FLOWS.map((flow, i) => (
-              <span key={i} class="topo-map-flow">
-                {flow.from}
-                <span class="topo-map-flow-arrow">{'\u2192'}</span>
-                {flow.to}
-                <span style="color:var(--n400);font-size:10px">({flow.label})</span>
-              </span>
-            ))}
-          </div>
-          {/* Resource group cards */}
-          <div class="topo-map" style="position:relative;z-index:2">
-            {MAP_GROUPS.map(group => (
-              <div key={group.id} class="topo-map-group">
-                <div class="topo-map-group-header" style={{ borderBottomColor: group.color + '40' }}>
-                  <span class="topo-map-dot" style={{ background: group.color }} />
-                  <span style={{ color: group.color }}>{group.label}</span>
-                  <span class="topo-map-count">{group.resources.length}</span>
-                </div>
-                <div class="topo-map-resources">
-                  {group.resources.map((res, i) => (
-                    <span
-                      key={i}
-                      class="topo-map-chip"
-                      style={{
-                        background: group.color + '14',
-                        color: group.color,
-                      }}
-                      onClick={() => {
-                        const svc = res.service;
-                        const name = res.name;
-                        location.hash = `/resources?service=${encodeURIComponent(svc)}&resource=${encodeURIComponent(name)}`;
-                      }}
-                    >
-                      <span class="topo-map-chip-icon">{res.icon}</span>
-                      {res.name}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : (
       <div class="card topology-container" style="position:relative;overflow:hidden">
         {/* biome-ignore lint: internal dashboard SVG */}
         <svg
@@ -1372,7 +434,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           onMouseUp={onMouseUp}
           onMouseLeave={onMouseUp}
         >
-          {/* Background grid */}
           <defs>
             <pattern id="topo-grid" width="30" height="30" patternUnits="userSpaceOnUse">
               <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#E2E8F0" stroke-width="0.5" />
@@ -1383,83 +444,138 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             <marker id="topo-arrow-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
               <polygon points="0 0, 8 3, 0 6" fill="#3B82F6" />
             </marker>
-            {/* Pulse animation */}
-            <filter id="topo-pulse">
-              <feGaussianBlur in="SourceGraphic" stdDeviation="3" />
-            </filter>
           </defs>
-          <rect
-            width={svgW}
-            height={svgH}
-            fill="url(#topo-grid)"
-            onClick={() => setExpandedNode(null)}
-            style={{ cursor: 'grab' }}
-          />
+
+          <rect width={svgW} height={svgH} fill="url(#topo-grid)" />
 
           <g transform={`translate(${transform.x},${transform.y}) scale(${transform.scale})`}>
-            {/* Layer / category headers */}
-            {presentLayers.map(layer => {
-              const lx = nodeX(layer);
-              const header = LAYER_HEADERS[layer] || '';
-              return header ? (
-                <text
-                  key={`header-${layer}`}
-                  x={lx + NODE_W / 2}
-                  y={30}
-                  text-anchor="middle"
-                  font-size="11"
-                  font-weight="700"
-                  font-family="var(--font-sans)"
-                  fill="#94A3B8"
-                  letter-spacing="0.5"
-                  style={{ textTransform: 'uppercase', pointerEvents: 'none' } as any}
+
+            {/* Group cluster rectangles */}
+            {layout.positionedGroups.map(g => {
+              const dimmed = hoveredCluster && hoveredCluster !== g.id;
+              return (
+                <g
+                  key={`cluster-${g.id}`}
+                  style={{ opacity: dimmed ? 0.2 : 1, transition: 'opacity 0.2s' }}
+                  onMouseEnter={() => setHoveredCluster(g.id)}
+                  onMouseLeave={() => setHoveredCluster(null)}
                 >
-                  {header}
-                </text>
-              ) : null;
+                  <rect
+                    x={g.x}
+                    y={g.y}
+                    width={g.width}
+                    height={g.height}
+                    rx={12}
+                    fill={`${g.color}08`}
+                    stroke={`${g.color}4D`}
+                    stroke-width="1.5"
+                    stroke-dasharray="6 3"
+                  />
+                  {/* Colored top accent border */}
+                  <rect
+                    x={g.x}
+                    y={g.y}
+                    width={g.width}
+                    height={4}
+                    rx={2}
+                    fill={g.color}
+                    opacity="0.6"
+                  />
+                  {/* Group label */}
+                  <text
+                    x={g.x + 10}
+                    y={g.y + 18}
+                    font-size="10.5"
+                    font-weight="700"
+                    font-family="var(--font-sans)"
+                    fill={g.color}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {g.label}
+                  </text>
+                  {/* Resource count badge */}
+                  <g>
+                    <rect
+                      x={g.x + g.width - 32}
+                      y={g.y + 8}
+                      width={22}
+                      height={16}
+                      rx={8}
+                      fill={g.color}
+                      opacity="0.2"
+                    />
+                    <text
+                      x={g.x + g.width - 21}
+                      y={g.y + 16}
+                      text-anchor="middle"
+                      dominant-baseline="central"
+                      font-size="9"
+                      font-weight="700"
+                      font-family="var(--font-mono)"
+                      fill={g.color}
+                      style={{ pointerEvents: 'none' }}
+                    >
+                      {g.nodeCount}
+                    </text>
+                  </g>
+                </g>
+              );
             })}
 
-            {/* ===== COLLAPSED MODE: service-level edges and nodes ===== */}
-            {viewMode === 'collapsed' && filteredEdges.map((edge, i) => {
-              const from = nodePos[edge.from];
-              const to = nodePos[edge.to];
+            {/* Edges (arrows) */}
+            {edges.map((edge, i) => {
+              const from = nodePos.get(edge.source);
+              const to = nodePos.get(edge.target);
               if (!from || !to) return null;
-              const highlighted = connectedEdges.has(i);
-              const dimmed = hoveredNode && !highlighted;
+
+              const highlighted = connectedEdges.has(i) || hoveredEdge === i;
+              const dimmedByNode = hoveredNode && !highlighted;
+              const dimmedByCluster = hoveredCluster && !(
+                nodeGroupMap.get(edge.source) === hoveredCluster ||
+                nodeGroupMap.get(edge.target) === hoveredCluster
+              );
+              const dimmed = dimmedByNode || dimmedByCluster;
+
+              const isDashed = edge.discovered === 'traffic';
               const edgeColor = highlighted ? '#3B82F6' : '#CBD5E1';
 
               const dx = to.cx - from.cx;
               const dy = to.cy - from.cy;
               const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-              const endX = to.cx - (dx / dist) * (NODE_W / 2 + 4);
-              const endY = to.cy - (dy / dist) * (NODE_H / 2 + 2);
-              const startX = from.cx + (dx / dist) * (NODE_W / 2 + 4);
-              const startY = from.cy + (dy / dist) * (NODE_H / 2 + 2);
+              const startX = from.cx + (dx / dist) * (RES_W / 2 + 3);
+              const startY = from.cy + (dy / dist) * (RES_H / 2 + 2);
+              const endX = to.cx - (dx / dist) * (RES_W / 2 + 3);
+              const endY = to.cy - (dy / dist) * (RES_H / 2 + 2);
 
               const path = bezierPath(startX, startY, endX, endY);
               const midX = (startX + endX) / 2;
-              const midY = (startY + endY) / 2 - 10;
+              const midY = (startY + endY) / 2 - 6;
 
               const labelText = edge.label || '';
-              const labelW = labelText.length * 5.5 + 8;
-              const labelH = 14;
+              const labelW = labelText.length * 5 + 10;
 
               return (
-                <g key={`e-${i}`} style={{ opacity: dimmed ? 0.15 : 1, transition: 'opacity 0.2s' }}>
+                <g
+                  key={`e-${i}`}
+                  style={{ opacity: dimmed ? 0.08 : 1, transition: 'opacity 0.2s', cursor: 'default' }}
+                  onMouseEnter={() => setHoveredEdge(i)}
+                  onMouseLeave={() => setHoveredEdge(null)}
+                >
                   <path
                     d={path}
                     fill="none"
                     stroke={edgeColor}
-                    stroke-width={highlighted ? 2 : 1.2}
+                    stroke-width={highlighted ? 2 : 1}
+                    stroke-dasharray={isDashed ? '5 3' : 'none'}
                     marker-end={highlighted ? 'url(#topo-arrow-active)' : 'url(#topo-arrow)'}
                   />
                   {labelText && (
                     <>
                       <rect
                         x={midX - labelW / 2}
-                        y={midY - labelH / 2}
+                        y={midY - 7}
                         width={labelW}
-                        height={labelH}
+                        height={14}
                         rx={3}
                         fill="white"
                         stroke={highlighted ? '#3B82F6' : '#E2E8F0'}
@@ -1470,7 +586,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         y={midY + 1}
                         text-anchor="middle"
                         dominant-baseline="central"
-                        font-size="8.5"
+                        font-size="8"
                         font-family="var(--font-sans)"
                         fill={highlighted ? '#3B82F6' : '#94A3B8'}
                         style={{ pointerEvents: 'none' }}
@@ -1479,146 +595,28 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                       </text>
                     </>
                   )}
-                  {(pulsing.has(edge.from) || pulsing.has(edge.to)) && (
-                    <circle r="3" fill={CATEGORY_COLORS[filteredNodes.find(n => n.id === edge.from)?.category || 'Other'] || '#3B82F6'}>
-                      <animateMotion dur="1s" repeatCount="indefinite" {...{ path } as any} />
-                    </circle>
-                  )}
-                </g>
-              );
-            })}
-
-            {viewMode === 'collapsed' && renderNodes.map(node => {
-              const x = nodeX(node.layer);
-              const y = node.y;
-              const isPulsing = pulsing.has(node.id);
-              const isHovered = hoveredNode === node.id;
-              const dimmed = hoveredNode && !connectedNodes.has(node.id);
-              const isClient = node.id === 'Client Apps';
-              const fillOpacity = node.active ? 0.15 : 0.06;
-              const borderColor = node.active ? node.color : '#CBD5E1';
-
-              return (
-                <g
-                  key={node.id}
-                  style={{
-                    cursor: isClient ? 'default' : 'pointer',
-                    opacity: dimmed ? 0.2 : 1,
-                    transition: 'opacity 0.2s',
-                  }}
-                  onMouseEnter={() => setHoveredNode(node.id)}
-                  onMouseLeave={() => setHoveredNode(null)}
-                  onClick={(e: MouseEvent) => {
-                    if (isClient) return;
-                    e.stopPropagation();
-                    handleNodeClick(node.id);
-                  }}
-                >
-                  {isPulsing && (
-                    <rect
-                      x={x - 4}
-                      y={y - 4}
-                      width={NODE_W + 8}
-                      height={NODE_H + 8}
-                      rx={NODE_RX + 2}
-                      fill={node.color}
-                      opacity="0.25"
-                      filter="url(#topo-pulse)"
-                    >
-                      <animate attributeName="opacity" values="0.25;0.08;0.25" dur="1s" repeatCount="indefinite" />
-                    </rect>
-                  )}
-
-                  <rect
-                    x={x}
-                    y={y}
-                    width={NODE_W}
-                    height={NODE_H}
-                    rx={NODE_RX}
-                    fill={`${node.color}${Math.round(fillOpacity * 255).toString(16).padStart(2, '0')}`}
-                    stroke={borderColor}
-                    stroke-width={isHovered ? 2.5 : 1.5}
-                    style={{ transition: 'all 0.3s ease' }}
-                  />
-
-                  <ServiceIcon
-                    service={node.id}
-                    x={x + 16}
-                    y={y + NODE_H / 2}
-                    color={node.color}
-                  />
-
-                  <text
-                    x={x + 30}
-                    y={y + NODE_H / 2 + 1}
-                    dominant-baseline="central"
-                    font-size="11.5"
-                    font-weight="600"
-                    font-family="var(--font-sans)"
-                    fill="#1E293B"
-                    style={{ pointerEvents: 'none' }}
-                  >
-                    {node.label}
-                  </text>
-
-                  {node.requests > 0 && (
-                    <>
-                      <rect
-                        x={x + NODE_W - 40}
-                        y={y + 8}
-                        width={34}
-                        height={18}
-                        rx={9}
-                        fill={node.color}
-                        opacity="0.18"
-                      />
-                      <text
-                        x={x + NODE_W - 23}
-                        y={y + 17}
-                        dominant-baseline="central"
-                        text-anchor="middle"
-                        font-size="9.5"
-                        font-weight="700"
-                        font-family="var(--font-mono)"
-                        fill={node.color}
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        {node.requests > 999 ? `${Math.round(node.requests / 1000)}k` : node.requests}
-                      </text>
-                    </>
-                  )}
-
-                  {isHovered && (
+                  {/* Edge tooltip on hover */}
+                  {hoveredEdge === i && (
                     <g style={{ pointerEvents: 'none' }}>
                       <rect
-                        x={x + NODE_W / 2 - 80}
-                        y={y - 48}
-                        width={160}
-                        height={40}
-                        rx={6}
+                        x={midX - 60}
+                        y={midY - 30}
+                        width={120}
+                        height={22}
+                        rx={4}
                         fill="#0F172A"
                         opacity="0.92"
                       />
                       <text
-                        x={x + NODE_W / 2}
-                        y={y - 33}
+                        x={midX}
+                        y={midY - 19}
                         text-anchor="middle"
-                        font-size="10"
-                        font-weight="600"
+                        dominant-baseline="central"
+                        font-size="9"
                         font-family="var(--font-sans)"
                         fill="white"
                       >
-                        {node.label}
-                      </text>
-                      <text
-                        x={x + NODE_W / 2}
-                        y={y - 18}
-                        text-anchor="middle"
-                        font-size="9"
-                        font-family="var(--font-sans)"
-                        fill="#94A3B8"
-                      >
-                        {node.category} | {node.requests} req | {(nodeResources[node.id] || []).length} resources
+                        {edge.label || edge.type} ({edge.discovered})
                       </text>
                     </g>
                   )}
@@ -1626,247 +624,95 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               );
             })}
 
-            {/* Collapsed mode: resource panel on click */}
-            {viewMode === 'collapsed' && expandedNode && (() => {
-              const node = filteredNodes.find(n => n.id === expandedNode);
-              if (!node) return null;
-              const x = nodeX(node.layer);
-              const y = node.y;
-              const resources = nodeResources[expandedNode] || [];
-              const isLoading = loadingResources.has(expandedNode);
-              const panelW = 280;
-              const rowH = 28;
-              const headerH = 40;
-              const footerH = 32;
-              const listMaxH = 220;
-              const listH = Math.min(listMaxH, resources.length * rowH);
-              const panelH = isLoading ? headerH + 48 + footerH : headerH + listH + footerH;
-              let panelX = x + NODE_W + 12;
-              if (panelX + panelW > 1180) panelX = x - panelW - 12;
-              const panelY = Math.max(10, Math.min(y - 20, svgH - panelH - 10));
+            {/* Resource nodes */}
+            {layout.positionedNodes.map(n => {
+              const groupColor = topoData.groups.find(g => g.id === n.group)?.color || '#94A3B8';
+              const isHovered = hoveredNode === n.id;
+              const dimmedByNode = hoveredNode && !connectedNodes.has(n.id);
+              const dimmedByCluster = hoveredCluster && n.group !== hoveredCluster;
+              const dimmed = dimmedByNode || dimmedByCluster;
+              const truncated = n.label.length > 14 ? n.label.slice(0, 13) + '\u2026' : n.label;
 
               return (
-                <foreignObject
-                  key={`panel-${expandedNode}`}
-                  x={panelX}
-                  y={panelY}
-                  width={panelW}
-                  height={panelH + 4}
-                  style={{ overflow: 'visible' }}
-                  onClick={(e: MouseEvent) => e.stopPropagation()}
+                <g
+                  key={n.id}
+                  style={{
+                    cursor: 'pointer',
+                    opacity: dimmed ? 0.15 : 1,
+                    transition: 'opacity 0.2s',
+                  }}
+                  onMouseEnter={() => { setHoveredNode(n.id); setHoveredCluster(null); }}
+                  onMouseLeave={() => setHoveredNode(null)}
+                  onClick={(e: MouseEvent) => {
+                    e.stopPropagation();
+                    navigateToResource(n.service, n.label);
+                  }}
                 >
-                  <div
-                    class="topo-resource-panel"
-                    style={{ width: `${panelW}px`, height: `${panelH}px` }}
-                  >
-                    <div class="topo-resource-header">
-                      <span>{node.label} Resources</span>
-                      <button
-                        class="topo-resource-close"
-                        onClick={(e: MouseEvent) => { e.stopPropagation(); setExpandedNode(null); }}
-                      >×</button>
-                    </div>
-                    <div class="topo-resource-list">
-                      {isLoading ? (
-                        <div class="topo-resource-loading">Loading…</div>
-                      ) : resources.length === 0 ? (
-                        <div class="topo-resource-empty">No resources found</div>
-                      ) : (
-                        resources.map((r: any, i: number) => {
-                          const name = r.name || r.id || (typeof r === 'string' ? r : JSON.stringify(r));
-                          return (
-                            <div
-                              key={i}
-                              class="topo-resource-item"
-                              onClick={(e: MouseEvent) => { e.stopPropagation(); navigateToResource(expandedNode, r); }}
-                            >
-                              <span class="topo-resource-dot" />
-                              <span class="topo-resource-name">{name}</span>
-                            </div>
-                          );
-                        })
-                      )}
-                    </div>
-                    <a
-                      class="topo-resource-footer"
-                      href={`#/resources?service=${encodeURIComponent(expandedNode)}`}
-                      onClick={(e: MouseEvent) => e.stopPropagation()}
-                    >
-                      View all in Explorer →
-                    </a>
-                  </div>
-                </foreignObject>
-              );
-            })()}
-
-            {/* ===== EXPANDED MODE: resource-level nodes and edges ===== */}
-            {viewMode === 'expanded' && expandedLayout && (
-              <g>
-                {/* Cluster group rectangles */}
-                {expandedLayout.clusters.map(cluster => (
-                  <g key={`cluster-${cluster.service}`}>
-                    <rect
-                      x={cluster.x}
-                      y={cluster.y}
-                      width={cluster.width}
-                      height={cluster.height}
-                      rx={12}
-                      fill="none"
-                      stroke={`${cluster.color}4D`}
-                      stroke-width="1.5"
-                      stroke-dasharray="6 3"
-                    />
-                    {/* Service name label above cluster */}
-                    <text
-                      x={cluster.x + 8}
-                      y={cluster.y + 13}
-                      font-size="10"
-                      font-weight="600"
-                      font-family="var(--font-sans)"
-                      fill={cluster.color}
-                      opacity="0.8"
-                      style={{ pointerEvents: 'none' }}
-                    >
-                      {cluster.service}
-                      {cluster.resourceCount > 0 ? ` (${cluster.resourceCount})` : ''}
-                    </text>
-                  </g>
-                ))}
-
-                {/* Resource-level edges */}
-                {expandedLayout.resourceEdges.map((edge, i) => {
-                  const from = resNodePos[edge.from];
-                  const to = resNodePos[edge.to];
-                  if (!from || !to) return null;
-
-                  const dx = to.cx - from.cx;
-                  const dy = to.cy - from.cy;
-                  const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                  const endX = to.cx - (dx / dist) * (RES_NODE_W / 2 + 3);
-                  const endY = to.cy - (dy / dist) * (RES_NODE_H / 2 + 2);
-                  const startX = from.cx + (dx / dist) * (RES_NODE_W / 2 + 3);
-                  const startY = from.cy + (dy / dist) * (RES_NODE_H / 2 + 2);
-
-                  const path = bezierPath(startX, startY, endX, endY);
-
-                  return (
-                    <g key={`re-${i}`} style={{ opacity: 0.6 }}>
-                      <path
-                        d={path}
-                        fill="none"
-                        stroke="#CBD5E1"
-                        stroke-width="1"
-                        marker-end="url(#topo-arrow)"
-                      />
-                    </g>
-                  );
-                })}
-
-                {/* Resource nodes */}
-                {expandedLayout.resourceNodes.map(rn => {
-                  const isPlaceholder = rn.id.endsWith('::__service__');
-                  const isHovered = hoveredNode === rn.id;
-                  const displayName = isPlaceholder ? rn.resourceName : rn.resourceName;
-                  const truncated = displayName.length > 16 ? displayName.slice(0, 15) + '\u2026' : displayName;
-
-                  return (
-                    <g
-                      key={rn.id}
-                      style={{ cursor: 'pointer' }}
-                      onMouseEnter={() => setHoveredNode(rn.id)}
-                      onMouseLeave={() => setHoveredNode(null)}
-                      onClick={(e: MouseEvent) => {
-                        e.stopPropagation();
-                        if (!isPlaceholder) {
-                          navigateToResource(rn.service, { name: rn.resourceName });
-                        }
-                      }}
-                    >
-                      <rect
-                        x={rn.x}
-                        y={rn.y}
-                        width={RES_NODE_W}
-                        height={RES_NODE_H}
-                        rx={6}
-                        fill={`${rn.color}1A`}
-                        stroke={isHovered ? rn.color : `${rn.color}66`}
-                        stroke-width={isHovered ? 2 : 1}
-                        style={{ transition: 'all 0.15s ease' }}
-                      />
-
-                      {/* Small service icon badge in top-left */}
-                      <g transform={`translate(${rn.x + 10}, ${rn.y + RES_NODE_H / 2}) scale(0.6) translate(${-(rn.x + 10)}, ${-(rn.y + RES_NODE_H / 2)})`}>
-                        <ServiceIcon
-                          service={rn.service}
-                          x={rn.x + 10}
-                          y={rn.y + RES_NODE_H / 2}
-                          color={rn.color}
-                        />
-                      </g>
-
-                      {/* Resource name label */}
-                      <text
-                        x={rn.x + 22}
-                        y={rn.y + RES_NODE_H / 2 + 1}
-                        dominant-baseline="central"
-                        font-size="11"
-                        font-family="var(--font-mono)"
-                        fill="#334155"
-                        style={{ pointerEvents: 'none' }}
-                      >
-                        {truncated}
-                      </text>
-
-                      {/* Tooltip on hover showing full name */}
-                      {isHovered && displayName.length > 16 && (
-                        <g style={{ pointerEvents: 'none' }}>
-                          <rect
-                            x={rn.x + RES_NODE_W / 2 - (displayName.length * 3.5 + 8)}
-                            y={rn.y - 24}
-                            width={displayName.length * 7 + 16}
-                            height={20}
-                            rx={4}
-                            fill="#0F172A"
-                            opacity="0.92"
-                          />
-                          <text
-                            x={rn.x + RES_NODE_W / 2}
-                            y={rn.y - 14}
-                            text-anchor="middle"
-                            dominant-baseline="central"
-                            font-size="10"
-                            font-family="var(--font-mono)"
-                            fill="white"
-                          >
-                            {displayName}
-                          </text>
-                        </g>
-                      )}
-                    </g>
-                  );
-                })}
-
-                {/* Loading indicator */}
-                {loadingResources.size > 0 && (
+                  <rect
+                    x={n.x}
+                    y={n.y}
+                    width={RES_W}
+                    height={RES_H}
+                    rx={6}
+                    fill={isHovered ? `${groupColor}30` : `${groupColor}1A`}
+                    stroke={isHovered ? groupColor : `${groupColor}66`}
+                    stroke-width={isHovered ? 2 : 1}
+                    style={{ transition: 'all 0.15s ease' }}
+                  />
                   <text
-                    x={svgW / 2}
-                    y={40}
-                    text-anchor="middle"
-                    font-size="11"
-                    font-family="var(--font-sans)"
-                    fill="#94A3B8"
+                    x={n.x + 8}
+                    y={n.y + RES_H / 2 + 1}
+                    dominant-baseline="central"
+                    font-size="10"
+                    font-family="var(--font-mono)"
+                    fill="#334155"
                     style={{ pointerEvents: 'none' }}
                   >
-                    Loading resources...
+                    {truncated}
                   </text>
-                )}
-              </g>
-            )}
+
+                  {/* Tooltip on hover */}
+                  {isHovered && (
+                    <g style={{ pointerEvents: 'none' }}>
+                      <rect
+                        x={n.x + RES_W / 2 - 75}
+                        y={n.y - 36}
+                        width={150}
+                        height={30}
+                        rx={5}
+                        fill="#0F172A"
+                        opacity="0.92"
+                      />
+                      <text
+                        x={n.x + RES_W / 2}
+                        y={n.y - 25}
+                        text-anchor="middle"
+                        font-size="9.5"
+                        font-weight="600"
+                        font-family="var(--font-sans)"
+                        fill="white"
+                      >
+                        {n.label}
+                      </text>
+                      <text
+                        x={n.x + RES_W / 2}
+                        y={n.y - 12}
+                        text-anchor="middle"
+                        font-size="8.5"
+                        font-family="var(--font-sans)"
+                        fill="#94A3B8"
+                      >
+                        {n.service} | {n.type}
+                      </text>
+                    </g>
+                  )}
+                </g>
+              );
+            })}
           </g>
 
           {/* Minimap */}
           <g transform={`translate(${svgW - minimapW - 16}, ${svgH - minimapH - 16})`}>
-            {/* Minimap background */}
             <rect
               width={minimapW}
               height={minimapH}
@@ -1876,39 +722,40 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               stroke-width="1"
               opacity="0.92"
             />
-            {/* Minimap nodes */}
             <g transform={`scale(${minimapScale})`}>
-              {viewMode === 'collapsed' ? renderNodes.map(node => {
-                const mx = nodeX(node.layer);
-                const my = node.y;
+              {/* Minimap clusters */}
+              {layout.positionedGroups.map(g => (
+                <rect
+                  key={`mm-c-${g.id}`}
+                  x={g.x}
+                  y={g.y}
+                  width={g.width}
+                  height={g.height}
+                  rx={4}
+                  fill={g.color}
+                  opacity={0.15}
+                />
+              ))}
+              {/* Minimap nodes */}
+              {layout.positionedNodes.map(n => {
+                const groupColor = topoData.groups.find(g => g.id === n.group)?.color || '#94A3B8';
                 return (
                   <rect
-                    key={`mm-${node.id}`}
-                    x={mx}
-                    y={my}
-                    width={NODE_W}
-                    height={NODE_H}
+                    key={`mm-${n.id}`}
+                    x={n.x}
+                    y={n.y}
+                    width={RES_W}
+                    height={RES_H}
                     rx={2}
-                    fill={node.color}
-                    opacity={node.active ? 0.7 : 0.3}
+                    fill={groupColor}
+                    opacity={0.5}
                   />
                 );
-              }) : expandedLayout ? expandedLayout.resourceNodes.map(rn => (
-                <rect
-                  key={`mm-${rn.id}`}
-                  x={rn.x}
-                  y={rn.y}
-                  width={RES_NODE_W}
-                  height={RES_NODE_H}
-                  rx={1}
-                  fill={rn.color}
-                  opacity={0.6}
-                />
-              )) : null}
+              })}
               {/* Minimap edges */}
-              {viewMode === 'collapsed' ? filteredEdges.map((edge, i) => {
-                const from = nodePos[edge.from];
-                const to = nodePos[edge.to];
+              {edges.map((edge, i) => {
+                const from = nodePos.get(edge.source);
+                const to = nodePos.get(edge.target);
                 if (!from || !to) return null;
                 return (
                   <line
@@ -1919,26 +766,10 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     y2={to.cy}
                     stroke="#CBD5E1"
                     stroke-width="1"
-                    opacity="0.5"
+                    opacity="0.3"
                   />
                 );
-              }) : expandedLayout ? expandedLayout.resourceEdges.map((edge, i) => {
-                const from = resNodePos[edge.from];
-                const to = resNodePos[edge.to];
-                if (!from || !to) return null;
-                return (
-                  <line
-                    key={`mme-${i}`}
-                    x1={from.cx}
-                    y1={from.cy}
-                    x2={to.cx}
-                    y2={to.cy}
-                    stroke="#CBD5E1"
-                    stroke-width="1"
-                    opacity="0.4"
-                  />
-                );
-              }) : null}
+              })}
             </g>
             {/* Viewport indicator */}
             <rect
@@ -1955,7 +786,6 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           </g>
         </svg>
       </div>
-      )}
     </div>
   );
 }

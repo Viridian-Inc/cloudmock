@@ -29,6 +29,39 @@ func (s *CloudFormationService) SetLocator(locator ServiceLocator) {
 	s.store.SetProvisioner(p)
 }
 
+// GetStackResources returns all resources across all stacks for topology queries.
+func (s *CloudFormationService) GetStackResources() map[string][]StackResource {
+	stacks := s.store.AllStacks()
+	result := make(map[string][]StackResource, len(stacks))
+	for _, st := range stacks {
+		if st.StackStatus == "DELETE_COMPLETE" {
+			continue
+		}
+		result[st.StackName] = st.Resources
+	}
+	return result
+}
+
+// GetStackResourcesSummary returns parallel slices for topology building.
+func (s *CloudFormationService) GetStackResourcesSummary() (stackNames []string, resourceTypes [][]string, logicalIDs [][]string) {
+	stacks := s.store.AllStacks()
+	for _, st := range stacks {
+		if st.StackStatus == "DELETE_COMPLETE" {
+			continue
+		}
+		types := make([]string, 0, len(st.Resources))
+		ids := make([]string, 0, len(st.Resources))
+		for _, r := range st.Resources {
+			types = append(types, r.ResourceType)
+			ids = append(ids, r.LogicalResourceId)
+		}
+		stackNames = append(stackNames, st.StackName)
+		resourceTypes = append(resourceTypes, types)
+		logicalIDs = append(logicalIDs, ids)
+	}
+	return stackNames, resourceTypes, logicalIDs
+}
+
 // Name returns the AWS service name used for routing.
 func (s *CloudFormationService) Name() string { return "cloudformation" }
 

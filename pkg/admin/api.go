@@ -502,72 +502,14 @@ func (a *API) handleSESEmailByID(w http.ResponseWriter, r *http.Request) {
 	http.NotFound(w, r)
 }
 
-// TopologyNode describes a service in the topology graph.
-type TopologyNode struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Type string `json:"type"`
-}
-
-// TopologyEdge describes a connection between services.
-type TopologyEdge struct {
-	Source string `json:"source"`
-	Target string `json:"target"`
-	Label  string `json:"label"`
-}
-
-// TopologyResponse is the topology graph.
-type TopologyResponse struct {
-	Nodes []TopologyNode `json:"nodes"`
-	Edges []TopologyEdge `json:"edges"`
-}
-
 func (a *API) handleTopology(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Build topology from registered services and known inter-service connections.
-	svcs := a.registry.List()
-	nodes := make([]TopologyNode, 0, len(svcs))
-	svcSet := make(map[string]bool)
-	for _, svc := range svcs {
-		nodes = append(nodes, TopologyNode{
-			ID:   svc.Name(),
-			Name: svc.Name(),
-			Type: "service",
-		})
-		svcSet[svc.Name()] = true
-	}
-
-	// Known AWS cross-service integrations.
-	knownEdges := []TopologyEdge{
-		{Source: "s3", Target: "sqs", Label: "event notification"},
-		{Source: "s3", Target: "sns", Label: "event notification"},
-		{Source: "s3", Target: "lambda", Label: "event notification"},
-		{Source: "sns", Target: "sqs", Label: "subscription"},
-		{Source: "sns", Target: "lambda", Label: "subscription"},
-		{Source: "eventbridge", Target: "sqs", Label: "target"},
-		{Source: "eventbridge", Target: "sns", Label: "target"},
-		{Source: "eventbridge", Target: "lambda", Label: "target"},
-		{Source: "dynamodb", Target: "lambda", Label: "streams"},
-		{Source: "kinesis", Target: "lambda", Label: "event source"},
-		{Source: "sqs", Target: "lambda", Label: "event source"},
-		{Source: "apigateway", Target: "lambda", Label: "integration"},
-		{Source: "cognito", Target: "lambda", Label: "triggers"},
-		{Source: "ses", Target: "sns", Label: "notifications"},
-		{Source: "cloudwatch", Target: "sns", Label: "alarm actions"},
-	}
-
-	edges := make([]TopologyEdge, 0)
-	for _, e := range knownEdges {
-		if svcSet[e.Source] && svcSet[e.Target] {
-			edges = append(edges, e)
-		}
-	}
-
-	writeJSON(w, http.StatusOK, TopologyResponse{Nodes: nodes, Edges: edges})
+	topo := a.buildDynamicTopology()
+	writeJSON(w, http.StatusOK, topo)
 }
 
 // ResourcesResponse is the response body for the /api/resources/:service endpoint.

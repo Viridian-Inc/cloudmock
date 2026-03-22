@@ -44,6 +44,11 @@ func (s *SQSService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *SQSService) HealthCheck() error { return nil }
 
+// GetQueueNames returns all queue names for topology queries.
+func (s *SQSService) GetQueueNames() []string {
+	return s.store.ListQueues("")
+}
+
 // EnqueueDirect adds a message to the named queue without going through
 // the HTTP/form-parsing path. This is used for cross-service delivery
 // (e.g., SNS → SQS, EventBridge → SQS, S3 notifications → SQS).

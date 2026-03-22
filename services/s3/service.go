@@ -65,6 +65,16 @@ func (s *S3Service) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *S3Service) HealthCheck() error { return nil }
 
+// GetBucketNames returns all bucket names for topology queries.
+func (s *S3Service) GetBucketNames() []string {
+	buckets := s.store.ListBuckets()
+	names := make([]string, 0, len(buckets))
+	for _, b := range buckets {
+		names = append(names, b.Name)
+	}
+	return names
+}
+
 // ResourceSchemas returns the schema for S3 bucket resources.
 func (s *S3Service) ResourceSchemas() []schema.ResourceSchema {
 	return []schema.ResourceSchema{

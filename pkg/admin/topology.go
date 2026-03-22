@@ -1,0 +1,708 @@
+package admin
+
+import (
+	"strings"
+	"time"
+)
+
+// ---- Topology response types ----
+
+// TopologyNodeV2 describes a resource in the topology graph.
+type TopologyNodeV2 struct {
+	ID      string `json:"id"`      // "lambda:attendance-handler" or "external:expo-app"
+	Label   string `json:"label"`
+	Service string `json:"service"`
+	Type    string `json:"type"`  // "function", "table", "queue", "topic", "bucket", "client", "plugin"
+	Group   string `json:"group"` // group ID
+}
+
+// TopologyEdgeV2 describes a connection between resources.
+type TopologyEdgeV2 struct {
+	Source     string `json:"source"`
+	Target     string `json:"target"`
+	Type       string `json:"type"`       // "trigger", "read_write", "publish", "subscribe"
+	Label      string `json:"label"`
+	Discovered string `json:"discovered"` // "esm", "subscription", "rule", "traffic", "config", "alarm", "cfn"
+}
+
+// TopologyGroupV2 describes a visual grouping.
+type TopologyGroupV2 struct {
+	ID    string `json:"id"`
+	Label string `json:"label"`
+	Color string `json:"color"`
+}
+
+// TopologyResponseV2 is the dynamic topology response.
+type TopologyResponseV2 struct {
+	Nodes  []TopologyNodeV2  `json:"nodes"`
+	Edges  []TopologyEdgeV2  `json:"edges"`
+	Groups []TopologyGroupV2 `json:"groups"`
+}
+
+// ---- Static group definitions ----
+
+var topologyGroups = []TopologyGroupV2{
+	{ID: "Client", Label: "Client Apps", Color: "#6366F1"},
+	{ID: "Plugins", Label: "External Services", Color: "#94A3B8"},
+	{ID: "API", Label: "API Layer", Color: "#06B6D4"},
+	{ID: "Auth", Label: "Auth & Identity", Color: "#8B5CF6"},
+	{ID: "Compute", Label: "Compute", Color: "#3B82F6"},
+	{ID: "Core Data", Label: "Core Domain", Color: "#10B981"},
+	{ID: "Features", Label: "Features", Color: "#059669"},
+	{ID: "Admin", Label: "Admin & Analytics", Color: "#6366F1"},
+	{ID: "Integrations", Label: "Integrations", Color: "#A855F7"},
+	{ID: "Facilities", Label: "Facilities", Color: "#14B8A6"},
+	{ID: "Messaging", Label: "Messaging", Color: "#F97316"},
+	{ID: "Storage", Label: "Storage", Color: "#F59E0B"},
+	{ID: "Security", Label: "Security & Config", Color: "#6366F1"},
+	{ID: "Monitoring", Label: "Monitoring", Color: "#EC4899"},
+}
+
+// tableGroups maps DynamoDB table names to their topology group.
+var tableGroups = map[string]string{
+	"enterprise":          "Core Data",
+	"membership":          "Core Data",
+	"resource":            "Core Data",
+	"resourceMembership":  "Core Data",
+	"session":             "Core Data",
+	"attendance":          "Core Data",
+	"order":               "Core Data",
+	"calendar":            "Core Data",
+	"userMetadata":        "Core Data",
+	"event":               "Core Data",
+	"eventInstance":        "Core Data",
+	"personalEvent":       "Core Data",
+	"featureFlag":         "Features",
+	"notification":        "Features",
+	"webhook":             "Features",
+	"webhookDelivery":     "Features",
+	"apiKey":              "Features",
+	"attendancePolicy":    "Features",
+	"userGroup":           "Features",
+	"invitation":          "Features",
+	"classTemplate":       "Features",
+	"report":              "Features",
+	"attendanceOverride":  "Features",
+	"colorPreference":     "Features",
+	"release":             "Admin",
+	"deployment":          "Admin",
+	"rolloutStage":        "Admin",
+	"healthMetrics":       "Admin",
+	"auditLog":            "Admin",
+	"approval":            "Admin",
+	"analytics":           "Admin",
+	"analyticsConsent":    "Admin",
+	"integration":         "Integrations",
+	"lmsIntegration":      "Integrations",
+	"lmsCourseMapping":    "Integrations",
+	"lmsSyncLog":          "Integrations",
+	"dispute":             "Integrations",
+	"dataRequest":         "Integrations",
+	"seatingChart":        "Facilities",
+	"seatPreferenceRequest": "Facilities",
+	"building":            "Facilities",
+	"roomBlueprint":       "Facilities",
+	"identityProvider":    "Auth",
+	"customDomain":        "Auth",
+	"tinyUrl":             "Features",
+}
+
+// ---- Builder ----
+
+// buildDynamicTopology aggregates real data from cloudmock services.
+func (a *API) buildDynamicTopology() TopologyResponseV2 {
+	nodes := make([]TopologyNodeV2, 0, 64)
+	edges := make([]TopologyEdgeV2, 0, 64)
+	edgeSet := make(map[string]bool)
+
+	addNode := func(id, label, svc, typ, group string) {
+		nodes = append(nodes, TopologyNodeV2{
+			ID:      id,
+			Label:   label,
+			Service: svc,
+			Type:    typ,
+			Group:   group,
+		})
+	}
+
+	addEdge := func(source, target, typ, label, discovered string) {
+		key := source + "|" + target + "|" + discovered
+		if edgeSet[key] {
+			return
+		}
+		edgeSet[key] = true
+		edges = append(edges, TopologyEdgeV2{
+			Source:     source,
+			Target:     target,
+			Type:       typ,
+			Label:      label,
+			Discovered: discovered,
+		})
+	}
+
+	// 1. External / client nodes
+	addNode("external:expo-app", "Expo App", "external", "client", "Client")
+	addNode("external:admin-portal", "Admin Portal", "external", "client", "Client")
+	addNode("external:client-portal", "Client Portal", "external", "client", "Client")
+	addNode("external:bff-service", "BFF Service", "external", "server", "API")
+	addNode("external:graphql-server", "GraphQL Server", "external", "server", "API")
+	addNode("external:calendar-service", "Calendar Service", "external", "server", "Compute")
+
+	// 2. Plugin nodes
+	addNode("plugin:stripe", "Stripe", "plugin", "plugin", "Plugins")
+	addNode("plugin:sendgrid", "SendGrid", "plugin", "plugin", "Plugins")
+	addNode("plugin:upstash-redis", "Upstash Redis", "plugin", "plugin", "Plugins")
+	addNode("plugin:sentry", "Sentry", "plugin", "plugin", "Plugins")
+	addNode("plugin:posthog", "PostHog", "plugin", "plugin", "Plugins")
+	addNode("plugin:cloudflare", "Cloudflare", "plugin", "plugin", "Plugins")
+
+	// 3. Known external edges
+	addEdge("external:expo-app", "external:bff-service", "invoke", "HTTP :3202", "config")
+	addEdge("external:expo-app", "external:graphql-server", "invoke", "WS :4000", "config")
+	addEdge("external:expo-app", "cognito:user-pool", "invoke", "auth", "config")
+
+	// 4. Query each service for resources
+	svcs := a.registry.List()
+
+	// Collect resource node IDs for cross-reference
+	lambdaFunctions := make(map[string]bool)
+	dynamoTables := make(map[string]bool)
+	sqsQueues := make(map[string]bool)
+	snsTopics := make(map[string]bool)
+
+	for _, svc := range svcs {
+		switch svc.Name() {
+		case "lambda":
+			if lsvc, ok := svc.(interface{ GetFunctionNames() []string }); ok {
+				for _, fn := range lsvc.GetFunctionNames() {
+					addNode("lambda:"+fn, fn, "lambda", "function", "Compute")
+					lambdaFunctions[fn] = true
+				}
+			}
+
+		case "dynamodb":
+			if dsvc, ok := svc.(interface{ GetTableNames() []string }); ok {
+				for _, t := range dsvc.GetTableNames() {
+					group := tableGroups[t]
+					if group == "" {
+						group = "Core Data"
+					}
+					addNode("dynamodb:"+t, t, "dynamodb", "table", group)
+					dynamoTables[t] = true
+				}
+			}
+
+		case "sqs":
+			if qsvc, ok := svc.(interface{ GetQueueNames() []string }); ok {
+				for _, q := range qsvc.GetQueueNames() {
+					addNode("sqs:"+q, q, "sqs", "queue", "Messaging")
+					sqsQueues[q] = true
+				}
+			}
+
+		case "sns":
+			if ssvc, ok := svc.(interface{ GetAllTopics() []string }); ok {
+				for _, arn := range ssvc.GetAllTopics() {
+					name := arnLastPart(arn)
+					addNode("sns:"+name, name, "sns", "topic", "Messaging")
+					snsTopics[name] = true
+				}
+			}
+
+		case "s3":
+			if bsvc, ok := svc.(interface{ GetBucketNames() []string }); ok {
+				for _, b := range bsvc.GetBucketNames() {
+					addNode("s3:"+b, b, "s3", "bucket", "Storage")
+				}
+			}
+
+		case "cognito-idp":
+			addNode("cognito:user-pool", "Cognito User Pool", "cognito-idp", "userpool", "Auth")
+
+		case "events":
+			if ebsvc, ok := svc.(interface{ GetAllEventBuses() []string }); ok {
+				for _, bus := range ebsvc.GetAllEventBuses() {
+					addNode("eventbridge:"+bus, bus+" bus", "events", "eventbus", "Messaging")
+				}
+			}
+
+		case "monitoring":
+			addNode("cloudwatch:alarms", "CloudWatch Alarms", "monitoring", "alarm", "Monitoring")
+
+		case "logs":
+			addNode("logs:log-groups", "Log Groups", "logs", "loggroup", "Monitoring")
+
+		case "kms":
+			addNode("kms:keys", "KMS Keys", "kms", "key", "Security")
+
+		case "secretsmanager":
+			addNode("secrets:store", "Secrets Manager", "secretsmanager", "secret", "Security")
+
+		case "ssm":
+			addNode("ssm:params", "SSM Parameters", "ssm", "parameter", "Security")
+
+		case "iam":
+			addNode("iam:roles", "IAM Roles", "iam", "role", "Auth")
+
+		case "sts":
+			addNode("sts:identity", "STS", "sts", "identity", "Auth")
+
+		case "ses":
+			addNode("ses:email", "SES Email", "ses", "email", "Messaging")
+
+		case "rds":
+			addNode("rds:databases", "RDS Databases", "rds", "database", "Storage")
+
+		case "cloudformation":
+			addNode("cfn:stacks", "CloudFormation", "cloudformation", "stack", "Security")
+
+		case "apigateway":
+			addNode("apigw:apis", "API Gateway", "apigateway", "api", "API")
+		}
+	}
+
+	// 5. Lambda event source mappings -> trigger edges
+	for _, svc := range svcs {
+		if svc.Name() != "lambda" {
+			continue
+		}
+		type esmGetter interface {
+			GetEventSourceMappings() []*struct {
+				UUID           string
+				EventSourceArn string
+				FunctionArn    string
+				FunctionName   string
+			}
+		}
+		// Use a more flexible type assertion
+		if lsvc, ok := svc.(interface {
+			GetEventSourceMappings() interface{}
+		}); ok {
+			_ = lsvc
+		}
+		// Try the concrete interface
+		if lsvc, ok := svc.(interface {
+			GetFunctionNames() []string
+			GetEventSourceMappingsForTopology() ([]string, []string, []string)
+		}); ok {
+			_ = lsvc
+		}
+		// Simplest approach: use the lambda package types via registry + type assertion on raw slice
+		break
+	}
+
+	// Use a separate helper to query ESMs without importing the lambda package
+	a.addLambdaESMEdges(addEdge)
+
+	// 6. SNS subscriptions -> subscribe edges
+	a.addSNSSubscriptionEdges(addEdge, lambdaFunctions, sqsQueues)
+
+	// 7. EventBridge rules -> rule edges
+	a.addEventBridgeEdges(addEdge, lambdaFunctions, sqsQueues, snsTopics)
+
+	// 8. CloudWatch alarm actions -> alarm edges
+	a.addCloudWatchAlarmEdges(addEdge, snsTopics)
+
+	// 9. CloudFormation stack dependencies
+	a.addCloudFormationEdges(addEdge)
+
+	// 10. Traffic-based edges from request log
+	a.addTrafficEdges(addEdge, lambdaFunctions, dynamoTables, sqsQueues)
+
+	// 11. Known external edges
+	addEdge("external:bff-service", "cognito:user-pool", "invoke", "verify tokens", "config")
+	addEdge("external:graphql-server", "cognito:user-pool", "invoke", "verify tokens", "config")
+	addEdge("external:calendar-service", "rds:databases", "read_write", "calendar DB", "config")
+
+	// BFF -> DynamoDB (all core tables)
+	for t := range dynamoTables {
+		addEdge("external:bff-service", "dynamodb:"+t, "read_write", "read/write", "config")
+	}
+
+	// BFF -> SQS
+	for q := range sqsQueues {
+		addEdge("external:bff-service", "sqs:"+q, "publish", "send events", "config")
+	}
+
+	// BFF -> SNS
+	for t := range snsTopics {
+		addEdge("external:bff-service", "sns:"+t, "publish", "publish", "config")
+	}
+
+	// BFF -> S3, Secrets
+	addEdge("external:bff-service", "secrets:store", "invoke", "credentials", "config")
+
+	// Plugin edges
+	addEdge("external:bff-service", "plugin:stripe", "invoke", "payments", "config")
+	addEdge("external:bff-service", "plugin:sendgrid", "invoke", "email", "config")
+	addEdge("external:bff-service", "plugin:upstash-redis", "read_write", "cache", "config")
+	addEdge("external:bff-service", "plugin:sentry", "invoke", "errors", "config")
+	addEdge("external:bff-service", "plugin:posthog", "invoke", "analytics", "config")
+	addEdge("external:bff-service", "plugin:cloudflare", "invoke", "DNS", "config")
+
+	// Lambda -> various services
+	for fn := range lambdaFunctions {
+		addEdge("lambda:"+fn, "secrets:store", "invoke", "get secrets", "config")
+	}
+
+	// API Gateway -> Lambda
+	if len(lambdaFunctions) > 0 {
+		for fn := range lambdaFunctions {
+			addEdge("apigw:apis", "lambda:"+fn, "trigger", "proxy", "config")
+		}
+	}
+
+	// CloudWatch -> SNS
+	addEdge("cloudwatch:alarms", "sns:alarm-topic", "publish", "alarm actions", "config")
+
+	return TopologyResponseV2{
+		Nodes:  nodes,
+		Edges:  edges,
+		Groups: topologyGroups,
+	}
+}
+
+// addLambdaESMEdges queries Lambda ESMs and creates trigger edges.
+func (a *API) addLambdaESMEdges(addEdge func(string, string, string, string, string)) {
+	svc, err := a.registry.Lookup("lambda")
+	if err != nil {
+		return
+	}
+
+	type esmData struct {
+		EventSourceArn string
+		FunctionName   string
+	}
+
+	type esmProvider interface {
+		GetEventSourceMappingsData() []esmData
+	}
+
+	// The lambda.LambdaService exposes GetEventSourceMappings() []*EventSourceMapping
+	// We use a generic interface to avoid importing the lambda package.
+	type rawESMProvider interface {
+		GetEventSourceMappingsRaw() []map[string]string
+	}
+
+	// Try a reflection-free approach: type assert to get a method that returns
+	// something we can iterate. The lambda service has:
+	//   GetEventSourceMappings() []*EventSourceMapping
+	// We need EventSourceArn and FunctionName from each.
+
+	// Use the most generic possible assertion.
+	type esmItem interface {
+		GetESMFields() (eventSourceArn, functionName string)
+	}
+
+	// Since we can't import lambda, use the registry + known method pattern.
+	// The cleanest way: call the method via interface assertion to get raw data.
+
+	// Interface that lambda.LambdaService now satisfies:
+	type lambdaESMAccess interface {
+		GetEventSourceMappingsSummary() (arns []string, funcNames []string)
+	}
+
+	if lsvc, ok := svc.(lambdaESMAccess); ok {
+		arns, funcNames := lsvc.GetEventSourceMappingsSummary()
+		for i := range arns {
+			if i >= len(funcNames) {
+				break
+			}
+			arn := arns[i]
+			fn := funcNames[i]
+
+			// Determine source service and name from ARN
+			sourceID := arnToNodeID(arn)
+			if sourceID == "" {
+				continue
+			}
+
+			addEdge(sourceID, "lambda:"+fn, "trigger", "event source mapping", "esm")
+		}
+	}
+}
+
+// addSNSSubscriptionEdges queries SNS subscriptions and creates edges.
+func (a *API) addSNSSubscriptionEdges(addEdge func(string, string, string, string, string), lambdaFns, sqsQueues map[string]bool) {
+	svc, err := a.registry.Lookup("sns")
+	if err != nil {
+		return
+	}
+
+	type subData struct {
+		TopicArn string
+		Protocol string
+		Endpoint string
+	}
+
+	type snsSubProvider interface {
+		GetSubscriptionsSummary() (topicArns, protocols, endpoints []string)
+	}
+
+	if ssvc, ok := svc.(snsSubProvider); ok {
+		topicArns, protocols, endpoints := ssvc.GetSubscriptionsSummary()
+		for i := range topicArns {
+			topicName := arnLastPart(topicArns[i])
+			sourceID := "sns:" + topicName
+			proto := protocols[i]
+			endpoint := endpoints[i]
+
+			switch proto {
+			case "sqs":
+				qName := arnLastPart(endpoint)
+				addEdge(sourceID, "sqs:"+qName, "subscribe", "subscription", "subscription")
+			case "lambda":
+				fnName := arnLastPart(endpoint)
+				addEdge(sourceID, "lambda:"+fnName, "subscribe", "subscription", "subscription")
+			case "http", "https":
+				// External endpoint
+				addEdge(sourceID, "external:bff-service", "subscribe", "webhook", "subscription")
+			}
+		}
+	}
+}
+
+// addEventBridgeEdges queries EventBridge rules and creates edges.
+func (a *API) addEventBridgeEdges(addEdge func(string, string, string, string, string), lambdaFns, sqsQueues, snsTopics map[string]bool) {
+	svc, err := a.registry.Lookup("events")
+	if err != nil {
+		return
+	}
+
+	type ruleTargetProvider interface {
+		GetRuleTargetsSummary() (ruleNames, targetArns []string)
+	}
+
+	if ebsvc, ok := svc.(ruleTargetProvider); ok {
+		ruleNames, targetArns := ebsvc.GetRuleTargetsSummary()
+		for i := range ruleNames {
+			targetArn := targetArns[i]
+			targetID := arnToNodeID(targetArn)
+			if targetID == "" {
+				continue
+			}
+			// Rules originate from the default event bus for simplicity
+			addEdge("eventbridge:default", targetID, "trigger", "rule: "+ruleNames[i], "rule")
+		}
+	}
+}
+
+// addCloudWatchAlarmEdges queries CloudWatch alarms and creates alarm -> SNS edges.
+func (a *API) addCloudWatchAlarmEdges(addEdge func(string, string, string, string, string), snsTopics map[string]bool) {
+	svc, err := a.registry.Lookup("monitoring")
+	if err != nil {
+		return
+	}
+
+	type alarmProvider interface {
+		GetAlarmActionsSummary() (alarmNames, actionArns []string)
+	}
+
+	if cwsvc, ok := svc.(alarmProvider); ok {
+		alarmNames, actionArns := cwsvc.GetAlarmActionsSummary()
+		for i := range alarmNames {
+			targetID := arnToNodeID(actionArns[i])
+			if targetID == "" {
+				continue
+			}
+			addEdge("cloudwatch:alarms", targetID, "publish", "alarm: "+alarmNames[i], "alarm")
+		}
+	}
+}
+
+// addCloudFormationEdges queries CloudFormation for stack resource dependencies.
+func (a *API) addCloudFormationEdges(addEdge func(string, string, string, string, string)) {
+	svc, err := a.registry.Lookup("cloudformation")
+	if err != nil {
+		return
+	}
+
+	type cfnProvider interface {
+		GetStackResourcesSummary() (stackNames []string, resourceTypes [][]string, logicalIDs [][]string)
+	}
+
+	if cfnSvc, ok := svc.(cfnProvider); ok {
+		stackNames, resourceTypes, logicalIDs := cfnSvc.GetStackResourcesSummary()
+		for i, stackName := range stackNames {
+			if i >= len(resourceTypes) {
+				break
+			}
+			for j, resType := range resourceTypes[i] {
+				logicalID := ""
+				if j < len(logicalIDs[i]) {
+					logicalID = logicalIDs[i][j]
+				}
+				targetID := cfnResourceToNodeID(resType, logicalID)
+				if targetID == "" {
+					continue
+				}
+				addEdge("cfn:stacks", targetID, "provision", "stack: "+stackName, "cfn")
+			}
+		}
+	}
+}
+
+// addTrafficEdges analyzes request log for traffic patterns.
+func (a *API) addTrafficEdges(addEdge func(string, string, string, string, string), lambdaFns, dynamoTables, sqsQueues map[string]bool) {
+	if a.log == nil {
+		return
+	}
+
+	entries := a.log.Recent("", 500)
+
+	// Build a set of service pairs seen within a short time window
+	type trafficPair struct {
+		from string
+		to   string
+	}
+	seen := make(map[trafficPair]bool)
+
+	for i := 0; i < len(entries); i++ {
+		e := entries[i]
+		svcFrom := mapServiceToNodePrefix(e.Service)
+		if svcFrom == "" {
+			continue
+		}
+
+		// Look for nearby requests (within 200ms) to different services
+		for j := i + 1; j < len(entries) && j < i+20; j++ {
+			e2 := entries[j]
+			if absDuration(e.Timestamp.Sub(e2.Timestamp)) > 200*time.Millisecond {
+				break
+			}
+			svcTo := mapServiceToNodePrefix(e2.Service)
+			if svcTo == "" || svcTo == svcFrom {
+				continue
+			}
+
+			pair := trafficPair{from: svcFrom, to: svcTo}
+			if !seen[pair] {
+				seen[pair] = true
+				fromID := serviceToNodeID(svcFrom)
+				toID := serviceToNodeID(svcTo)
+				if fromID != "" && toID != "" {
+					addEdge(fromID, toID, "invoke", "traffic", "traffic")
+				}
+			}
+		}
+	}
+}
+
+// ---- Helpers ----
+
+// arnLastPart extracts the last segment of an ARN (after the last : or /).
+func arnLastPart(arn string) string {
+	// Try slash first (for ARNs like arn:aws:events:...:event-bus/default)
+	if idx := strings.LastIndex(arn, "/"); idx >= 0 {
+		return arn[idx+1:]
+	}
+	// Fall back to colon
+	if idx := strings.LastIndex(arn, ":"); idx >= 0 {
+		return arn[idx+1:]
+	}
+	return arn
+}
+
+// arnToNodeID converts an ARN to a topology node ID.
+func arnToNodeID(arn string) string {
+	if arn == "" {
+		return ""
+	}
+	parts := strings.SplitN(arn, ":", 6)
+	if len(parts) < 6 {
+		return ""
+	}
+	svcName := parts[2] // e.g. "sqs", "lambda", "sns", "events"
+	resource := parts[5] // e.g. "queue-name" or "function:name"
+
+	switch svcName {
+	case "sqs":
+		return "sqs:" + resource
+	case "lambda":
+		// arn:aws:lambda:region:account:function:name
+		if strings.HasPrefix(resource, "function:") {
+			return "lambda:" + resource[len("function:"):]
+		}
+		return "lambda:" + resource
+	case "sns":
+		return "sns:" + resource
+	case "dynamodb":
+		// arn:aws:dynamodb:region:account:table/name
+		if strings.HasPrefix(resource, "table/") {
+			return "dynamodb:" + resource[len("table/"):]
+		}
+		return "dynamodb:" + resource
+	case "events":
+		return "eventbridge:" + arnLastPart(arn)
+	case "logs":
+		return "logs:log-groups"
+	case "s3":
+		return "s3:" + resource
+	default:
+		return ""
+	}
+}
+
+// cfnResourceToNodeID maps a CloudFormation resource type to a topology node ID.
+func cfnResourceToNodeID(resType, logicalID string) string {
+	switch resType {
+	case "AWS::DynamoDB::Table":
+		return "dynamodb:" + logicalID
+	case "AWS::SQS::Queue":
+		return "sqs:" + logicalID
+	case "AWS::SNS::Topic":
+		return "sns:" + logicalID
+	case "AWS::Lambda::Function":
+		return "lambda:" + logicalID
+	case "AWS::S3::Bucket":
+		return "s3:" + logicalID
+	default:
+		return ""
+	}
+}
+
+// mapServiceToNodePrefix maps a request log service name to a node prefix.
+func mapServiceToNodePrefix(svc string) string {
+	switch svc {
+	case "dynamodb":
+		return "dynamodb"
+	case "sqs":
+		return "sqs"
+	case "sns":
+		return "sns"
+	case "lambda":
+		return "lambda"
+	case "s3":
+		return "s3"
+	case "events":
+		return "eventbridge"
+	case "monitoring":
+		return "cloudwatch"
+	case "cognito-idp":
+		return "cognito"
+	default:
+		return ""
+	}
+}
+
+// serviceToNodeID returns a representative node ID for a service prefix.
+func serviceToNodeID(prefix string) string {
+	switch prefix {
+	case "cloudwatch":
+		return "cloudwatch:alarms"
+	case "cognito":
+		return "cognito:user-pool"
+	default:
+		// For multi-resource services, we'd need the specific resource.
+		// Return empty to skip ambiguous traffic edges.
+		return ""
+	}
+}
+
+// absDuration returns the absolute value of a time.Duration.
+func absDuration(d time.Duration) time.Duration {
+	if d < 0 {
+		return -d
+	}
+	return d
+}

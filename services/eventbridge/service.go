@@ -67,6 +67,51 @@ func (s *EventBridgeService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *EventBridgeService) HealthCheck() error { return nil }
 
+// RuleWithTargets pairs a rule with its targets for topology queries.
+type RuleWithTargets struct {
+	Rule    *Rule
+	Targets []Target
+}
+
+// GetAllRulesWithTargets returns all rules across all event buses with their targets.
+func (s *EventBridgeService) GetAllRulesWithTargets() []RuleWithTargets {
+	buses := s.store.ListEventBuses()
+	var result []RuleWithTargets
+	for _, bus := range buses {
+		rules, ok := s.store.ListRules(bus.Name, "")
+		if !ok {
+			continue
+		}
+		for _, rule := range rules {
+			targets, _ := s.store.ListTargetsByRule(bus.Name, rule.Name)
+			result = append(result, RuleWithTargets{Rule: rule, Targets: targets})
+		}
+	}
+	return result
+}
+
+// GetAllEventBuses returns all event bus names for topology queries.
+func (s *EventBridgeService) GetAllEventBuses() []string {
+	buses := s.store.ListEventBuses()
+	names := make([]string, 0, len(buses))
+	for _, bus := range buses {
+		names = append(names, bus.Name)
+	}
+	return names
+}
+
+// GetRuleTargetsSummary returns parallel slices of rule names and target ARNs for topology.
+func (s *EventBridgeService) GetRuleTargetsSummary() (ruleNames, targetArns []string) {
+	rwts := s.GetAllRulesWithTargets()
+	for _, rwt := range rwts {
+		for _, t := range rwt.Targets {
+			ruleNames = append(ruleNames, rwt.Rule.Name)
+			targetArns = append(targetArns, t.Arn)
+		}
+	}
+	return ruleNames, targetArns
+}
+
 // HandleRequest routes an incoming EventBridge request to the appropriate handler.
 // EventBridge uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway
 // (e.g. "AWSEvents.CreateEventBus" → "CreateEventBus").

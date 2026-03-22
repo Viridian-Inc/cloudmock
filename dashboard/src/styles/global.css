@@ -913,6 +913,124 @@ html[data-theme="dark"], html[data-theme="dark"] body {
 [data-theme="dark"] .topo-view-toggle button { color: var(--n400); }
 [data-theme="dark"] .topo-view-toggle button:not(.active):hover { background: #1E293B; }
 
+/* --- Topology Map View --- */
+.topo-map {
+  padding: 24px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  font-family: var(--font-sans);
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+.topo-map-group {
+  background: white;
+  border: 1px solid var(--n200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+.topo-map-group:hover {
+  box-shadow: var(--shadow-md);
+}
+[data-theme="dark"] .topo-map-group {
+  background: var(--n800);
+  border-color: var(--n700);
+}
+.topo-map-group-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--n100);
+}
+[data-theme="dark"] .topo-map-group-header {
+  border-bottom-color: var(--n700);
+}
+.topo-map-group-header .topo-map-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.topo-map-group-header .topo-map-count {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--n400);
+  font-family: var(--font-mono);
+}
+.topo-map-resources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px;
+}
+.topo-map-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  line-height: 1.4;
+}
+.topo-map-chip:hover {
+  border-color: currentColor;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+}
+.topo-map-chip-icon {
+  font-size: 12px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+.topo-map-flows {
+  grid-column: 1 / -1;
+  padding: 16px 20px;
+  background: var(--n50);
+  border: 1px solid var(--n200);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 24px;
+  align-items: center;
+}
+[data-theme="dark"] .topo-map-flows {
+  background: var(--n900);
+  border-color: var(--n700);
+}
+.topo-map-flow-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--n400);
+  margin-right: 4px;
+}
+.topo-map-flow {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--n600);
+  font-family: var(--font-sans);
+}
+[data-theme="dark"] .topo-map-flow { color: var(--n300); }
+.topo-map-flow-arrow {
+  color: var(--n400);
+  font-size: 10px;
+}
+
 /* --- PK/SK Key Badges (prominent) --- */
 .ddb-key-badge {
   display: inline-flex; padding: 1px 6px; border-radius: 4px; font-size: 10px;

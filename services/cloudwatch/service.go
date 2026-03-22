@@ -30,6 +30,23 @@ func (s *CloudWatchService) SetLocator(locator ServiceLocator) {
 	s.locator = locator
 }
 
+// GetAllAlarms returns all alarms for topology queries.
+func (s *CloudWatchService) GetAllAlarms() []*Alarm {
+	return s.store.DescribeAlarms(nil)
+}
+
+// GetAlarmActionsSummary returns parallel slices of alarm names and action ARNs for topology.
+func (s *CloudWatchService) GetAlarmActionsSummary() (alarmNames, actionArns []string) {
+	alarms := s.store.DescribeAlarms(nil)
+	for _, a := range alarms {
+		for _, action := range a.AlarmActions {
+			alarmNames = append(alarmNames, a.AlarmName)
+			actionArns = append(actionArns, action)
+		}
+	}
+	return alarmNames, actionArns
+}
+
 // Name returns the AWS service name used for routing.
 // CloudWatch Metrics uses "monitoring" in the credential scope.
 func (s *CloudWatchService) Name() string { return "monitoring" }

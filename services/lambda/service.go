@@ -81,6 +81,34 @@ func (s *LambdaService) Store() *FunctionStore {
 	return s.store
 }
 
+// GetEventSourceMappings returns all event source mappings for topology queries.
+func (s *LambdaService) GetEventSourceMappings() []*EventSourceMapping {
+	return s.esmStore.List("", "")
+}
+
+// GetFunctionNames returns all Lambda function names for topology queries.
+func (s *LambdaService) GetFunctionNames() []string {
+	fns := s.store.List()
+	names := make([]string, 0, len(fns))
+	for _, fn := range fns {
+		names = append(names, fn.FunctionName)
+	}
+	return names
+}
+
+// GetEventSourceMappingsSummary returns parallel slices of event source ARNs and function names
+// for topology building without exposing internal types.
+func (s *LambdaService) GetEventSourceMappingsSummary() (arns []string, funcNames []string) {
+	mappings := s.esmStore.List("", "")
+	arns = make([]string, 0, len(mappings))
+	funcNames = make([]string, 0, len(mappings))
+	for _, m := range mappings {
+		arns = append(arns, m.EventSourceArn)
+		funcNames = append(funcNames, m.FunctionName)
+	}
+	return arns, funcNames
+}
+
 // HandleRequest routes an incoming Lambda request to the appropriate handler.
 // Lambda uses REST path-based routing.
 //

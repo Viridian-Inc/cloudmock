@@ -55,6 +55,11 @@ func (s *DynamoDBService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *DynamoDBService) HealthCheck() error { return nil }
 
+// GetTableNames returns all table names for topology queries.
+func (s *DynamoDBService) GetTableNames() []string {
+	return s.store.ListTables()
+}
+
 // ResourceSchemas returns the schema for DynamoDB table resources.
 func (s *DynamoDBService) ResourceSchemas() []schema.ResourceSchema {
 	return []schema.ResourceSchema{

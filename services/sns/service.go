@@ -64,6 +64,30 @@ func (s *SNSService) Actions() []service.Action {
 // HealthCheck always returns nil (no external dependencies).
 func (s *SNSService) HealthCheck() error { return nil }
 
+// GetAllSubscriptions returns all SNS subscriptions for topology queries.
+func (s *SNSService) GetAllSubscriptions() []*Subscription {
+	return s.store.ListSubscriptions()
+}
+
+// GetAllTopics returns all topic ARNs for topology queries.
+func (s *SNSService) GetAllTopics() []string {
+	return s.store.ListTopics()
+}
+
+// GetSubscriptionsSummary returns parallel slices of subscription data for topology building.
+func (s *SNSService) GetSubscriptionsSummary() (topicArns, protocols, endpoints []string) {
+	subs := s.store.ListSubscriptions()
+	topicArns = make([]string, 0, len(subs))
+	protocols = make([]string, 0, len(subs))
+	endpoints = make([]string, 0, len(subs))
+	for _, sub := range subs {
+		topicArns = append(topicArns, sub.TopicArn)
+		protocols = append(protocols, sub.Protocol)
+		endpoints = append(endpoints, sub.Endpoint)
+	}
+	return topicArns, protocols, endpoints
+}
+
 // PublishDirect publishes a message to a topic by name (not ARN) without going
 // through the HTTP/form-parsing path. Used for cross-service delivery
 // (e.g., EventBridge → SNS).

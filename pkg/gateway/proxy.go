@@ -12,9 +12,10 @@ import (
 
 // ProxyRoute defines a single routing rule for the reverse proxy.
 type ProxyRoute struct {
-	Host    string // e.g. "bff.localhost" or "bff.localhost.example.com"
-	Path    string // path prefix, e.g. "/bff/" — empty means match all
-	Backend string // e.g. "http://localhost:3202"
+	Host         string // e.g. "bff.localhost" or "bff.localhost.example.com"
+	Path         string // path prefix, e.g. "/bff/" — empty means match all
+	Backend      string // e.g. "http://localhost:3202"
+	PreserveHost bool   // if true, forward original Host header to backend
 }
 
 // ProxyServer is a virtual-host reverse proxy that routes requests
@@ -32,7 +33,8 @@ func BuildRoutes(autotendDomain, cloudmockDomain string) []ProxyRoute {
 
 	return []ProxyRoute{
 		// .localhost domains (RFC 6761, zero config)
-		{Host: "autotend-app.localhost", Path: "/", Backend: "http://localhost:8081"},
+		// Expo app: PreserveHost so Metro serves assets with correct origin
+		{Host: "autotend-app.localhost", Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
 		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
 		{Host: "cloudmock.localhost", Path: "/api/", Backend: "http://localhost:4599"},
 		{Host: "cloudmock.localhost", Path: "/", Backend: "http://localhost:4500"},
@@ -43,13 +45,13 @@ func BuildRoutes(autotendDomain, cloudmockDomain string) []ProxyRoute {
 		{Host: "graphql.localhost", Path: "/", Backend: "http://localhost:4000"},
 
 		// custom domain: autotend app services
-		{Host: "autotend-app." + at, Path: "/", Backend: "http://localhost:8081"},
+		{Host: "autotend-app." + at, Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
 		{Host: "bff." + at, Path: "", Backend: "http://localhost:3202"},
 		{Host: "api." + at, Path: "", Backend: "http://localhost:4566"},
 		{Host: "auth." + at, Path: "", Backend: "http://localhost:4566"},
 		{Host: "admin." + at, Path: "", Backend: "http://localhost:4599"},
 		{Host: "graphql." + at, Path: "", Backend: "http://localhost:4000"},
-		{Host: at, Path: "/", Backend: "http://localhost:8081"},
+		{Host: at, Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
 
 		// custom domain: cloudmock dashboard
 		{Host: cm, Path: "/_cloudmock/", Backend: "http://localhost:4566"},
@@ -80,7 +82,7 @@ func (ps *ProxyServer) buildHandler() http.Handler {
 			if route.Path != "" && !strings.HasPrefix(r.URL.Path, route.Path) {
 				continue
 			}
-			ps.proxyTo(route.Backend, w, r)
+			ps.proxyToWithOpts(route.Backend, w, r, route.PreserveHost)
 			return
 		}
 
@@ -89,6 +91,18 @@ func (ps *ProxyServer) buildHandler() http.Handler {
 }
 
 func (ps *ProxyServer) proxyTo(backend string, w http.ResponseWriter, r *http.Request) {
+	ps.proxyToWithOpts(backend, w, r, false)
+}
+
+// proxyToPreserveHost proxies the request but preserves the original Host
+// header. Use this for dev servers (like Metro/Expo) that embed the Host
+// in asset URLs — the browser needs those URLs to point back through
+// the proxy, not to the backend's internal address.
+func (ps *ProxyServer) proxyToPreserveHost(backend string, w http.ResponseWriter, r *http.Request) {
+	ps.proxyToWithOpts(backend, w, r, true)
+}
+
+func (ps *ProxyServer) proxyToWithOpts(backend string, w http.ResponseWriter, r *http.Request, preserveHost bool) {
 	target, err := url.Parse(backend)
 	if err != nil {
 		http.Error(w, "bad backend URL", http.StatusInternalServerError)
@@ -101,12 +115,16 @@ func (ps *ProxyServer) proxyTo(backend string, w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	originalHost := r.Host
 	proxy := &httputil.ReverseProxy{
 		Director: func(req *http.Request) {
 			req.URL.Scheme = target.Scheme
 			req.URL.Host = target.Host
-			req.Host = target.Host
-			// Preserve original path
+			if preserveHost {
+				req.Host = originalHost
+			} else {
+				req.Host = target.Host
+			}
 			if _, ok := req.Header["User-Agent"]; !ok {
 				req.Header.Set("User-Agent", "")
 			}

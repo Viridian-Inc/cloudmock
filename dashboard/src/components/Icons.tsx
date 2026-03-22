@@ -239,6 +239,20 @@ export function BugIcon(p: IconProps) {
   </Icon>;
 }
 
+export function ChartIcon(p: IconProps) {
+  return <Icon {...p}>
+    <line x1="18" y1="20" x2="18" y2="10" />
+    <line x1="12" y1="20" x2="12" y2="4" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+  </Icon>;
+}
+
+export function ZapIcon(p: IconProps) {
+  return <Icon {...p}>
+    <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+  </Icon>;
+}
+
 export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
   home: HomeIcon,
   cloud: CloudIcon,
@@ -255,4 +269,6 @@ export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
   users: UsersIcon,
   traces: TracesIcon,
   bug: BugIcon,
+  chart: ChartIcon,
+  zap: ZapIcon,
 };

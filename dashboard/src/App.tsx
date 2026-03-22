@@ -21,6 +21,8 @@ import { SQSBrowserPage } from './pages/SQSBrowser';
 import { CognitoBrowserPage } from './pages/CognitoBrowser';
 import { DebugAssistantPage, useDebugErrorCount } from './pages/DebugAssistant';
 import { TracesPage } from './pages/Traces';
+import { MetricsPage } from './pages/Metrics';
+import { ChaosPage, useChaosActive } from './pages/Chaos';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -34,6 +36,7 @@ export function App() {
   const [toast, setToast] = useState('');
   const [mailCount, setMailCount] = useState(0);
   const debugErrorCount = useDebugErrorCount();
+  const chaosActive = useChaosActive();
 
   const showToast = useCallback((msg: string) => {
     setToast(msg);
@@ -83,6 +86,8 @@ export function App() {
     { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
     { id: '/topology', label: 'Topology', icon: 'topology' },
     { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
+    { id: '/metrics', label: 'Metrics', icon: 'chart' },
+    { id: '/chaos', label: 'Chaos', icon: 'zap', badge: chaosActive ? 1 : null },
   ];
 
   function renderPage() {
@@ -103,6 +108,8 @@ export function App() {
       case '/mail': return <MailPage />;
       case '/topology': return <TopologyPage sse={sse} />;
       case '/debug': return <DebugAssistantPage showToast={showToast} />;
+      case '/metrics': return <MetricsPage />;
+      case '/chaos': return <ChaosPage showToast={showToast} />;
       default: return <HomePage sse={sse} showToast={showToast} />;
     }
   }

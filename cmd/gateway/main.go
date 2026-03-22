@@ -227,9 +227,13 @@ func main() {
 	requestStats := gateway.NewRequestStats()
 	traceStore := gateway.NewTraceStore(500)
 
+	// Chaos engine for fault injection
+	chaosEngine := gateway.NewChaosEngine()
+
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
 	adminAPI.SetTraceStore(traceStore)
+	adminAPI.SetChaosEngine(chaosEngine)
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -244,6 +248,8 @@ func main() {
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	var handler http.Handler = gw
+	// Wrap with chaos middleware for fault injection
+	handler = gateway.ChaosMiddleware(handler, chaosEngine)
 	// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
 	corsEnabled := os.Getenv("CLOUDMOCK_CORS")
 	if corsEnabled != "false" && corsEnabled != "0" {

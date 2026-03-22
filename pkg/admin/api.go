@@ -46,6 +46,7 @@ type API struct {
 	iamEngine   *iam.Engine
 	sesStore    *ses.Store
 	traceStore  *gateway.TraceStore
+	chaosEngine *gateway.ChaosEngine
 	mux         *http.ServeMux
 }
 
@@ -78,6 +79,10 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
+	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
+	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
+	a.mux.HandleFunc("/api/chaos", a.handleChaos)
+	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
 
 	return a
 }
@@ -786,6 +791,100 @@ func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, trace)
+}
+
+// SetChaosEngine sets the chaos engine for the admin API to manage fault injection rules.
+func (a *API) SetChaosEngine(engine *gateway.ChaosEngine) {
+	a.chaosEngine = engine
+}
+
+// ChaosEngine returns the configured chaos engine.
+func (a *API) ChaosEngine() *gateway.ChaosEngine {
+	return a.chaosEngine
+}
+
+// handleChaos handles GET /api/chaos (list rules) and POST /api/chaos (create rule).
+func (a *API) handleChaos(w http.ResponseWriter, r *http.Request) {
+	if a.chaosEngine == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		rules := a.chaosEngine.Rules()
+		if rules == nil {
+			rules = []gateway.ChaosRule{}
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"rules":  rules,
+			"active": a.chaosEngine.HasActiveRules(),
+		})
+
+	case http.MethodPost:
+		var rule gateway.ChaosRule
+		if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		created := a.chaosEngine.AddRule(rule)
+		writeJSON(w, http.StatusCreated, created)
+
+	case http.MethodDelete:
+		// DELETE /api/chaos — disable all rules
+		a.chaosEngine.DisableAll()
+		writeJSON(w, http.StatusOK, map[string]string{"status": "all_disabled"})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleChaosRule handles PUT /api/chaos/:id (update) and DELETE /api/chaos/:id (delete).
+func (a *API) handleChaosRule(w http.ResponseWriter, r *http.Request) {
+	if a.chaosEngine == nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/chaos/")
+	// Handle /api/metrics/timeline specially
+	if id == "timeline" || strings.HasPrefix(id, "timeline") {
+		// This shouldn't happen because /api/metrics/ is handled separately,
+		// but just in case, redirect to timeline handler.
+		http.NotFound(w, r)
+		return
+	}
+
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		var update gateway.ChaosRule
+		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
+			http.Error(w, "invalid request body", http.StatusBadRequest)
+			return
+		}
+		updated, ok := a.chaosEngine.UpdateRule(id, update)
+		if !ok {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, updated)
+
+	case http.MethodDelete:
+		if !a.chaosEngine.DeleteRule(id) {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v interface{}) {

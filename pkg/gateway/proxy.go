@@ -12,7 +12,7 @@ import (
 
 // ProxyRoute defines a single routing rule for the reverse proxy.
 type ProxyRoute struct {
-	Host    string // e.g. "bff.local.autotend.io"
+	Host    string // e.g. "bff.localhost" or "bff.localhost.example.com"
 	Path    string // path prefix, e.g. "/bff/" — empty means match all
 	Backend string // e.g. "http://localhost:3202"
 }
@@ -24,49 +24,37 @@ type ProxyServer struct {
 	mux    http.Handler
 }
 
-// DefaultAutotendRoutes returns the standard routing table for autotend
-// local development. Order matters — more specific paths must come first.
-//
-// Two sets of domains are supported simultaneously:
-//   - *.localhost domains (RFC 6761 — zero config, all browsers resolve these to 127.0.0.1)
-//   - *.local.autotend.io (requires one-time DNS setup via: sudo cloudmock-dns auto)
-func DefaultAutotendRoutes() []ProxyRoute {
+// BuildRoutes generates the routing table dynamically from the provided domain names.
+// Order matters — more specific paths must come first.
+func BuildRoutes(autotendDomain, cloudmockDomain string) []ProxyRoute {
+	at := "localhost." + autotendDomain
+	cm := "localhost." + cloudmockDomain
+
 	return []ProxyRoute{
-		// ---- .localhost domains (RFC 6761, zero config) ----
+		// .localhost domains (RFC 6761, zero config)
+		{Host: "autotend-app.localhost", Path: "/", Backend: "http://localhost:8081"},
+		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
+		{Host: "cloudmock.localhost", Path: "/api/", Backend: "http://localhost:4599"},
+		{Host: "cloudmock.localhost", Path: "/", Backend: "http://localhost:4500"},
+		{Host: "bff.localhost", Path: "/", Backend: "http://localhost:3202"},
+		{Host: "api.localhost", Path: "/", Backend: "http://localhost:4566"},
+		{Host: "auth.localhost", Path: "/", Backend: "http://localhost:4566"},
+		{Host: "admin.localhost", Path: "/", Backend: "http://localhost:4599"},
+		{Host: "graphql.localhost", Path: "/", Backend: "http://localhost:4000"},
 
-		// Subdomain routes
-		{Host: "bff.autotend.localhost", Backend: "http://localhost:3202"},
-		{Host: "api.autotend.localhost", Backend: "http://localhost:4566"},
-		{Host: "auth.autotend.localhost", Backend: "http://localhost:4566"},
-		{Host: "dashboard.autotend.localhost", Backend: "http://localhost:4500"},
-		{Host: "admin.autotend.localhost", Backend: "http://localhost:4599"},
+		// custom domain: autotend app services
+		{Host: "autotend-app." + at, Path: "/", Backend: "http://localhost:8081"},
+		{Host: "bff." + at, Path: "", Backend: "http://localhost:3202"},
+		{Host: "api." + at, Path: "", Backend: "http://localhost:4566"},
+		{Host: "auth." + at, Path: "", Backend: "http://localhost:4566"},
+		{Host: "admin." + at, Path: "", Backend: "http://localhost:4599"},
+		{Host: "graphql." + at, Path: "", Backend: "http://localhost:4000"},
+		{Host: at, Path: "/", Backend: "http://localhost:8081"},
 
-		// Path-based routes on the main .localhost domain (most specific first)
-		{Host: "autotend.localhost", Path: "/bff/", Backend: "http://localhost:3202"},
-		{Host: "autotend.localhost", Path: "/v1/", Backend: "http://localhost:3202"},
-		{Host: "autotend.localhost", Path: "/health", Backend: "http://localhost:3202"},
-		{Host: "autotend.localhost", Path: "/graphql", Backend: "http://localhost:4000"},
-		{Host: "autotend.localhost", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
-		{Host: "autotend.localhost", Path: "/", Backend: "http://localhost:4500"},
-
-		// ---- local.autotend.io domains (requires DNS setup) ----
-
-		// Subdomain routes (match entire host)
-		{Host: "bff.local.autotend.io", Path: "", Backend: "http://localhost:3202"},
-		{Host: "api.local.autotend.io", Path: "", Backend: "http://localhost:4566"},
-		{Host: "auth.local.autotend.io", Path: "", Backend: "http://localhost:4566"},
-		{Host: "dashboard.local.autotend.io", Path: "", Backend: "http://localhost:4500"},
-		{Host: "admin.local.autotend.io", Path: "", Backend: "http://localhost:4599"},
-
-		// Path-based routes on the main domain (order: most specific first)
-		{Host: "local.autotend.io", Path: "/bff/", Backend: "http://localhost:3202"},
-		{Host: "local.autotend.io", Path: "/v1/", Backend: "http://localhost:3202"},
-		{Host: "local.autotend.io", Path: "/health", Backend: "http://localhost:3202"},
-		{Host: "local.autotend.io", Path: "/graphql", Backend: "http://localhost:4000"},
-		{Host: "local.autotend.io", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
-
-		// Default: dashboard
-		{Host: "local.autotend.io", Path: "", Backend: "http://localhost:4500"},
+		// custom domain: cloudmock dashboard
+		{Host: cm, Path: "/_cloudmock/", Backend: "http://localhost:4566"},
+		{Host: cm, Path: "/api/", Backend: "http://localhost:4599"},
+		{Host: cm, Path: "/", Backend: "http://localhost:4500"},
 	}
 }
 
@@ -209,7 +197,7 @@ func StartProxy(routes []ProxyRoute, tlsCert *CertPair) {
 				return
 			}
 		}
-		log.Printf("proxy: listening on http://autotend.localhost%s (and http://local.autotend.io%s)", addr, addr)
+		log.Printf("proxy HTTP%s: routing via .localhost and custom domains", addr)
 		if err := http.Serve(ln, proxy); err != nil {
 			log.Printf("proxy HTTP exited: %v", err)
 		}
@@ -231,7 +219,7 @@ func StartProxy(routes []ProxyRoute, tlsCert *CertPair) {
 				}
 			}
 			tlsLn := tls.NewListener(ln, tlsConfig)
-			log.Printf("proxy: listening on https://autotend.localhost%s (and https://local.autotend.io%s)", addr, addr)
+			log.Printf("proxy HTTPS%s: same routes with TLS", addr)
 			if err := http.Serve(tlsLn, proxy); err != nil {
 				log.Printf("proxy HTTPS exited: %v", err)
 			}

@@ -1,11 +1,15 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
 	"runtime"
+	"sort"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 const marker = "# cloudmock local development"
@@ -14,100 +18,197 @@ const hostsFile = "/etc/hosts"
 // resolverDir is the macOS per-domain resolver directory.
 const resolverDir = "/etc/resolver"
 
-// resolverFile is the file that points macOS at cloudmock's DNS server
-// for the autotend.io domain.
-const resolverFile = resolverDir + "/autotend.io"
+const baseDNSPort = 15353
 
-// resolverContent is written to /etc/resolver/autotend.io.
-// It tells macOS to send all *.autotend.io queries to cloudmock's DNS
-// server running on UDP :15353.
-const resolverContent = "nameserver 127.0.0.1\nport 15353\n"
-
-var entries = []string{
-	"127.0.0.1  local.autotend.io",
-	"127.0.0.1  bff.local.autotend.io",
-	"127.0.0.1  api.local.autotend.io",
-	"127.0.0.1  auth.local.autotend.io",
-	"127.0.0.1  dashboard.local.autotend.io",
-	"127.0.0.1  admin.local.autotend.io",
+type domainConfig struct {
+	Autotend  string
+	Cloudmock string
 }
 
+var defaultDomains = domainConfig{
+	Autotend:  "autotend.io",
+	Cloudmock: "cloudmock.io",
+}
+
+func parsePulumiConfig(path string) (domainConfig, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return defaultDomains, err
+	}
+	var raw struct {
+		Config map[string]interface{} `yaml:"config"`
+	}
+	if err := yaml.Unmarshal(data, &raw); err != nil {
+		return defaultDomains, fmt.Errorf("parse %s: %w", path, err)
+	}
+	domainsRaw, ok := raw.Config["autotend-backend:domains"]
+	if !ok {
+		return defaultDomains, fmt.Errorf("no autotend-backend:domains in %s", path)
+	}
+	domainsMap, ok := domainsRaw.(map[string]interface{})
+	if !ok {
+		return defaultDomains, fmt.Errorf("domains is not a map in %s", path)
+	}
+	dc := defaultDomains
+	if v, ok := domainsMap["autotend"].(string); ok {
+		dc.Autotend = v
+	}
+	if v, ok := domainsMap["cloudmock"].(string); ok {
+		dc.Cloudmock = v
+	}
+	return dc, nil
+}
+
+func (dc domainConfig) sortedDomains() []struct{ key, domain string } {
+	pairs := []struct{ key, domain string }{
+		{"autotend", dc.Autotend},
+		{"cloudmock", dc.Cloudmock},
+	}
+	sort.Slice(pairs, func(i, j int) bool { return pairs[i].key < pairs[j].key })
+	return pairs
+}
+
+func (dc domainConfig) resolverEntries() []struct{ path, content string } {
+	var entries []struct{ path, content string }
+	for i, d := range dc.sortedDomains() {
+		port := baseDNSPort + i
+		entries = append(entries, struct{ path, content string }{
+			path:    resolverDir + "/" + d.domain,
+			content: fmt.Sprintf("nameserver 127.0.0.1\nport %d\n", port),
+		})
+	}
+	return entries
+}
+
+func (dc domainConfig) hostsEntries() []string {
+	at := "localhost." + dc.Autotend
+	cm := "localhost." + dc.Cloudmock
+	return []string{
+		"127.0.0.1  " + at,
+		"127.0.0.1  autotend-app." + at,
+		"127.0.0.1  bff." + at,
+		"127.0.0.1  api." + at,
+		"127.0.0.1  auth." + at,
+		"127.0.0.1  admin." + at,
+		"127.0.0.1  graphql." + at,
+		"127.0.0.1  " + cm,
+	}
+}
+
+var configPath string
+
 func main() {
-	if len(os.Args) < 2 {
+	fs := flag.NewFlagSet("cloudmock-dns", flag.ExitOnError)
+	fs.StringVar(&configPath, "config", "", "path to Pulumi stack YAML config file")
+	args := os.Args[1:]
+	if len(args) == 0 {
 		printUsage()
 		os.Exit(1)
 	}
+	cmd := args[0]
+	fs.Parse(args[1:])
 
-	switch os.Args[1] {
+	domains := defaultDomains
+	if configPath != "" {
+		var err error
+		domains, err = parsePulumiConfig(configPath)
+		if err != nil {
+			fmt.Printf("Warning: %v, using defaults\n", err)
+		}
+	}
+
+	switch cmd {
 	case "auto", "setup":
-		if os.Args[1] == "auto" {
-			autoSetup()
+		if cmd == "auto" {
+			autoSetup(domains)
 		} else {
-			setup()
+			setup(domains)
 		}
 	case "remove":
-		remove()
+		remove(domains)
 	case "status":
-		status()
+		status(domains)
 	default:
-		fmt.Printf("Unknown command: %s\n", os.Args[1])
+		fmt.Printf("Unknown command: %s\n", cmd)
 		printUsage()
 		os.Exit(1)
 	}
 }
 
 func printUsage() {
-	fmt.Println("Usage: cloudmock-dns <auto|setup|remove|status>")
+	fmt.Println("Usage: cloudmock-dns <auto|setup|remove|status> [--config <path>]")
 	fmt.Println()
 	fmt.Println("Commands:")
 	fmt.Println("  auto    One-time OS resolver setup (preferred — uses /etc/resolver on macOS)")
 	fmt.Println("  setup   Add entries to /etc/hosts (legacy — requires sudo)")
 	fmt.Println("  remove  Remove all cloudmock DNS configuration")
 	fmt.Println("  status  Show current DNS configuration status")
+	fmt.Println()
+	fmt.Println("Flags:")
+	fmt.Println("  --config <path>  Path to Pulumi stack YAML config file for domain config")
 }
 
-// autoSetup configures the OS resolver so that *.local.autotend.io queries
+// autoSetup configures the OS resolver so that *.localhost.autotend.io queries
 // are answered by cloudmock's built-in DNS server on :15353.
 //
 // On macOS this writes /etc/resolver/autotend.io (needs sudo once).
 // On Linux it prints manual instructions for systemd-resolved or NetworkManager.
 //
 // This only needs to be done ONCE — the config persists across reboots.
-func autoSetup() {
+func autoSetup(dc domainConfig) {
 	switch runtime.GOOS {
 	case "darwin":
-		autoSetupMacOS()
+		autoSetupMacOS(dc)
 	case "linux":
-		autoSetupLinux()
+		autoSetupLinux(dc)
 	default:
 		fmt.Printf("Auto-setup is not supported on %s.\n", runtime.GOOS)
 		fmt.Println("Use 'cloudmock-dns setup' to edit /etc/hosts instead.")
 	}
 }
 
-func autoSetupMacOS() {
-	// Check whether already configured.
-	if _, err := os.Stat(resolverFile); err == nil {
-		data, _ := os.ReadFile(resolverFile)
-		if strings.Contains(string(data), "15353") {
-			fmt.Println("Status: CONFIGURED (macOS resolver)")
-			fmt.Printf("  %s already points to cloudmock DNS on :15353\n", resolverFile)
-			printLocalDomains()
-			return
+func autoSetupMacOS(dc domainConfig) {
+	resolverFiles := dc.resolverEntries()
+
+	// Check whether all resolvers are already configured.
+	allConfigured := true
+	for _, r := range resolverFiles {
+		if _, err := os.Stat(r.path); err != nil {
+			allConfigured = false
+			break
 		}
+		data, _ := os.ReadFile(r.path)
+		if string(data) != r.content {
+			allConfigured = false
+			break
+		}
+	}
+	if allConfigured {
+		fmt.Println("Status: CONFIGURED (macOS resolver)")
+		for _, r := range resolverFiles {
+			fmt.Printf("  %s\n", r.path)
+		}
+		printLocalDomains(dc)
+		return
 	}
 
 	// Try to write directly (works if we are root).
-	if tryWriteResolverFile() {
-		fmt.Println("cloudmock DNS resolver configured!")
-		fmt.Printf("  Created: %s\n", resolverFile)
-		printLocalDomains()
+	if tryWriteResolverFiles(dc) {
+		fmt.Println("cloudmock DNS resolvers configured!")
+		for _, r := range resolverFiles {
+			fmt.Printf("  Created: %s\n", r.path)
+		}
+		printLocalDomains(dc)
 		return
 	}
 
 	// Re-exec ourselves with sudo.
 	fmt.Println("Configuring macOS DNS resolver (requires sudo)...")
-	cmd := exec.Command("sudo", os.Args[0], "_internal_resolver_setup")
+	sudoArgs := []string{os.Args[0], "_internal_resolver_setup"}
+	if configPath != "" {
+		sudoArgs = append(sudoArgs, "--config", configPath)
+	}
+	cmd := exec.Command("sudo", sudoArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
@@ -115,30 +216,34 @@ func autoSetupMacOS() {
 		fmt.Printf("\nFailed to configure resolver: %v\n", err)
 		fmt.Println("\nYou can do it manually:")
 		fmt.Printf("  sudo mkdir -p %s\n", resolverDir)
-		fmt.Printf("  printf '%s' | sudo tee %s\n", resolverContent, resolverFile)
+		for _, r := range resolverFiles {
+			fmt.Printf("  printf '%s' | sudo tee %s\n", r.content, r.path)
+		}
 		os.Exit(1)
 	}
-	printLocalDomains()
+	printLocalDomains(dc)
 }
 
-func tryWriteResolverFile() bool {
+func tryWriteResolverFiles(dc domainConfig) bool {
 	if err := os.MkdirAll(resolverDir, 0755); err != nil {
 		return false
 	}
-	if err := os.WriteFile(resolverFile, []byte(resolverContent), 0644); err != nil {
-		return false
+	for _, r := range dc.resolverEntries() {
+		if err := os.WriteFile(r.path, []byte(r.content), 0644); err != nil {
+			return false
+		}
 	}
 	return true
 }
 
-func autoSetupLinux() {
+func autoSetupLinux(dc domainConfig) {
 	fmt.Println("Linux auto-setup:")
 	fmt.Println()
 	fmt.Println("Option A — systemd-resolved:")
 	fmt.Println("  Create /etc/systemd/resolved.conf.d/cloudmock.conf:")
 	fmt.Println("    [Resolve]")
 	fmt.Println("    DNS=127.0.0.1")
-	fmt.Println("    Domains=~autotend.io")
+	fmt.Printf("    Domains=~%s ~%s\n", dc.Autotend, dc.Cloudmock)
 	fmt.Println("  Then: sudo systemctl restart systemd-resolved")
 	fmt.Println()
 	fmt.Println("Option B — /etc/hosts (no cloudmock DNS needed):")
@@ -147,33 +252,40 @@ func autoSetupLinux() {
 
 // _internal_resolver_setup is called by autoSetupMacOS after re-execing with sudo.
 // It performs the actual file write as root.
-func internalResolverSetup() {
-	if !tryWriteResolverFile() {
-		fmt.Fprintf(os.Stderr, "failed to write %s\n", resolverFile)
+func internalResolverSetup(dc domainConfig) {
+	if !tryWriteResolverFiles(dc) {
+		fmt.Fprintf(os.Stderr, "failed to write resolver files\n")
 		os.Exit(1)
 	}
-	fmt.Printf("Created %s\n", resolverFile)
+	for _, r := range dc.resolverEntries() {
+		fmt.Printf("Created %s\n", r.path)
+	}
 }
 
-func printLocalDomains() {
+func printLocalDomains(dc domainConfig) {
+	at := dc.Autotend
+	cm := dc.Cloudmock
 	fmt.Println()
 	fmt.Println("  Zero-config (works immediately, no setup needed):")
-	fmt.Println("    http://autotend.localhost")
-	fmt.Println("    http://bff.autotend.localhost")
-	fmt.Println("    http://api.autotend.localhost")
-	fmt.Println("    http://auth.autotend.localhost")
-	fmt.Println("    http://dashboard.autotend.localhost")
+	fmt.Println("    http://autotend-app.localhost")
+	fmt.Println("    http://cloudmock.localhost")
+	fmt.Println("    http://bff.localhost")
+	fmt.Println("    http://api.localhost")
+	fmt.Println("    http://auth.localhost")
 	fmt.Println()
-	fmt.Println("  Custom domain (now configured via DNS resolver):")
-	fmt.Println("    http://local.autotend.io")
-	fmt.Println("    http://bff.local.autotend.io")
-	fmt.Println("    http://api.local.autotend.io")
-	fmt.Println("    http://auth.local.autotend.io")
-	fmt.Println("    http://dashboard.local.autotend.io")
+	fmt.Println("  Custom domains (now configured via DNS resolver):")
+	fmt.Printf("    https://localhost.%s          ← autotend app\n", at)
+	fmt.Printf("    https://bff.localhost.%s\n", at)
+	fmt.Printf("    https://api.localhost.%s\n", at)
+	fmt.Printf("    https://auth.localhost.%s\n", at)
+	fmt.Printf("    https://graphql.localhost.%s\n", at)
+	fmt.Printf("    https://localhost.%s         ← cloudmock dashboard\n", cm)
 }
 
 // setup adds /etc/hosts entries (legacy, requires sudo).
-func setup() {
+func setup(dc domainConfig) {
+	entries := dc.hostsEntries()
+
 	data, err := os.ReadFile(hostsFile)
 	if err != nil {
 		fmt.Printf("Error reading %s: %v\n", hostsFile, err)
@@ -184,7 +296,7 @@ func setup() {
 	content := string(data)
 	if strings.Contains(content, marker) {
 		fmt.Println("cloudmock DNS entries already exist in /etc/hosts")
-		status()
+		status(dc)
 		return
 	}
 
@@ -201,22 +313,24 @@ func setup() {
 	for _, e := range entries {
 		fmt.Printf("  %s\n", e)
 	}
-	fmt.Println("\nYou can now access: http://local.autotend.io")
+	fmt.Printf("\nYou can now access: http://localhost.%s\n", dc.Autotend)
 	fmt.Println("\nTip: 'cloudmock-dns auto' sets up a DNS resolver instead (no /etc/hosts needed).")
 }
 
 // remove removes all cloudmock DNS configuration (/etc/resolver and /etc/hosts).
-func remove() {
+func remove(dc domainConfig) {
 	removedAny := false
 
-	// Remove macOS resolver file.
-	if _, err := os.Stat(resolverFile); err == nil {
-		if err := os.Remove(resolverFile); err != nil {
-			fmt.Printf("Error removing %s: %v\n", resolverFile, err)
-			fmt.Println("Try: sudo cloudmock-dns remove")
-		} else {
-			fmt.Printf("Removed %s\n", resolverFile)
-			removedAny = true
+	// Remove macOS resolver files.
+	for _, r := range dc.resolverEntries() {
+		if _, err := os.Stat(r.path); err == nil {
+			if err := os.Remove(r.path); err != nil {
+				fmt.Printf("Error removing %s: %v\n", r.path, err)
+				fmt.Println("Try: sudo cloudmock-dns remove")
+			} else {
+				fmt.Printf("Removed %s\n", r.path)
+				removedAny = true
+			}
 		}
 	}
 
@@ -238,7 +352,8 @@ func remove() {
 				continue
 			}
 			if inBlock {
-				if strings.Contains(line, "autotend.io") && strings.HasPrefix(strings.TrimSpace(line), "127.0.0.1") {
+				if strings.HasPrefix(strings.TrimSpace(line), "127.0.0.1") &&
+					(strings.Contains(line, "localhost."+dc.Autotend) || strings.Contains(line, "localhost."+dc.Cloudmock)) {
 					continue
 				}
 				if strings.TrimSpace(line) == "" {
@@ -265,21 +380,25 @@ func remove() {
 }
 
 // status shows the current DNS configuration.
-func status() {
+func status(dc domainConfig) {
+	entries := dc.hostsEntries()
+	resolverFiles := dc.resolverEntries()
+
 	fmt.Println("cloudmock DNS status")
 	fmt.Println("====================")
 
-	// Check macOS resolver.
-	if _, err := os.Stat(resolverFile); err == nil {
-		data, _ := os.ReadFile(resolverFile)
-		if strings.Contains(string(data), "15353") {
-			fmt.Printf("  Resolver file : CONFIGURED (%s)\n", resolverFile)
-			fmt.Println("  DNS server    : cloudmock built-in on UDP :15353")
+	// Check macOS resolver files.
+	for _, r := range resolverFiles {
+		if _, err := os.Stat(r.path); err == nil {
+			data, _ := os.ReadFile(r.path)
+			if string(data) == r.content {
+				fmt.Printf("  Resolver       : CONFIGURED (%s)\n", r.path)
+			} else {
+				fmt.Printf("  Resolver       : EXISTS but unexpected content (%s)\n", r.path)
+			}
 		} else {
-			fmt.Printf("  Resolver file : EXISTS but unexpected content (%s)\n", resolverFile)
+			fmt.Printf("  Resolver       : not configured (%s)\n", r.path)
 		}
-	} else {
-		fmt.Println("  Resolver file : not configured")
 	}
 
 	// Check /etc/hosts.
@@ -298,7 +417,8 @@ func status() {
 
 	fmt.Println()
 	fmt.Println("  Zero-config (always works):")
-	fmt.Println("    http://autotend.localhost  ← use this immediately, no setup needed")
+	fmt.Println("    http://autotend-app.localhost  ← Expo app (no setup needed)")
+	fmt.Println("    http://cloudmock.localhost     ← cloudmock dashboard")
 	fmt.Println()
 	fmt.Println("  To configure custom domain: sudo cloudmock-dns auto")
 }
@@ -306,7 +426,19 @@ func status() {
 func init() {
 	// When re-execed by autoSetupMacOS with sudo, handle the internal command.
 	if len(os.Args) >= 2 && os.Args[1] == "_internal_resolver_setup" {
-		internalResolverSetup()
+		fs := flag.NewFlagSet("_internal", flag.ContinueOnError)
+		var cfgPath string
+		fs.StringVar(&cfgPath, "config", "", "")
+		fs.Parse(os.Args[2:])
+
+		domains := defaultDomains
+		if cfgPath != "" {
+			configPath = cfgPath
+			if dc, err := parsePulumiConfig(cfgPath); err == nil {
+				domains = dc
+			}
+		}
+		internalResolverSetup(domains)
 		os.Exit(0)
 	}
 }

@@ -16,7 +16,7 @@ import (
 //
 // Typical usage (non-privileged port):
 //
-//	go gateway.StartDNSServer(15353, "local.autotend.io")
+//	go gateway.StartDNSServer(15353, "localhost.autotend.io")
 func StartDNSServer(port int, domain string) {
 	addr := &net.UDPAddr{Port: port, IP: net.ParseIP("127.0.0.1")}
 	conn, err := net.ListenUDP("udp", addr)

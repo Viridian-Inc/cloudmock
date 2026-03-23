@@ -16,6 +16,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	chImpl "github.com/neureaux/cloudmock/pkg/dataplane/clickhouse"
 	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
 	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
@@ -324,6 +325,9 @@ func main() {
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	adminAPI.SetChaosEngine(chaosEngine)
+
+	tc := tracecompare.New(dp.Traces)
+	adminAPI.SetTraceComparer(tc)
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile

@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/gateway"
@@ -391,14 +392,14 @@ func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
 	id := strings.TrimPrefix(r.URL.Path, "/api/requests/")
 
 	if r.Method == http.MethodPost && strings.HasSuffix(id, "/replay") {
-		// Replay not yet implemented — return a stub.
 		id = strings.TrimSuffix(id, "/replay")
 		entry := a.log.GetByID(id)
 		if entry == nil {
 			http.NotFound(w, r)
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "replayed", "id": id})
+		result := a.replayRequest(entry)
+		writeJSON(w, http.StatusOK, result)
 		return
 	}
 
@@ -413,6 +414,69 @@ func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, entry)
+}
+
+// ReplayResult captures the result of replaying a captured request.
+type ReplayResult struct {
+	OriginalID     string `json:"original_id"`
+	OriginalStatus int    `json:"original_status"`
+	OriginalMs     float64 `json:"original_latency_ms"`
+	ReplayStatus   int    `json:"replay_status"`
+	ReplayMs       float64 `json:"replay_latency_ms"`
+	ReplayBody     string `json:"replay_response_body"`
+	Match          bool   `json:"match"` // status codes match
+	LatencyDelta   float64 `json:"latency_delta_ms"` // replay - original
+}
+
+// replayRequest re-executes a captured request against the gateway.
+func (a *API) replayRequest(entry *gateway.RequestEntry) ReplayResult {
+	gwPort := a.cfg.Gateway.Port
+	gwURL := fmt.Sprintf("http://localhost:%d%s", gwPort, entry.Path)
+
+	var body io.Reader
+	if entry.RequestBody != "" {
+		body = strings.NewReader(entry.RequestBody)
+	}
+
+	req, err := http.NewRequest(entry.Method, gwURL, body)
+	if err != nil {
+		return ReplayResult{OriginalID: entry.ID, ReplayStatus: 0, ReplayBody: "failed to create request: " + err.Error()}
+	}
+
+	// Restore original headers
+	for k, v := range entry.RequestHeaders {
+		req.Header.Set(k, v)
+	}
+	// Mark as replay so it shows in the request log
+	req.Header.Set("X-Cloudmock-Replay", entry.ID)
+
+	start := time.Now()
+	resp, err := http.DefaultClient.Do(req)
+	replayMs := float64(time.Since(start).Nanoseconds()) / 1e6
+	if err != nil {
+		return ReplayResult{
+			OriginalID: entry.ID, OriginalStatus: entry.StatusCode, OriginalMs: entry.LatencyMs,
+			ReplayStatus: 0, ReplayMs: replayMs, ReplayBody: "request failed: " + err.Error(),
+		}
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+	respStr := string(respBody)
+	if len(respStr) > 10240 {
+		respStr = respStr[:10240]
+	}
+
+	return ReplayResult{
+		OriginalID:     entry.ID,
+		OriginalStatus: entry.StatusCode,
+		OriginalMs:     entry.LatencyMs,
+		ReplayStatus:   resp.StatusCode,
+		ReplayMs:       replayMs,
+		ReplayBody:     respStr,
+		Match:          resp.StatusCode == entry.StatusCode,
+		LatencyDelta:   replayMs - entry.LatencyMs,
+	}
 }
 
 // IAMEvalRequest is the request body for the IAM evaluate endpoint.

@@ -49,6 +49,8 @@ export function RequestPanel({ sse, onSelectRequest, selectedRequestId }: Reques
     if (sse.events.length === 0) return;
     const latest = sse.events[0];
     if (latest?.type === 'request' && latest.data) {
+      // Only show app-level requests — skip infra (DynamoDB/Lambda/Cognito calls to cloudmock)
+      if (latest.data.level === 'infra') return;
       if (paused) {
         bufferRef.current = [latest.data, ...bufferRef.current].slice(0, 200);
       } else {

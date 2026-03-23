@@ -445,93 +445,99 @@ function RequestInlineDetail({ req }: { req: any }) {
 
 function ExplainPanel({ data, loading }: { data: any; loading: boolean }) {
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}><div style={S.spinner} /> Analyzing...</div>;
+    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}><div style={S.spinner} /> Analyzing request...</div>;
   }
   if (!data) {
     return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}>No analysis available</div>;
   }
 
-  const a = data.analysis;
-  const anomalies = a.anomalies || [];
-
   return (
-    <div style={{ fontSize: 12 }}>
-      {/* Anomalies */}
-      {anomalies.length > 0 && (
-        <div style={{ marginBottom: 12 }}>
-          {anomalies.map((msg: string, i: number) => (
-            <div key={i} style={{
-              padding: '8px 10px', marginBottom: 4, borderRadius: 6,
-              background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', fontSize: 11,
-            }}>
-              {'\u26A0'} {msg}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Latency context */}
-      <div style={{ ...S.card, marginBottom: 10 }}>
-        <div style={S.cardLabel}>Latency Context</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtDuration(a.p50_ms)}</div>
-            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P50</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#F59E0B' }}>{fmtDuration(a.p95_ms)}</div>
-            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P95</div>
-          </div>
-          <div style={{ textAlign: 'center' }}>
-            <div style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>{fmtDuration(a.p99_ms)}</div>
-            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P99</div>
-          </div>
-        </div>
-        <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: a.is_slow ? '#EF4444' : 'var(--n500)' }}>
-          This request: {fmtDuration(data.request?.latency_ms)} ({a.latency_ratio?.toFixed(1)}x P50)
-        </div>
-      </div>
-
-      {/* Health */}
-      <div style={{ ...S.card, marginBottom: 10 }}>
-        <div style={S.cardLabel}>Service Health</div>
-        <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-          <div>
-            <span style={{ color: 'var(--n400)' }}>Error rate: </span>
-            <span style={{ fontWeight: 600, color: a.error_rate > 0.1 ? '#EF4444' : 'var(--n700)' }}>
-              {(a.error_rate * 100).toFixed(0)}%
-            </span>
-          </div>
-          <div>
-            <span style={{ color: 'var(--n400)' }}>Spans: </span>
-            <span style={{ fontWeight: 600 }}>{a.span_count}</span>
-          </div>
-          {a.slowest_span && (
-            <div>
-              <span style={{ color: 'var(--n400)' }}>Slowest: </span>
-              <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{a.slowest_span}</span>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Similar requests */}
-      {data.similar_recent && data.similar_recent.length > 0 && (
-        <div style={{ ...S.card }}>
-          <div style={S.cardLabel}>Similar Requests ({data.similar_recent.length})</div>
-          <div style={{ marginTop: 8, maxHeight: 120, overflow: 'auto' }}>
-            {data.similar_recent.slice(0, 8).map((r: any, i: number) => (
-              <div key={i} style={{ display: 'flex', gap: 8, fontSize: 11, padding: '3px 0', borderBottom: '1px solid var(--n100)' }}>
-                <span style={{ color: 'var(--n400)', fontFamily: 'var(--font-mono)', width: 62, flexShrink: 0 }}>{fmtTime(r.timestamp)}</span>
-                <StatusBadge code={r.status_code || r.status} />
-                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>{fmtDuration(r.latency_ms)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+    <div style={{
+      fontSize: 12, lineHeight: 1.6, fontFamily: 'var(--font-sans)',
+      maxHeight: 500, overflow: 'auto',
+    }}>
+      <NarrativeRenderer text={data.narrative} />
     </div>
   );
+}
+
+function NarrativeRenderer({ text }: { text: string }) {
+  if (!text) return null;
+
+  const lines = text.split('\n');
+  const elements: any[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Headers
+    if (line.startsWith('### ')) {
+      elements.push(<h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--n800)', margin: '14px 0 6px', borderBottom: '1px solid var(--n100)', paddingBottom: 4 }}>{line.slice(4)}</h4>);
+    } else if (line.startsWith('## ')) {
+      elements.push(<h3 key={i} style={{ fontSize: 15, fontWeight: 700, color: 'var(--n800)', margin: '0 0 10px' }}>{line.slice(3)}</h3>);
+    }
+    // Table
+    else if (line.startsWith('|') && line.includes('|')) {
+      // Collect table rows
+      const tableLines = [line];
+      while (i + 1 < lines.length && lines[i + 1].startsWith('|')) {
+        i++;
+        if (!lines[i].startsWith('|---')) tableLines.push(lines[i]);
+      }
+      if (tableLines.length > 1) {
+        const headers = tableLines[0].split('|').filter(Boolean).map(h => h.trim());
+        const rows = tableLines.slice(1).map(r => r.split('|').filter(Boolean).map(c => c.trim()));
+        elements.push(
+          <table key={i} style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
+            <thead><tr>{headers.map((h, j) => <th key={j} style={{ textAlign: 'left', padding: '4px 8px', background: 'var(--n50)', borderBottom: '1px solid var(--n200)', fontWeight: 600, color: 'var(--n600)' }}>{renderInline(h)}</th>)}</tr></thead>
+            <tbody>{rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ padding: '3px 8px', borderBottom: '1px solid var(--n100)', fontFamily: cell.startsWith('`') ? 'var(--font-mono)' : 'inherit' }}>{renderInline(cell)}</td>)}</tr>)}</tbody>
+          </table>
+        );
+      }
+    }
+    // Code block
+    else if (line.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      elements.push(
+        <pre key={i} style={{ background: 'var(--n50)', border: '1px solid var(--n200)', borderRadius: 6, padding: 10, fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'auto', marginBottom: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+          {codeLines.join('\n')}
+        </pre>
+      );
+    }
+    // List item
+    else if (line.startsWith('- ')) {
+      elements.push(<div key={i} style={{ paddingLeft: 12, position: 'relative', marginBottom: 2 }}><span style={{ position: 'absolute', left: 0 }}>{'\u2022'}</span>{renderInline(line.slice(2))}</div>);
+    }
+    // Empty line
+    else if (line.trim() === '') {
+      elements.push(<div key={i} style={{ height: 6 }} />);
+    }
+    // Regular text
+    else {
+      elements.push(<div key={i} style={{ marginBottom: 2 }}>{renderInline(line)}</div>);
+    }
+  }
+
+  return <>{elements}</>;
+}
+
+function renderInline(text: string): any {
+  // Bold: **text**
+  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`|\u26A0|\u274C)/g);
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9em', background: 'var(--n100)', padding: '1px 4px', borderRadius: 3 }}>{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
 }
 
 // --- Traces tab ---

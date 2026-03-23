@@ -966,6 +966,7 @@ type ExplainContext struct {
 	ServiceMetrics interface{}              `json:"service_metrics,omitempty"`
 	Topology       *TopologyResponseV2      `json:"topology_context,omitempty"`
 	Analysis       ExplainAnalysis          `json:"analysis"`
+	Narrative      string                   `json:"narrative"`
 }
 
 // ExplainAnalysis contains pre-computed analysis hints.
@@ -1082,7 +1083,165 @@ func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx.Analysis = analysis
+	ctx.Narrative = buildNarrative(entry, &ctx, &analysis)
 	writeJSON(w, http.StatusOK, ctx)
+}
+
+// buildNarrative generates a detailed text explanation of a request for debugging.
+func buildNarrative(entry *gateway.RequestEntry, ctx *ExplainContext, a *ExplainAnalysis) string {
+	var b strings.Builder
+
+	// Header
+	b.WriteString(fmt.Sprintf("## Request Analysis: %s %s\n\n", entry.Method, entry.Path))
+	b.WriteString(fmt.Sprintf("**Request ID:** `%s`\n", entry.ID))
+	b.WriteString(fmt.Sprintf("**Timestamp:** %s\n", entry.Timestamp.Format("2006-01-02 15:04:05.000 MST")))
+	b.WriteString(fmt.Sprintf("**Service:** %s\n", entry.Service))
+	b.WriteString(fmt.Sprintf("**Action:** %s\n", entry.Action))
+	b.WriteString(fmt.Sprintf("**Status:** %d\n", entry.StatusCode))
+	b.WriteString(fmt.Sprintf("**Latency:** %.2fms\n", entry.LatencyMs))
+	if entry.TraceID != "" {
+		b.WriteString(fmt.Sprintf("**Trace ID:** `%s`\n", entry.TraceID))
+	}
+	if entry.CallerID != "" {
+		b.WriteString(fmt.Sprintf("**Caller:** %s\n", entry.CallerID))
+	}
+	b.WriteString("\n")
+
+	// Status assessment
+	b.WriteString("### Status\n\n")
+	if a.IsError {
+		b.WriteString(fmt.Sprintf("This request **failed** with HTTP %d.", entry.StatusCode))
+		if entry.Error != "" {
+			b.WriteString(fmt.Sprintf(" Error: `%s`", entry.Error))
+		}
+		b.WriteString("\n\n")
+		if a.ErrorRate < 0.1 {
+			b.WriteString(fmt.Sprintf("This is **unusual** — the recent error rate for %s/%s is only %.0f%%, suggesting this is an intermittent or new failure rather than a systemic issue.\n\n", entry.Service, entry.Action, a.ErrorRate*100))
+		} else if a.ErrorRate > 0.5 {
+			b.WriteString(fmt.Sprintf("**Warning:** The %s service is currently experiencing a %.0f%% error rate for this action. This appears to be a systemic issue, not an isolated failure.\n\n", entry.Service, a.ErrorRate*100))
+		} else {
+			b.WriteString(fmt.Sprintf("The current error rate for this action is %.0f%%.\n\n", a.ErrorRate*100))
+		}
+	} else {
+		b.WriteString(fmt.Sprintf("Request completed **successfully** with HTTP %d.\n\n", entry.StatusCode))
+	}
+
+	// Latency analysis
+	b.WriteString("### Latency Analysis\n\n")
+	b.WriteString(fmt.Sprintf("| Percentile | Value |\n|---|---|\n"))
+	b.WriteString(fmt.Sprintf("| This request | **%.2fms** |\n", entry.LatencyMs))
+	b.WriteString(fmt.Sprintf("| P50 (median) | %.2fms |\n", a.P50Ms))
+	b.WriteString(fmt.Sprintf("| P95 | %.2fms |\n", a.P95Ms))
+	b.WriteString(fmt.Sprintf("| P99 | %.2fms |\n\n", a.P99Ms))
+
+	if a.IsSlow {
+		b.WriteString(fmt.Sprintf("**This request is slow** — it took %.1fx longer than the median (P50). ", a.LatencyRatio))
+		if a.SlowestSpan != "" {
+			b.WriteString(fmt.Sprintf("The bottleneck appears to be `%s`.", a.SlowestSpan))
+		}
+		b.WriteString("\n\n")
+	} else if a.P50Ms > 0 {
+		b.WriteString(fmt.Sprintf("Latency is **within normal range** at %.1fx the median.\n\n", a.LatencyRatio))
+	}
+
+	// Trace walkthrough
+	if len(ctx.Timeline) > 0 {
+		b.WriteString("### Execution Trace\n\n")
+		b.WriteString(fmt.Sprintf("The request executed across **%d spans**:\n\n", len(ctx.Timeline)))
+		b.WriteString("| # | Service | Action | Offset | Duration | Status | Depth |\n")
+		b.WriteString("|---|---------|--------|--------|----------|--------|-------|\n")
+
+		for i, span := range ctx.Timeline {
+			statusStr := fmt.Sprintf("%d", span.StatusCode)
+			if span.Error != "" {
+				statusStr = fmt.Sprintf("%d \u274C", span.StatusCode)
+			}
+			indent := ""
+			for j := 0; j < span.Depth; j++ {
+				indent += "\u2514 "
+			}
+			b.WriteString(fmt.Sprintf("| %d | %s%s | %s | +%.1fms | %.2fms | %s | %d |\n",
+				i+1, indent, span.Service, span.Action, span.StartOffsetMs, span.DurationMs, statusStr, span.Depth))
+		}
+		b.WriteString("\n")
+
+		// Identify the critical path
+		if len(ctx.Timeline) > 1 {
+			slowest := ctx.Timeline[0]
+			for _, s := range ctx.Timeline[1:] {
+				if s.DurationMs > slowest.DurationMs {
+					slowest = s
+				}
+			}
+			b.WriteString(fmt.Sprintf("**Critical path:** The slowest span is `%s/%s` at %.2fms (%.0f%% of total request time).\n\n",
+				slowest.Service, slowest.Action, slowest.DurationMs,
+				(slowest.DurationMs/entry.LatencyMs)*100))
+		}
+	}
+
+	// Request/response bodies
+	if entry.RequestBody != "" {
+		b.WriteString("### Request Body\n\n")
+		b.WriteString("```json\n")
+		b.WriteString(entry.RequestBody)
+		if len(entry.RequestBody) > 0 && entry.RequestBody[len(entry.RequestBody)-1] != '\n' {
+			b.WriteString("\n")
+		}
+		b.WriteString("```\n\n")
+	}
+
+	if entry.ResponseBody != "" {
+		b.WriteString("### Response Body\n\n")
+		b.WriteString("```json\n")
+		b.WriteString(entry.ResponseBody)
+		if len(entry.ResponseBody) > 0 && entry.ResponseBody[len(entry.ResponseBody)-1] != '\n' {
+			b.WriteString("```\n\n")
+		} else {
+			b.WriteString("```\n\n")
+		}
+	}
+
+	// Request headers
+	if len(entry.RequestHeaders) > 0 {
+		b.WriteString("### Request Headers\n\n")
+		b.WriteString("| Header | Value |\n|---|---|\n")
+		for k, v := range entry.RequestHeaders {
+			if strings.HasPrefix(strings.ToLower(k), "authorization") {
+				v = v[:min(20, len(v))] + "..."
+			}
+			b.WriteString(fmt.Sprintf("| %s | `%s` |\n", k, v))
+		}
+		b.WriteString("\n")
+	}
+
+	// Similar requests context
+	if len(ctx.SimilarRecent) > 1 {
+		b.WriteString("### Recent Baseline\n\n")
+		b.WriteString(fmt.Sprintf("Based on %d recent similar requests (%s/%s):\n\n", len(ctx.SimilarRecent), entry.Service, entry.Action))
+		errCount := 0
+		for _, r := range ctx.SimilarRecent {
+			if r.StatusCode >= 400 {
+				errCount++
+			}
+		}
+		b.WriteString(fmt.Sprintf("- **Success rate:** %.0f%%\n", float64(len(ctx.SimilarRecent)-errCount)/float64(len(ctx.SimilarRecent))*100))
+		b.WriteString(fmt.Sprintf("- **Median latency:** %.2fms\n", a.P50Ms))
+		b.WriteString(fmt.Sprintf("- **P99 latency:** %.2fms\n", a.P99Ms))
+		b.WriteString("\n")
+	}
+
+	// Summary
+	b.WriteString("### Summary\n\n")
+	if len(a.Anomalies) > 0 {
+		b.WriteString("**Findings:**\n")
+		for _, anom := range a.Anomalies {
+			b.WriteString(fmt.Sprintf("- \u26A0 %s\n", anom))
+		}
+	} else {
+		b.WriteString("No anomalies detected. Request completed within normal parameters.\n")
+	}
+
+	return b.String()
 }
 
 // explainSortFloat64s sorts a slice of float64s in place.

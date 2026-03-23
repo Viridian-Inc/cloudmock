@@ -253,15 +253,26 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	svcFilter := r.URL.Query().Get("service")
+	q := r.URL.Query()
 	limit := 100
-	if l := r.URL.Query().Get("limit"); l != "" {
+	if l := q.Get("limit"); l != "" {
 		if n, err := strconv.Atoi(l); err == nil && n > 0 {
 			limit = n
 		}
 	}
 
-	entries := a.log.Recent(svcFilter, limit)
+	filter := gateway.RequestFilter{
+		Service:   q.Get("service"),
+		Path:      q.Get("path"),
+		Method:    q.Get("method"),
+		CallerID:  q.Get("caller_id"),
+		Action:    q.Get("action"),
+		ErrorOnly: q.Get("error") == "true",
+		TraceID:   q.Get("trace_id"),
+		Limit:     limit,
+	}
+
+	entries := a.log.RecentFiltered(filter)
 	writeJSON(w, http.StatusOK, entries)
 }
 

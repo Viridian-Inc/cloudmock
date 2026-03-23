@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -67,12 +68,30 @@ func (rl *RequestLog) Add(entry RequestEntry) {
 	}
 }
 
+// RequestFilter defines filtering criteria for request log queries.
+type RequestFilter struct {
+	Service   string
+	Path      string
+	Method    string
+	CallerID  string
+	Action    string
+	ErrorOnly bool
+	TraceID   string
+	Limit     int
+}
+
 // Recent returns up to limit entries, newest first.
 // If service is non-empty, only entries matching that service are returned.
 func (rl *RequestLog) Recent(service string, limit int) []RequestEntry {
+	return rl.RecentFiltered(RequestFilter{Service: service, Limit: limit})
+}
+
+// RecentFiltered returns entries matching all non-empty filter fields.
+func (rl *RequestLog) RecentFiltered(f RequestFilter) []RequestEntry {
 	rl.mu.RLock()
 	defer rl.mu.RUnlock()
 
+	limit := f.Limit
 	if limit <= 0 {
 		limit = rl.count
 	}
@@ -81,9 +100,28 @@ func (rl *RequestLog) Recent(service string, limit int) []RequestEntry {
 	for i := 0; i < rl.count && len(result) < limit; i++ {
 		idx := (rl.pos - 1 - i + rl.size) % rl.size
 		e := rl.entries[idx]
-		if service == "" || e.Service == service {
-			result = append(result, e)
+		if f.Service != "" && e.Service != f.Service {
+			continue
 		}
+		if f.Path != "" && !strings.HasPrefix(e.Path, f.Path) {
+			continue
+		}
+		if f.Method != "" && !strings.EqualFold(e.Method, f.Method) {
+			continue
+		}
+		if f.CallerID != "" && e.CallerID != f.CallerID {
+			continue
+		}
+		if f.Action != "" && e.Action != f.Action {
+			continue
+		}
+		if f.ErrorOnly && e.StatusCode < 400 {
+			continue
+		}
+		if f.TraceID != "" && e.TraceID != f.TraceID {
+			continue
+		}
+		result = append(result, e)
 	}
 	return result
 }

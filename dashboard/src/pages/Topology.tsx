@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks'
 import { api } from '../api';
 import type { SSEState } from '../hooks/useSSE';
 import { NodeDetailDrawer } from '../components/NodeDetailDrawer';
+import { RequestPanel } from '../components/RequestPanel';
 
 // Internal developer dashboard -- SVG content is generated programmatically
 // from our own service API data, not from user input.
@@ -516,6 +517,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
   const [showAll, setShowAll] = useState(true);
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<TopoNode | null>(null);
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [highlightService, setHighlightService] = useState<string | null>(null);
   const [hoveredEdge, setHoveredEdge] = useState<number | null>(null);
   const [hoveredCluster, setHoveredCluster] = useState<string | null>(null);
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
@@ -785,7 +788,23 @@ export function TopologyPage({ sse }: TopologyPageProps) {
         ))}
       </div>
 
-      <div class="card topology-container" style="position:relative;overflow:hidden">
+      <div class="card topology-container" style="position:relative;overflow:hidden;display:flex">
+        {panelOpen && (
+          <RequestPanel
+            sse={sse}
+            selectedRequestId={undefined}
+            onSelectRequest={(req: any) => {
+              setHighlightService(req.service);
+              // Find matching topo node and select it
+              const matchingNode = topoData?.nodes.find((n: TopoNode) => n.service === req.service);
+              if (matchingNode) {
+                setSelectedNode(matchingNode);
+              }
+              setTimeout(() => setHighlightService(null), 2000);
+            }}
+          />
+        )}
+        <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
         {/* biome-ignore lint: internal dashboard SVG */}
         <svg
           ref={svgRef}
@@ -1036,6 +1055,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const groupColor = groupColorMap.get(n.group) || '#94A3B8';
               const isHovered = hoveredNode === n.id;
               const isSelected = selectedNode?.id === n.id;
+              const isHighlighted = highlightService === n.service;
               const dimmedByNode = hoveredNode && !connectedNodes.has(n.id);
               const dimmedByCluster = hoveredCluster && n.group !== hoveredCluster;
               const dimmed = dimmedByNode || dimmedByCluster;
@@ -1090,9 +1110,9 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     width={RES_W}
                     height={RES_H}
                     rx={10}
-                    fill={isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
-                    stroke={isSelected ? groupColor : isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
-                    stroke-width={isSelected ? 3 : isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
+                    fill={isHighlighted ? `${groupColor}30` : isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
+                    stroke={isHighlighted ? groupColor : isSelected ? groupColor : isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
+                    stroke-width={isHighlighted ? 3.5 : isSelected ? 3 : isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }}
                   />
                   {/* Left color accent */}
@@ -1245,6 +1265,22 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             />
           </g>
         </svg>
+        {/* Panel toggle button */}
+        <button
+          onClick={() => setPanelOpen(!panelOpen)}
+          style={{
+            position: 'absolute', top: 8, left: panelOpen ? 308 : 8, zIndex: 10,
+            width: 28, height: 28, borderRadius: 6, border: '1px solid var(--n200)',
+            background: 'white', cursor: 'pointer', display: 'flex',
+            alignItems: 'center', justifyContent: 'center', fontSize: 12,
+            color: 'var(--n500)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            transition: 'left 0.2s ease',
+          }}
+          title={panelOpen ? 'Hide request panel' : 'Show request panel'}
+        >
+          {panelOpen ? '\u25C0' : '\u25B6'}
+        </button>
+        </div>
       </div>
 
       {selectedNode && (

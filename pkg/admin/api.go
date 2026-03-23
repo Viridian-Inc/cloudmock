@@ -96,6 +96,9 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
 	a.mux.HandleFunc("/api/slo", a.handleSLO)
 	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
+	a.mux.HandleFunc("/api/tenants", a.handleTenants)
+	a.mux.HandleFunc("/api/cost", a.handleCost)
+	a.mux.HandleFunc("/api/compare", a.handleCompare)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
@@ -1003,6 +1006,251 @@ func bfsNodes(startID string, adj map[string][]string) []string {
 		}
 	}
 	return result
+}
+
+// handleTenants returns per-tenant request stats and filtering.
+// GET /api/tenants — list all observed tenants with request counts
+// GET /api/tenants?id=CALLER_ID — detail for a specific tenant
+func (a *API) handleTenants(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	entries := a.log.Recent("", 1000)
+
+	tenantID := r.URL.Query().Get("id")
+	if tenantID != "" {
+		// Filter for specific tenant
+		var tenantReqs []gateway.RequestEntry
+		for _, e := range entries {
+			if e.CallerID == tenantID {
+				tenantReqs = append(tenantReqs, e)
+			}
+		}
+		errorCount := 0
+		var totalLatency float64
+		services := make(map[string]int)
+		for _, e := range tenantReqs {
+			if e.StatusCode >= 400 {
+				errorCount++
+			}
+			totalLatency += e.LatencyMs
+			services[e.Service]++
+		}
+		avgLatency := 0.0
+		if len(tenantReqs) > 0 {
+			avgLatency = totalLatency / float64(len(tenantReqs))
+		}
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"tenant_id":    tenantID,
+			"request_count": len(tenantReqs),
+			"error_count":  errorCount,
+			"error_rate":   float64(errorCount) / float64(max(len(tenantReqs), 1)),
+			"avg_latency_ms": avgLatency,
+			"services":     services,
+			"requests":     tenantReqs,
+		})
+		return
+	}
+
+	// List all tenants
+	type tenantSummary struct {
+		ID          string  `json:"id"`
+		Requests    int     `json:"requests"`
+		Errors      int     `json:"errors"`
+		ErrorRate   float64 `json:"error_rate"`
+		AvgLatency  float64 `json:"avg_latency_ms"`
+		LastSeen    string  `json:"last_seen"`
+	}
+	tenants := make(map[string]*tenantSummary)
+	for _, e := range entries {
+		if e.CallerID == "" {
+			continue
+		}
+		t, ok := tenants[e.CallerID]
+		if !ok {
+			t = &tenantSummary{ID: e.CallerID}
+			tenants[e.CallerID] = t
+		}
+		t.Requests++
+		t.AvgLatency += e.LatencyMs
+		if e.StatusCode >= 400 {
+			t.Errors++
+		}
+		ts := e.Timestamp.Format(time.RFC3339)
+		if ts > t.LastSeen {
+			t.LastSeen = ts
+		}
+	}
+	result := make([]tenantSummary, 0, len(tenants))
+	for _, t := range tenants {
+		if t.Requests > 0 {
+			t.AvgLatency /= float64(t.Requests)
+			t.ErrorRate = float64(t.Errors) / float64(t.Requests)
+		}
+		result = append(result, *t)
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// handleCost returns estimated AWS cost breakdown from recent request traffic.
+// Prices based on us-east-1 on-demand pricing (approximate).
+func (a *API) handleCost(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	entries := a.log.Recent("", 1000)
+
+	// Approximate AWS pricing per operation (us-east-1, USD)
+	prices := map[string]float64{
+		"dynamodb":       0.00000025, // $0.25 per million read units
+		"s3":             0.0000004,  // $0.40 per million GET
+		"sqs":            0.0000004,  // $0.40 per million requests
+		"sns":            0.0000005,  // $0.50 per million publishes
+		"lambda":         0.0000002,  // $0.20 per million invocations + compute
+		"cognito-idp":    0.00000550, // $0.0055 per MAU (amortized)
+		"ses":            0.0001,     // $0.10 per 1000 emails
+		"secretsmanager": 0.00000005, // $0.05 per 10,000 API calls
+		"kms":            0.000003,   // $0.03 per 10,000 requests
+	}
+
+	type serviceCost struct {
+		Service    string  `json:"service"`
+		Requests   int     `json:"requests"`
+		CostUSD    float64 `json:"cost_usd"`
+		PricePerOp float64 `json:"price_per_op_usd"`
+	}
+
+	svcCounts := make(map[string]int)
+	for _, e := range entries {
+		svcCounts[e.Service]++
+	}
+
+	var costs []serviceCost
+	var totalCost float64
+	for svc, count := range svcCounts {
+		price := prices[svc]
+		if price == 0 {
+			price = 0.0000001 // default
+		}
+		cost := float64(count) * price
+		totalCost += cost
+		costs = append(costs, serviceCost{
+			Service:    svc,
+			Requests:   count,
+			CostUSD:    cost,
+			PricePerOp: price,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"total_cost_usd": totalCost,
+		"request_count":  len(entries),
+		"services":       costs,
+		"note":           "Estimates based on us-east-1 on-demand pricing. Actual costs vary.",
+	})
+}
+
+// handleCompare returns a before/after comparison for a service/action.
+// GET /api/compare?service=dynamodb&action=Query&window=60
+// Splits recent requests into two halves and compares metrics.
+func (a *API) handleCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	service := r.URL.Query().Get("service")
+	action := r.URL.Query().Get("action")
+
+	entries := a.log.RecentFiltered(gateway.RequestFilter{
+		Service: service,
+		Action:  action,
+		Limit:   500,
+	})
+
+	if len(entries) < 4 {
+		writeJSON(w, http.StatusOK, map[string]string{"status": "insufficient data", "count": fmt.Sprintf("%d", len(entries))})
+		return
+	}
+
+	// Split into two halves: "before" (older) and "after" (newer)
+	mid := len(entries) / 2
+	after := entries[:mid]  // newer (entries are newest-first)
+	before := entries[mid:] // older
+
+	type windowStats struct {
+		Count     int     `json:"count"`
+		ErrorRate float64 `json:"error_rate"`
+		P50Ms     float64 `json:"p50_ms"`
+		P95Ms     float64 `json:"p95_ms"`
+		P99Ms     float64 `json:"p99_ms"`
+		AvgMs     float64 `json:"avg_ms"`
+		From      string  `json:"from"`
+		To        string  `json:"to"`
+	}
+
+	calcStats := func(reqs []gateway.RequestEntry) windowStats {
+		if len(reqs) == 0 {
+			return windowStats{}
+		}
+		var totalMs float64
+		var errors int
+		latencies := make([]float64, len(reqs))
+		for i, r := range reqs {
+			latencies[i] = r.LatencyMs
+			totalMs += r.LatencyMs
+			if r.StatusCode >= 400 {
+				errors++
+			}
+		}
+		explainSortFloat64s(latencies)
+		return windowStats{
+			Count:     len(reqs),
+			ErrorRate: float64(errors) / float64(len(reqs)),
+			P50Ms:     explainPercentile(latencies, 50),
+			P95Ms:     explainPercentile(latencies, 95),
+			P99Ms:     explainPercentile(latencies, 99),
+			AvgMs:     totalMs / float64(len(reqs)),
+			From:      reqs[len(reqs)-1].Timestamp.Format(time.RFC3339),
+			To:        reqs[0].Timestamp.Format(time.RFC3339),
+		}
+	}
+
+	beforeStats := calcStats(before)
+	afterStats := calcStats(after)
+
+	// Calculate deltas
+	p50Delta := afterStats.P50Ms - beforeStats.P50Ms
+	p99Delta := afterStats.P99Ms - beforeStats.P99Ms
+	errDelta := afterStats.ErrorRate - beforeStats.ErrorRate
+
+	regression := false
+	if p99Delta > beforeStats.P99Ms*0.5 && beforeStats.P99Ms > 0 {
+		regression = true // P99 increased by >50%
+	}
+	if errDelta > 0.05 {
+		regression = true // error rate increased by >5%
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"service":    service,
+		"action":     action,
+		"before":     beforeStats,
+		"after":      afterStats,
+		"p50_delta_ms": p50Delta,
+		"p99_delta_ms": p99Delta,
+		"error_delta":  errDelta,
+		"regression":   regression,
+	})
+}
+
+func max(a, b int) int {
+	if a > b { return a }
+	return b
 }
 
 // SetChaosEngine sets the chaos engine for the admin API to manage fault injection rules.

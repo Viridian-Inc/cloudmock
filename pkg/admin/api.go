@@ -3,6 +3,7 @@ package admin
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -18,6 +19,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	"github.com/neureaux/cloudmock/services/lambda"
 	"github.com/neureaux/cloudmock/services/ses"
 )
@@ -75,6 +77,7 @@ type API struct {
 	views          []SavedView
 	viewsMu        sync.RWMutex
 	regressionEngine *regression.Engine
+	traceComparer    *tracecompare.Comparer
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -159,6 +162,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
+	a.mux.HandleFunc("/api/traces/compare", a.handleTraceCompare)
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
@@ -1865,6 +1869,58 @@ func (a *API) ChaosEngine() *gateway.ChaosEngine {
 // SetRegressionEngine sets the regression detection engine for the admin API.
 func (a *API) SetRegressionEngine(engine *regression.Engine) {
 	a.regressionEngine = engine
+}
+
+// SetTraceComparer sets the trace comparer for the /api/traces/compare endpoint.
+func (a *API) SetTraceComparer(tc *tracecompare.Comparer) {
+	a.traceComparer = tc
+}
+
+func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.traceComparer == nil {
+		http.Error(w, "trace comparison not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	traceA := r.URL.Query().Get("a")
+	if traceA == "" {
+		http.Error(w, "missing required parameter: a", http.StatusBadRequest)
+		return
+	}
+
+	baseline := r.URL.Query().Get("baseline") == "true"
+	traceB := r.URL.Query().Get("b")
+
+	if !baseline && traceB == "" {
+		http.Error(w, "must provide parameter b or baseline=true", http.StatusBadRequest)
+		return
+	}
+
+	ctx := r.Context()
+	var result *tracecompare.TraceComparison
+	var err error
+
+	if baseline {
+		result, err = a.traceComparer.CompareBaseline(ctx, traceA)
+	} else {
+		result, err = a.traceComparer.Compare(ctx, traceA, traceB)
+	}
+
+	if errors.Is(err, dataplane.ErrNotFound) {
+		http.Error(w, "trace not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
 }
 
 // handleRegressions handles regression API endpoints:

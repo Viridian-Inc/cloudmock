@@ -469,6 +469,19 @@ func main() {
 		}
 
 		adminAPI.SetIncidentService(incService)
+
+		// Webhook dispatcher — wired inside the incident block so it is always
+		// co-located with the incident service.
+		var whStore webhook.Store
+		switch mode {
+		case "local":
+			whStore = whmemory.NewStore()
+		case "production":
+			whStore = whpg.NewStore(pgPool)
+		}
+		whDispatcher := webhook.NewDispatcher(whStore)
+		adminAPI.SetWebhookDispatcher(whDispatcher)
+		incService.SetWebhookDispatcher(whDispatcher)
 	}
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)

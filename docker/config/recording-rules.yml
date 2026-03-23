@@ -14,3 +14,21 @@ groups:
           sum(rate(cloudmock_http_request_errors_total[5m])) by (service, action)
           /
           sum(rate(cloudmock_http_requests_total[5m])) by (service, action)
+
+  - name: regression_detection
+    interval: 30s
+    rules:
+      - record: cloudmock:service_p50_5m
+        expr: histogram_quantile(0.5, sum(rate(cloudmock_http_request_duration_seconds_bucket[5m])) by (service, action, le))
+      - record: cloudmock:service_p95_5m
+        expr: histogram_quantile(0.95, sum(rate(cloudmock_http_request_duration_seconds_bucket[5m])) by (service, action, le))
+      - record: cloudmock:service_p99_5m
+        expr: histogram_quantile(0.99, sum(rate(cloudmock_http_request_duration_seconds_bucket[5m])) by (service, action, le))
+      - record: cloudmock:service_error_rate_5m
+        expr: sum(rate(cloudmock_http_request_errors_total[5m])) by (service, action) / sum(rate(cloudmock_http_requests_total[5m])) by (service, action)
+      - record: cloudmock:service_request_count_5m
+        expr: sum(increase(cloudmock_http_requests_total[5m])) by (service, action)
+      - record: cloudmock:tenant_p99_5m
+        expr: histogram_quantile(0.99, sum(rate(cloudmock_http_request_duration_seconds_bucket[5m])) by (service, tenant_id, le))
+      - record: cloudmock:fleet_p99_5m
+        expr: histogram_quantile(0.99, sum(rate(cloudmock_http_request_duration_seconds_bucket[5m])) by (service, le))

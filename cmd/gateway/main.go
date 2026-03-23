@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"time"
 
@@ -23,6 +24,7 @@ import (
 	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
 	promImpl "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/incident"
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
@@ -329,6 +331,13 @@ func main() {
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	adminAPI.SetChaosEngine(chaosEngine)
+
+	profileDir := filepath.Join(os.TempDir(), "cloudmock-profiles")
+	os.MkdirAll(profileDir, 0755)
+	profEngine := profiling.New(profileDir, 100)
+	symbolizer := profiling.NewSymbolizer()
+	adminAPI.SetProfilingEngine(profEngine)
+	adminAPI.SetSymbolizer(symbolizer)
 
 	costEngine := cost.New(dp.Requests, cfg.Cost.Pricing)
 	adminAPI.SetCostEngine(costEngine)

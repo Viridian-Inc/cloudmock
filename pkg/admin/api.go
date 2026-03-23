@@ -18,6 +18,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -82,6 +83,8 @@ type API struct {
 	traceComparer    *tracecompare.Comparer
 	costEngine       *cost.Engine
 	incidentService  *incident.Service
+	profilingEngine  *profiling.Engine
+	symbolizer       *profiling.Symbolizer
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -189,6 +192,10 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
 	a.mux.HandleFunc("/api/incidents", a.handleIncidents)
 	a.mux.HandleFunc("/api/incidents/", a.handleIncidents)
+	a.mux.HandleFunc("/api/profile/", a.handleProfile)
+	a.mux.HandleFunc("/api/profiles", a.handleProfiles)
+	a.mux.HandleFunc("/api/profiles/", a.handleProfiles)
+	a.mux.HandleFunc("/api/sourcemaps", a.handleSourcemaps)
 
 	return a
 }
@@ -1978,6 +1985,16 @@ func (a *API) SetIncidentService(svc *incident.Service) {
 	a.incidentService = svc
 }
 
+// SetProfilingEngine sets the profiling engine for the admin API.
+func (a *API) SetProfilingEngine(e *profiling.Engine) {
+	a.profilingEngine = e
+}
+
+// SetSymbolizer sets the source-map symbolizer for the admin API.
+func (a *API) SetSymbolizer(s *profiling.Symbolizer) {
+	a.symbolizer = s
+}
+
 func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2835,4 +2852,115 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	http.Error(w, "not found", http.StatusNotFound)
+}
+
+func (a *API) handleProfile(w http.ResponseWriter, r *http.Request) {
+	if a.profilingEngine == nil {
+		http.Error(w, "profiling not available", http.StatusServiceUnavailable)
+		return
+	}
+	// Parse service from path: /api/profile/{service}
+	service := strings.TrimPrefix(r.URL.Path, "/api/profile/")
+	profileType := r.URL.Query().Get("type")
+	if profileType == "" {
+		profileType = "heap"
+	}
+
+	var duration time.Duration
+	if d := r.URL.Query().Get("duration"); d != "" {
+		duration, _ = time.ParseDuration(d)
+	}
+	if profileType == "cpu" && duration == 0 {
+		duration = 5 * time.Second
+	}
+
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "flamegraph"
+	}
+
+	p, err := a.profilingEngine.Capture(service, profileType, duration)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if format == "pprof" {
+		w.Header().Set("Content-Type", "application/octet-stream")
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%s.pprof", p.ID))
+		filePath, _ := a.profilingEngine.FilePath(p.ID)
+		http.ServeFile(w, r, filePath)
+		return
+	}
+
+	// flamegraph format
+	folded, err := a.profilingEngine.FoldedStacks(p.ID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(folded))
+}
+
+func (a *API) handleProfiles(w http.ResponseWriter, r *http.Request) {
+	if a.profilingEngine == nil {
+		http.Error(w, "profiling not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// GET /api/profiles — list
+	path := strings.TrimPrefix(r.URL.Path, "/api/profiles")
+	path = strings.TrimPrefix(path, "/")
+
+	if path == "" {
+		service := r.URL.Query().Get("service")
+		profiles, _ := a.profilingEngine.List(service)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(profiles)
+		return
+	}
+
+	// GET /api/profiles/{id}?format=pprof|flamegraph
+	format := r.URL.Query().Get("format")
+	if format == "pprof" {
+		filePath, err := a.profilingEngine.FilePath(path)
+		if err != nil {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/octet-stream")
+		http.ServeFile(w, r, filePath)
+		return
+	}
+	folded, err := a.profilingEngine.FoldedStacks(path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/plain")
+	w.Write([]byte(folded))
+}
+
+func (a *API) handleSourcemaps(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost || a.symbolizer == nil {
+		http.Error(w, "not available", http.StatusServiceUnavailable)
+		return
+	}
+	filePath := r.URL.Query().Get("file")
+	if filePath == "" {
+		http.Error(w, "missing file parameter", http.StatusBadRequest)
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if err := a.symbolizer.LoadMap(filePath, body); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status":"ok"}`))
 }

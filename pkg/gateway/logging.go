@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/neureaux/cloudmock/pkg/profiling"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -430,6 +432,14 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				endTime := time.Now()
 				// Capture distributed context from headers
 				metadata := extractTraceMetadata(r)
+
+				// Capture call stack at handler entry for profiling.
+				stacks := []profiling.SpanStack{profiling.CaptureStack("handler_entry", 2)}
+				stackJSON, _ := json.Marshal(stacks)
+				if metadata == nil {
+					metadata = make(map[string]string)
+				}
+				metadata["stacks"] = string(stackJSON)
 
 				trace := &TraceContext{
 					TraceID:      traceID,

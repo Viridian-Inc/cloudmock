@@ -74,12 +74,25 @@ func NewTraceStore(capacity int) *TraceStore {
 	}
 }
 
-// Add stores a trace in the circular buffer.
+// Add stores a trace span. If a trace with the same TraceID already exists
+// and the span has a ParentSpanID, it is attached as a child of the parent
+// span in the existing trace tree. Otherwise, a new root trace is created.
 func (ts *TraceStore) Add(trace *TraceContext) {
 	ts.mu.Lock()
 	defer ts.mu.Unlock()
 
-	// If overwriting an existing slot, remove old index entry.
+	// If this span belongs to an existing trace, merge it as a child.
+	if trace.ParentSpanID != "" {
+		if idx, ok := ts.index[trace.TraceID]; ok {
+			root := ts.traces[idx]
+			if root != nil {
+				attachChild(root, trace)
+				return
+			}
+		}
+	}
+
+	// New root trace — store in circular buffer.
 	if ts.traces[ts.pos] != nil {
 		delete(ts.index, ts.traces[ts.pos].TraceID)
 	}
@@ -90,6 +103,30 @@ func (ts *TraceStore) Add(trace *TraceContext) {
 	if ts.count < ts.size {
 		ts.count++
 	}
+}
+
+// attachChild recursively searches the trace tree for the parent span and
+// appends the child. If the parent is not found, attaches to root.
+func attachChild(root *TraceContext, child *TraceContext) {
+	if parent := findSpan(root, child.ParentSpanID); parent != nil {
+		parent.Children = append(parent.Children, child)
+		return
+	}
+	// Parent not found — attach to root as fallback
+	root.Children = append(root.Children, child)
+}
+
+// findSpan searches the trace tree for a span with the given SpanID.
+func findSpan(t *TraceContext, spanID string) *TraceContext {
+	if t.SpanID == spanID {
+		return t
+	}
+	for _, c := range t.Children {
+		if found := findSpan(c, spanID); found != nil {
+			return found
+		}
+	}
+	return nil
 }
 
 // Get returns the trace with the given ID, or nil if not found.

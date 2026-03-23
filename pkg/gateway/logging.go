@@ -247,9 +247,11 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			traceID = GenerateTraceID()
 		}
 		spanID := GenerateSpanID()
+		parentSpanID := r.Header.Get("X-Cloudmock-Parent-Span-Id")
 
 		// Set trace headers on the response so callers can correlate.
 		w.Header().Set("X-Cloudmock-Trace-Id", traceID)
+		w.Header().Set("X-Cloudmock-Span-Id", spanID)
 
 		// Capture request headers.
 		reqHeaders := make(map[string]string, len(r.Header))
@@ -326,18 +328,19 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		if opts.TraceStore != nil {
 			endTime := time.Now()
 			trace := &TraceContext{
-				TraceID:    traceID,
-				SpanID:     spanID,
-				Service:    svcName,
-				Action:     action,
-				Method:     r.Method,
-				Path:       r.URL.Path,
-				StartTime:  start,
-				EndTime:    endTime,
-				Duration:   latency,
-				DurationMs: latencyMs,
-				StatusCode: rec.statusCode,
-				Error:      errMsg,
+				TraceID:      traceID,
+				SpanID:       spanID,
+				ParentSpanID: parentSpanID,
+				Service:      svcName,
+				Action:       action,
+				Method:       r.Method,
+				Path:         r.URL.Path,
+				StartTime:    start,
+				EndTime:      endTime,
+				Duration:     latency,
+				DurationMs:   latencyMs,
+				StatusCode:   rec.statusCode,
+				Error:        errMsg,
 			}
 			opts.TraceStore.Add(trace)
 		}

@@ -391,18 +391,26 @@ function RequestsTab({ requests }: { requests: any[] }) {
 }
 
 function RequestInlineDetail({ req }: { req: any }) {
-  const [subTab, setSubTab] = useState<'info' | 'request' | 'response'>('info');
+  const [subTab, setSubTab] = useState<'info' | 'request' | 'response' | 'explain'>('info');
+  const [explainData, setExplainData] = useState<any>(null);
+  const [explainLoading, setExplainLoading] = useState(false);
+
+  function loadExplain() {
+    if (explainData || explainLoading) return;
+    setExplainLoading(true);
+    api(`/api/explain/${req.id}`).then(setExplainData).catch(() => {}).finally(() => setExplainLoading(false));
+  }
 
   return (
     <div style={{ borderTop: '1px solid var(--n100, #F1F5F9)' }}>
       <div style={{ display: 'flex', gap: 0, background: 'var(--n50, #F8FAFC)', borderBottom: '1px solid var(--n100)' }}>
-        {(['info', 'request', 'response'] as const).map(t => (
-          <button key={t} onClick={() => setSubTab(t)} style={{
+        {(['info', 'request', 'response', 'explain'] as const).map(t => (
+          <button key={t} onClick={() => { setSubTab(t); if (t === 'explain') loadExplain(); }} style={{
             ...S.subTab,
-            color: subTab === t ? 'var(--brand-blue, #097FF5)' : 'var(--n500)',
+            color: subTab === t ? (t === 'explain' ? '#8B5CF6' : 'var(--brand-blue, #097FF5)') : 'var(--n500)',
             fontWeight: subTab === t ? 600 : 400,
-            borderBottom: subTab === t ? '2px solid var(--brand-blue, #097FF5)' : '2px solid transparent',
-          }}>{t.charAt(0).toUpperCase() + t.slice(1)}</button>
+            borderBottom: subTab === t ? `2px solid ${t === 'explain' ? '#8B5CF6' : 'var(--brand-blue, #097FF5)'}` : '2px solid transparent',
+          }}>{t === 'explain' ? '\u2728 Explain' : t.charAt(0).toUpperCase() + t.slice(1)}</button>
         ))}
       </div>
 
@@ -429,7 +437,99 @@ function RequestInlineDetail({ req }: { req: any }) {
             {req.response_body ? <JsonView data={tryParse(req.response_body)} /> : <span style={{ color: 'var(--n400)', fontSize: 12 }}>No response body</span>}
           </div>
         )}
+        {subTab === 'explain' && <ExplainPanel data={explainData} loading={explainLoading} />}
       </div>
+    </div>
+  );
+}
+
+function ExplainPanel({ data, loading }: { data: any; loading: boolean }) {
+  if (loading) {
+    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}><div style={S.spinner} /> Analyzing...</div>;
+  }
+  if (!data) {
+    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}>No analysis available</div>;
+  }
+
+  const a = data.analysis;
+  const anomalies = a.anomalies || [];
+
+  return (
+    <div style={{ fontSize: 12 }}>
+      {/* Anomalies */}
+      {anomalies.length > 0 && (
+        <div style={{ marginBottom: 12 }}>
+          {anomalies.map((msg: string, i: number) => (
+            <div key={i} style={{
+              padding: '8px 10px', marginBottom: 4, borderRadius: 6,
+              background: '#FEF2F2', border: '1px solid #FECACA', color: '#991B1B', fontSize: 11,
+            }}>
+              {'\u26A0'} {msg}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Latency context */}
+      <div style={{ ...S.card, marginBottom: 10 }}>
+        <div style={S.cardLabel}>Latency Context</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginTop: 8 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 700 }}>{fmtDuration(a.p50_ms)}</div>
+            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P50</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#F59E0B' }}>{fmtDuration(a.p95_ms)}</div>
+            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P95</div>
+          </div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontSize: 16, fontWeight: 700, color: '#EF4444' }}>{fmtDuration(a.p99_ms)}</div>
+            <div style={{ fontSize: 10, color: 'var(--n400)' }}>P99</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', marginTop: 8, fontSize: 11, color: a.is_slow ? '#EF4444' : 'var(--n500)' }}>
+          This request: {fmtDuration(data.request?.latency_ms)} ({a.latency_ratio?.toFixed(1)}x P50)
+        </div>
+      </div>
+
+      {/* Health */}
+      <div style={{ ...S.card, marginBottom: 10 }}>
+        <div style={S.cardLabel}>Service Health</div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
+          <div>
+            <span style={{ color: 'var(--n400)' }}>Error rate: </span>
+            <span style={{ fontWeight: 600, color: a.error_rate > 0.1 ? '#EF4444' : 'var(--n700)' }}>
+              {(a.error_rate * 100).toFixed(0)}%
+            </span>
+          </div>
+          <div>
+            <span style={{ color: 'var(--n400)' }}>Spans: </span>
+            <span style={{ fontWeight: 600 }}>{a.span_count}</span>
+          </div>
+          {a.slowest_span && (
+            <div>
+              <span style={{ color: 'var(--n400)' }}>Slowest: </span>
+              <span style={{ fontWeight: 600, fontFamily: 'var(--font-mono)', fontSize: 11 }}>{a.slowest_span}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Similar requests */}
+      {data.similar_recent && data.similar_recent.length > 0 && (
+        <div style={{ ...S.card }}>
+          <div style={S.cardLabel}>Similar Requests ({data.similar_recent.length})</div>
+          <div style={{ marginTop: 8, maxHeight: 120, overflow: 'auto' }}>
+            {data.similar_recent.slice(0, 8).map((r: any, i: number) => (
+              <div key={i} style={{ display: 'flex', gap: 8, fontSize: 11, padding: '3px 0', borderBottom: '1px solid var(--n100)' }}>
+                <span style={{ color: 'var(--n400)', fontFamily: 'var(--font-mono)', width: 62, flexShrink: 0 }}>{fmtTime(r.timestamp)}</span>
+                <StatusBadge code={r.status_code || r.status} />
+                <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>{fmtDuration(r.latency_ms)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

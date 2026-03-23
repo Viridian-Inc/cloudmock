@@ -23,6 +23,7 @@ import { DebugAssistantPage, useDebugErrorCount } from './pages/DebugAssistant';
 import { TracesPage } from './pages/Traces';
 import { MetricsPage } from './pages/Metrics';
 import { ChaosPage, useChaosActive } from './pages/Chaos';
+import { ConsolePage } from './pages/Console';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -84,6 +85,7 @@ export function App() {
     { id: '/lambda', label: 'Lambda', icon: 'lambda' },
     { id: '/iam', label: 'IAM', icon: 'shield' },
     { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
+    { id: '/console', label: 'Console', icon: 'topology' },
     { id: '/topology', label: 'Topology', icon: 'topology' },
     { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
     { id: '/metrics', label: 'Metrics', icon: 'chart' },
@@ -106,6 +108,7 @@ export function App() {
       case '/lambda': return <LambdaPage sse={sse} />;
       case '/iam': return <IAMPage showToast={showToast} />;
       case '/mail': return <MailPage />;
+      case '/console': return <ConsolePage sse={sse} showToast={showToast} />;
       case '/topology': return <TopologyPage sse={sse} />;
       case '/debug': return <DebugAssistantPage showToast={showToast} />;
       case '/metrics': return <MetricsPage />;

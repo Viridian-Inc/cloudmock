@@ -52,4 +52,28 @@ export function getMetrics() {
   return api<any>('/api/metrics');
 }
 
+export function getViews() {
+  return api<any[]>('/api/views');
+}
+
+export function createView(view: any) {
+  return api<any>('/api/views', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(view),
+  });
+}
+
+export function deleteView(id: string) {
+  return api('/api/views?id=' + id, { method: 'DELETE' });
+}
+
+export function getSLOStatus() {
+  return api<any>('/api/slo');
+}
+
+export function getBlastRadius(nodeId: string) {
+  return api<any>('/api/blast-radius?node=' + encodeURIComponent(nodeId));
+}
+
 export { ADMIN_BASE, GW_BASE };

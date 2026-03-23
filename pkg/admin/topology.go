@@ -1,8 +1,8 @@
 package admin
 
 import (
+	"fmt"
 	"strings"
-	"time"
 
 	"github.com/neureaux/cloudmock/pkg/gateway"
 )
@@ -544,50 +544,197 @@ func (a *API) addCloudFormationEdges(addEdge func(string, string, string, string
 	}
 }
 
-// addTrafficEdges analyzes request log for traffic patterns.
+// addTrafficEdges discovers service-to-resource edges from observed request
+// traffic. Uses two strategies:
+//  1. Trace correlation: requests sharing a TraceID are linked as caller→callee
+//  2. Request analysis: extracts the specific resource (table, queue, bucket)
+//     from each request's action/path to build precise edges
+//
+// This automatically discovers edges like:
+//   lambda:attendance-handler → dynamodb:attendance (from Invoke → Query trace)
+//   lambda:order-handler → dynamodb:order (from PutItem request body)
+//   bff-service → dynamodb:featureFlag (from Query with TableName)
 func (a *API) addTrafficEdges(addEdge func(string, string, string, string, string), lambdaFns, dynamoTables, sqsQueues map[string]bool) {
 	if a.log == nil {
 		return
 	}
 
-	entries := a.log.Recent("", 500)
+	entries := a.log.Recent("", 1000)
 
-	// Build a set of service pairs seen within a short time window
-	type trafficPair struct {
-		from string
-		to   string
+	// Group requests by TraceID to find caller→callee relationships
+	traceGroups := make(map[string][]gateway.RequestEntry)
+	for _, e := range entries {
+		if e.TraceID != "" {
+			traceGroups[e.TraceID] = append(traceGroups[e.TraceID], e)
+		}
 	}
-	seen := make(map[trafficPair]bool)
 
-	for i := 0; i < len(entries); i++ {
-		e := entries[i]
-		svcFrom := mapServiceToNodePrefix(e.Service)
-		if svcFrom == "" {
+	type edgeKey struct{ from, to string }
+	seen := make(map[edgeKey]int) // count of observations
+
+	// Strategy 1: Trace-correlated edges
+	// Within a trace, the first request is the caller, subsequent requests are callees
+	for _, group := range traceGroups {
+		if len(group) < 2 {
 			continue
 		}
+		// Sort by timestamp (entries are already newest-first, reverse for chronological)
+		sorted := make([]gateway.RequestEntry, len(group))
+		copy(sorted, group)
+		for i, j := 0, len(sorted)-1; i < j; i, j = i+1, j-1 {
+			sorted[i], sorted[j] = sorted[j], sorted[i]
+		}
 
-		// Look for nearby requests (within 200ms) to different services
-		for j := i + 1; j < len(entries) && j < i+20; j++ {
-			e2 := entries[j]
-			if absDuration(e.Timestamp.Sub(e2.Timestamp)) > 200*time.Millisecond {
-				break
+		callerID := requestToNodeID(sorted[0], lambdaFns, dynamoTables, sqsQueues)
+		for _, callee := range sorted[1:] {
+			calleeID := requestToNodeID(callee, lambdaFns, dynamoTables, sqsQueues)
+			if callerID != "" && calleeID != "" && callerID != calleeID {
+				k := edgeKey{callerID, calleeID}
+				seen[k]++
 			}
-			svcTo := mapServiceToNodePrefix(e2.Service)
-			if svcTo == "" || svcTo == svcFrom {
-				continue
-			}
+		}
+	}
 
-			pair := trafficPair{from: svcFrom, to: svcTo}
-			if !seen[pair] {
-				seen[pair] = true
-				fromID := serviceToNodeID(svcFrom)
-				toID := serviceToNodeID(svcTo)
-				if fromID != "" && toID != "" {
-					addEdge(fromID, toID, "invoke", "traffic", "traffic")
+	// Strategy 2: Per-request resource extraction
+	// Each request to DynamoDB/SQS/S3/RDS includes the specific resource name
+	for _, e := range entries {
+		resourceID := extractResourceNodeID(e, dynamoTables, sqsQueues)
+		if resourceID == "" {
+			continue
+		}
+		// The caller is either a Lambda function (if CallerID matches) or the BFF
+		callerID := ""
+		if e.CallerID != "" {
+			// Try to match caller to a known Lambda function name
+			for fn := range lambdaFns {
+				if strings.Contains(e.CallerID, fn) || strings.Contains(fn, e.CallerID) {
+					callerID = "lambda:" + fn
+					break
 				}
 			}
 		}
+		if callerID == "" {
+			callerID = "external:bff-service" // default caller
+		}
+		if callerID != resourceID {
+			k := edgeKey{callerID, resourceID}
+			seen[k]++
+		}
 	}
+
+	// Emit edges with call counts
+	for k, count := range seen {
+		label := "observed"
+		if count > 1 {
+			label = fmt.Sprintf("%d calls", count)
+		}
+		addEdge(k.from, k.to, "read_write", label, "traffic")
+	}
+}
+
+// requestToNodeID maps a request entry to its topology node ID.
+func requestToNodeID(e gateway.RequestEntry, lambdaFns, dynamoTables, sqsQueues map[string]bool) string {
+	switch e.Service {
+	case "lambda":
+		// Extract function name from action or path
+		if strings.Contains(e.Action, "Invoke") {
+			name := extractLambdaName(e)
+			if name != "" && lambdaFns[name] {
+				return "lambda:" + name
+			}
+		}
+		return "lambda:" + e.Action
+	case "dynamodb":
+		return extractResourceNodeID(e, dynamoTables, sqsQueues)
+	case "sqs":
+		return extractResourceNodeID(e, dynamoTables, sqsQueues)
+	case "s3":
+		return extractResourceNodeID(e, dynamoTables, sqsQueues)
+	case "cognito-idp":
+		return "cognito:user-pool"
+	case "rds":
+		return "rds:databases"
+	case "secretsmanager":
+		return "secrets:store"
+	case "ses":
+		return "ses:email"
+	default:
+		return ""
+	}
+}
+
+// extractResourceNodeID extracts the specific resource (table/queue/bucket) from
+// a request's body or path.
+func extractResourceNodeID(e gateway.RequestEntry, dynamoTables, sqsQueues map[string]bool) string {
+	switch e.Service {
+	case "dynamodb":
+		// DynamoDB requests include TableName in the JSON body
+		tableName := extractJSONField(e.RequestBody, "TableName")
+		if tableName != "" && dynamoTables[tableName] {
+			return "dynamodb:" + tableName
+		}
+		// Fallback: try action name (e.g., "Query" doesn't help, but "CreateTable" might)
+		return ""
+	case "sqs":
+		// SQS queue name from URL path or QueueUrl parameter
+		for q := range sqsQueues {
+			if strings.Contains(e.Path, q) || strings.Contains(e.RequestBody, q) {
+				return "sqs:" + q
+			}
+		}
+		return ""
+	case "s3":
+		// S3 bucket from path: /{bucket}/{key}
+		path := strings.TrimPrefix(e.Path, "/")
+		if idx := strings.Index(path, "/"); idx > 0 {
+			return "s3:" + path[:idx]
+		}
+		if path != "" {
+			return "s3:" + path
+		}
+		return ""
+	case "rds":
+		return "rds:databases"
+	default:
+		return ""
+	}
+}
+
+// extractLambdaName tries to extract the Lambda function name from a request.
+func extractLambdaName(e gateway.RequestEntry) string {
+	// Path format: /2015-03-31/functions/{name}/invocations
+	path := e.Path
+	if strings.Contains(path, "/functions/") {
+		parts := strings.Split(path, "/functions/")
+		if len(parts) > 1 {
+			name := strings.Split(parts[1], "/")[0]
+			return name
+		}
+	}
+	return ""
+}
+
+// extractJSONField extracts a simple string field from a JSON body.
+// Uses simple string scanning to avoid json.Unmarshal overhead.
+func extractJSONField(body, field string) string {
+	key := `"` + field + `"`
+	idx := strings.Index(body, key)
+	if idx < 0 {
+		return ""
+	}
+	// Find the value after the key
+	rest := body[idx+len(key):]
+	// Skip whitespace and colon
+	rest = strings.TrimLeft(rest, " \t\n\r:")
+	if len(rest) == 0 || rest[0] != '"' {
+		return ""
+	}
+	rest = rest[1:]
+	end := strings.Index(rest, `"`)
+	if end < 0 {
+		return ""
+	}
+	return rest[:end]
 }
 
 // ---- Helpers ----
@@ -663,48 +810,3 @@ func cfnResourceToNodeID(resType, logicalID string) string {
 	}
 }
 
-// mapServiceToNodePrefix maps a request log service name to a node prefix.
-func mapServiceToNodePrefix(svc string) string {
-	switch svc {
-	case "dynamodb":
-		return "dynamodb"
-	case "sqs":
-		return "sqs"
-	case "sns":
-		return "sns"
-	case "lambda":
-		return "lambda"
-	case "s3":
-		return "s3"
-	case "events":
-		return "eventbridge"
-	case "monitoring":
-		return "cloudwatch"
-	case "cognito-idp":
-		return "cognito"
-	default:
-		return ""
-	}
-}
-
-// serviceToNodeID returns a representative node ID for a service prefix.
-func serviceToNodeID(prefix string) string {
-	switch prefix {
-	case "cloudwatch":
-		return "cloudwatch:alarms"
-	case "cognito":
-		return "cognito:user-pool"
-	default:
-		// For multi-resource services, we'd need the specific resource.
-		// Return empty to skip ambiguous traffic edges.
-		return ""
-	}
-}
-
-// absDuration returns the absolute value of a time.Duration.
-func absDuration(d time.Duration) time.Duration {
-	if d < 0 {
-		return -d
-	}
-	return d
-}

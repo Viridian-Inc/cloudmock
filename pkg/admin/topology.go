@@ -11,11 +11,12 @@ import (
 
 // TopologyNodeV2 describes a resource in the topology graph.
 type TopologyNodeV2 struct {
-	ID      string `json:"id"`      // "lambda:attendance-handler" or "external:expo-app"
-	Label   string `json:"label"`
-	Service string `json:"service"`
-	Type    string `json:"type"`  // "function", "table", "queue", "topic", "bucket", "client", "plugin"
-	Group   string `json:"group"` // group ID
+	ID             string `json:"id"`                        // "lambda:attendance-handler" or "external:expo-app"
+	Label          string `json:"label"`
+	Service        string `json:"service"`
+	Type           string `json:"type"`                      // "function", "table", "queue", "topic", "bucket", "client", "plugin"
+	Group          string `json:"group"`                     // group ID
+	RequestService string `json:"requestService,omitempty"` // service name in request log (e.g. "bff" for external:bff-service)
 }
 
 // TopologyEdgeV2 describes a connection between resources.

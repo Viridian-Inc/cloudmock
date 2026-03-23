@@ -15,6 +15,7 @@ interface TopoNode {
   service: string;
   type: string;
   group: string;
+  requestService?: string;
 }
 
 interface TopoEdge {
@@ -512,34 +513,23 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 // --- Component ---
 
 // Maps a request's service name to its topology node.
-// Handles cases where request service (e.g. "bff") differs from node service (e.g. "external").
+// Uses requestService field from IaC topology config (no hardcoding).
 function findNodeForRequest(nodes: TopoNode[], req: any): TopoNode | undefined {
   const svc = req.service;
 
-  // Direct match on service field
-  let match = nodes.find(n => n.service === svc);
+  // Match on requestService field (from IaC config)
+  let match = nodes.find(n => n.requestService === svc);
   if (match) return match;
 
-  // Map request services to known node IDs
-  const serviceToNodeId: Record<string, string> = {
-    bff: 'external:bff-service',
-    graphql: 'external:graphql-server',
-    app: 'external:expo-app',
-    gateway: 'apigw:apis',
-    proxy: 'external:bff-service',
-  };
+  // Direct match on service field
+  match = nodes.find(n => n.service === svc);
+  if (match) return match;
 
-  const nodeId = serviceToNodeId[svc];
-  if (nodeId) {
-    match = nodes.find(n => n.id === nodeId);
-    if (match) return match;
-  }
-
-  // Try matching by node ID containing the service name
+  // Try matching by node ID or label containing the service name
   match = nodes.find(n => n.id.includes(svc) || n.label.toLowerCase().includes(svc));
   if (match) return match;
 
-  // For DynamoDB/Lambda — try to find the specific resource from the request body
+  // For DynamoDB — find the specific table node from request body
   if (svc === 'dynamodb' && req.request_body) {
     try {
       const body = typeof req.request_body === 'string' ? JSON.parse(req.request_body) : req.request_body;

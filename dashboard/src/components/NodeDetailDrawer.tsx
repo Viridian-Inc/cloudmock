@@ -13,6 +13,7 @@ interface TopoNode {
   service: string;
   type: string;
   group: string;
+  requestService?: string;
 }
 
 interface TopoEdge {
@@ -780,18 +781,9 @@ function InfoRow({ label, value }: { label: string; value: any }) {
 }
 
 // Maps a topology node to the service name used in request logs.
-// Topology nodes use "external" as the service for BFF/GraphQL/Calendar,
-// but requests are logged with "bff", "graphql", etc.
-function nodeToRequestService(node: TopoNode): string {
-  const idMap: Record<string, string> = {
-    'external:bff-service': 'bff',
-    'external:graphql-server': 'graphql',
-    'external:calendar-service': 'calendar',
-    'external:expo-app': 'app',
-    'external:admin-portal': 'app',
-    'external:client-portal': 'app',
-  };
-  return idMap[node.id] || node.service;
+// Uses the requestService field from IaC topology config (no hardcoding).
+function nodeToRequestService(node: any): string {
+  return node.requestService || node.service;
 }
 
 function tryParse(s: string): any {

@@ -28,6 +28,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
+	"github.com/neureaux/cloudmock/pkg/webhook"
 	"github.com/neureaux/cloudmock/services/lambda"
 	"github.com/neureaux/cloudmock/services/ses"
 )
@@ -93,6 +94,7 @@ type API struct {
 	auditLogger      audit.Logger
 	userStore        auth.UserStore
 	authSecret       []byte
+	webhookDispatcher *webhook.Dispatcher
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -206,6 +208,8 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
 	a.mux.HandleFunc("/api/incidents", a.handleIncidents)
 	a.mux.HandleFunc("/api/incidents/", a.handleIncidents)
+	a.mux.HandleFunc("/api/webhooks", a.handleWebhooks)
+	a.mux.HandleFunc("/api/webhooks/", a.handleWebhooks)
 	a.mux.HandleFunc("/api/profile/", a.handleProfile)
 	a.mux.HandleFunc("/api/profiles", a.handleProfiles)
 	a.mux.HandleFunc("/api/profiles/", a.handleProfiles)
@@ -2013,6 +2017,11 @@ func (a *API) SetIncidentService(svc *incident.Service) {
 	a.incidentService = svc
 }
 
+// SetWebhookDispatcher sets the webhook dispatcher for the admin API.
+func (a *API) SetWebhookDispatcher(d *webhook.Dispatcher) {
+	a.webhookDispatcher = d
+}
+
 // SetProfilingEngine sets the profiling engine for the admin API.
 func (a *API) SetProfilingEngine(e *profiling.Engine) {
 	a.profilingEngine = e
@@ -2934,6 +2943,104 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		}
 		a.auditLog(r.Context(), "incident.resolved", "incident:"+id, nil)
 		writeJSON(w, http.StatusOK, inc)
+		return
+	}
+
+	http.Error(w, "not found", http.StatusNotFound)
+}
+
+// handleWebhooks handles webhook CRUD endpoints:
+//
+//	GET    /api/webhooks              — list all webhooks
+//	POST   /api/webhooks              — create a webhook
+//	DELETE /api/webhooks/{id}         — delete a webhook
+//	POST   /api/webhooks/{id}/test    — send a test payload
+func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
+	if a.webhookDispatcher == nil {
+		http.Error(w, "webhook dispatcher not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	store := a.webhookDispatcher.Store()
+
+	path := strings.TrimPrefix(r.URL.Path, "/api/webhooks")
+	path = strings.TrimPrefix(path, "/")
+
+	// GET /api/webhooks — list
+	if r.Method == http.MethodGet && path == "" {
+		list, err := store.List(r.Context())
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if list == nil {
+			list = []webhook.Config{}
+		}
+		writeJSON(w, http.StatusOK, list)
+		return
+	}
+
+	// POST /api/webhooks — create
+	if r.Method == http.MethodPost && path == "" {
+		var cfg webhook.Config
+		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		cfg.ID = "" // always generate a new ID
+		if err := store.Save(r.Context(), &cfg); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		a.auditLog(r.Context(), "webhook.created", "webhook:"+cfg.ID, map[string]interface{}{"url": cfg.URL})
+		writeJSON(w, http.StatusCreated, cfg)
+		return
+	}
+
+	// DELETE /api/webhooks/{id}
+	if r.Method == http.MethodDelete && path != "" && !strings.Contains(path, "/") {
+		if err := store.Delete(r.Context(), path); err != nil {
+			if errors.Is(err, webhook.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		a.auditLog(r.Context(), "webhook.deleted", "webhook:"+path, nil)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	// POST /api/webhooks/{id}/test — send a test payload
+	if r.Method == http.MethodPost && strings.HasSuffix(path, "/test") {
+		id := strings.TrimSuffix(path, "/test")
+		cfg, err := store.Get(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, webhook.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		_ = cfg // fire a test payload via the dispatcher
+		testInc := &incident.Incident{
+			ID:               "test-" + id,
+			Status:           "active",
+			Severity:         "info",
+			Title:            "Test webhook delivery",
+			AffectedServices: []string{"cloudmock"},
+			AffectedTenants:  []string{},
+			AlertCount:       1,
+			FirstSeen:        time.Now(),
+			LastSeen:         time.Now(),
+		}
+		if err := a.webhookDispatcher.FireToConfig(r.Context(), *cfg, "incident.created", testInc); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 		return
 	}
 

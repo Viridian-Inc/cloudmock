@@ -9,11 +9,18 @@ import (
 	"github.com/neureaux/cloudmock/pkg/regression"
 )
 
+// WebhookDispatcher is the interface used by the incident service to fire
+// outbound webhooks. It matches *webhook.Dispatcher.
+type WebhookDispatcher interface {
+	Fire(ctx context.Context, event string, payload interface{}) error
+}
+
 // Service correlates regressions and SLO breaches into grouped incidents.
 type Service struct {
 	store       IncidentStore
 	regStore    regression.RegressionStore
 	groupWindow time.Duration
+	webhooks    WebhookDispatcher
 }
 
 // NewService creates an incident service with the given stores and grouping window.
@@ -27,6 +34,12 @@ func NewService(store IncidentStore, regStore regression.RegressionStore, groupW
 
 // Store returns the underlying incident store.
 func (s *Service) Store() IncidentStore { return s.store }
+
+// SetWebhookDispatcher configures an optional dispatcher to fire webhooks on
+// incident creation and resolution.
+func (s *Service) SetWebhookDispatcher(d WebhookDispatcher) {
+	s.webhooks = d
+}
 
 // OnRegression handles a regression notification, creating or updating an incident.
 func (s *Service) OnRegression(ctx context.Context, r regression.Regression) error {
@@ -75,7 +88,13 @@ func (s *Service) OnSLOBreach(ctx context.Context, service, action string, burnR
 		FirstSeen:        now,
 		LastSeen:         now,
 	}
-	return s.store.Save(ctx, inc)
+	if err := s.store.Save(ctx, inc); err != nil {
+		return err
+	}
+	if s.webhooks != nil {
+		s.webhooks.Fire(ctx, "incident.created", inc)
+	}
+	return nil
 }
 
 func (s *Service) handleResolved(ctx context.Context, r regression.Regression) error {
@@ -96,7 +115,13 @@ func (s *Service) handleResolved(ctx context.Context, r regression.Regression) e
 		now := time.Now()
 		existing.Status = "resolved"
 		existing.ResolvedAt = &now
-		return s.store.Update(ctx, existing)
+		if err := s.store.Update(ctx, existing); err != nil {
+			return err
+		}
+		if s.webhooks != nil {
+			s.webhooks.Fire(ctx, "incident.resolved", existing)
+		}
+		return nil
 	}
 
 	return nil
@@ -145,7 +170,13 @@ func (s *Service) handleActive(ctx context.Context, r regression.Regression) err
 		FirstSeen:        r.DetectedAt,
 		LastSeen:         r.DetectedAt,
 	}
-	return s.store.Save(ctx, inc)
+	if err := s.store.Save(ctx, inc); err != nil {
+		return err
+	}
+	if s.webhooks != nil {
+		s.webhooks.Fire(ctx, "incident.created", inc)
+	}
+	return nil
 }
 
 // severityRank returns a numeric rank for severity comparison.

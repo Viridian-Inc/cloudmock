@@ -3,12 +3,14 @@ package gateway
 import (
 	"bytes"
 	"crypto/tls"
+	"fmt"
 	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 )
@@ -28,38 +30,78 @@ type ProxyServer struct {
 	mux    http.Handler
 }
 
-// BuildRoutes generates the routing table dynamically from the provided domain names.
+// ServicePorts maps logical service names to their listen ports.
+// These are read from cloudmock config and environment variables.
+type ServicePorts struct {
+	Gateway   int // cloudmock AWS API (default 4566)
+	Dashboard int // cloudmock dashboard (default 4500)
+	Admin     int // admin API (default 4599)
+	App       int // Expo/Metro app (default 8081)
+	BFF       int // BFF service (default 3202)
+	GraphQL   int // GraphQL server (default 4000)
+}
+
+// DefaultServicePorts returns ports from environment or sensible defaults.
+func DefaultServicePorts() ServicePorts {
+	return ServicePorts{
+		Gateway:   envInt("CLOUDMOCK_PORT", 4566),
+		Dashboard: envInt("CLOUDMOCK_DASHBOARD_PORT", 4500),
+		Admin:     envInt("CLOUDMOCK_ADMIN_PORT", 4599),
+		App:       envInt("CLOUDMOCK_APP_PORT", 8081),
+		BFF:       envInt("CLOUDMOCK_BFF_PORT", 3202),
+		GraphQL:   envInt("CLOUDMOCK_GRAPHQL_PORT", 4000),
+	}
+}
+
+func envInt(key string, fallback int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
+	}
+	return fallback
+}
+
+func backend(port int) string {
+	return fmt.Sprintf("http://localhost:%d", port)
+}
+
+// BuildRoutes generates the routing table dynamically from domain names and port config.
 // Order matters — more specific paths must come first.
 func BuildRoutes(autotendDomain, cloudmockDomain string) []ProxyRoute {
+	return BuildRoutesWithPorts(autotendDomain, cloudmockDomain, DefaultServicePorts())
+}
+
+// BuildRoutesWithPorts generates routes using explicit port configuration.
+func BuildRoutesWithPorts(autotendDomain, cloudmockDomain string, p ServicePorts) []ProxyRoute {
 	at := "localhost." + autotendDomain
 	cm := "localhost." + cloudmockDomain
 
 	return []ProxyRoute{
 		// .localhost domains (RFC 6761, zero config)
-		// Expo app: PreserveHost so Metro serves assets with correct origin
-		{Host: "autotend-app.localhost", Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
-		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: "http://localhost:4566"},
-		{Host: "cloudmock.localhost", Path: "/api/", Backend: "http://localhost:4599"},
-		{Host: "cloudmock.localhost", Path: "/", Backend: "http://localhost:4500"},
-		{Host: "bff.localhost", Path: "/", Backend: "http://localhost:3202"},
-		{Host: "api.localhost", Path: "/", Backend: "http://localhost:4566"},
-		{Host: "auth.localhost", Path: "/", Backend: "http://localhost:4566"},
-		{Host: "admin.localhost", Path: "/", Backend: "http://localhost:4599"},
-		{Host: "graphql.localhost", Path: "/", Backend: "http://localhost:4000"},
+		{Host: "autotend-app.localhost", Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: backend(p.Gateway)},
+		{Host: "cloudmock.localhost", Path: "/api/", Backend: backend(p.Admin)},
+		{Host: "cloudmock.localhost", Path: "/", Backend: backend(p.Dashboard)},
+		{Host: "bff.localhost", Path: "/", Backend: backend(p.BFF)},
+		{Host: "api.localhost", Path: "/", Backend: backend(p.Gateway)},
+		{Host: "auth.localhost", Path: "/", Backend: backend(p.Gateway)},
+		{Host: "admin.localhost", Path: "/", Backend: backend(p.Admin)},
+		{Host: "graphql.localhost", Path: "/", Backend: backend(p.GraphQL)},
 
 		// custom domain: autotend app services
-		{Host: "autotend-app." + at, Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
-		{Host: "bff." + at, Path: "", Backend: "http://localhost:3202"},
-		{Host: "api." + at, Path: "", Backend: "http://localhost:4566"},
-		{Host: "auth." + at, Path: "", Backend: "http://localhost:4566"},
-		{Host: "admin." + at, Path: "", Backend: "http://localhost:4599"},
-		{Host: "graphql." + at, Path: "", Backend: "http://localhost:4000"},
-		{Host: at, Path: "/", Backend: "http://localhost:8081", PreserveHost: true},
+		{Host: "autotend-app." + at, Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "bff." + at, Path: "", Backend: backend(p.BFF)},
+		{Host: "api." + at, Path: "", Backend: backend(p.Gateway)},
+		{Host: "auth." + at, Path: "", Backend: backend(p.Gateway)},
+		{Host: "admin." + at, Path: "", Backend: backend(p.Admin)},
+		{Host: "graphql." + at, Path: "", Backend: backend(p.GraphQL)},
+		{Host: at, Path: "/", Backend: backend(p.App), PreserveHost: true},
 
 		// custom domain: cloudmock dashboard
-		{Host: cm, Path: "/_cloudmock/", Backend: "http://localhost:4566"},
-		{Host: cm, Path: "/api/", Backend: "http://localhost:4599"},
-		{Host: cm, Path: "/", Backend: "http://localhost:4500"},
+		{Host: cm, Path: "/_cloudmock/", Backend: backend(p.Gateway)},
+		{Host: cm, Path: "/api/", Backend: backend(p.Admin)},
+		{Host: cm, Path: "/", Backend: backend(p.Dashboard)},
 	}
 }
 

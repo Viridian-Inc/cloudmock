@@ -2,6 +2,7 @@ package sqs
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 )
@@ -13,21 +14,30 @@ type QueueStore struct {
 	byName    map[string]*Queue
 	accountID string
 	region    string
+	port      int
 }
 
 // NewStore returns a new QueueStore.
 func NewStore(accountID, region string) *QueueStore {
+	port := 4566
+	if v := os.Getenv("CLOUDMOCK_PORT"); v != "" {
+		var p int
+		if _, err := fmt.Sscanf(v, "%d", &p); err == nil {
+			port = p
+		}
+	}
 	return &QueueStore{
 		byURL:     make(map[string]*Queue),
 		byName:    make(map[string]*Queue),
 		accountID: accountID,
 		region:    region,
+		port:      port,
 	}
 }
 
 // QueueURL builds the canonical URL for a queue name.
 func (s *QueueStore) QueueURL(name string) string {
-	return fmt.Sprintf("http://sqs.%s.localhost:4566/%s/%s", s.region, s.accountID, name)
+	return fmt.Sprintf("http://sqs.%s.localhost:%d/%s/%s", s.region, s.port, s.accountID, name)
 }
 
 // CreateQueue creates a queue with the given name and attributes.
@@ -41,7 +51,7 @@ func (s *QueueStore) CreateQueue(name string, attrs map[string]string) (*Queue, 
 		return q, nil
 	}
 
-	url := fmt.Sprintf("http://sqs.%s.localhost:4566/%s/%s", s.region, s.accountID, name)
+	url := fmt.Sprintf("http://sqs.%s.localhost:%d/%s/%s", s.region, s.port, s.accountID, name)
 	q := newQueue(name, url, attrs)
 	s.byURL[url] = q
 	s.byName[name] = q

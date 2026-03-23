@@ -111,6 +111,72 @@ type RegressionConfig struct {
 	Window       string `yaml:"window" json:"window"`
 }
 
+// LambdaPricing holds per-invocation pricing for AWS Lambda.
+type LambdaPricing struct {
+	PerGBSecond     float64 `json:"perGBSecond" yaml:"perGBSecond"`
+	DefaultMemoryMB float64 `json:"defaultMemoryMB" yaml:"defaultMemoryMB"`
+}
+
+// DynamoDBPricing holds per-operation pricing for DynamoDB.
+type DynamoDBPricing struct {
+	PerRCU float64 `json:"perRCU" yaml:"perRCU"`
+	PerWCU float64 `json:"perWCU" yaml:"perWCU"`
+}
+
+// S3Pricing holds per-request pricing for S3.
+type S3Pricing struct {
+	PerGET float64 `json:"perGET" yaml:"perGET"`
+	PerPUT float64 `json:"perPUT" yaml:"perPUT"`
+}
+
+// SQSPricing holds per-request pricing for SQS.
+type SQSPricing struct {
+	PerRequest float64 `json:"perRequest" yaml:"perRequest"`
+}
+
+// TransferPricing holds data transfer pricing.
+type TransferPricing struct {
+	PerKB float64 `json:"perKB" yaml:"perKB"`
+}
+
+// PricingConfig holds all service pricing configurations.
+type PricingConfig struct {
+	Lambda       LambdaPricing   `json:"lambda" yaml:"lambda"`
+	DynamoDB     DynamoDBPricing `json:"dynamodb" yaml:"dynamodb"`
+	S3           S3Pricing       `json:"s3" yaml:"s3"`
+	SQS          SQSPricing      `json:"sqs" yaml:"sqs"`
+	DataTransfer TransferPricing `json:"dataTransfer" yaml:"dataTransfer"`
+}
+
+// DefaultPricingConfig returns a PricingConfig with standard AWS pricing.
+func DefaultPricingConfig() PricingConfig {
+	return PricingConfig{
+		Lambda: LambdaPricing{
+			PerGBSecond:     0.0000166667,
+			DefaultMemoryMB: 128,
+		},
+		DynamoDB: DynamoDBPricing{
+			PerRCU: 0.00000025,
+			PerWCU: 0.00000125,
+		},
+		S3: S3Pricing{
+			PerGET: 0.0000004,
+			PerPUT: 0.000005,
+		},
+		SQS: SQSPricing{
+			PerRequest: 0.0000004,
+		},
+		DataTransfer: TransferPricing{
+			PerKB: 0.00000009,
+		},
+	}
+}
+
+// CostConfig holds cost intelligence engine configuration.
+type CostConfig struct {
+	Pricing PricingConfig `yaml:"pricing" json:"pricing"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -126,6 +192,7 @@ type Config struct {
 	AdminAuth   AdminAuthConfig          `yaml:"admin_auth"`
 	DataPlane   DataPlaneConfig          `yaml:"dataplane"`
 	Regression  RegressionConfig         `yaml:"regression"`
+	Cost        CostConfig               `yaml:"cost" json:"cost"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -170,6 +237,9 @@ func Default() *Config {
 			Enabled:      true,
 			ScanInterval: "5m",
 			Window:       "15m",
+		},
+		Cost: CostConfig{
+			Pricing: DefaultPricingConfig(),
 		},
 	}
 }

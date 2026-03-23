@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/neureaux/cloudmock/pkg/cost"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
@@ -78,6 +79,7 @@ type API struct {
 	viewsMu        sync.RWMutex
 	regressionEngine *regression.Engine
 	traceComparer    *tracecompare.Comparer
+	costEngine       *cost.Engine
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -172,6 +174,9 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/tenants/export", a.handleTenantExport)
 	a.mux.HandleFunc("/api/shadow", a.handleShadowTest)
 	a.mux.HandleFunc("/api/cost", a.handleCost)
+	a.mux.HandleFunc("/api/cost/routes", a.handleCostRoutes)
+	a.mux.HandleFunc("/api/cost/tenants", a.handleCostTenants)
+	a.mux.HandleFunc("/api/cost/trend", a.handleCostTrend)
 	a.mux.HandleFunc("/api/compare", a.handleCompare)
 	a.mux.HandleFunc("/api/deploys", a.handleDeploys)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
@@ -1505,6 +1510,94 @@ func (a *API) handleCost(w http.ResponseWriter, r *http.Request) {
 		"services":       costs,
 		"note":           "Estimates based on us-east-1 on-demand pricing. Actual costs vary.",
 	})
+}
+
+// SetCostEngine wires the cost engine to the admin API.
+func (a *API) SetCostEngine(engine *cost.Engine) {
+	a.costEngine = engine
+}
+
+// parseDuration parses duration strings including "d" suffix for days.
+// Go's time.ParseDuration does not support days.
+func parseDuration(s string, fallback time.Duration) time.Duration {
+	if strings.HasSuffix(s, "d") {
+		days, err := strconv.Atoi(strings.TrimSuffix(s, "d"))
+		if err == nil {
+			return time.Duration(days) * 24 * time.Hour
+		}
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return fallback
+	}
+	return d
+}
+
+// handleCostRoutes returns costs aggregated by service+method+path.
+// GET /api/cost/routes?limit=20
+func (a *API) handleCostRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.costEngine == nil {
+		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		limit, _ = strconv.Atoi(l)
+	}
+	results, err := a.costEngine.ByRoute(r.Context(), limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// handleCostTenants returns costs aggregated by tenant ID.
+// GET /api/cost/tenants?limit=20
+func (a *API) handleCostTenants(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.costEngine == nil {
+		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	limit := 20
+	if l := r.URL.Query().Get("limit"); l != "" {
+		limit, _ = strconv.Atoi(l)
+	}
+	results, err := a.costEngine.ByTenant(r.Context(), limit)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// handleCostTrend returns cost aggregated into time buckets over a window.
+// GET /api/cost/trend?window=24h&bucket=1h
+func (a *API) handleCostTrend(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.costEngine == nil {
+		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		return
+	}
+	window := parseDuration(r.URL.Query().Get("window"), 24*time.Hour)
+	bucket := parseDuration(r.URL.Query().Get("bucket"), time.Hour)
+	results, err := a.costEngine.Trend(r.Context(), window, bucket)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
 }
 
 // handleCompare returns a before/after comparison for a service/action.

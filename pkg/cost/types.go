@@ -1,66 +1,29 @@
 package cost
 
-import "time"
+import (
+	"time"
 
-// LambdaPricing holds per-invocation pricing for AWS Lambda.
-type LambdaPricing struct {
-	PerGBSecond     float64 `json:"perGBSecond" yaml:"perGBSecond"`
-	DefaultMemoryMB float64 `json:"defaultMemoryMB" yaml:"defaultMemoryMB"`
-}
+	"github.com/neureaux/cloudmock/pkg/config"
+)
 
-// DynamoDBPricing holds per-operation pricing for DynamoDB.
-type DynamoDBPricing struct {
-	PerRCU float64 `json:"perRCU" yaml:"perRCU"`
-	PerWCU float64 `json:"perWCU" yaml:"perWCU"`
-}
+// Type aliases for config pricing types so cost-package callers do not need to
+// import config directly, and existing code referencing these types continues
+// to compile without change.
+type LambdaPricing = config.LambdaPricing
+type DynamoDBPricing = config.DynamoDBPricing
+type S3Pricing = config.S3Pricing
+type SQSPricing = config.SQSPricing
+type TransferPricing = config.TransferPricing
 
-// S3Pricing holds per-request pricing for S3.
-type S3Pricing struct {
-	PerGET float64 `json:"perGET" yaml:"perGET"`
-	PerPUT float64 `json:"perPUT" yaml:"perPUT"`
-}
-
-// SQSPricing holds per-request pricing for SQS.
-type SQSPricing struct {
-	PerRequest float64 `json:"perRequest" yaml:"perRequest"`
-}
-
-// TransferPricing holds data transfer pricing.
-type TransferPricing struct {
-	PerKB float64 `json:"perKB" yaml:"perKB"`
-}
-
-// PricingConfig holds all service pricing configurations.
-type PricingConfig struct {
-	Lambda       LambdaPricing   `json:"lambda" yaml:"lambda"`
-	DynamoDB     DynamoDBPricing `json:"dynamodb" yaml:"dynamodb"`
-	S3           S3Pricing       `json:"s3" yaml:"s3"`
-	SQS          SQSPricing      `json:"sqs" yaml:"sqs"`
-	DataTransfer TransferPricing `json:"dataTransfer" yaml:"dataTransfer"`
-}
+// PricingConfig is an alias for config.PricingConfig so callers can use
+// cost.PricingConfig without importing the config package directly.
+type PricingConfig = config.PricingConfig
 
 // DefaultPricingConfig returns a PricingConfig with standard AWS pricing.
+// It delegates to config.DefaultPricingConfig so pricing defaults are defined
+// in a single place.
 func DefaultPricingConfig() PricingConfig {
-	return PricingConfig{
-		Lambda: LambdaPricing{
-			PerGBSecond:     0.0000166667,
-			DefaultMemoryMB: 128,
-		},
-		DynamoDB: DynamoDBPricing{
-			PerRCU: 0.00000025,
-			PerWCU: 0.00000125,
-		},
-		S3: S3Pricing{
-			PerGET: 0.0000004,
-			PerPUT: 0.000005,
-		},
-		SQS: SQSPricing{
-			PerRequest: 0.0000004,
-		},
-		DataTransfer: TransferPricing{
-			PerKB: 0.00000009,
-		},
-	}
+	return config.DefaultPricingConfig()
 }
 
 // ServiceCost represents the aggregated cost for a single AWS service.

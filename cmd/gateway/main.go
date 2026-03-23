@@ -14,6 +14,7 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/neureaux/cloudmock/pkg/cost"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
@@ -325,6 +326,9 @@ func main() {
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	adminAPI.SetChaosEngine(chaosEngine)
+
+	costEngine := cost.New(dp.Requests, cfg.Cost.Pricing)
+	adminAPI.SetCostEngine(costEngine)
 
 	tc := tracecompare.New(dp.Traces)
 	adminAPI.SetTraceComparer(tc)

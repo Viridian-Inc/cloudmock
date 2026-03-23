@@ -154,7 +154,7 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 
 	if iacCfg != nil {
 		for _, n := range iacCfg.Nodes {
-			addNode(n.ID, n.Label, n.Service, n.Type, n.Group)
+			nodes = append(nodes, n) // preserve all fields including requestService
 		}
 		for _, e := range iacCfg.Edges {
 			addEdge(e.Source, e.Target, e.Type, e.Label, e.Discovered)

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { api } from '../api';
+import { api, fetchCostRoutes, fetchCostTenants, fetchCostTrend } from '../api';
 
 interface ServiceMetric {
   service: string;
@@ -26,9 +26,33 @@ interface TimeBucket {
   services: Record<string, BucketMetric>;
 }
 
+interface CostRoute {
+  service: string;
+  method: string;
+  path: string;
+  requests: number;
+  total_cost: number;
+  avg_cost: number;
+}
+
+interface CostTenant {
+  tenant_id: string;
+  requests: number;
+  total_cost: number;
+  avg_cost: number;
+}
+
+interface CostTrendBucket {
+  timestamp: string;
+  requests: number;
+  total_cost: number;
+}
+
 type SortField = 'service' | 'p50ms' | 'p95ms' | 'p99ms' | 'avgMs' | 'errorRate' | 'totalCalls';
+type MetricsTab = 'latency' | 'cost';
 
 export function MetricsPage() {
+  const [activeTab, setActiveTab] = useState<MetricsTab>('latency');
   const [metrics, setMetrics] = useState<ServiceMetric[]>([]);
   const [timeline, setTimeline] = useState<TimeBucket[]>([]);
   const [selectedService, setSelectedService] = useState<string>('_all');
@@ -37,9 +61,20 @@ export function MetricsPage() {
   const [tooltip, setTooltip] = useState<{ x: number; y: number; bucket: TimeBucket } | null>(null);
   const chartRef = useRef<SVGSVGElement>(null);
 
+  // Cost tab state
+  const [costRoutes, setCostRoutes] = useState<CostRoute[]>([]);
+  const [costTenants, setCostTenants] = useState<CostTenant[]>([]);
+  const [costTrend, setCostTrend] = useState<CostTrendBucket[]>([]);
+
   const fetchData = useCallback(() => {
     api('/api/metrics').then(setMetrics).catch(() => {});
     api('/api/metrics/timeline?minutes=15&bucket=1m').then(setTimeline).catch(() => {});
+  }, []);
+
+  const fetchCostData = useCallback(() => {
+    fetchCostRoutes(20).then(setCostRoutes).catch(() => {});
+    fetchCostTenants(20).then(setCostTenants).catch(() => {});
+    fetchCostTrend('24h', '1h').then(setCostTrend).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,6 +82,12 @@ export function MetricsPage() {
     const iv = setInterval(fetchData, 5000);
     return () => clearInterval(iv);
   }, [fetchData]);
+
+  useEffect(() => {
+    if (activeTab === 'cost') {
+      fetchCostData();
+    }
+  }, [activeTab, fetchCostData]);
 
   // Compute summary stats.
   const totalRequests = metrics.reduce((s, m) => s + m.totalCalls, 0);
@@ -123,6 +164,10 @@ export function MetricsPage() {
 
   const sortArrow = (field: SortField) => sortField === field ? (sortAsc ? ' \u25B2' : ' \u25BC') : '';
 
+  const fmtCost = (v: number) => v >= 0.01 ? `$${v.toFixed(2)}` : `$${v.toFixed(6)}`;
+
+  const maxTrendCost = Math.max(1e-9, ...costTrend.map(b => b.total_cost));
+
   // Tooltip content
   const tooltipContent = tooltip ? (() => {
     const b = tooltip.bucket;
@@ -133,8 +178,131 @@ export function MetricsPage() {
 
   return (
     <div style={{ padding: '24px' }}>
-      <h2 style={{ margin: '0 0 20px', fontSize: '20px', fontWeight: 600 }}>Metrics</h2>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px' }}>
+        <h2 style={{ margin: 0, fontSize: '20px', fontWeight: 600 }}>Metrics</h2>
+        <div style={{ display: 'flex', gap: 0, borderBottom: '2px solid var(--border)' }}>
+          {(['latency', 'cost'] as MetricsTab[]).map(t => (
+            <button
+              key={t}
+              onClick={() => setActiveTab(t)}
+              style={{
+                padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer',
+                fontSize: '13px', fontWeight: activeTab === t ? 600 : 400,
+                color: activeTab === t ? 'var(--brand-blue, #097FF5)' : 'var(--text-secondary)',
+                borderBottom: activeTab === t ? '2px solid var(--brand-blue, #097FF5)' : '2px solid transparent',
+                marginBottom: '-2px', textTransform: 'capitalize' as const,
+              }}
+            >
+              {t === 'latency' ? 'Latency' : 'Cost'}
+            </button>
+          ))}
+        </div>
+      </div>
 
+      {activeTab === 'cost' && (
+        <div>
+          {/* Top routes by cost */}
+          <div class="card" style={{ padding: '16px', marginBottom: '24px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Top Routes by Cost</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Service', 'Method', 'Path', 'Requests', 'Total Cost ($)', 'Avg Cost ($)'].map(h => (
+                    <th key={h} style={{ padding: '8px', textAlign: h === 'Service' || h === 'Method' || h === 'Path' ? 'left' : 'right', fontWeight: 500, opacity: 0.8 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {costRoutes.map((r, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px', fontWeight: 500 }}>{r.service}</td>
+                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: '#3B82F6' }}>{r.method}</td>
+                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '11px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{r.path}</td>
+                    <td style={{ padding: '8px', textAlign: 'right' }}>{r.requests.toLocaleString()}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(r.total_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtCost(r.avg_cost)}</td>
+                  </tr>
+                ))}
+                {costRoutes.length === 0 && (
+                  <tr><td colSpan={6} style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No cost data yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Top tenants by cost */}
+          <div class="card" style={{ padding: '16px', marginBottom: '24px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Top Tenants by Cost</h3>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  {['Tenant ID', 'Requests', 'Total Cost ($)', 'Avg Cost ($)'].map(h => (
+                    <th key={h} style={{ padding: '8px', textAlign: h === 'Tenant ID' ? 'left' : 'right', fontWeight: 500, opacity: 0.8 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {costTenants.map((t, i) => (
+                  <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px', fontFamily: 'monospace', fontWeight: 500 }}>{t.tenant_id}</td>
+                    <td style={{ padding: '8px', textAlign: 'right' }}>{t.requests.toLocaleString()}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(t.total_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtCost(t.avg_cost)}</td>
+                  </tr>
+                ))}
+                {costTenants.length === 0 && (
+                  <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No tenant cost data yet.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Cost trend */}
+          <div class="card" style={{ padding: '16px' }}>
+            <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Cost Trend (24h, 1h buckets)</h3>
+            {costTrend.length === 0 ? (
+              <div style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No trend data yet.</div>
+            ) : (
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                    <th style={{ padding: '6px 8px', textAlign: 'left', fontWeight: 500, opacity: 0.8, width: '140px' }}>Time</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, opacity: 0.8, width: '80px' }}>Requests</th>
+                    <th style={{ padding: '6px 8px', textAlign: 'right', fontWeight: 500, opacity: 0.8, width: '100px' }}>Total Cost</th>
+                    <th style={{ padding: '6px 8px', fontWeight: 500, opacity: 0.8 }}>Distribution</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {costTrend.map((b, i) => {
+                    const barPct = (b.total_cost / maxTrendCost) * 100;
+                    const ts = new Date(b.timestamp);
+                    return (
+                      <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '11px' }}>
+                          {ts.toLocaleDateString([], { month: 'short', day: 'numeric' })} {ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right' }}>{b.requests.toLocaleString()}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(b.total_cost)}</td>
+                        <td style={{ padding: '6px 8px' }}>
+                          <div style={{ height: '12px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
+                            <div style={{
+                              height: '100%', width: `${barPct}%`,
+                              background: barPct > 75 ? '#ef4444' : barPct > 40 ? '#f59e0b' : '#3B82F6',
+                              borderRadius: '2px', transition: 'width 0.3s ease',
+                            }} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'latency' && <>
       {/* Summary cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
         <div class="card" style={{ padding: '16px' }}>
@@ -278,6 +446,7 @@ export function MetricsPage() {
           </tbody>
         </table>
       </div>
+      </>}
     </div>
   );
 }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'preact/hooks';
-import { api, getNodeRequests, getNodeTraces, getStats, getMetrics, getBlastRadius, getSLOStatus } from '../api';
+import { api, getNodeRequests, getNodeTraces, getStats, getMetrics, getBlastRadius, getSLOStatus, captureProfile, fetchProfiles, fetchProfileFlamegraph } from '../api';
 import { StatusBadge } from './StatusBadge';
 import { JsonView } from './JsonView';
+import { FlameGraph } from './FlameGraph';
 import { fmtTime, fmtDuration } from '../utils';
 
 interface TopoNode {
@@ -30,7 +31,7 @@ interface ServiceInspectorProps {
   onSelectNode: (node: TopoNode) => void;
 }
 
-type Tab = 'overview' | 'requests' | 'traces' | 'connections' | 'slo' | 'blast';
+type Tab = 'overview' | 'requests' | 'traces' | 'connections' | 'slo' | 'blast' | 'profile';
 
 const NODE_TYPE_COLORS: Record<string, { bg: string; fg: string; icon: string }> = {
   function:  { bg: '#DBEAFE', fg: '#1D4ED8', icon: 'fn' },
@@ -89,6 +90,12 @@ export function ServiceInspector({ node, edges, nodes, onSelectNode }: ServiceIn
   const [explainData, setExplainData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Profile tab state
+  const [profileList, setProfileList] = useState<any[]>([]);
+  const [flamegraphData, setFlamegraphData] = useState<string>('');
+  const [capturing, setCapturing] = useState(false);
+  const [captureError, setCaptureError] = useState<string | null>(null);
+
   const requestService = nodeToRequestService(node);
 
   useEffect(() => {
@@ -97,6 +104,9 @@ export function ServiceInspector({ node, edges, nodes, onSelectNode }: ServiceIn
     setSloData(null);
     setBlastData(null);
     setExplainData(null);
+    setProfileList([]);
+    setFlamegraphData('');
+    setCaptureError(null);
 
     Promise.all([
       getNodeRequests(requestService).catch(() => []),
@@ -145,6 +155,7 @@ export function ServiceInspector({ node, edges, nodes, onSelectNode }: ServiceIn
     { key: 'connections', label: 'Connections', count: inbound.length + outbound.length },
     { key: 'slo', label: 'SLO' },
     { key: 'blast', label: 'Blast Radius' },
+    { key: 'profile', label: 'Profile' },
   ];
 
   return (
@@ -200,6 +211,9 @@ export function ServiceInspector({ node, edges, nodes, onSelectNode }: ServiceIn
               if (t.key === 'blast' && !blastData) {
                 getBlastRadius(node.id).then(setBlastData).catch(() => {});
               }
+              if (t.key === 'profile') {
+                fetchProfiles(requestService).then(setProfileList).catch(() => {});
+              }
             }}
             style={{
               ...S.tabBtn,
@@ -238,6 +252,36 @@ export function ServiceInspector({ node, edges, nodes, onSelectNode }: ServiceIn
             )}
             {tab === 'slo' && <SLOContent sloData={sloService} p50={p50} p95={p95} p99={p99} />}
             {tab === 'blast' && <BlastRadiusContent data={blastData} nodeMap={nodeMap} onSelectNode={onSelectNode} />}
+            {tab === 'profile' && (
+              <ProfileContent
+                service={requestService}
+                profileList={profileList}
+                flamegraphData={flamegraphData}
+                capturing={capturing}
+                captureError={captureError}
+                onCapture={async (type: string) => {
+                  setCapturing(true);
+                  setCaptureError(null);
+                  setFlamegraphData('');
+                  try {
+                    const data = await captureProfile(requestService, type, type === 'cpu' ? '5s' : undefined);
+                    setFlamegraphData(data);
+                    fetchProfiles(requestService).then(setProfileList).catch(() => {});
+                  } catch (e: any) {
+                    setCaptureError(e?.message || 'Capture failed');
+                  } finally {
+                    setCapturing(false);
+                  }
+                }}
+                onSelectProfile={async (id: string) => {
+                  setFlamegraphData('');
+                  try {
+                    const data = await fetchProfileFlamegraph(id);
+                    setFlamegraphData(data);
+                  } catch {}
+                }}
+              />
+            )}
           </>
         )}
       </div>
@@ -766,6 +810,110 @@ function EmptyState({ icon, message }: { icon: string; message: string }) {
     <div style={{ textAlign: 'center', padding: '32px 16px' }}>
       <div style={{ fontSize: 28, marginBottom: 6, opacity: 0.3 }}>{icon}</div>
       <div style={{ fontSize: 12, color: 'var(--n400)' }}>{message}</div>
+    </div>
+  );
+}
+
+function ProfileContent({ service, profileList, flamegraphData, capturing, captureError, onCapture, onSelectProfile }: {
+  service: string;
+  profileList: any[];
+  flamegraphData: string;
+  capturing: boolean;
+  captureError: string | null;
+  onCapture: (type: string) => void;
+  onSelectProfile: (id: string) => void;
+}) {
+  const profileTypes = [
+    { type: 'cpu', label: 'CPU Profile (5s)' },
+    { type: 'heap', label: 'Heap Snapshot' },
+    { type: 'goroutine', label: 'Goroutines' },
+  ];
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* Capture buttons */}
+      <div style={S.card}>
+        <div style={S.cardLabel}>Capture Profile</div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 10, flexWrap: 'wrap' as const }}>
+          {profileTypes.map(({ type, label }) => (
+            <button
+              key={type}
+              disabled={capturing}
+              onClick={() => onCapture(type)}
+              style={{
+                padding: '6px 12px', borderRadius: 6, border: '1px solid var(--n200)',
+                background: capturing ? 'var(--n100)' : 'white', cursor: capturing ? 'not-allowed' : 'pointer',
+                fontSize: 12, fontWeight: 500, color: 'var(--n700)',
+                display: 'flex', alignItems: 'center', gap: 6,
+                opacity: capturing ? 0.6 : 1,
+              }}
+            >
+              {capturing && type === 'cpu' ? (
+                <span style={S.spinner} />
+              ) : null}
+              {label}
+            </button>
+          ))}
+        </div>
+        {capturing && (
+          <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--n500)' }}>
+            <span style={S.spinner} />
+            Capturing...
+          </div>
+        )}
+        {captureError && (
+          <div style={{ marginTop: 8, padding: '6px 10px', borderRadius: 6, background: '#FEE2E2', color: '#DC2626', fontSize: 12 }}>
+            {captureError}
+          </div>
+        )}
+      </div>
+
+      {/* FlameGraph */}
+      {flamegraphData && (
+        <div style={S.card}>
+          <div style={S.cardLabel}>Flame Graph</div>
+          <div style={{ marginTop: 10 }}>
+            <FlameGraph data={flamegraphData} />
+          </div>
+        </div>
+      )}
+
+      {/* Recent profiles list */}
+      <div style={S.card}>
+        <div style={S.cardLabel}>Recent Profiles</div>
+        {profileList.length === 0 ? (
+          <div style={{ padding: '16px 0', textAlign: 'center', fontSize: 12, color: 'var(--n400)', opacity: 0.7 }}>
+            No profiles captured yet.
+          </div>
+        ) : (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11, marginTop: 8 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--n200)' }}>
+                {['Type', 'Captured At', 'Size'].map(h => (
+                  <th key={h} style={{ padding: '5px 6px', textAlign: h === 'Size' ? 'right' : 'left', fontWeight: 500, color: 'var(--n500)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {profileList.map((p: any) => (
+                <tr
+                  key={p.id}
+                  onClick={() => onSelectProfile(p.id)}
+                  style={{ borderBottom: '1px solid var(--n100)', cursor: 'pointer' }}
+                >
+                  <td style={{ padding: '6px', fontWeight: 600, color: 'var(--brand-blue, #097FF5)' }}>{p.type}</td>
+                  <td style={{ padding: '6px', fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>
+                    {new Date(p.captured_at || p.timestamp || p.created_at).toLocaleString()}
+                  </td>
+                  <td style={{ padding: '6px', textAlign: 'right', fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>
+                    {p.size_bytes ? `${(p.size_bytes / 1024).toFixed(1)} KB` : '\u2014'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   );
 }

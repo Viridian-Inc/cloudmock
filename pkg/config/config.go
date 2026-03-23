@@ -177,6 +177,13 @@ func DefaultPricingConfig() PricingConfig {
 	}
 }
 
+// RateLimitConfig holds rate limiting configuration.
+type RateLimitConfig struct {
+	Enabled           bool    `yaml:"enabled" json:"enabled"`
+	RequestsPerSecond float64 `yaml:"requests_per_second" json:"requests_per_second"`
+	Burst             int     `yaml:"burst" json:"burst"`
+}
+
 // CostConfig holds cost intelligence engine configuration.
 type CostConfig struct {
 	Pricing PricingConfig `yaml:"pricing" json:"pricing"`
@@ -199,6 +206,7 @@ type Config struct {
 	Regression  RegressionConfig         `yaml:"regression"`
 	Cost        CostConfig               `yaml:"cost" json:"cost"`
 	Incidents   IncidentConfig           `yaml:"incidents" json:"incidents"`
+	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -250,6 +258,11 @@ func Default() *Config {
 		Incidents: IncidentConfig{
 			Enabled:     true,
 			GroupWindow: "5m",
+		},
+		RateLimit: RateLimitConfig{
+			Enabled:           false,
+			RequestsPerSecond: 100,
+			Burst:             200,
 		},
 	}
 }

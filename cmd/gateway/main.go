@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/neureaux/cloudmock/pkg/admin"
+	"github.com/neureaux/cloudmock/pkg/ratelimit"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	auditmemory "github.com/neureaux/cloudmock/pkg/audit/memory"
 	auditpg "github.com/neureaux/cloudmock/pkg/audit/postgres"
@@ -451,6 +452,10 @@ func main() {
 	corsEnabled := os.Getenv("CLOUDMOCK_CORS")
 	if corsEnabled != "false" && corsEnabled != "0" {
 		handler = gateway.CORSMiddleware(handler)
+	}
+	if cfg.RateLimit.Enabled {
+		limiter := ratelimit.New(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
+		handler = limiter.Middleware(handler)
 	}
 	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster: adminAPI.Broadcaster(),

@@ -14,6 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/neureaux/cloudmock/pkg/admin"
+	"github.com/neureaux/cloudmock/pkg/auth"
+	authmemory "github.com/neureaux/cloudmock/pkg/auth/memory"
+	authpg "github.com/neureaux/cloudmock/pkg/auth/postgres"
 	"github.com/neureaux/cloudmock/pkg/ratelimit"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	auditmemory "github.com/neureaux/cloudmock/pkg/audit/memory"
@@ -351,6 +354,19 @@ func main() {
 	}
 	adminAPI.SetAuditLogger(auditLog)
 
+	// JWT-based RBAC auth (opt-in)
+	if cfg.Auth.Enabled {
+		var userStore auth.UserStore
+		switch mode {
+		case "local":
+			userStore = authmemory.NewStore()
+		case "production":
+			userStore = authpg.NewStore(pgPool)
+		}
+		adminAPI.SetUserStore(userStore)
+		adminAPI.SetAuthSecret([]byte(cfg.Auth.Secret))
+	}
+
 	adminAPI.SetChaosEngine(chaosEngine)
 
 	profileDir := filepath.Join(os.TempDir(), "cloudmock-profiles")
@@ -465,6 +481,9 @@ func main() {
 	})
 
 	var adminHandler http.Handler = adminAPI
+	if cfg.Auth.Enabled {
+		adminHandler = auth.Middleware([]byte(cfg.Auth.Secret))(adminHandler)
+	}
 	if cfg.AdminAuth.Enabled && cfg.AdminAuth.APIKey != "" {
 		adminHandler = admin.AdminAuthMiddleware(adminHandler, cfg.AdminAuth.APIKey)
 	}

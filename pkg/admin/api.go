@@ -13,6 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/bcrypt"
+
+	"github.com/neureaux/cloudmock/pkg/auth"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
@@ -88,6 +91,8 @@ type API struct {
 	profilingEngine  *profiling.Engine
 	symbolizer       *profiling.Symbolizer
 	auditLogger      audit.Logger
+	userStore        auth.UserStore
+	authSecret       []byte
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -139,6 +144,11 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
 	a.mux.HandleFunc("/api/audit", a.handleAudit)
+	a.mux.HandleFunc("/api/auth/login", a.handleAuthLogin)
+	a.mux.HandleFunc("/api/auth/register", a.handleAuthRegister)
+	a.mux.HandleFunc("/api/auth/me", a.handleAuthMe)
+	a.mux.HandleFunc("/api/users", a.handleUsers)
+	a.mux.HandleFunc("/api/users/", a.handleUserByID)
 
 	return a
 }
@@ -201,6 +211,11 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/profiles/", a.handleProfiles)
 	a.mux.HandleFunc("/api/sourcemaps", a.handleSourcemaps)
 	a.mux.HandleFunc("/api/audit", a.handleAudit)
+	a.mux.HandleFunc("/api/auth/login", a.handleAuthLogin)
+	a.mux.HandleFunc("/api/auth/register", a.handleAuthRegister)
+	a.mux.HandleFunc("/api/auth/me", a.handleAuthMe)
+	a.mux.HandleFunc("/api/users", a.handleUsers)
+	a.mux.HandleFunc("/api/users/", a.handleUserByID)
 
 	return a
 }
@@ -3035,4 +3050,234 @@ func (a *API) handleSourcemaps(w http.ResponseWriter, r *http.Request) {
 	a.auditLog(r.Context(), "sourcemap.uploaded", "sourcemap:"+filePath, nil)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
+}
+
+// SetUserStore sets the user store for auth endpoints.
+func (a *API) SetUserStore(s auth.UserStore) {
+	a.userStore = s
+}
+
+// SetAuthSecret sets the JWT signing secret.
+func (a *API) SetAuthSecret(secret []byte) {
+	a.authSecret = secret
+}
+
+// handleAuthLogin handles POST /api/auth/login.
+func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.userStore == nil {
+		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	user, err := a.userStore.GetByEmail(r.Context(), req.Email)
+	if err != nil {
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if err := bcryptCompare(user.PasswordHash, req.Password); err != nil {
+		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		return
+	}
+
+	token, err := auth.GenerateToken(user, a.authSecret, 24*time.Hour)
+	if err != nil {
+		http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"token": token,
+		"user":  user,
+	})
+}
+
+// handleAuthRegister handles POST /api/auth/register.
+func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.userStore == nil {
+		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		return
+	}
+
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+		Role     string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		http.Error(w, `{"error":"email, password, and name are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	role := req.Role
+	if role == "" {
+		role = auth.RoleViewer
+	}
+	if !auth.ValidRoles[role] {
+		http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+		return
+	}
+
+	// If auth is enabled (middleware is active), require admin to register users.
+	if a.cfg.Auth.Enabled {
+		caller := auth.UserFromContext(r.Context())
+		if caller == nil || caller.Role != auth.RoleAdmin {
+			http.Error(w, `{"error":"admin role required to register users"}`, http.StatusForbidden)
+			return
+		}
+	}
+
+	hash, err := bcryptHash(req.Password)
+	if err != nil {
+		http.Error(w, `{"error":"failed to hash password"}`, http.StatusInternalServerError)
+		return
+	}
+
+	user := &auth.User{
+		Email:        req.Email,
+		Name:         req.Name,
+		Role:         role,
+		PasswordHash: hash,
+	}
+	if err := a.userStore.Create(r.Context(), user); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusConflict)
+		return
+	}
+
+	a.auditLog(r.Context(), "user.created", "user:"+user.ID, map[string]interface{}{
+		"email": user.Email,
+		"role":  user.Role,
+	})
+
+	writeJSON(w, http.StatusCreated, user)
+}
+
+// handleAuthMe handles GET /api/auth/me.
+func (a *API) handleAuthMe(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	user := auth.UserFromContext(r.Context())
+	if user == nil {
+		http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, user)
+}
+
+// handleUsers handles GET /api/users (admin only).
+func (a *API) handleUsers(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.userStore == nil {
+		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		return
+	}
+
+	if a.cfg.Auth.Enabled {
+		caller := auth.UserFromContext(r.Context())
+		if caller == nil || caller.Role != auth.RoleAdmin {
+			http.Error(w, `{"error":"admin role required"}`, http.StatusForbidden)
+			return
+		}
+	}
+
+	users, err := a.userStore.List(r.Context())
+	if err != nil {
+		http.Error(w, `{"error":"failed to list users"}`, http.StatusInternalServerError)
+		return
+	}
+
+	writeJSON(w, http.StatusOK, users)
+}
+
+// handleUserByID handles PUT /api/users/{id} (admin only, update role).
+func (a *API) handleUserByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.userStore == nil {
+		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		return
+	}
+
+	if a.cfg.Auth.Enabled {
+		caller := auth.UserFromContext(r.Context())
+		if caller == nil || caller.Role != auth.RoleAdmin {
+			http.Error(w, `{"error":"admin role required"}`, http.StatusForbidden)
+			return
+		}
+	}
+
+	id := strings.TrimPrefix(r.URL.Path, "/api/users/")
+	if id == "" {
+		http.Error(w, `{"error":"user ID required"}`, http.StatusBadRequest)
+		return
+	}
+
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	if !auth.ValidRoles[req.Role] {
+		http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+		return
+	}
+
+	if err := a.userStore.UpdateRole(r.Context(), id, req.Role); err != nil {
+		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
+		return
+	}
+
+	a.auditLog(r.Context(), "user.role_updated", "user:"+id, map[string]interface{}{
+		"new_role": req.Role,
+	})
+
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+// bcryptHash hashes a plaintext password using bcrypt.
+func bcryptHash(password string) (string, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
+}
+
+// bcryptCompare compares a bcrypt hash with a plaintext password.
+func bcryptCompare(hash, password string) error {
+	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 }

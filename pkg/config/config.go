@@ -73,6 +73,12 @@ type AdminAuthConfig struct {
 	APIKey  string `yaml:"api_key" json:"-"` // never serialize the key
 }
 
+// AuthConfig holds JWT-based RBAC authentication configuration.
+type AuthConfig struct {
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	Secret  string `yaml:"secret" json:"secret"`
+}
+
 // DataPlaneConfig holds data plane configuration for request/trace storage.
 type DataPlaneConfig struct {
 	Mode       string           `yaml:"mode" json:"mode"`
@@ -202,6 +208,7 @@ type Config struct {
 	Logging     LoggingConfig            `yaml:"logging"`
 	SLO         SLOConfig                `yaml:"slo"`
 	AdminAuth   AdminAuthConfig          `yaml:"admin_auth"`
+	Auth        AuthConfig               `yaml:"auth"`
 	DataPlane   DataPlaneConfig          `yaml:"dataplane"`
 	Regression  RegressionConfig         `yaml:"regression"`
 	Cost        CostConfig               `yaml:"cost" json:"cost"`
@@ -243,6 +250,10 @@ func Default() *Config {
 			Rules: []SLORule{
 				{Service: "*", Action: "*", P50Ms: 50, P95Ms: 200, P99Ms: 500, ErrorRate: 0.01},
 			},
+		},
+		Auth: AuthConfig{
+			Enabled: false,
+			Secret:  "cloudmock-dev-secret-change-in-production",
 		},
 		DataPlane: DataPlaneConfig{
 			Mode: "local",

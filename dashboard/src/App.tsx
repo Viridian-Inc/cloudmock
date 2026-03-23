@@ -24,6 +24,10 @@ import { TracesPage } from './pages/Traces';
 import { MetricsPage } from './pages/Metrics';
 import { ChaosPage, useChaosActive } from './pages/Chaos';
 import { ConsolePage } from './pages/Console';
+import { IncidentsPage } from './pages/Incidents';
+import { RegressionsPage } from './pages/Regressions';
+import { SettingsPage } from './pages/Settings';
+import { TraceComparePage } from './pages/TraceCompare';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -77,6 +81,8 @@ export function App() {
     { id: '/services', label: 'Services', icon: 'services' },
     { id: '/requests', label: 'Requests', icon: 'requests' },
     { id: '/traces', label: 'Traces', icon: 'traces' },
+    { id: '/incidents', label: 'Incidents', icon: 'alert' },
+    { id: '/regressions', label: 'Regressions', icon: 'trendDown' },
     { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
     { id: '/s3', label: 'S3', icon: 'bucket' },
     { id: '/sqs', label: 'SQS', icon: 'queue' },
@@ -90,6 +96,7 @@ export function App() {
     { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
     { id: '/metrics', label: 'Metrics', icon: 'chart' },
     { id: '/chaos', label: 'Chaos', icon: 'zap', badge: chaosActive ? 1 : null },
+    { id: '/settings', label: 'Settings', icon: 'settings' },
   ];
 
   function renderPage() {
@@ -99,7 +106,11 @@ export function App() {
     switch (activePath) {
       case '/services': return <ServicesPage services={services} stats={stats} health={health} />;
       case '/requests': return <RequestsPage sse={sse} showToast={showToast} />;
-      case '/traces': return <TracesPage showToast={showToast} />;
+      case '/traces':
+        if (segments[1] === 'compare') return <TraceComparePage />;
+        return <TracesPage showToast={showToast} />;
+      case '/incidents': return <IncidentsPage />;
+      case '/regressions': return <RegressionsPage />;
       case '/dynamodb': return <DynamoDBPage showToast={showToast} />;
       case '/s3': return <S3BrowserPage showToast={showToast} />;
       case '/sqs': return <SQSBrowserPage showToast={showToast} />;
@@ -113,6 +124,7 @@ export function App() {
       case '/debug': return <DebugAssistantPage showToast={showToast} />;
       case '/metrics': return <MetricsPage />;
       case '/chaos': return <ChaosPage showToast={showToast} />;
+      case '/settings': return <SettingsPage />;
       default: return <HomePage sse={sse} showToast={showToast} />;
     }
   }

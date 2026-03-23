@@ -1642,3 +1642,15 @@ html[data-theme="dark"], html[data-theme="dark"] body {
 }
 
 .ml-2 { margin-left: 8px; }
+
+/* --- Summary Cards --- */
+.summary-cards { display: flex; gap: 16px; margin-bottom: 24px; }
+.summary-card { flex: 1; background: var(--n800); border-radius: var(--radius-md); padding: 20px; text-align: center; }
+.summary-card-value { font-size: 32px; font-weight: 700; font-family: var(--font-mono); }
+.summary-card-label { font-size: 13px; color: var(--n400); margin-top: 4px; }
+
+/* --- Flame Graph --- */
+.flame-graph { font-family: var(--font-mono); font-size: 11px; }
+.flame-bar { height: 20px; margin-bottom: 1px; border-radius: 2px; overflow: hidden; cursor: pointer; position: relative; min-width: 4px; }
+.flame-bar:hover { opacity: 0.8; }
+.flame-label { padding: 0 4px; line-height: 20px; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

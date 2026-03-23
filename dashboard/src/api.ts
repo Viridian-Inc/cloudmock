@@ -76,4 +76,138 @@ export function getBlastRadius(nodeId: string) {
   return api<any>('/api/blast-radius?node=' + encodeURIComponent(nodeId));
 }
 
+// --- Incidents ---
+
+export async function fetchIncidents(params?: { status?: string; severity?: string; service?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.status) query.set('status', params.status);
+  if (params?.severity) query.set('severity', params.severity);
+  if (params?.service) query.set('service', params.service);
+  if (params?.limit) query.set('limit', String(params.limit));
+  return api<any[]>(`/api/incidents?${query}`);
+}
+
+export async function acknowledgeIncident(id: string, owner: string) {
+  return api<any>(`/api/incidents/${id}/acknowledge`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ owner }),
+  });
+}
+
+export async function resolveIncident(id: string) {
+  return api(`/api/incidents/${id}/resolve`, { method: 'POST' });
+}
+
+export async function fetchIncidentReport(id: string, format = 'html') {
+  const res = await fetch(ADMIN_BASE + `/api/incidents/${id}/report?format=${format}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return format === 'json' ? res.json() : res.text();
+}
+
+// --- Regressions ---
+
+export async function fetchRegressions(params?: { service?: string; severity?: string; status?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.service) query.set('service', params.service);
+  if (params?.severity) query.set('severity', params.severity);
+  if (params?.status) query.set('status', params.status);
+  if (params?.limit) query.set('limit', String(params.limit));
+  return api<any[]>(`/api/regressions?${query}`);
+}
+
+export async function dismissRegression(id: string) {
+  return api(`/api/regressions/${id}/dismiss`, { method: 'POST' });
+}
+
+// --- Trace comparison ---
+
+export async function compareTraces(a: string, b: string) {
+  return api<any>(`/api/traces/compare?a=${a}&b=${b}`);
+}
+
+export async function compareBaseline(a: string) {
+  return api<any>(`/api/traces/compare?a=${a}&baseline=true`);
+}
+
+// --- Cost ---
+
+export async function fetchCostRoutes(limit = 20) {
+  return api<any[]>(`/api/cost/routes?limit=${limit}`);
+}
+
+export async function fetchCostTenants(limit = 20) {
+  return api<any[]>(`/api/cost/tenants?limit=${limit}`);
+}
+
+export async function fetchCostTrend(window = '24h', bucket = '1h') {
+  return api<any[]>(`/api/cost/trend?window=${window}&bucket=${bucket}`);
+}
+
+// --- Profiling ---
+
+export async function captureProfile(service: string, type: string, duration = '5s') {
+  const method = type === 'cpu' ? 'POST' : 'GET';
+  const res = await fetch(ADMIN_BASE + `/api/profile/${service}?type=${type}&duration=${duration}&format=flamegraph`, { method });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.text();
+}
+
+export async function fetchProfiles(service?: string) {
+  const query = service ? `?service=${service}` : '';
+  return api<any[]>(`/api/profiles${query}`);
+}
+
+export async function fetchProfileFlamegraph(id: string) {
+  const res = await fetch(ADMIN_BASE + `/api/profiles/${id}?format=flamegraph`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.text();
+}
+
+// --- Audit ---
+
+export async function fetchAudit(params?: { actor?: string; action?: string; limit?: number }) {
+  const query = new URLSearchParams();
+  if (params?.actor) query.set('actor', params.actor);
+  if (params?.action) query.set('action', params.action);
+  if (params?.limit) query.set('limit', String(params.limit));
+  return api<any[]>(`/api/audit?${query}`);
+}
+
+// --- Webhooks ---
+
+export async function fetchWebhooks() {
+  return api<any[]>('/api/webhooks');
+}
+
+export async function createWebhook(config: Record<string, unknown>) {
+  return api<any>('/api/webhooks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+}
+
+export async function deleteWebhook(id: string) {
+  return api(`/api/webhooks/${id}`, { method: 'DELETE' });
+}
+
+export async function testWebhook(id: string) {
+  return api(`/api/webhooks/${id}/test`, { method: 'POST' });
+}
+
+// --- Users ---
+
+export async function fetchUsers() {
+  return api<any[]>('/api/users');
+}
+
+export async function updateUserRole(id: string, role: string) {
+  return api(`/api/users/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+}
+
 export { ADMIN_BASE, GW_BASE };

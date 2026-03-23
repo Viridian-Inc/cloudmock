@@ -24,6 +24,9 @@ import (
 	promImpl "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/neureaux/cloudmock/pkg/incident"
+	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
+	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
@@ -345,6 +348,7 @@ func main() {
 	}
 
 	// Regression detection engine
+	var regEngine *regression.Engine
 	if cfg.Regression.Enabled {
 		var regStore regression.RegressionStore
 		var regSource regression.MetricSource
@@ -367,11 +371,47 @@ func main() {
 			window = 15 * time.Minute
 		}
 
-		regEngine := regression.New(regSource, regStore, dp.Config, regression.DefaultAlgorithmConfig(), scanInterval, window)
+		regEngine = regression.New(regSource, regStore, dp.Config, regression.DefaultAlgorithmConfig(), scanInterval, window)
 		regEngine.Start(ctx)
 		defer regEngine.Stop()
 
 		adminAPI.SetRegressionEngine(regEngine)
+	}
+
+	// Incident management service
+	if cfg.Incidents.Enabled {
+		var incStore incident.IncidentStore
+		switch mode {
+		case "local":
+			incStore = incmemory.NewStore()
+		case "production":
+			incStore = incpg.NewStore(pgPool)
+		}
+
+		groupWindow, _ := time.ParseDuration(cfg.Incidents.GroupWindow)
+		if groupWindow == 0 {
+			groupWindow = 5 * time.Minute
+		}
+
+		var regStore regression.RegressionStore
+		if regEngine != nil {
+			regStore = regEngine.Store()
+		}
+		incService := incident.NewService(incStore, regStore, groupWindow)
+
+		// Wire callbacks
+		if regEngine != nil {
+			regEngine.SetAlertCallback(func(ctx context.Context, r regression.Regression) {
+				incService.OnRegression(ctx, r)
+			})
+		}
+		if sloEngine != nil {
+			sloEngine.SetAlertFunc(func(service, action string, burnRate, budgetUsed float64) {
+				incService.OnSLOBreach(context.Background(), service, action, burnRate, budgetUsed)
+			})
+		}
+
+		adminAPI.SetIncidentService(incService)
 	}
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)

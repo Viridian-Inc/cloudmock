@@ -17,6 +17,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/neureaux/cloudmock/pkg/incident"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -80,6 +81,7 @@ type API struct {
 	regressionEngine *regression.Engine
 	traceComparer    *tracecompare.Comparer
 	costEngine       *cost.Engine
+	incidentService  *incident.Service
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -185,6 +187,8 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/views", a.handleViews)
 	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
+	a.mux.HandleFunc("/api/incidents", a.handleIncidents)
+	a.mux.HandleFunc("/api/incidents/", a.handleIncidents)
 
 	return a
 }
@@ -1969,6 +1973,11 @@ func (a *API) SetTraceComparer(tc *tracecompare.Comparer) {
 	a.traceComparer = tc
 }
 
+// SetIncidentService sets the incident service for the admin API.
+func (a *API) SetIncidentService(svc *incident.Service) {
+	a.incidentService = svc
+}
+
 func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2721,4 +2730,109 @@ func explainPercentile(sorted []float64, p int) float64 {
 		idx = len(sorted) - 1
 	}
 	return sorted[idx]
+}
+
+// handleIncidents handles incident API endpoints:
+//
+//	GET  /api/incidents              — list incidents with optional filters
+//	GET  /api/incidents/{id}         — get a single incident by ID
+//	POST /api/incidents/{id}/acknowledge — acknowledge an incident
+//	POST /api/incidents/{id}/resolve     — resolve an incident
+func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
+	if a.incidentService == nil {
+		http.Error(w, "incident service not available", http.StatusServiceUnavailable)
+		return
+	}
+
+	// Strip prefix to get ID
+	path := strings.TrimPrefix(r.URL.Path, "/api/incidents")
+	path = strings.TrimPrefix(path, "/")
+
+	// GET /api/incidents — list
+	if r.Method == http.MethodGet && path == "" {
+		filter := incident.IncidentFilter{
+			Status:   r.URL.Query().Get("status"),
+			Severity: r.URL.Query().Get("severity"),
+			Service:  r.URL.Query().Get("service"),
+		}
+		if l := r.URL.Query().Get("limit"); l != "" {
+			filter.Limit, _ = strconv.Atoi(l)
+		}
+		if filter.Limit == 0 {
+			filter.Limit = 50
+		}
+		results, err := a.incidentService.Store().List(r.Context(), filter)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, results)
+		return
+	}
+
+	// GET /api/incidents/{id} — detail
+	if r.Method == http.MethodGet && path != "" && !strings.Contains(path, "/") {
+		inc, err := a.incidentService.Store().Get(r.Context(), path)
+		if err != nil {
+			if errors.Is(err, incident.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, inc)
+		return
+	}
+
+	// POST /api/incidents/{id}/acknowledge
+	if r.Method == http.MethodPost && strings.HasSuffix(path, "/acknowledge") {
+		id := strings.TrimSuffix(path, "/acknowledge")
+		var body struct {
+			Owner string `json:"owner"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		inc, err := a.incidentService.Store().Get(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, incident.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		inc.Status = "acknowledged"
+		inc.Owner = body.Owner
+		if err := a.incidentService.Store().Update(r.Context(), inc); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, inc)
+		return
+	}
+
+	// POST /api/incidents/{id}/resolve
+	if r.Method == http.MethodPost && strings.HasSuffix(path, "/resolve") {
+		id := strings.TrimSuffix(path, "/resolve")
+		inc, err := a.incidentService.Store().Get(r.Context(), id)
+		if err != nil {
+			if errors.Is(err, incident.ErrNotFound) {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		now := time.Now()
+		inc.Status = "resolved"
+		inc.ResolvedAt = &now
+		if err := a.incidentService.Store().Update(r.Context(), inc); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, inc)
+		return
+	}
+
+	http.Error(w, "not found", http.StatusNotFound)
 }

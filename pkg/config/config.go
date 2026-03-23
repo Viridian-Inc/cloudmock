@@ -111,6 +111,12 @@ type RegressionConfig struct {
 	Window       string `yaml:"window" json:"window"`
 }
 
+// IncidentConfig holds incident management configuration.
+type IncidentConfig struct {
+	Enabled     bool   `yaml:"enabled" json:"enabled"`
+	GroupWindow string `yaml:"group_window" json:"group_window"`
+}
+
 // LambdaPricing holds per-invocation pricing for AWS Lambda.
 type LambdaPricing struct {
 	PerGBSecond     float64 `json:"perGBSecond" yaml:"perGBSecond"`
@@ -193,6 +199,7 @@ type Config struct {
 	DataPlane   DataPlaneConfig          `yaml:"dataplane"`
 	Regression  RegressionConfig         `yaml:"regression"`
 	Cost        CostConfig               `yaml:"cost" json:"cost"`
+	Incidents   IncidentConfig           `yaml:"incidents" json:"incidents"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -240,6 +247,10 @@ func Default() *Config {
 		},
 		Cost: CostConfig{
 			Pricing: DefaultPricingConfig(),
+		},
+		Incidents: IncidentConfig{
+			Enabled:     true,
+			GroupWindow: "5m",
 		},
 	}
 }

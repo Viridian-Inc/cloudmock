@@ -93,6 +93,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
+	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
 
 	return a
@@ -954,4 +955,153 @@ func writeJSON(w http.ResponseWriter, status int, v interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(data)
+}
+
+// ExplainContext aggregates all data needed for AI analysis of a request.
+type ExplainContext struct {
+	Request        *gateway.RequestEntry   `json:"request"`
+	Trace          *gateway.TraceContext    `json:"trace,omitempty"`
+	Timeline       []gateway.TimelineSpan  `json:"timeline,omitempty"`
+	SimilarRecent  []gateway.RequestEntry   `json:"similar_recent"`
+	ServiceMetrics interface{}              `json:"service_metrics,omitempty"`
+	Topology       *TopologyResponseV2      `json:"topology_context,omitempty"`
+	Analysis       ExplainAnalysis          `json:"analysis"`
+}
+
+// ExplainAnalysis contains pre-computed analysis hints.
+type ExplainAnalysis struct {
+	IsSlow       bool    `json:"is_slow"`
+	IsError      bool    `json:"is_error"`
+	P50Ms        float64 `json:"p50_ms"`
+	P95Ms        float64 `json:"p95_ms"`
+	P99Ms        float64 `json:"p99_ms"`
+	LatencyRatio float64 `json:"latency_ratio"` // request latency / p50 (>2 = slow)
+	ErrorRate    float64 `json:"error_rate"`     // recent error rate for this service
+	SpanCount    int     `json:"span_count"`
+	SlowestSpan  string  `json:"slowest_span,omitempty"`
+	Anomalies    []string `json:"anomalies,omitempty"`
+}
+
+// handleExplainRequest returns AI-ready context for a specific request.
+// GET /api/explain/{requestId}
+func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	reqID := strings.TrimPrefix(r.URL.Path, "/api/explain/")
+	if reqID == "" {
+		http.Error(w, "request ID required", http.StatusBadRequest)
+		return
+	}
+
+	// 1. Get the request
+	entry := a.log.GetByID(reqID)
+	if entry == nil {
+		http.Error(w, "request not found", http.StatusNotFound)
+		return
+	}
+
+	ctx := ExplainContext{
+		Request: entry,
+	}
+
+	// 2. Get the trace + timeline
+	if entry.TraceID != "" && a.traceStore != nil {
+		ctx.Trace = a.traceStore.Get(entry.TraceID)
+		ctx.Timeline = a.traceStore.Timeline(entry.TraceID)
+	}
+
+	// 3. Get recent similar requests (same service + action)
+	similar := a.log.RecentFiltered(gateway.RequestFilter{
+		Service: entry.Service,
+		Action:  entry.Action,
+		Limit:   20,
+	})
+	ctx.SimilarRecent = similar
+
+	// 4. Compute analysis
+	analysis := ExplainAnalysis{
+		IsError:   entry.StatusCode >= 400,
+		SpanCount: len(ctx.Timeline),
+	}
+
+	// Latency analysis from similar requests
+	if len(similar) > 0 {
+		latencies := make([]float64, len(similar))
+		errorCount := 0
+		for i, s := range similar {
+			latencies[i] = s.LatencyMs
+			if s.StatusCode >= 400 {
+				errorCount++
+			}
+		}
+		analysis.ErrorRate = float64(errorCount) / float64(len(similar))
+
+		// Sort for percentiles
+		explainSortFloat64s(latencies)
+		analysis.P50Ms = explainPercentile(latencies, 50)
+		analysis.P95Ms = explainPercentile(latencies, 95)
+		analysis.P99Ms = explainPercentile(latencies, 99)
+
+		if analysis.P50Ms > 0 {
+			analysis.LatencyRatio = entry.LatencyMs / analysis.P50Ms
+			analysis.IsSlow = analysis.LatencyRatio > 2.0
+		}
+	}
+
+	// Find slowest span in trace
+	if len(ctx.Timeline) > 0 {
+		slowest := ctx.Timeline[0]
+		for _, s := range ctx.Timeline[1:] {
+			if s.DurationMs > slowest.DurationMs {
+				slowest = s
+			}
+		}
+		analysis.SlowestSpan = slowest.Service + "/" + slowest.Action
+	}
+
+	// Detect anomalies
+	if analysis.IsSlow {
+		analysis.Anomalies = append(analysis.Anomalies,
+			fmt.Sprintf("Request latency (%.0fms) is %.1fx the p50 (%.0fms)",
+				entry.LatencyMs, analysis.LatencyRatio, analysis.P50Ms))
+	}
+	if analysis.IsError && analysis.ErrorRate < 0.1 {
+		analysis.Anomalies = append(analysis.Anomalies,
+			fmt.Sprintf("This error is unusual — service error rate is only %.0f%%", analysis.ErrorRate*100))
+	}
+	if analysis.IsError && analysis.ErrorRate > 0.5 {
+		analysis.Anomalies = append(analysis.Anomalies,
+			fmt.Sprintf("Service is experiencing high error rate: %.0f%%", analysis.ErrorRate*100))
+	}
+	if len(ctx.Timeline) > 5 {
+		analysis.Anomalies = append(analysis.Anomalies,
+			fmt.Sprintf("High span count (%d) — request fans out across multiple services", len(ctx.Timeline)))
+	}
+
+	ctx.Analysis = analysis
+	writeJSON(w, http.StatusOK, ctx)
+}
+
+// explainSortFloat64s sorts a slice of float64s in place.
+func explainSortFloat64s(s []float64) {
+	for i := 1; i < len(s); i++ {
+		for j := i; j > 0 && s[j] < s[j-1]; j-- {
+			s[j], s[j-1] = s[j-1], s[j]
+		}
+	}
+}
+
+// explainPercentile returns the p-th percentile of a sorted slice.
+func explainPercentile(sorted []float64, p int) float64 {
+	if len(sorted) == 0 {
+		return 0
+	}
+	idx := (p * len(sorted)) / 100
+	if idx >= len(sorted) {
+		idx = len(sorted) - 1
+	}
+	return sorted[idx]
 }

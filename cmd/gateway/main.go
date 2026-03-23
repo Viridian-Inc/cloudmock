@@ -25,6 +25,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/cost"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/neureaux/cloudmock/pkg/tenantscope"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	duckImpl "github.com/neureaux/cloudmock/pkg/dataplane/duckdb"
 	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
@@ -337,6 +338,13 @@ func main() {
 		}
 	default:
 		log.Fatalf("unknown dataplane mode: %q", mode)
+	}
+
+	// Tenant isolation: when auth is enabled, wrap DataPlane readers so that
+	// non-admin users only see data belonging to their tenant.
+	if cfg.Auth.Enabled {
+		dp.Traces = tenantscope.NewTraceReader(dp.Traces)
+		dp.Requests = tenantscope.NewRequestReader(dp.Requests)
 	}
 
 	// Chaos engine for fault injection

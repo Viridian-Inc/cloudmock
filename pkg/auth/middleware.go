@@ -64,6 +64,12 @@ func UserFromContext(ctx context.Context) *User {
 	return u
 }
 
+// ContextWithUser returns a new context with the given user stored in it.
+// This is primarily useful for testing.
+func ContextWithUser(ctx context.Context, user *User) context.Context {
+	return context.WithValue(ctx, userContextKey, user)
+}
+
 // GenerateToken creates a signed JWT for the given user.
 func GenerateToken(user *User, secret []byte, expiry time.Duration) (string, error) {
 	now := time.Now()

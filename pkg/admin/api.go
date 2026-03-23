@@ -95,6 +95,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
 	a.mux.HandleFunc("/api/slo", a.handleSLO)
+	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
@@ -950,6 +951,58 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleBlastRadius computes which services would be affected if a given
+// node fails. Traces upstream/downstream through the topology graph.
+// GET /api/blast-radius?node=dynamodb:attendance
+func (a *API) handleBlastRadius(w http.ResponseWriter, r *http.Request) {
+	nodeID := r.URL.Query().Get("node")
+	if nodeID == "" {
+		http.Error(w, "node parameter required", http.StatusBadRequest)
+		return
+	}
+
+	topo := a.buildDynamicTopology()
+
+	// Build adjacency: both directions
+	upstream := make(map[string][]string)   // target → sources
+	downstream := make(map[string][]string) // source → targets
+	for _, e := range topo.Edges {
+		downstream[e.Source] = append(downstream[e.Source], e.Target)
+		upstream[e.Target] = append(upstream[e.Target], e.Source)
+	}
+
+	// BFS downstream: what breaks if this node fails
+	affected := bfsNodes(nodeID, upstream) // nodes that depend on this node
+	dependsOn := bfsNodes(nodeID, downstream) // nodes this node depends on
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"node":       nodeID,
+		"affected":   affected,
+		"depends_on": dependsOn,
+		"blast_radius": len(affected),
+	})
+}
+
+// bfsNodes does a BFS from startID through the adjacency map.
+func bfsNodes(startID string, adj map[string][]string) []string {
+	visited := map[string]bool{startID: true}
+	queue := []string{startID}
+	var result []string
+
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		for _, next := range adj[current] {
+			if !visited[next] {
+				visited[next] = true
+				result = append(result, next)
+				queue = append(queue, next)
+			}
+		}
+	}
+	return result
 }
 
 // SetChaosEngine sets the chaos engine for the admin API to manage fault injection rules.

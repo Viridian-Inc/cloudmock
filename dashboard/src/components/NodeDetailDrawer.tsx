@@ -96,12 +96,15 @@ export function NodeDetailDrawer({ node, edges, nodes, onClose, onSelectNode }: 
   const [metrics, setMetrics] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  // Map topology node to the service name used in request logs
+  const requestService = nodeToRequestService(node);
+
   useEffect(() => {
     setLoading(true);
     setTab('overview');
     Promise.all([
-      getNodeRequests(node.service).catch(() => []),
-      getNodeTraces(node.service).catch(() => []),
+      getNodeRequests(requestService).catch(() => []),
+      getNodeTraces(requestService).catch(() => []),
       getNodeResources(node.service).catch(() => null),
       getStats().catch(() => ({})),
       getMetrics().catch(() => null),
@@ -119,10 +122,10 @@ export function NodeDetailDrawer({ node, edges, nodes, onClose, onSelectNode }: 
   const outbound = edges.filter(e => e.source === node.id);
   const nodeMap = new Map(nodes.map(n => [n.id, n]));
 
-  const reqCount = stats[node.service] || 0;
+  const reqCount = stats[requestService] || stats[node.service] || 0;
   const errorCount = requests.filter(r => r.status >= 400).length;
   const errorRate = requests.length > 0 ? Math.round((errorCount / requests.length) * 100) : 0;
-  const svcMetrics = metrics?.services?.[node.service];
+  const svcMetrics = metrics?.services?.[requestService] || metrics?.services?.[node.service];
   const avgLatency = svcMetrics?.p50 || 0;
   const typeStyle = getTypeStyle(node.type);
 
@@ -774,6 +777,21 @@ function InfoRow({ label, value }: { label: string; value: any }) {
       <div style={{ color: 'var(--n700, #334155)', fontSize: 12, padding: '2px 0' }}>{value}</div>
     </>
   );
+}
+
+// Maps a topology node to the service name used in request logs.
+// Topology nodes use "external" as the service for BFF/GraphQL/Calendar,
+// but requests are logged with "bff", "graphql", etc.
+function nodeToRequestService(node: TopoNode): string {
+  const idMap: Record<string, string> = {
+    'external:bff-service': 'bff',
+    'external:graphql-server': 'graphql',
+    'external:calendar-service': 'calendar',
+    'external:expo-app': 'app',
+    'external:admin-portal': 'app',
+    'external:client-portal': 'app',
+  };
+  return idMap[node.id] || node.service;
 }
 
 function tryParse(s: string): any {

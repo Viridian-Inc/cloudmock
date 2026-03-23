@@ -184,6 +184,12 @@ func (ps *ProxyServer) logProxyRequest(r *http.Request, host string, route Proxy
 			return
 		}
 	}
+	// Skip noise: HEAD requests, bare "/" pings, health checks, favicon, HMR
+	if r.Method == "HEAD" || r.URL.Path == "/" || r.URL.Path == "/favicon.ico" ||
+		strings.HasPrefix(r.URL.Path, "/__") || strings.HasPrefix(r.URL.Path, "/hot") ||
+		strings.HasPrefix(r.URL.Path, "/node_modules") || strings.HasPrefix(r.URL.Path, "/assets") {
+		return
+	}
 
 	// Determine service name from the route host
 	service := "proxy"

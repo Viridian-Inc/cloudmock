@@ -9,20 +9,22 @@ import (
 
 // TraceContext represents a single span in a distributed trace.
 type TraceContext struct {
-	TraceID      string          `json:"trace_id"`
-	SpanID       string          `json:"span_id"`
-	ParentSpanID string          `json:"parent_span_id,omitempty"`
-	Service      string          `json:"service"`
-	Action       string          `json:"action"`
-	Method       string          `json:"method,omitempty"`
-	Path         string          `json:"path,omitempty"`
-	StartTime    time.Time       `json:"start_time"`
-	EndTime      time.Time       `json:"end_time"`
-	Duration     time.Duration   `json:"duration_ns"`
-	DurationMs   float64         `json:"duration_ms"`
-	StatusCode   int             `json:"status_code"`
-	Error        string          `json:"error,omitempty"`
-	Children     []*TraceContext `json:"children,omitempty"`
+	TraceID      string            `json:"trace_id"`
+	SpanID       string            `json:"span_id"`
+	ParentSpanID string            `json:"parent_span_id,omitempty"`
+	Service      string            `json:"service"`
+	Action       string            `json:"action"`
+	Method       string            `json:"method,omitempty"`
+	Path         string            `json:"path,omitempty"`
+	StartTime    time.Time         `json:"start_time"`
+	EndTime      time.Time         `json:"end_time"`
+	Duration     time.Duration     `json:"duration_ns"`
+	DurationMs   float64           `json:"duration_ms"`
+	StatusCode   int               `json:"status_code"`
+	Error        string            `json:"error,omitempty"`
+	Children     []*TraceContext   `json:"children,omitempty"`
+	// Context propagation: feature flags, cache, policy decisions
+	Metadata     map[string]string `json:"metadata,omitempty"`
 }
 
 // TraceSummary is a lightweight representation for listing traces.
@@ -41,15 +43,16 @@ type TraceSummary struct {
 
 // TimelineSpan is a flattened span for waterfall rendering.
 type TimelineSpan struct {
-	SpanID       string  `json:"span_id"`
-	ParentSpanID string  `json:"parent_span_id,omitempty"`
-	Service      string  `json:"service"`
-	Action       string  `json:"action"`
-	StartOffsetMs float64 `json:"start_offset_ms"`
-	DurationMs   float64 `json:"duration_ms"`
-	StatusCode   int     `json:"status_code"`
-	Error        string  `json:"error,omitempty"`
-	Depth        int     `json:"depth"`
+	SpanID        string            `json:"span_id"`
+	ParentSpanID  string            `json:"parent_span_id,omitempty"`
+	Service       string            `json:"service"`
+	Action        string            `json:"action"`
+	StartOffsetMs float64           `json:"start_offset_ms"`
+	DurationMs    float64           `json:"duration_ms"`
+	StatusCode    int               `json:"status_code"`
+	Error         string            `json:"error,omitempty"`
+	Depth         int               `json:"depth"`
+	Metadata      map[string]string `json:"metadata,omitempty"`
 }
 
 // TraceStore is a thread-safe circular buffer of recent traces, indexed by TraceID.

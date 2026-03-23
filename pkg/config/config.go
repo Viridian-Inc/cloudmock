@@ -67,6 +67,12 @@ type SLOConfig struct {
 	Rules   []SLORule `yaml:"rules" json:"rules"`
 }
 
+// AdminAuthConfig holds admin API authentication configuration.
+type AdminAuthConfig struct {
+	Enabled bool   `yaml:"enabled" json:"enabled"`
+	APIKey  string `yaml:"api_key" json:"-"` // never serialize the key
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -79,6 +85,7 @@ type Config struct {
 	Admin       AdminConfig              `yaml:"admin"`
 	Logging     LoggingConfig            `yaml:"logging"`
 	SLO         SLOConfig                `yaml:"slo"`
+	AdminAuth   AdminAuthConfig          `yaml:"admin_auth"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 

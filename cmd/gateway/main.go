@@ -266,6 +266,9 @@ func main() {
 	})
 
 	var adminHandler http.Handler = adminAPI
+	if cfg.AdminAuth.Enabled && cfg.AdminAuth.APIKey != "" {
+		adminHandler = admin.AdminAuthMiddleware(adminHandler, cfg.AdminAuth.APIKey)
+	}
 	if corsEnabled != "false" && corsEnabled != "0" {
 		adminHandler = gateway.CORSMiddleware(adminHandler)
 	}

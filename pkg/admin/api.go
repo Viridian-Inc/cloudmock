@@ -99,6 +99,8 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/slo", a.handleSLO)
 	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
 	a.mux.HandleFunc("/api/tenants", a.handleTenants)
+	a.mux.HandleFunc("/api/tenants/export", a.handleTenantExport)
+	a.mux.HandleFunc("/api/shadow", a.handleShadowTest)
 	a.mux.HandleFunc("/api/cost", a.handleCost)
 	a.mux.HandleFunc("/api/compare", a.handleCompare)
 	a.mux.HandleFunc("/api/deploys", a.handleDeploys)
@@ -936,6 +938,28 @@ func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, trace)
 }
 
+// AdminAuthMiddleware protects admin endpoints with API key authentication.
+// Checks X-Admin-Key header or ?key= query param against the configured key.
+// Health and stream endpoints are excluded to allow monitoring.
+func AdminAuthMiddleware(next http.Handler, apiKey string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Skip auth for health checks and SSE stream
+		if r.URL.Path == "/api/health" || r.URL.Path == "/api/stream" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		key := r.Header.Get("X-Admin-Key")
+		if key == "" {
+			key = r.URL.Query().Get("key")
+		}
+		if key != apiKey {
+			http.Error(w, `{"error":"unauthorized","message":"Invalid or missing X-Admin-Key header"}`, http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // SetSLOEngine sets the SLO engine for the admin API.
 func (a *API) SetSLOEngine(engine *gateway.SLOEngine) {
 	a.sloEngine = engine
@@ -1316,6 +1340,145 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleTenantExport exports per-tenant report as CSV.
+// GET /api/tenants/export?format=csv
+func (a *API) handleTenantExport(w http.ResponseWriter, r *http.Request) {
+	entries := a.log.Recent("", 1000)
+
+	type tenantRow struct {
+		ID       string
+		Requests int
+		Errors   int
+		AvgMs    float64
+	}
+	tenants := make(map[string]*tenantRow)
+	for _, e := range entries {
+		if e.CallerID == "" {
+			continue
+		}
+		t, ok := tenants[e.CallerID]
+		if !ok {
+			t = &tenantRow{ID: e.CallerID}
+			tenants[e.CallerID] = t
+		}
+		t.Requests++
+		t.AvgMs += e.LatencyMs
+		if e.StatusCode >= 400 {
+			t.Errors++
+		}
+	}
+
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", "attachment; filename=tenant-report.csv")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte("tenant_id,requests,errors,error_rate,avg_latency_ms\n"))
+	for _, t := range tenants {
+		if t.Requests > 0 {
+			t.AvgMs /= float64(t.Requests)
+		}
+		errRate := float64(t.Errors) / float64(max(t.Requests, 1))
+		line := fmt.Sprintf("%s,%d,%d,%.4f,%.2f\n", t.ID, t.Requests, t.Errors, errRate, t.AvgMs)
+		_, _ = w.Write([]byte(line))
+	}
+}
+
+// handleShadowTest replays recent traffic against a target URL for synthetic testing.
+// POST /api/shadow {"target": "http://localhost:3203", "service": "bff", "limit": 10}
+func (a *API) handleShadowTest(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	body, _ := io.ReadAll(r.Body)
+	var req struct {
+		Target  string `json:"target"`
+		Service string `json:"service"`
+		Limit   int    `json:"limit"`
+	}
+	if err := json.Unmarshal(body, &req); err != nil {
+		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		return
+	}
+	if req.Target == "" {
+		http.Error(w, "target URL required", http.StatusBadRequest)
+		return
+	}
+	if req.Limit <= 0 {
+		req.Limit = 10
+	}
+
+	// Get recent requests to replay
+	entries := a.log.RecentFiltered(gateway.RequestFilter{
+		Service: req.Service,
+		Limit:   req.Limit,
+		Level:   "app",
+	})
+
+	type shadowResult struct {
+		OriginalID     string  `json:"original_id"`
+		Method         string  `json:"method"`
+		Path           string  `json:"path"`
+		OriginalStatus int     `json:"original_status"`
+		ShadowStatus   int     `json:"shadow_status"`
+		OriginalMs     float64 `json:"original_ms"`
+		ShadowMs       float64 `json:"shadow_ms"`
+		Match          bool    `json:"match"`
+		Error          string  `json:"error,omitempty"`
+	}
+
+	var results []shadowResult
+	client := &http.Client{Timeout: 10 * time.Second}
+
+	for _, entry := range entries {
+		targetURL := req.Target + entry.Path
+		var reqBody io.Reader
+		if entry.RequestBody != "" {
+			reqBody = strings.NewReader(entry.RequestBody)
+		}
+		httpReq, err := http.NewRequest(entry.Method, targetURL, reqBody)
+		if err != nil {
+			results = append(results, shadowResult{OriginalID: entry.ID, Error: err.Error()})
+			continue
+		}
+		for k, v := range entry.RequestHeaders {
+			httpReq.Header.Set(k, v)
+		}
+		httpReq.Header.Set("X-Cloudmock-Shadow", "true")
+
+		start := time.Now()
+		resp, err := client.Do(httpReq)
+		shadowMs := float64(time.Since(start).Nanoseconds()) / 1e6
+
+		if err != nil {
+			results = append(results, shadowResult{
+				OriginalID: entry.ID, Method: entry.Method, Path: entry.Path,
+				OriginalStatus: entry.StatusCode, OriginalMs: entry.LatencyMs,
+				ShadowMs: shadowMs, Error: err.Error(),
+			})
+			continue
+		}
+		resp.Body.Close()
+
+		results = append(results, shadowResult{
+			OriginalID:     entry.ID,
+			Method:         entry.Method,
+			Path:           entry.Path,
+			OriginalStatus: entry.StatusCode,
+			ShadowStatus:   resp.StatusCode,
+			OriginalMs:     entry.LatencyMs,
+			ShadowMs:       shadowMs,
+			Match:          resp.StatusCode == entry.StatusCode,
+		})
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"target":  req.Target,
+		"count":   len(results),
+		"results": results,
+	})
 }
 
 func max(a, b int) int {

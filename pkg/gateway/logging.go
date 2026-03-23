@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -30,6 +31,8 @@ type RequestEntry struct {
 	CallerID       string            `json:"caller_id"`
 	Error          string            `json:"error,omitempty"`
 	Level          string            `json:"level,omitempty"` // "app" (user-facing) or "infra" (AWS SDK calls to cloudmock)
+	MemAllocKB     int64             `json:"mem_alloc_kb,omitempty"`   // heap allocation at request time
+	Goroutines     int               `json:"goroutines,omitempty"`     // goroutine count at request time
 	RequestHeaders map[string]string `json:"request_headers,omitempty"`
 	RequestBody    string            `json:"request_body,omitempty"`
 	ResponseBody   string            `json:"response_body,omitempty"`
@@ -306,6 +309,10 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			_ = body
 		}
 
+		// Capture runtime profiling stats
+		var memStats runtime.MemStats
+		runtime.ReadMemStats(&memStats)
+
 		entry := RequestEntry{
 			ID:             fmt.Sprintf("%d-%d", id, counter),
 			TraceID:        traceID,
@@ -321,6 +328,8 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			CallerID:       extractCallerID(r),
 			Error:          errMsg,
 			Level:          "infra", // AWS SDK calls to cloudmock gateway
+			MemAllocKB:     int64(memStats.Alloc / 1024),
+			Goroutines:     runtime.NumGoroutine(),
 			RequestHeaders: reqHeaders,
 			RequestBody:    reqBody,
 			ResponseBody:   rec.body.String(),
@@ -334,6 +343,9 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		// Store trace context.
 		if opts.TraceStore != nil {
 			endTime := time.Now()
+			// Capture distributed context from headers
+			metadata := extractTraceMetadata(r)
+
 			trace := &TraceContext{
 				TraceID:      traceID,
 				SpanID:       spanID,
@@ -348,6 +360,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				DurationMs:   latencyMs,
 				StatusCode:   rec.statusCode,
 				Error:        errMsg,
+				Metadata:     metadata,
 			}
 			opts.TraceStore.Add(trace)
 		}
@@ -391,6 +404,31 @@ func detectActionFromRequest(r *http.Request) string {
 }
 
 // extractCallerID extracts the access key ID from the Authorization header.
+// extractTraceMetadata captures feature flags, cache behavior, policy decisions,
+// and other distributed context from request headers for trace propagation.
+func extractTraceMetadata(r *http.Request) map[string]string {
+	meta := make(map[string]string)
+	// Capture context propagation headers
+	contextHeaders := []string{
+		"x-feature-flag", "x-feature-flags",
+		"x-cache-status", "x-cache-hit",
+		"x-tenant-id", "x-enterprise-id",
+		"x-user-id", "x-contact-id",
+		"x-policy-decision", "x-authz-result",
+		"x-request-id", "x-correlation-id",
+		"x-environment", "x-deployment-id",
+	}
+	for _, h := range contextHeaders {
+		if v := r.Header.Get(h); v != "" {
+			meta[h] = v
+		}
+	}
+	if len(meta) == 0 {
+		return nil
+	}
+	return meta
+}
+
 func extractCallerID(r *http.Request) string {
 	auth := r.Header.Get("Authorization")
 	if auth == "" {

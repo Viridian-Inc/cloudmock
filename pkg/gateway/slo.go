@@ -7,12 +7,23 @@ import (
 	"github.com/neureaux/cloudmock/pkg/config"
 )
 
+// SLOAlertFunc is called when a breaching window is detected during Record.
+// It receives the service, action, current burn rate, and fraction of error budget used.
+type SLOAlertFunc func(service, action string, burnRate, budgetUsed float64)
+
 // SLOEngine evaluates requests against configured SLO thresholds
 // and tracks error budgets with burn rate calculation.
 type SLOEngine struct {
-	mu      sync.RWMutex
-	rules   []config.SLORule
-	windows map[string]*SLOWindow // key: "service:action"
+	mu        sync.RWMutex
+	rules     []config.SLORule
+	windows   map[string]*SLOWindow // key: "service:action"
+	alertFunc SLOAlertFunc
+}
+
+// SetAlertFunc registers a callback that is invoked on every Record call
+// where the window is found to be breaching. Passing nil disables alerting.
+func (e *SLOEngine) SetAlertFunc(fn SLOAlertFunc) {
+	e.alertFunc = fn
 }
 
 // SLOWindow tracks SLO compliance over a rolling window.
@@ -121,6 +132,21 @@ func (e *SLOEngine) Record(service, action string, latencyMs float64, statusCode
 		w.latencies = w.latencies[1:]
 	}
 	w.latencies = append(w.latencies, latencyMs)
+
+	// Detect breach and invoke alert callback when set
+	if e.alertFunc != nil && w.Total > 0 && w.ErrorTarget > 0 {
+		errorRate := float64(w.Errors) / float64(w.Total)
+		breaching := latencyMs > rule.P99Ms || errorRate > w.ErrorTarget
+		if breaching {
+			budgetUsed := errorRate / w.ErrorTarget
+			expectedErrors := w.ErrorTarget * float64(w.Total)
+			var burnRate float64
+			if expectedErrors > 0 {
+				burnRate = float64(w.Errors) / expectedErrors
+			}
+			e.alertFunc(service, action, burnRate, budgetUsed)
+		}
+	}
 }
 
 // Status returns the current SLO status across all windows.

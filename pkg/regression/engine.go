@@ -15,17 +15,28 @@ type pendingDeploy struct {
 	EvalTimes []time.Duration
 }
 
+// AlertCallback is called when a regression is detected or resolved.
+// It is defined here to avoid an import cycle with the incident package.
+type AlertCallback func(ctx context.Context, r Regression)
+
 // Engine orchestrates continuous regression detection and deploy-triggered evaluation.
 type Engine struct {
-	source   MetricSource
-	store    RegressionStore
-	deploys  dataplane.ConfigStore
-	config   AlgorithmConfig
-	interval time.Duration
-	window   time.Duration
-	pending  chan pendingDeploy
-	stop     chan struct{}
-	done     chan struct{}
+	source        MetricSource
+	store         RegressionStore
+	deploys       dataplane.ConfigStore
+	config        AlgorithmConfig
+	interval      time.Duration
+	window        time.Duration
+	pending       chan pendingDeploy
+	stop          chan struct{}
+	done          chan struct{}
+	alertCallback AlertCallback
+}
+
+// SetAlertCallback registers a callback that is invoked whenever a regression
+// is saved or resolved. The callback is optional; nil disables alerting.
+func (e *Engine) SetAlertCallback(fn AlertCallback) {
+	e.alertCallback = fn
 }
 
 // New creates a new regression detection engine.
@@ -157,6 +168,9 @@ func (e *Engine) Scan(ctx context.Context) error {
 				r.DetectedAt = now
 				r.WindowAfter = afterWindow
 				_ = e.store.Save(ctx, r)
+				if e.alertCallback != nil {
+					e.alertCallback(ctx, *r)
+				}
 			}
 		}
 	}
@@ -185,6 +199,9 @@ func (e *Engine) runAlgorithms(ctx context.Context, before, after *WindowMetrics
 		r.WindowBefore = beforeWindow
 		r.WindowAfter = afterWindow
 		_ = e.store.Save(ctx, r)
+		if e.alertCallback != nil {
+			e.alertCallback(ctx, *r)
+		}
 	}
 }
 
@@ -242,9 +259,15 @@ func (e *Engine) runAlgorithmsForDeploy(ctx context.Context, before, after *Wind
 			// Update only if higher confidence
 			if c.result.Confidence > prev.Confidence {
 				_ = e.store.Save(ctx, c.result)
+				if e.alertCallback != nil {
+					e.alertCallback(ctx, *c.result)
+				}
 			}
 		} else {
 			_ = e.store.Save(ctx, c.result)
+			if e.alertCallback != nil {
+				e.alertCallback(ctx, *c.result)
+			}
 		}
 	}
 }
@@ -290,6 +313,11 @@ func (e *Engine) checkResolutions(ctx context.Context) error {
 		deviation := math.Abs(currentValue-r.BeforeValue) / r.BeforeValue
 		if deviation <= 0.10 {
 			_ = e.store.UpdateStatus(ctx, r.ID, "resolved")
+			if e.alertCallback != nil {
+				resolved := r
+				resolved.Status = "resolved"
+				e.alertCallback(ctx, resolved)
+			}
 		}
 	}
 

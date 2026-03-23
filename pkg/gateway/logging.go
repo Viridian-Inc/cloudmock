@@ -13,6 +13,10 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 )
 
 // maxBodyCapture is the maximum number of bytes captured for request/response bodies.
@@ -395,7 +399,25 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				}
 				_ = opts.DataPlane.RequestW.Write(context.Background(), dpEntry)
 			}
-			// In production mode, OTel SDK handles traces and SLO recording.
+
+			// Emit an OTel span for each request.
+			tracer := otel.Tracer("cloudmock-gateway")
+			_, span := tracer.Start(r.Context(), fmt.Sprintf("%s %s", r.Method, svcName))
+			span.SetAttributes(
+				attribute.String("service.name", svcName),
+				attribute.String("service.action", action),
+				attribute.String("http.method", r.Method),
+				attribute.String("http.path", r.URL.Path),
+				attribute.Int("http.status_code", rec.statusCode),
+			)
+			if tenantID := r.Header.Get("X-Tenant-Id"); tenantID != "" {
+				span.SetAttributes(attribute.String("tenant_id", tenantID))
+			}
+			if errMsg != "" {
+				span.SetAttributes(attribute.String("error", errMsg))
+				span.SetStatus(codes.Error, errMsg)
+			}
+			span.End()
 		} else {
 			// Local mode: write directly to in-memory stores.
 			log.Add(entry)

@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log"
@@ -11,7 +12,10 @@ import (
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
+	chImpl "github.com/neureaux/cloudmock/pkg/dataplane/clickhouse"
 	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
+	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
+	promImpl "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
@@ -226,6 +230,8 @@ func main() {
 	stubs.RegisterAllLazy(registry, cfg.AccountID, cfg.Region)
 
 	// Determine DataPlane mode
+	ctx := context.Background()
+
 	mode := cfg.DataPlane.Mode
 	if mode == "" {
 		mode = "local"
@@ -257,7 +263,44 @@ func main() {
 			Mode:     "local",
 		}
 	case "production":
-		log.Fatal("production mode not yet implemented")
+		chClient, err := chImpl.NewClient(ctx, cfg.DataPlane.ClickHouse)
+		if err != nil {
+			log.Fatalf("clickhouse: %v", err)
+		}
+		defer chClient.Close()
+
+		pgPool, err := pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
+		if err != nil {
+			log.Fatalf("postgres: %v", err)
+		}
+		defer pgPool.Close()
+
+		promClient, err := promImpl.NewClient(cfg.DataPlane.Prometheus)
+		if err != nil {
+			log.Fatalf("prometheus: %v", err)
+		}
+
+		shutdown, err := dataplane.InitTracer(ctx, cfg.DataPlane.OTel)
+		if err != nil {
+			log.Fatalf("otel: %v", err)
+		}
+		defer shutdown(ctx)
+
+		chTraces := chImpl.NewTraceStore(chClient)
+		chRequests := chImpl.NewRequestStore(chClient)
+
+		dp = &dataplane.DataPlane{
+			Traces:   chTraces,
+			TraceW:   chTraces,
+			Requests: chRequests,
+			RequestW: chRequests,
+			Metrics:  promImpl.NewMetricReader(promClient),
+			MetricW:  promImpl.NewMetricWriter(),
+			SLO:      pgImpl.NewSLOStore(pgPool),
+			Config:   pgImpl.NewConfigStore(pgPool),
+			Topology: pgImpl.NewTopologyStore(pgPool),
+			Mode:     "production",
+		}
 	default:
 		log.Fatalf("unknown dataplane mode: %q", mode)
 	}

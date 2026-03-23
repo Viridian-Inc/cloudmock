@@ -1,12 +1,15 @@
 package gateway
 
 import (
+	"bytes"
 	"crypto/tls"
+	"io"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -131,11 +134,50 @@ func (ps *ProxyServer) proxyToWithOpts(backend string, w http.ResponseWriter, r 
 		},
 		ModifyResponse: func(resp *http.Response) error {
 			addCORSHeaders(resp, r)
+			// Rewrite backend URLs in response bodies for PreserveHost routes.
+			// Metro/Expo embeds http://localhost:8081 in JS bundles; the browser
+			// on https://proxy.domain blocks these as mixed content.
+			if preserveHost {
+				rewriteResponseBody(resp, target, r)
+			}
 			return nil
 		},
 	}
 
 	proxy.ServeHTTP(w, r)
+}
+
+// rewriteResponseBody replaces backend origin URLs with the proxy's origin
+// in text responses. This fixes mixed-content issues where Metro embeds
+// http://localhost:8081 in JS bundles but the browser is on https://proxy.domain.
+func rewriteResponseBody(resp *http.Response, target *url.URL, req *http.Request) {
+	ct := resp.Header.Get("Content-Type")
+	if !strings.Contains(ct, "javascript") && !strings.Contains(ct, "json") && !strings.Contains(ct, "html") && !strings.Contains(ct, "text/") {
+		return
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		resp.Body = io.NopCloser(bytes.NewReader(body))
+		return
+	}
+
+	// Determine the proxy's public origin from the original request
+	scheme := "http"
+	if req.TLS != nil {
+		scheme = "https"
+	}
+	proxyOrigin := scheme + "://" + req.Host
+	backendOrigin := target.Scheme + "://" + target.Host
+
+	if bytes.Contains(body, []byte(backendOrigin)) {
+		body = bytes.ReplaceAll(body, []byte(backendOrigin), []byte(proxyOrigin))
+		resp.Header.Set("Content-Length", strconv.Itoa(len(body)))
+		resp.ContentLength = int64(len(body))
+	}
+
+	resp.Body = io.NopCloser(bytes.NewReader(body))
 }
 
 // addCORSHeaders adds CORS headers to proxied responses.

@@ -38,6 +38,15 @@ type HealthResponse struct {
 	Services map[string]bool `json:"services"`
 }
 
+// SavedView represents a named filter preset that users can save and recall.
+type SavedView struct {
+	ID        string            `json:"id"`
+	Name      string            `json:"name"`
+	Filters   map[string]string `json:"filters"`
+	CreatedBy string            `json:"created_by"`
+	CreatedAt string            `json:"created_at"`
+}
+
 // IaCTopologyConfig holds the topology graph pushed from the IaC layer.
 type IaCTopologyConfig struct {
 	Nodes []TopologyNodeV2 `json:"nodes"`
@@ -61,6 +70,8 @@ type API struct {
 	deploys        []DeployEvent
 	deploysMu      sync.RWMutex
 	sloEngine      *gateway.SLOEngine
+	views          []SavedView
+	viewsMu        sync.RWMutex
 	mux            *http.ServeMux
 }
 
@@ -107,6 +118,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
+	a.mux.HandleFunc("/api/views", a.handleViews)
 
 	return a
 }
@@ -271,6 +283,61 @@ func (a *API) handleStats(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, a.stats.Snapshot())
 }
 
+func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		a.viewsMu.RLock()
+		views := make([]SavedView, len(a.views))
+		copy(views, a.views)
+		a.viewsMu.RUnlock()
+		writeJSON(w, http.StatusOK, views)
+
+	case http.MethodPost:
+		var v SavedView
+		if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		v.ID = fmt.Sprintf("view-%d", time.Now().UnixNano())
+		v.CreatedAt = time.Now().UTC().Format(time.RFC3339)
+
+		a.viewsMu.Lock()
+		if len(a.views) >= 50 {
+			a.viewsMu.Unlock()
+			http.Error(w, "maximum of 50 saved views reached", http.StatusConflict)
+			return
+		}
+		a.views = append(a.views, v)
+		a.viewsMu.Unlock()
+		writeJSON(w, http.StatusCreated, v)
+
+	case http.MethodDelete:
+		id := r.URL.Query().Get("id")
+		if id == "" {
+			http.Error(w, "missing id query parameter", http.StatusBadRequest)
+			return
+		}
+		a.viewsMu.Lock()
+		found := false
+		for i, v := range a.views {
+			if v.ID == id {
+				a.views = append(a.views[:i], a.views[i+1:]...)
+				found = true
+				break
+			}
+		}
+		a.viewsMu.Unlock()
+		if !found {
+			http.Error(w, "view not found", http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -295,16 +362,47 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		level = ""
 	}
 
+	var minLatency, maxLatency float64
+	if v := q.Get("min_latency_ms"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			minLatency = f
+		}
+	}
+	if v := q.Get("max_latency_ms"); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			maxLatency = f
+		}
+	}
+
+	var from, to time.Time
+	if v := q.Get("from"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			from = t
+		}
+	}
+	if v := q.Get("to"); v != "" {
+		if t, err := time.Parse(time.RFC3339, v); err == nil {
+			to = t
+		}
+	}
+
 	filter := gateway.RequestFilter{
-		Service:   q.Get("service"),
-		Path:      q.Get("path"),
-		Method:    q.Get("method"),
-		CallerID:  q.Get("caller_id"),
-		Action:    q.Get("action"),
-		ErrorOnly: q.Get("error") == "true",
-		TraceID:   q.Get("trace_id"),
-		Level:     level,
-		Limit:     limit,
+		Service:      q.Get("service"),
+		Path:         q.Get("path"),
+		Method:       q.Get("method"),
+		CallerID:     q.Get("caller_id"),
+		Action:       q.Get("action"),
+		ErrorOnly:    q.Get("error") == "true",
+		TraceID:      q.Get("trace_id"),
+		Level:        level,
+		Limit:        limit,
+		TenantID:     q.Get("tenant_id"),
+		OrgID:        q.Get("org_id"),
+		UserID:       q.Get("user_id"),
+		MinLatencyMs: minLatency,
+		MaxLatencyMs: maxLatency,
+		From:         from,
+		To:           to,
 	}
 
 	entries := a.log.RecentFiltered(filter)

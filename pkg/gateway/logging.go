@@ -74,15 +74,22 @@ func (rl *RequestLog) Add(entry RequestEntry) {
 
 // RequestFilter defines filtering criteria for request log queries.
 type RequestFilter struct {
-	Service   string
-	Path      string
-	Method    string
-	CallerID  string
-	Action    string
-	ErrorOnly bool
-	TraceID   string
-	Level     string // "app" or "infra" — empty means all
-	Limit     int
+	Service      string
+	Path         string
+	Method       string
+	CallerID     string
+	Action       string
+	ErrorOnly    bool
+	TraceID      string
+	Level        string // "app" or "infra" — empty means all
+	Limit        int
+	TenantID     string
+	OrgID        string
+	UserID       string
+	MinLatencyMs float64
+	MaxLatencyMs float64
+	From         time.Time
+	To           time.Time
 }
 
 // Recent returns up to limit entries, newest first.
@@ -127,6 +134,27 @@ func (rl *RequestLog) RecentFiltered(f RequestFilter) []RequestEntry {
 			continue
 		}
 		if f.Level != "" && e.Level != f.Level {
+			continue
+		}
+		if f.TenantID != "" && e.RequestHeaders["X-Tenant-Id"] != f.TenantID {
+			continue
+		}
+		if f.OrgID != "" && e.RequestHeaders["X-Enterprise-Id"] != f.OrgID {
+			continue
+		}
+		if f.UserID != "" && e.RequestHeaders["X-User-Id"] != f.UserID {
+			continue
+		}
+		if f.MinLatencyMs > 0 && e.LatencyMs < f.MinLatencyMs {
+			continue
+		}
+		if f.MaxLatencyMs > 0 && e.LatencyMs > f.MaxLatencyMs {
+			continue
+		}
+		if !f.From.IsZero() && e.Timestamp.Before(f.From) {
+			continue
+		}
+		if !f.To.IsZero() && e.Timestamp.After(f.To) {
 			continue
 		}
 		result = append(result, e)

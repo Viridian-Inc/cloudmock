@@ -165,9 +165,24 @@ func (ps *ProxyServer) buildHandler() http.Handler {
 }
 
 // logProxyRequest records a proxied request in the request log and broadcasts it.
+// Skips cloudmock's own internal traffic (dashboard, admin API) to avoid log pollution.
 func (ps *ProxyServer) logProxyRequest(r *http.Request, host string, route ProxyRoute, status int, latency time.Duration) {
 	if ps.requestLog == nil {
 		return
+	}
+
+	// Skip cloudmock's own traffic — dashboard, admin API, and gateway requests
+	// are internal observability traffic, not application requests to debug.
+	// Gateway requests are already logged by the gateway's own middleware.
+	if strings.Contains(host, "cloudmock") || strings.Contains(host, "admin") {
+		return
+	}
+	// Skip routes that proxy to cloudmock itself (dashboard, admin, gateway)
+	ports := DefaultServicePorts()
+	for _, skipPort := range []int{ports.Gateway, ports.Dashboard, ports.Admin} {
+		if strings.Contains(route.Backend, fmt.Sprintf(":%d", skipPort)) {
+			return
+		}
 	}
 
 	// Determine service name from the route host

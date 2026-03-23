@@ -25,6 +25,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/incident"
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
@@ -95,6 +96,7 @@ type API struct {
 	userStore        auth.UserStore
 	authSecret       []byte
 	webhookDispatcher *webhook.Dispatcher
+	reportGenerator   *report.Generator
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -2017,6 +2019,11 @@ func (a *API) SetIncidentService(svc *incident.Service) {
 	a.incidentService = svc
 }
 
+// SetReportGenerator sets the incident report generator for the admin API.
+func (a *API) SetReportGenerator(g *report.Generator) {
+	a.reportGenerator = g
+}
+
 // SetWebhookDispatcher sets the webhook dispatcher for the admin API.
 func (a *API) SetWebhookDispatcher(d *webhook.Dispatcher) {
 	a.webhookDispatcher = d
@@ -2857,6 +2864,34 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 	// Strip prefix to get ID
 	path := strings.TrimPrefix(r.URL.Path, "/api/incidents")
 	path = strings.TrimPrefix(path, "/")
+
+	// GET /api/incidents/{id}/report — export report
+	if r.Method == http.MethodGet && strings.HasSuffix(path, "/report") {
+		id := strings.TrimSuffix(path, "/report")
+		format := r.URL.Query().Get("format")
+		if format == "" {
+			format = "json"
+		}
+		if a.reportGenerator == nil {
+			http.Error(w, "report generator not available", http.StatusServiceUnavailable)
+			return
+		}
+		content, contentType, err := a.reportGenerator.Generate(r.Context(), id, format)
+		if err != nil {
+			if strings.Contains(err.Error(), "not found") {
+				http.Error(w, err.Error(), http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", contentType)
+		if format != "json" {
+			w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=incident-%s.%s", id, format))
+		}
+		w.Write(content) //nolint:errcheck
+		return
+	}
 
 	// GET /api/incidents — list
 	if r.Method == http.MethodGet && path == "" {

@@ -38,6 +38,7 @@ import (
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/webhook"
 	whmemory "github.com/neureaux/cloudmock/pkg/webhook/memory"
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
@@ -469,6 +470,13 @@ func main() {
 		}
 
 		adminAPI.SetIncidentService(incService)
+
+		var reportRegStore regression.RegressionStore
+		if regEngine != nil {
+			reportRegStore = regEngine.Store()
+		}
+		reportGen := report.New(incService.Store(), reportRegStore, dp.Traces)
+		adminAPI.SetReportGenerator(reportGen)
 
 		// Webhook dispatcher — wired inside the incident block so it is always
 		// co-located with the incident service.

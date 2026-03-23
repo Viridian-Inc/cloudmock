@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/neureaux/cloudmock/pkg/dataplane"
 )
 
 // maxBodyCapture is the maximum number of bytes captured for request/response bodies.
@@ -254,6 +257,7 @@ type LoggingMiddlewareOpts struct {
 	Broadcaster RequestBroadcaster
 	TraceStore  *TraceStore
 	SLOEngine   *SLOEngine
+	DataPlane   *dataplane.DataPlane
 }
 
 // LoggingMiddleware wraps a gateway handler and records request data.
@@ -363,42 +367,74 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			ResponseBody:   rec.body.String(),
 		}
 
-		log.Add(entry)
-		if svcName != "" {
-			stats.Increment(svcName)
-		}
+		productionMode := opts.DataPlane != nil && opts.DataPlane.Mode == "production"
 
-		// Store trace context.
-		if opts.TraceStore != nil {
-			endTime := time.Now()
-			// Capture distributed context from headers
-			metadata := extractTraceMetadata(r)
-
-			trace := &TraceContext{
-				TraceID:      traceID,
-				SpanID:       spanID,
-				ParentSpanID: parentSpanID,
-				Service:      svcName,
-				Action:       action,
-				Method:       r.Method,
-				Path:         r.URL.Path,
-				StartTime:    start,
-				EndTime:      endTime,
-				Duration:     latency,
-				DurationMs:   latencyMs,
-				StatusCode:   rec.statusCode,
-				Error:        errMsg,
-				Metadata:     metadata,
+		if productionMode {
+			// Production mode: write request via DataPlane, skip local stores.
+			if opts.DataPlane.RequestW != nil {
+				dpEntry := dataplane.RequestEntry{
+					ID:             entry.ID,
+					TraceID:        entry.TraceID,
+					SpanID:         entry.SpanID,
+					Timestamp:      entry.Timestamp,
+					Service:        entry.Service,
+					Action:         entry.Action,
+					Method:         entry.Method,
+					Path:           entry.Path,
+					StatusCode:     entry.StatusCode,
+					Latency:        entry.Latency,
+					LatencyMs:      entry.LatencyMs,
+					CallerID:       entry.CallerID,
+					Error:          entry.Error,
+					Level:          entry.Level,
+					MemAllocKB:     float64(entry.MemAllocKB),
+					Goroutines:     entry.Goroutines,
+					RequestHeaders: entry.RequestHeaders,
+					RequestBody:    entry.RequestBody,
+					ResponseBody:   entry.ResponseBody,
+				}
+				_ = opts.DataPlane.RequestW.Write(context.Background(), dpEntry)
 			}
-			opts.TraceStore.Add(trace)
+			// In production mode, OTel SDK handles traces and SLO recording.
+		} else {
+			// Local mode: write directly to in-memory stores.
+			log.Add(entry)
+			if svcName != "" {
+				stats.Increment(svcName)
+			}
+
+			// Store trace context.
+			if opts.TraceStore != nil {
+				endTime := time.Now()
+				// Capture distributed context from headers
+				metadata := extractTraceMetadata(r)
+
+				trace := &TraceContext{
+					TraceID:      traceID,
+					SpanID:       spanID,
+					ParentSpanID: parentSpanID,
+					Service:      svcName,
+					Action:       action,
+					Method:       r.Method,
+					Path:         r.URL.Path,
+					StartTime:    start,
+					EndTime:      endTime,
+					Duration:     latency,
+					DurationMs:   latencyMs,
+					StatusCode:   rec.statusCode,
+					Error:        errMsg,
+					Metadata:     metadata,
+				}
+				opts.TraceStore.Add(trace)
+			}
+
+			// Record SLO metrics.
+			if opts.SLOEngine != nil {
+				opts.SLOEngine.Record(svcName, action, latencyMs, rec.statusCode)
+			}
 		}
 
-		// Record SLO metrics.
-		if opts.SLOEngine != nil {
-			opts.SLOEngine.Record(svcName, action, latencyMs, rec.statusCode)
-		}
-
-		// Broadcast request event for SSE clients.
+		// Broadcast request event for SSE clients — always runs regardless of mode.
 		if opts.Broadcaster != nil {
 			opts.Broadcaster.Broadcast("request", entry)
 		}

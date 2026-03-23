@@ -10,6 +10,8 @@ import (
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
+	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
@@ -223,21 +225,49 @@ func main() {
 	// Tier 2 stub services — always lazy to avoid initializing ~73 services at startup.
 	stubs.RegisterAllLazy(registry, cfg.AccountID, cfg.Region)
 
-	requestLog := gateway.NewRequestLog(1000)
-	requestStats := gateway.NewRequestStats()
-	traceStore := gateway.NewTraceStore(500)
+	// Determine DataPlane mode
+	mode := cfg.DataPlane.Mode
+	if mode == "" {
+		mode = "local"
+	}
+
+	var dp *dataplane.DataPlane
+	var requestLog *gateway.RequestLog
+	var requestStats *gateway.RequestStats
+	var traceStore *gateway.TraceStore
+	var sloEngine *gateway.SLOEngine
+
+	switch mode {
+	case "local":
+		requestLog = gateway.NewRequestLog(1000)
+		requestStats = gateway.NewRequestStats()
+		traceStore = gateway.NewTraceStore(500)
+		sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
+
+		dp = &dataplane.DataPlane{
+			Traces:   memory.NewTraceStore(traceStore),
+			TraceW:   memory.NewTraceStore(traceStore),
+			Requests: memory.NewRequestStore(requestLog),
+			RequestW: memory.NewRequestStore(requestLog),
+			Metrics:  memory.NewMetricStore(requestStats, requestLog),
+			MetricW:  memory.NewMetricStore(requestStats, requestLog),
+			SLO:      memory.NewSLOStore(sloEngine),
+			Config:   memory.NewConfigStore(cfg),
+			Topology: memory.NewTopologyStore(),
+			Mode:     "local",
+		}
+	case "production":
+		log.Fatal("production mode not yet implemented")
+	default:
+		log.Fatalf("unknown dataplane mode: %q", mode)
+	}
 
 	// Chaos engine for fault injection
 	chaosEngine := gateway.NewChaosEngine()
 
-	// SLO engine for latency/error tracking
-	sloEngine := gateway.NewSLOEngine(cfg.SLO.Rules)
-
 	// Admin API (with CORS for dashboard cross-origin access)
-	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
-	adminAPI.SetTraceStore(traceStore)
+	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	adminAPI.SetChaosEngine(chaosEngine)
-	adminAPI.SetSLOEngine(sloEngine)
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -263,6 +293,7 @@ func main() {
 		Broadcaster: adminAPI.Broadcaster(),
 		TraceStore:  traceStore,
 		SLOEngine:   sloEngine,
+		DataPlane:   dp,
 	})
 
 	var adminHandler http.Handler = adminAPI

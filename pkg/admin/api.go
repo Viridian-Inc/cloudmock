@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
@@ -73,6 +74,7 @@ type API struct {
 	views          []SavedView
 	viewsMu        sync.RWMutex
 	mux            *http.ServeMux
+	dp             *dataplane.DataPlane
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -84,6 +86,55 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 		stats:       stats,
 		broadcaster: NewEventBroadcaster(),
 		mux:         http.NewServeMux(),
+	}
+
+	a.mux.HandleFunc("/api/services", a.handleServices)
+	a.mux.HandleFunc("/api/services/", a.handleServiceByName)
+	a.mux.HandleFunc("/api/reset", a.handleResetAll)
+	a.mux.HandleFunc("/api/health", a.handleHealth)
+	a.mux.HandleFunc("/api/config", a.handleConfig)
+	a.mux.HandleFunc("/api/stats", a.handleStats)
+	a.mux.HandleFunc("/api/requests", a.handleRequests)
+	a.mux.HandleFunc("/api/stream", a.handleStream)
+	a.mux.HandleFunc("/api/lambda/logs", a.handleLambdaLogs)
+	a.mux.HandleFunc("/api/lambda/logs/stream", a.handleLambdaLogStream)
+	a.mux.HandleFunc("/api/requests/", a.handleRequestByID)
+	a.mux.HandleFunc("/api/iam/evaluate", a.handleIAMEvaluate)
+	a.mux.HandleFunc("/api/ses/emails", a.handleSESEmails)
+	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
+	a.mux.HandleFunc("/api/topology", a.handleTopology)
+	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
+	a.mux.HandleFunc("/api/resources/", a.handleResources)
+	a.mux.HandleFunc("/api/traces", a.handleTraces)
+	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
+	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
+	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
+	a.mux.HandleFunc("/api/slo", a.handleSLO)
+	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
+	a.mux.HandleFunc("/api/tenants", a.handleTenants)
+	a.mux.HandleFunc("/api/tenants/export", a.handleTenantExport)
+	a.mux.HandleFunc("/api/shadow", a.handleShadowTest)
+	a.mux.HandleFunc("/api/cost", a.handleCost)
+	a.mux.HandleFunc("/api/compare", a.handleCompare)
+	a.mux.HandleFunc("/api/deploys", a.handleDeploys)
+	a.mux.HandleFunc("/api/chaos", a.handleChaos)
+	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
+	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
+	a.mux.HandleFunc("/api/views", a.handleViews)
+
+	return a
+}
+
+// NewWithDataPlane creates an admin API handler wired to the given registry,
+// config, and DataPlane. When dp is non-nil, handlers use DataPlane stores
+// for reads/writes instead of the legacy in-memory fields.
+func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *dataplane.DataPlane) *API {
+	a := &API{
+		cfg:         cfg,
+		registry:    registry,
+		broadcaster: NewEventBroadcaster(),
+		mux:         http.NewServeMux(),
+		dp:          dp,
 	}
 
 	a.mux.HandleFunc("/api/services", a.handleServices)
@@ -280,10 +331,55 @@ func (a *API) handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.dp != nil && a.stats == nil {
+		// DataPlane mode without legacy stats — return empty snapshot
+		writeJSON(w, http.StatusOK, map[string]int64{})
+		return
+	}
+
 	writeJSON(w, http.StatusOK, a.stats.Snapshot())
 }
 
 func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
+	if a.dp != nil {
+		switch r.Method {
+		case http.MethodGet:
+			views, err := a.dp.Config.ListViews(r.Context())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, views)
+		case http.MethodPost:
+			var v dataplane.SavedView
+			if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
+				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			v.ID = fmt.Sprintf("view-%d", time.Now().UnixNano())
+			v.CreatedAt = time.Now().UTC()
+			if err := a.dp.Config.SaveView(r.Context(), v); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusCreated, v)
+		case http.MethodDelete:
+			id := r.URL.Query().Get("id")
+			if id == "" {
+				http.Error(w, "missing id query parameter", http.StatusBadRequest)
+				return
+			}
+			if err := a.dp.Config.DeleteView(r.Context(), id); err != nil {
+				http.Error(w, "view not found", http.StatusNotFound)
+				return
+			}
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		a.viewsMu.RLock()
@@ -384,6 +480,34 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		if t, err := time.Parse(time.RFC3339, v); err == nil {
 			to = t
 		}
+	}
+
+	if a.dp != nil {
+		dpFilter := dataplane.RequestFilter{
+			Service:      q.Get("service"),
+			Path:         q.Get("path"),
+			Method:       q.Get("method"),
+			CallerID:     q.Get("caller_id"),
+			Action:       q.Get("action"),
+			ErrorOnly:    q.Get("error") == "true",
+			TraceID:      q.Get("trace_id"),
+			Level:        level,
+			Limit:        limit,
+			TenantID:     q.Get("tenant_id"),
+			OrgID:        q.Get("org_id"),
+			UserID:       q.Get("user_id"),
+			MinLatencyMs: minLatency,
+			MaxLatencyMs: maxLatency,
+			From:         from,
+			To:           to,
+		}
+		entries, err := a.dp.Requests.Query(r.Context(), dpFilter)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, entries)
+		return
 	}
 
 	filter := gateway.RequestFilter{
@@ -511,6 +635,7 @@ func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost && strings.HasSuffix(id, "/replay") {
 		id = strings.TrimSuffix(id, "/replay")
+		// Replay always uses the legacy log (needs gateway.RequestEntry)
 		entry := a.log.GetByID(id)
 		if entry == nil {
 			http.NotFound(w, r)
@@ -523,6 +648,16 @@ func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	if a.dp != nil {
+		entry, err := a.dp.Requests.GetByID(r.Context(), id)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, entry)
 		return
 	}
 
@@ -970,11 +1105,6 @@ func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if a.traceStore == nil {
-		writeJSON(w, http.StatusOK, []struct{}{})
-		return
-	}
-
 	svcFilter := r.URL.Query().Get("service")
 	limit := 100
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -990,6 +1120,25 @@ func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
 	} else if ef == "false" {
 		v := false
 		hasErrorFilter = &v
+	}
+
+	if a.dp != nil {
+		summaries, err := a.dp.Traces.Search(r.Context(), dataplane.TraceFilter{
+			Service:  svcFilter,
+			HasError: hasErrorFilter,
+			Limit:    limit,
+		})
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, summaries)
+		return
+	}
+
+	if a.traceStore == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
 	}
 
 	traces := a.traceStore.Recent(svcFilter, hasErrorFilter, limit)
@@ -1009,6 +1158,27 @@ func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 
 	if traceID == "" {
 		http.NotFound(w, r)
+		return
+	}
+
+	if a.dp != nil {
+		// /api/traces/:traceId/timeline
+		if len(parts) == 2 && parts[1] == "timeline" {
+			spans, err := a.dp.Traces.Timeline(r.Context(), traceID)
+			if err != nil {
+				http.NotFound(w, r)
+				return
+			}
+			writeJSON(w, http.StatusOK, spans)
+			return
+		}
+
+		trace, err := a.dp.Traces.Get(r.Context(), traceID)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		writeJSON(w, http.StatusOK, trace)
 		return
 	}
 
@@ -1065,6 +1235,43 @@ func (a *API) SetSLOEngine(engine *gateway.SLOEngine) {
 
 // handleSLO returns the current SLO status or updates rules.
 func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
+	if a.dp != nil {
+		switch r.Method {
+		case http.MethodGet:
+			status, err := a.dp.SLO.Status(r.Context())
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			rules, _ := a.dp.SLO.Rules(r.Context())
+			writeJSON(w, http.StatusOK, map[string]interface{}{
+				"windows": status.Windows,
+				"healthy": status.Healthy,
+				"alerts":  status.Alerts,
+				"rules":   rules,
+			})
+		case http.MethodPut:
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			var rules []config.SLORule
+			if err := json.Unmarshal(body, &rules); err != nil {
+				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			if err := a.dp.SLO.SetRules(r.Context(), rules); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
 	if a.sloEngine == nil {
 		writeJSON(w, http.StatusOK, map[string]interface{}{"enabled": false})
 		return
@@ -1400,6 +1607,43 @@ type DeployEvent struct {
 // GET /api/deploys — list recent deploys
 // POST /api/deploys — record a new deploy
 func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
+	if a.dp != nil {
+		switch r.Method {
+		case http.MethodGet:
+			deploys, err := a.dp.Config.ListDeploys(r.Context(), dataplane.DeployFilter{Limit: 100})
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, deploys)
+		case http.MethodPost:
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, "bad request", http.StatusBadRequest)
+				return
+			}
+			var deploy dataplane.DeployEvent
+			if err := json.Unmarshal(body, &deploy); err != nil {
+				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				return
+			}
+			if deploy.DeployedAt.IsZero() {
+				deploy.DeployedAt = time.Now()
+			}
+			if deploy.ID == "" {
+				deploy.ID = fmt.Sprintf("deploy-%d", time.Now().UnixNano())
+			}
+			if err := a.dp.Config.AddDeploy(r.Context(), deploy); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusCreated, deploy)
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
 	switch r.Method {
 	case http.MethodGet:
 		a.deploysMu.RLock()

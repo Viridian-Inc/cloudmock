@@ -73,6 +73,37 @@ type AdminAuthConfig struct {
 	APIKey  string `yaml:"api_key" json:"-"` // never serialize the key
 }
 
+// DataPlaneConfig holds data plane configuration for request/trace storage.
+type DataPlaneConfig struct {
+	Mode       string           `yaml:"mode" json:"mode"`
+	ClickHouse ClickHouseConfig `yaml:"clickhouse" json:"clickhouse"`
+	PostgreSQL PostgreSQLConfig `yaml:"postgresql" json:"postgresql"`
+	Prometheus PrometheusConfig `yaml:"prometheus" json:"prometheus"`
+	OTel       OTelConfig       `yaml:"otel" json:"otel"`
+}
+
+// ClickHouseConfig holds ClickHouse connection configuration.
+type ClickHouseConfig struct {
+	Endpoint string `yaml:"endpoint" json:"endpoint"`
+	Database string `yaml:"database" json:"database"`
+}
+
+// PostgreSQLConfig holds PostgreSQL connection configuration.
+type PostgreSQLConfig struct {
+	URL string `yaml:"url" json:"url"`
+}
+
+// PrometheusConfig holds Prometheus connection configuration.
+type PrometheusConfig struct {
+	URL string `yaml:"url" json:"url"`
+}
+
+// OTelConfig holds OpenTelemetry configuration.
+type OTelConfig struct {
+	CollectorEndpoint string `yaml:"collector_endpoint" json:"collector_endpoint"`
+	ServiceName       string `yaml:"service_name" json:"service_name"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -86,6 +117,7 @@ type Config struct {
 	Logging     LoggingConfig            `yaml:"logging"`
 	SLO         SLOConfig                `yaml:"slo"`
 	AdminAuth   AdminAuthConfig          `yaml:"admin_auth"`
+	DataPlane   DataPlaneConfig          `yaml:"dataplane"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -123,6 +155,9 @@ func Default() *Config {
 				{Service: "*", Action: "*", P50Ms: 50, P95Ms: 200, P99Ms: 500, ErrorRate: 0.01},
 			},
 		},
+		DataPlane: DataPlaneConfig{
+			Mode: "local",
+		},
 	}
 }
 
@@ -137,6 +172,10 @@ func LoadFromFile(path string) (*Config, error) {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
+	}
+
+	if cfg.DataPlane.Mode == "" {
+		cfg.DataPlane.Mode = "local"
 	}
 
 	return cfg, nil

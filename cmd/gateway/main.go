@@ -14,6 +14,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/neureaux/cloudmock/pkg/admin"
+	"github.com/neureaux/cloudmock/pkg/audit"
+	auditmemory "github.com/neureaux/cloudmock/pkg/audit/memory"
+	auditpg "github.com/neureaux/cloudmock/pkg/audit/postgres"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
@@ -330,6 +333,16 @@ func main() {
 
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
+	// Audit logger
+	var auditLog audit.Logger
+	switch mode {
+	case "local":
+		auditLog = auditmemory.NewLogger()
+	case "production":
+		auditLog = auditpg.NewLogger(pgPool)
+	}
+	adminAPI.SetAuditLogger(auditLog)
+
 	adminAPI.SetChaosEngine(chaosEngine)
 
 	profileDir := filepath.Join(os.TempDir(), "cloudmock-profiles")

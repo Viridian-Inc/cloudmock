@@ -2,6 +2,7 @@ package admin
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
@@ -85,6 +87,7 @@ type API struct {
 	incidentService  *incident.Service
 	profilingEngine  *profiling.Engine
 	symbolizer       *profiling.Symbolizer
+	auditLogger      audit.Logger
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 }
@@ -135,6 +138,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/views", a.handleViews)
 	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
+	a.mux.HandleFunc("/api/audit", a.handleAudit)
 
 	return a
 }
@@ -196,6 +200,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/profiles", a.handleProfiles)
 	a.mux.HandleFunc("/api/profiles/", a.handleProfiles)
 	a.mux.HandleFunc("/api/sourcemaps", a.handleSourcemaps)
+	a.mux.HandleFunc("/api/audit", a.handleAudit)
 
 	return a
 }
@@ -388,6 +393,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]interface{}{"name": v.Name})
 			writeJSON(w, http.StatusCreated, v)
 		case http.MethodDelete:
 			id := r.URL.Query().Get("id")
@@ -399,6 +405,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "view not found", http.StatusNotFound)
 				return
 			}
+			a.auditLog(r.Context(), "view.deleted", "view:"+id, nil)
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -431,6 +438,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		}
 		a.views = append(a.views, v)
 		a.viewsMu.Unlock()
+		a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]interface{}{"name": v.Name})
 		writeJSON(w, http.StatusCreated, v)
 
 	case http.MethodDelete:
@@ -453,6 +461,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "view not found", http.StatusNotFound)
 			return
 		}
+		a.auditLog(r.Context(), "view.deleted", "view:"+id, nil)
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
@@ -1291,6 +1300,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]interface{}{"rule_count": len(rules)})
 			writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1319,6 +1329,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.sloEngine.SetRules(rules)
+		a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]interface{}{"rule_count": len(rules)})
 		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1754,6 +1765,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			if a.regressionEngine != nil {
 				a.regressionEngine.OnDeploy(deploy)
 			}
+			a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]interface{}{"service": deploy.Service})
 			writeJSON(w, http.StatusCreated, deploy)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1809,6 +1821,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
+		a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]interface{}{"service": deploy.Service})
 		writeJSON(w, http.StatusCreated, deploy)
 
 	default:
@@ -1995,6 +2008,61 @@ func (a *API) SetSymbolizer(s *profiling.Symbolizer) {
 	a.symbolizer = s
 }
 
+// SetAuditLogger sets the audit logger for recording mutating API actions.
+func (a *API) SetAuditLogger(l audit.Logger) {
+	a.auditLogger = l
+}
+
+// auditLog records an audit entry if the audit logger is configured.
+// It is a fire-and-forget helper — errors are silently ignored.
+func (a *API) auditLog(ctx context.Context, action, resource string, details map[string]interface{}) {
+	if a.auditLogger == nil {
+		return
+	}
+	_ = a.auditLogger.Log(ctx, audit.Entry{
+		Actor:    "system",
+		Action:   action,
+		Resource: resource,
+		Details:  details,
+	})
+}
+
+// handleAudit serves GET /api/audit — returns recent audit log entries.
+func (a *API) handleAudit(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	if a.auditLogger == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	filter := audit.Filter{
+		Actor:    r.URL.Query().Get("actor"),
+		Action:   r.URL.Query().Get("action"),
+		Resource: r.URL.Query().Get("resource"),
+	}
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+			filter.Limit = l
+		}
+	}
+	if filter.Limit == 0 {
+		filter.Limit = 50
+	}
+
+	entries, err := a.auditLogger.Query(r.Context(), filter)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if entries == nil {
+		entries = []audit.Entry{}
+	}
+	writeJSON(w, http.StatusOK, entries)
+}
+
 func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -2073,6 +2141,7 @@ func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		a.auditLog(r.Context(), "regression.dismissed", "regression:"+id, nil)
 		writeJSON(w, http.StatusOK, map[string]string{"status": "dismissed"})
 
 	// GET /api/regressions/{id}
@@ -2824,6 +2893,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		a.auditLog(r.Context(), "incident.acknowledged", "incident:"+id, map[string]interface{}{"owner": body.Owner})
 		writeJSON(w, http.StatusOK, inc)
 		return
 	}
@@ -2847,6 +2917,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		a.auditLog(r.Context(), "incident.resolved", "incident:"+id, nil)
 		writeJSON(w, http.StatusOK, inc)
 		return
 	}
@@ -2961,6 +3032,7 @@ func (a *API) handleSourcemaps(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	a.auditLog(r.Context(), "sourcemap.uploaded", "sourcemap:"+filePath, nil)
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status":"ok"}`))
 }

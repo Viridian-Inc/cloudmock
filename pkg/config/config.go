@@ -76,16 +76,15 @@ type AdminAuthConfig struct {
 // DataPlaneConfig holds data plane configuration for request/trace storage.
 type DataPlaneConfig struct {
 	Mode       string           `yaml:"mode" json:"mode"`
-	ClickHouse ClickHouseConfig `yaml:"clickhouse" json:"clickhouse"`
+	DuckDB     DuckDBConfig     `yaml:"duckdb" json:"duckdb"`
 	PostgreSQL PostgreSQLConfig `yaml:"postgresql" json:"postgresql"`
 	Prometheus PrometheusConfig `yaml:"prometheus" json:"prometheus"`
 	OTel       OTelConfig       `yaml:"otel" json:"otel"`
 }
 
-// ClickHouseConfig holds ClickHouse connection configuration.
-type ClickHouseConfig struct {
-	Endpoint string `yaml:"endpoint" json:"endpoint"`
-	Database string `yaml:"database" json:"database"`
+// DuckDBConfig holds DuckDB database configuration.
+type DuckDBConfig struct {
+	Path string `yaml:"path" json:"path"` // default: "cloudmock.duckdb"
 }
 
 // PostgreSQLConfig holds PostgreSQL connection configuration.

@@ -1,4 +1,4 @@
-package clickhouse_test
+package duckdb_test
 
 import (
 	"context"
@@ -9,17 +9,26 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
-	chstore "github.com/neureaux/cloudmock/pkg/dataplane/clickhouse"
+	duckstore "github.com/neureaux/cloudmock/pkg/dataplane/duckdb"
 )
 
-func TestTraceWriteAndGet(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
+func setupTestDB(t *testing.T) *duckstore.Client {
+	t.Helper()
+	client, err := duckstore.NewClient(":memory:")
+	if err != nil {
+		t.Fatal(err)
 	}
+	if err := client.InitSchema(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { client.Close() })
+	return client
+}
 
+func TestTraceWriteAndGet(t *testing.T) {
 	ctx := context.Background()
-	client := setupClickHouse(t, ctx)
-	store := chstore.NewTraceStore(client)
+	client := setupTestDB(t)
+	store := duckstore.NewTraceStore(client)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
@@ -101,13 +110,9 @@ func TestTraceWriteAndGet(t *testing.T) {
 }
 
 func TestTraceSearch(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
 	ctx := context.Background()
-	client := setupClickHouse(t, ctx)
-	store := chstore.NewTraceStore(client)
+	client := setupTestDB(t)
+	store := duckstore.NewTraceStore(client)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
@@ -172,13 +177,9 @@ func TestTraceSearch(t *testing.T) {
 }
 
 func TestTraceTimeline(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
 	ctx := context.Background()
-	client := setupClickHouse(t, ctx)
-	store := chstore.NewTraceStore(client)
+	client := setupTestDB(t)
+	store := duckstore.NewTraceStore(client)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 

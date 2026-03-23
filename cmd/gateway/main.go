@@ -22,7 +22,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/dashboard"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
-	chImpl "github.com/neureaux/cloudmock/pkg/dataplane/clickhouse"
+	duckImpl "github.com/neureaux/cloudmock/pkg/dataplane/duckdb"
 	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
 	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
 	promImpl "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
@@ -261,7 +261,7 @@ func main() {
 	var sloEngine *gateway.SLOEngine
 
 	// Production-mode clients, hoisted for use by the regression engine.
-	var chClient *chImpl.Client
+	var duckClient *duckImpl.Client
 	var pgPool *pgxpool.Pool
 	var promClient *promImpl.Client
 
@@ -286,11 +286,18 @@ func main() {
 		}
 	case "production":
 		var err error
-		chClient, err = chImpl.NewClient(ctx, cfg.DataPlane.ClickHouse)
-		if err != nil {
-			log.Fatalf("clickhouse: %v", err)
+		duckPath := cfg.DataPlane.DuckDB.Path
+		if duckPath == "" {
+			duckPath = "cloudmock.duckdb"
 		}
-		defer chClient.Close()
+		duckClient, err = duckImpl.NewClient(duckPath)
+		if err != nil {
+			log.Fatalf("duckdb: %v", err)
+		}
+		defer duckClient.Close()
+		if err := duckClient.InitSchema(); err != nil {
+			log.Fatalf("duckdb schema: %v", err)
+		}
 
 		pgPool, err = pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
 		if err != nil {
@@ -309,14 +316,14 @@ func main() {
 		}
 		defer shutdown(ctx)
 
-		chTraces := chImpl.NewTraceStore(chClient)
-		chRequests := chImpl.NewRequestStore(chClient)
+		duckTraces := duckImpl.NewTraceStore(duckClient)
+		duckRequests := duckImpl.NewRequestStore(duckClient)
 
 		dp = &dataplane.DataPlane{
-			Traces:   chTraces,
-			TraceW:   chTraces,
-			Requests: chRequests,
-			RequestW: chRequests,
+			Traces:   duckTraces,
+			TraceW:   duckTraces,
+			Requests: duckRequests,
+			RequestW: duckRequests,
 			Metrics:  promImpl.NewMetricReader(promClient),
 			MetricW:  promImpl.NewMetricWriter(),
 			SLO:      pgImpl.NewSLOStore(pgPool),
@@ -381,7 +388,7 @@ func main() {
 			regSource = regmemory.NewMetricSource(requestLog, traceStore)
 		case "production":
 			regStore = regpg.NewStore(pgPool)
-			regSource = regression.NewMetricSource(promClient.API(), chClient.Conn())
+			regSource = regression.NewMetricSource(promClient.API(), duckClient.DB())
 		}
 
 		scanInterval, _ := time.ParseDuration(cfg.Regression.ScanInterval)

@@ -1,60 +1,35 @@
-package clickhouse
+package duckdb
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 )
 
 // TraceStore implements dataplane.TraceReader and dataplane.TraceWriter
-// backed by ClickHouse.
+// backed by DuckDB.
 type TraceStore struct {
-	conn driver.Conn
+	db *sql.DB
 }
 
-// NewTraceStore creates a TraceStore using the given Client's connection.
+// NewTraceStore creates a TraceStore using the given Client's database.
 func NewTraceStore(c *Client) *TraceStore {
-	return &TraceStore{conn: c.Conn()}
+	return &TraceStore{db: c.DB()}
 }
 
-// spanRow is the internal representation matching the ClickHouse spans table.
-type spanRow struct {
-	TraceID        string            `ch:"trace_id"`
-	SpanID         string            `ch:"span_id"`
-	ParentSpanID   string            `ch:"parent_span_id"`
-	StartTime      time.Time         `ch:"start_time"`
-	EndTime        time.Time         `ch:"end_time"`
-	DurationNs     uint64            `ch:"duration_ns"`
-	ServiceName    string            `ch:"service_name"`
-	Action         string            `ch:"action"`
-	Method         string            `ch:"method"`
-	Path           string            `ch:"path"`
-	StatusCode     uint16            `ch:"status_code"`
-	Error          string            `ch:"error"`
-	TenantID       string            `ch:"tenant_id"`
-	OrgID          string            `ch:"org_id"`
-	UserID         string            `ch:"user_id"`
-	MemAllocKB     float64           `ch:"mem_alloc_kb"`
-	Goroutines     uint32            `ch:"goroutines"`
-	Metadata       map[string]string `ch:"metadata"`
-	RequestHeaders map[string]string `ch:"request_headers"`
-	RequestBody    string            `ch:"request_body"`
-	ResponseBody   string            `ch:"response_body"`
-}
-
-// trimNulls strips null bytes that ClickHouse FixedString columns pad with.
-func trimNulls(s string) string {
-	return strings.TrimRight(s, "\x00")
-}
-
-// WriteSpans batch-inserts spans into the spans table.
+// WriteSpans inserts spans into the spans table.
 func (s *TraceStore) WriteSpans(ctx context.Context, spans []*dataplane.Span) error {
-	batch, err := s.conn.PrepareBatch(ctx, `INSERT INTO spans (
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO spans (
 		trace_id, span_id, parent_span_id,
 		start_time, end_time, duration_ns,
 		service_name, action, method, path,
@@ -63,42 +38,46 @@ func (s *TraceStore) WriteSpans(ctx context.Context, spans []*dataplane.Span) er
 		mem_alloc_kb, goroutines,
 		metadata, request_headers,
 		request_body, response_body
-	)`)
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
-		return fmt.Errorf("prepare batch: %w", err)
+		return fmt.Errorf("prepare insert: %w", err)
 	}
+	defer stmt.Close()
+
 	for _, sp := range spans {
 		durationNs := sp.DurationNs
 		if durationNs == 0 {
 			durationNs = uint64(sp.EndTime.Sub(sp.StartTime).Nanoseconds())
 		}
-		meta := sp.Metadata
-		if meta == nil {
-			meta = map[string]string{}
+
+		metaJSON, err := marshalMap(sp.Metadata)
+		if err != nil {
+			return fmt.Errorf("marshal metadata: %w", err)
 		}
-		headers := sp.ReqHeaders
-		if headers == nil {
-			headers = map[string]string{}
+		headersJSON, err := marshalMap(sp.ReqHeaders)
+		if err != nil {
+			return fmt.Errorf("marshal headers: %w", err)
 		}
-		if err := batch.Append(
+
+		if _, err := stmt.ExecContext(ctx,
 			sp.TraceID, sp.SpanID, sp.ParentSpanID,
-			sp.StartTime, sp.EndTime, durationNs,
+			sp.StartTime, sp.EndTime, int64(durationNs),
 			sp.Service, sp.Action, sp.Method, sp.Path,
-			uint16(sp.StatusCode), sp.Error,
+			sp.StatusCode, sp.Error,
 			sp.TenantID, sp.OrgID, sp.UserID,
 			sp.MemAllocKB, sp.Goroutines,
-			meta, headers,
+			metaJSON, headersJSON,
 			sp.ReqBody, sp.RespBody,
 		); err != nil {
-			return fmt.Errorf("append span: %w", err)
+			return fmt.Errorf("insert span: %w", err)
 		}
 	}
-	return batch.Send()
+	return tx.Commit()
 }
 
 // selectSpans queries spans for a given trace_id ordered by start_time.
 func (s *TraceStore) selectSpans(ctx context.Context, traceID string) ([]spanRow, error) {
-	rows, err := s.conn.Query(ctx,
+	rows, err := s.db.QueryContext(ctx,
 		`SELECT trace_id, span_id, parent_span_id,
 			start_time, end_time, duration_ns,
 			service_name, action, method, path,
@@ -116,12 +95,21 @@ func (s *TraceStore) selectSpans(ctx context.Context, traceID string) ([]spanRow
 	var result []spanRow
 	for rows.Next() {
 		var r spanRow
-		if err := rows.ScanStruct(&r); err != nil {
+		var metaJSON, headersJSON sql.NullString
+		if err := rows.Scan(
+			&r.TraceID, &r.SpanID, &r.ParentSpanID,
+			&r.StartTime, &r.EndTime, &r.DurationNs,
+			&r.ServiceName, &r.Action, &r.Method, &r.Path,
+			&r.StatusCode, &r.Error,
+			&r.TenantID, &r.OrgID, &r.UserID,
+			&r.MemAllocKB, &r.Goroutines,
+			&metaJSON, &headersJSON,
+			&r.RequestBody, &r.ResponseBody,
+		); err != nil {
 			return nil, fmt.Errorf("scan span: %w", err)
 		}
-		r.TraceID = trimNulls(r.TraceID)
-		r.SpanID = trimNulls(r.SpanID)
-		r.ParentSpanID = trimNulls(r.ParentSpanID)
+		r.Metadata = unmarshalMap(metaJSON.String)
+		r.RequestHeaders = unmarshalMap(headersJSON.String)
 		result = append(result, r)
 	}
 	return result, rows.Err()
@@ -203,10 +191,8 @@ func (s *TraceStore) Search(ctx context.Context, filter dataplane.TraceFilter) (
 		query += " WHERE " + strings.Join(where, " AND ")
 	}
 	query += " ORDER BY start_time DESC"
-	// We don't LIMIT at the SQL level because we need to group by trace_id.
-	// Instead, we'll limit the output after grouping.
 
-	rows, err := s.conn.Query(ctx, query, args...)
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("search query: %w", err)
 	}
@@ -222,19 +208,17 @@ func (s *TraceStore) Search(ctx context.Context, filter dataplane.TraceFilter) (
 
 	for rows.Next() {
 		var (
-			tid, sid, pid  string
-			startTime      time.Time
-			durationNs     uint64
-			svc, act       string
-			method, path   string
-			statusCode     uint16
-			errStr         string
+			tid, sid, pid string
+			startTime     time.Time
+			durationNs    int64
+			svc, act      string
+			method, path  string
+			statusCode    int
+			errStr        string
 		)
 		if err := rows.Scan(&tid, &sid, &pid, &startTime, &durationNs, &svc, &act, &method, &path, &statusCode, &errStr); err != nil {
 			return nil, fmt.Errorf("scan search row: %w", err)
 		}
-		tid = trimNulls(tid)
-		pid = trimNulls(pid)
 
 		agg, ok := traces[tid]
 		if !ok {
@@ -253,7 +237,7 @@ func (s *TraceStore) Search(ctx context.Context, filter dataplane.TraceFilter) (
 				Method:      method,
 				Path:        path,
 				DurationMs:  float64(durationNs) / 1e6,
-				StatusCode:  int(statusCode),
+				StatusCode:  statusCode,
 				HasError:    errStr != "",
 				StartTime:   startTime,
 			}

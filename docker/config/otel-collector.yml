@@ -27,13 +27,6 @@ processors:
             value: "^/(favicon|__hmr|assets/)"
 
 exporters:
-  clickhouse:
-    endpoint: tcp://clickhouse:9000
-    database: cloudmock
-    traces_table_name: spans
-    timeout: 10s
-    retry_on_failure:
-      enabled: true
   prometheus:
     endpoint: 0.0.0.0:8889
     namespace: cloudmock
@@ -43,7 +36,7 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, attributes, filter]
-      exporters: [clickhouse]
+      exporters: []
     metrics:
       receivers: [otlp]
       processors: [batch]

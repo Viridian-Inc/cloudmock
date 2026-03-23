@@ -1,4 +1,4 @@
-package clickhouse_test
+package duckdb_test
 
 import (
 	"context"
@@ -9,17 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
-	chstore "github.com/neureaux/cloudmock/pkg/dataplane/clickhouse"
+	duckstore "github.com/neureaux/cloudmock/pkg/dataplane/duckdb"
 )
 
 func TestRequestWriteAndQuery(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
 	ctx := context.Background()
-	client := setupClickHouse(t, ctx)
-	store := chstore.NewRequestStore(client)
+	client := setupTestDB(t)
+	store := duckstore.NewRequestStore(client)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 
@@ -123,13 +119,9 @@ func TestRequestWriteAndQuery(t *testing.T) {
 }
 
 func TestRequestGetByID(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
-
 	ctx := context.Background()
-	client := setupClickHouse(t, ctx)
-	store := chstore.NewRequestStore(client)
+	client := setupTestDB(t)
+	store := duckstore.NewRequestStore(client)
 
 	now := time.Now().UTC().Truncate(time.Millisecond)
 

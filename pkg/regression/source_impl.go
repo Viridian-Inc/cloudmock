@@ -2,28 +2,28 @@ package regression
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"math"
 	"time"
 
-	"github.com/ClickHouse/clickhouse-go/v2/lib/driver"
 	promv1 "github.com/prometheus/client_golang/api/prometheus/v1"
 	"github.com/prometheus/common/model"
 )
 
 type prodMetricSource struct {
 	prom promv1.API
-	ch   driver.Conn
+	db   *sql.DB
 }
 
 // NewMetricSource returns a MetricSource backed by Prometheus (for
-// latency/error/count aggregates) and ClickHouse (for cache miss, fanout, and
+// latency/error/count aggregates) and DuckDB (for cache miss, fanout, and
 // payload metrics derived from spans).
-func NewMetricSource(prom promv1.API, ch driver.Conn) MetricSource {
-	return &prodMetricSource{prom: prom, ch: ch}
+func NewMetricSource(prom promv1.API, db *sql.DB) MetricSource {
+	return &prodMetricSource{prom: prom, db: db}
 }
 
-// WindowMetrics queries Prometheus recording rules and ClickHouse for the
+// WindowMetrics queries Prometheus recording rules and DuckDB for the
 // given service+action over the supplied time window.
 func (s *prodMetricSource) WindowMetrics(ctx context.Context, service, action string, window TimeWindow) (*WindowMetrics, error) {
 	wm := &WindowMetrics{
@@ -61,8 +61,8 @@ func (s *prodMetricSource) WindowMetrics(ctx context.Context, service, action st
 	wm.ErrorRate = errRate
 	wm.RequestCount = int64(math.Round(reqCount))
 
-	if s.ch != nil {
-		if err := s.enrichFromClickHouse(ctx, wm, service, window); err != nil {
+	if s.db != nil {
+		if err := s.enrichFromDB(ctx, wm, service, window); err != nil {
 			// Trace-based metrics are best-effort; don't fail the whole call.
 			_ = err
 		}
@@ -106,8 +106,8 @@ func (s *prodMetricSource) FleetWindowMetrics(ctx context.Context, service strin
 // ListServices returns distinct service names seen in spans within the last
 // hour.
 func (s *prodMetricSource) ListServices(ctx context.Context) ([]string, error) {
-	rows, err := s.ch.Query(ctx,
-		`SELECT DISTINCT service_name FROM spans WHERE start_time > now() - INTERVAL 1 HOUR`)
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT DISTINCT service_name FROM spans WHERE start_time > current_timestamp - INTERVAL '1 hour'`)
 	if err != nil {
 		return nil, fmt.Errorf("list services: %w", err)
 	}
@@ -127,8 +127,8 @@ func (s *prodMetricSource) ListServices(ctx context.Context) ([]string, error) {
 // ListTenants returns tenant IDs for a service ordered by request volume
 // (descending), limited to 100 results.
 func (s *prodMetricSource) ListTenants(ctx context.Context, service string) ([]string, error) {
-	rows, err := s.ch.Query(ctx,
-		`SELECT tenant_id FROM spans WHERE service_name = ? AND start_time > now() - INTERVAL 1 HOUR GROUP BY tenant_id ORDER BY count(*) DESC LIMIT 100`,
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT tenant_id FROM spans WHERE service_name = ? AND start_time > current_timestamp - INTERVAL '1 hour' GROUP BY tenant_id ORDER BY count(*) DESC LIMIT 100`,
 		service)
 	if err != nil {
 		return nil, fmt.Errorf("list tenants: %w", err)
@@ -146,37 +146,37 @@ func (s *prodMetricSource) ListTenants(ctx context.Context, service string) ([]s
 	return tenants, rows.Err()
 }
 
-// enrichFromClickHouse populates the cache-miss rate, average fanout span
+// enrichFromDB populates the cache-miss rate, average fanout span
 // count, and average response payload size from the spans table.
-func (s *prodMetricSource) enrichFromClickHouse(ctx context.Context, wm *WindowMetrics, service string, window TimeWindow) error {
+func (s *prodMetricSource) enrichFromDB(ctx context.Context, wm *WindowMetrics, service string, window TimeWindow) error {
 	start := window.Start
 	end := window.End
 
-	// Cache miss rate.
-	var cacheMissRate float64
-	if err := s.ch.QueryRow(ctx,
-		`SELECT countIf(metadata['x-cache-status'] = 'MISS') / count(*) FROM spans WHERE service_name = ? AND start_time BETWEEN ? AND ?`,
+	// Cache miss rate: metadata is stored as JSON, so we use json_extract_string.
+	var cacheMissRate sql.NullFloat64
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT CAST(count(*) FILTER (WHERE json_extract_string(metadata, '$.x-cache-status') = 'MISS') AS DOUBLE) / count(*) FROM spans WHERE service_name = ? AND start_time BETWEEN ? AND ?`,
 		service, start, end,
-	).Scan(&cacheMissRate); err == nil {
-		wm.CacheMissRate = cacheMissRate
+	).Scan(&cacheMissRate); err == nil && cacheMissRate.Valid {
+		wm.CacheMissRate = cacheMissRate.Float64
 	}
 
 	// Average fanout (spans per trace).
-	var avgFanout float64
-	if err := s.ch.QueryRow(ctx,
+	var avgFanout sql.NullFloat64
+	if err := s.db.QueryRowContext(ctx,
 		`SELECT avg(cnt) FROM (SELECT trace_id, count(*) as cnt FROM spans WHERE service_name = ? AND start_time BETWEEN ? AND ? GROUP BY trace_id)`,
 		service, start, end,
-	).Scan(&avgFanout); err == nil {
-		wm.AvgSpanCount = avgFanout
+	).Scan(&avgFanout); err == nil && avgFanout.Valid {
+		wm.AvgSpanCount = avgFanout.Float64
 	}
 
 	// Average response payload size.
-	var avgPayload float64
-	if err := s.ch.QueryRow(ctx,
+	var avgPayload sql.NullFloat64
+	if err := s.db.QueryRowContext(ctx,
 		`SELECT avg(length(response_body)) FROM spans WHERE service_name = ? AND start_time BETWEEN ? AND ?`,
 		service, start, end,
-	).Scan(&avgPayload); err == nil {
-		wm.AvgRespSize = avgPayload
+	).Scan(&avgPayload); err == nil && avgPayload.Valid {
+		wm.AvgRespSize = avgPayload.Float64
 	}
 
 	return nil

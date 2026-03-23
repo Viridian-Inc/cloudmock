@@ -175,10 +175,9 @@ func TestProductionDataPlane(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	// TODO: Build production DataPlane with testcontainers.
-	// This would start ClickHouse + PostgreSQL containers,
-	// apply schemas, and connect all stores.
+	// TODO: Build production DataPlane with DuckDB + PostgreSQL.
+	// DuckDB can use :memory: but PostgreSQL still needs a container.
 	// For now, skip — the individual store tests in
-	// clickhouse/ and postgres/ packages cover this.
-	t.Skip("production parity test requires Docker — individual store tests provide coverage")
+	// duckdb/ and postgres/ packages cover this.
+	t.Skip("production parity test requires Docker for PostgreSQL — individual store tests provide coverage")
 }

@@ -1,15 +1,4 @@
 services:
-  clickhouse:
-    image: clickhouse/clickhouse-server:24.3
-    ports:
-      - "8123:8123"
-      - "9000:9000"
-    volumes:
-      - clickhouse-data:/var/lib/clickhouse
-      - ./init/clickhouse:/docker-entrypoint-initdb.d
-    environment:
-      CLICKHOUSE_DB: cloudmock
-
   postgres:
     image: postgres:16-alpine
     ports:
@@ -50,17 +39,18 @@ services:
       - "4599:4599"
     environment:
       CLOUDMOCK_DATAPLANE_MODE: production
-      CLOUDMOCK_CLICKHOUSE_ENDPOINT: clickhouse:9000
+      CLOUDMOCK_DUCKDB_PATH: /data/cloudmock.duckdb
       CLOUDMOCK_POSTGRESQL_URL: postgres://cloudmock:cloudmock@postgres:5432/cloudmock
       CLOUDMOCK_PROMETHEUS_URL: http://prometheus:9090
       CLOUDMOCK_OTEL_ENDPOINT: otel-collector:4317
+    volumes:
+      - duckdb-data:/data
     depends_on:
-      - clickhouse
       - postgres
       - prometheus
       - otel-collector
 
 volumes:
-  clickhouse-data:
+  duckdb-data:
   postgres-data:
   prometheus-data:

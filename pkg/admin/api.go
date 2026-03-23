@@ -283,6 +283,16 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Default to "app" level to hide infrastructure (AWS SDK) traffic.
+	// Use level=all to see everything, level=infra for only AWS calls.
+	level := q.Get("level")
+	if level == "" {
+		level = "app"
+	}
+	if level == "all" {
+		level = ""
+	}
+
 	filter := gateway.RequestFilter{
 		Service:   q.Get("service"),
 		Path:      q.Get("path"),
@@ -291,6 +301,7 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		Action:    q.Get("action"),
 		ErrorOnly: q.Get("error") == "true",
 		TraceID:   q.Get("trace_id"),
+		Level:     level,
 		Limit:     limit,
 	}
 

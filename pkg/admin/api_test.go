@@ -207,8 +207,8 @@ func TestRequests(t *testing.T) {
 
 	api := admin.New(cfg, reg, rl, rs)
 
-	// All requests
-	req := httptest.NewRequest(http.MethodGet, "/api/requests", nil)
+	// All requests (level=all to include infra-level entries)
+	req := httptest.NewRequest(http.MethodGet, "/api/requests?level=all", nil)
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, req)
 
@@ -219,7 +219,7 @@ func TestRequests(t *testing.T) {
 	assert.Len(t, entries, 3)
 
 	// Filtered by service
-	req = httptest.NewRequest(http.MethodGet, "/api/requests?service=s3&limit=10", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/requests?service=s3&limit=10&level=all", nil)
 	w = httptest.NewRecorder()
 	api.ServeHTTP(w, req)
 

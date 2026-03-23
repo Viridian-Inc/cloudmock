@@ -202,16 +202,17 @@ func (ps *ProxyServer) logProxyRequest(r *http.Request, host string, route Proxy
 	latencyMs := float64(latency.Nanoseconds()) / 1e6
 
 	entry := RequestEntry{
-		ID:        GenerateTraceID(),
-		Timestamp: time.Now(),
-		Service:   service,
-		Action:    r.Method + " " + r.URL.Path,
-		Method:    r.Method,
-		Path:      r.URL.Path,
+		ID:         GenerateTraceID(),
+		Timestamp:  time.Now(),
+		Service:    service,
+		Action:     r.Method + " " + r.URL.Path,
+		Method:     r.Method,
+		Path:       r.URL.Path,
 		StatusCode: status,
-		Latency:   latency,
-		LatencyMs: latencyMs,
-		TraceID:   r.Header.Get("X-Cloudmock-Trace-Id"),
+		Latency:    latency,
+		LatencyMs:  latencyMs,
+		Level:      "app", // user-facing requests through the proxy
+		TraceID:    r.Header.Get("X-Cloudmock-Trace-Id"),
 	}
 
 	ps.requestLog.Add(entry)

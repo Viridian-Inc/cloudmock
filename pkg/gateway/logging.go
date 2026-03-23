@@ -29,6 +29,7 @@ type RequestEntry struct {
 	LatencyMs      float64           `json:"latency_ms"`
 	CallerID       string            `json:"caller_id"`
 	Error          string            `json:"error,omitempty"`
+	Level          string            `json:"level,omitempty"` // "app" (user-facing) or "infra" (AWS SDK calls to cloudmock)
 	RequestHeaders map[string]string `json:"request_headers,omitempty"`
 	RequestBody    string            `json:"request_body,omitempty"`
 	ResponseBody   string            `json:"response_body,omitempty"`
@@ -77,6 +78,7 @@ type RequestFilter struct {
 	Action    string
 	ErrorOnly bool
 	TraceID   string
+	Level     string // "app" or "infra" — empty means all
 	Limit     int
 }
 
@@ -119,6 +121,9 @@ func (rl *RequestLog) RecentFiltered(f RequestFilter) []RequestEntry {
 			continue
 		}
 		if f.TraceID != "" && e.TraceID != f.TraceID {
+			continue
+		}
+		if f.Level != "" && e.Level != f.Level {
 			continue
 		}
 		result = append(result, e)
@@ -315,6 +320,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			LatencyMs:      latencyMs,
 			CallerID:       extractCallerID(r),
 			Error:          errMsg,
+			Level:          "infra", // AWS SDK calls to cloudmock gateway
 			RequestHeaders: reqHeaders,
 			RequestBody:    reqBody,
 			ResponseBody:   rec.body.String(),

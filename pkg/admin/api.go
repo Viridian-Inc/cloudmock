@@ -4,9 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/gateway"
@@ -35,19 +37,27 @@ type HealthResponse struct {
 	Services map[string]bool `json:"services"`
 }
 
+// IaCTopologyConfig holds the topology graph pushed from the IaC layer.
+type IaCTopologyConfig struct {
+	Nodes []TopologyNodeV2 `json:"nodes"`
+	Edges []TopologyEdgeV2 `json:"edges"`
+}
+
 // API is the admin HTTP handler.
 type API struct {
-	cfg         *config.Config
-	registry    *routing.Registry
-	log         *gateway.RequestLog
-	stats       *gateway.RequestStats
-	broadcaster *EventBroadcaster
-	lambdaLogs  *lambda.LogBuffer
-	iamEngine   *iam.Engine
-	sesStore    *ses.Store
-	traceStore  *gateway.TraceStore
-	chaosEngine *gateway.ChaosEngine
-	mux         *http.ServeMux
+	cfg            *config.Config
+	registry       *routing.Registry
+	log            *gateway.RequestLog
+	stats          *gateway.RequestStats
+	broadcaster    *EventBroadcaster
+	lambdaLogs     *lambda.LogBuffer
+	iamEngine      *iam.Engine
+	sesStore       *ses.Store
+	traceStore     *gateway.TraceStore
+	chaosEngine    *gateway.ChaosEngine
+	iacTopology    *IaCTopologyConfig
+	iacTopologyMu  sync.RWMutex
+	mux            *http.ServeMux
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -76,6 +86,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/ses/emails", a.handleSESEmails)
 	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
+	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
@@ -529,6 +540,42 @@ func (a *API) handleTopology(w http.ResponseWriter, r *http.Request) {
 
 	topo := a.buildDynamicTopology()
 	writeJSON(w, http.StatusOK, topo)
+}
+
+// handleTopologyConfig accepts (PUT) or returns (GET) the IaC-derived topology config.
+func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPut:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "failed to read body", http.StatusBadRequest)
+			return
+		}
+		var cfg IaCTopologyConfig
+		if err := json.Unmarshal(body, &cfg); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		a.iacTopologyMu.Lock()
+		a.iacTopology = &cfg
+		a.iacTopologyMu.Unlock()
+		writeJSON(w, http.StatusOK, map[string]interface{}{
+			"status": "ok",
+			"nodes":  len(cfg.Nodes),
+			"edges":  len(cfg.Edges),
+		})
+	case http.MethodGet:
+		a.iacTopologyMu.RLock()
+		cfg := a.iacTopology
+		a.iacTopologyMu.RUnlock()
+		if cfg == nil {
+			writeJSON(w, http.StatusOK, IaCTopologyConfig{})
+			return
+		}
+		writeJSON(w, http.StatusOK, cfg)
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // ResourcesResponse is the response body for the /api/resources/:service endpoint.

@@ -57,6 +57,7 @@ type API struct {
 	chaosEngine    *gateway.ChaosEngine
 	iacTopology    *IaCTopologyConfig
 	iacTopologyMu  sync.RWMutex
+	sloEngine      *gateway.SLOEngine
 	mux            *http.ServeMux
 }
 
@@ -92,6 +93,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
+	a.mux.HandleFunc("/api/slo", a.handleSLO)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
@@ -850,6 +852,40 @@ func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, trace)
+}
+
+// SetSLOEngine sets the SLO engine for the admin API.
+func (a *API) SetSLOEngine(engine *gateway.SLOEngine) {
+	a.sloEngine = engine
+}
+
+// handleSLO returns the current SLO status or updates rules.
+func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
+	if a.sloEngine == nil {
+		writeJSON(w, http.StatusOK, map[string]interface{}{"enabled": false})
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		status := a.sloEngine.Status()
+		writeJSON(w, http.StatusOK, status)
+	case http.MethodPut:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		var rules []config.SLORule
+		if err := json.Unmarshal(body, &rules); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		a.sloEngine.SetRules(rules)
+		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // SetChaosEngine sets the chaos engine for the admin API to manage fault injection rules.

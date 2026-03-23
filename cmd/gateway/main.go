@@ -230,10 +230,14 @@ func main() {
 	// Chaos engine for fault injection
 	chaosEngine := gateway.NewChaosEngine()
 
+	// SLO engine for latency/error tracking
+	sloEngine := gateway.NewSLOEngine(cfg.SLO.Rules)
+
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.New(cfg, registry, requestLog, requestStats)
 	adminAPI.SetTraceStore(traceStore)
 	adminAPI.SetChaosEngine(chaosEngine)
+	adminAPI.SetSLOEngine(sloEngine)
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -258,6 +262,7 @@ func main() {
 	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster: adminAPI.Broadcaster(),
 		TraceStore:  traceStore,
+		SLOEngine:   sloEngine,
 	})
 
 	var adminHandler http.Handler = adminAPI

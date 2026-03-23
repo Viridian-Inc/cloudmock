@@ -51,6 +51,22 @@ type ServiceConfig struct {
 	Runtimes []string `yaml:"runtimes"`
 }
 
+// SLORule defines a latency SLO for a service/action.
+type SLORule struct {
+	Service   string  `yaml:"service" json:"service"`     // e.g. "dynamodb", "*" for all
+	Action    string  `yaml:"action" json:"action"`       // e.g. "Query", "*" for all
+	P50Ms     float64 `yaml:"p50_ms" json:"p50_ms"`       // target P50 latency
+	P95Ms     float64 `yaml:"p95_ms" json:"p95_ms"`       // target P95 latency
+	P99Ms     float64 `yaml:"p99_ms" json:"p99_ms"`       // target P99 latency
+	ErrorRate float64 `yaml:"error_rate" json:"error_rate"` // max acceptable error rate (0.01 = 1%)
+}
+
+// SLOConfig holds SLO configuration.
+type SLOConfig struct {
+	Enabled bool      `yaml:"enabled" json:"enabled"`
+	Rules   []SLORule `yaml:"rules" json:"rules"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -62,6 +78,7 @@ type Config struct {
 	Dashboard   DashboardConfig          `yaml:"dashboard"`
 	Admin       AdminConfig              `yaml:"admin"`
 	Logging     LoggingConfig            `yaml:"logging"`
+	SLO         SLOConfig                `yaml:"slo"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -92,6 +109,12 @@ func Default() *Config {
 		Logging: LoggingConfig{
 			Level:  "info",
 			Format: "text",
+		},
+		SLO: SLOConfig{
+			Enabled: true,
+			Rules: []SLORule{
+				{Service: "*", Action: "*", P50Ms: 50, P95Ms: 200, P99Ms: 500, ErrorRate: 0.01},
+			},
 		},
 	}
 }

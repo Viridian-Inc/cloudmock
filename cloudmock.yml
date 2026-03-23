@@ -49,6 +49,32 @@ logging:
   # Log format: text | json
   format: text
 
+slo:
+  # SLO tracking — configurable latency and error rate thresholds
+  enabled: true
+  rules:
+    # Default: all services
+    - service: "*"
+      action: "*"
+      p50_ms: 50
+      p95_ms: 200
+      p99_ms: 500
+      error_rate: 0.01  # 1% error budget
+    # Tighter thresholds for DynamoDB
+    - service: dynamodb
+      action: "*"
+      p50_ms: 10
+      p95_ms: 50
+      p99_ms: 100
+      error_rate: 0.001
+    # Lambda invocations
+    - service: lambda
+      action: Invoke
+      p50_ms: 100
+      p95_ms: 500
+      p99_ms: 1000
+      error_rate: 0.01
+
 # Per-service overrides (used when profile: custom, or to override defaults)
 # services:
 #   s3:

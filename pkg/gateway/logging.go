@@ -217,6 +217,7 @@ type RequestBroadcaster interface {
 type LoggingMiddlewareOpts struct {
 	Broadcaster RequestBroadcaster
 	TraceStore  *TraceStore
+	SLOEngine   *SLOEngine
 }
 
 // LoggingMiddleware wraps a gateway handler and records request data.
@@ -343,6 +344,11 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				Error:        errMsg,
 			}
 			opts.TraceStore.Add(trace)
+		}
+
+		// Record SLO metrics.
+		if opts.SLOEngine != nil {
+			opts.SLOEngine.Record(svcName, action, latencyMs, rec.statusCode)
 		}
 
 		// Broadcast request event for SSE clients.

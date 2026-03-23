@@ -511,6 +511,48 @@ function bezierPath(x1: number, y1: number, x2: number, y2: number): string {
 
 // --- Component ---
 
+// Maps a request's service name to its topology node.
+// Handles cases where request service (e.g. "bff") differs from node service (e.g. "external").
+function findNodeForRequest(nodes: TopoNode[], req: any): TopoNode | undefined {
+  const svc = req.service;
+
+  // Direct match on service field
+  let match = nodes.find(n => n.service === svc);
+  if (match) return match;
+
+  // Map request services to known node IDs
+  const serviceToNodeId: Record<string, string> = {
+    bff: 'external:bff-service',
+    graphql: 'external:graphql-server',
+    app: 'external:expo-app',
+    gateway: 'apigw:apis',
+    proxy: 'external:bff-service',
+  };
+
+  const nodeId = serviceToNodeId[svc];
+  if (nodeId) {
+    match = nodes.find(n => n.id === nodeId);
+    if (match) return match;
+  }
+
+  // Try matching by node ID containing the service name
+  match = nodes.find(n => n.id.includes(svc) || n.label.toLowerCase().includes(svc));
+  if (match) return match;
+
+  // For DynamoDB/Lambda — try to find the specific resource from the request body
+  if (svc === 'dynamodb' && req.request_body) {
+    try {
+      const body = typeof req.request_body === 'string' ? JSON.parse(req.request_body) : req.request_body;
+      if (body.TableName) {
+        match = nodes.find(n => n.id === `dynamodb:${body.TableName}`);
+        if (match) return match;
+      }
+    } catch {}
+  }
+
+  return undefined;
+}
+
 export function TopologyPage({ sse }: TopologyPageProps) {
   const [topoData, setTopoData] = useState<TopoData | null>(null);
   const [groupMode, setGroupMode] = useState<GroupMode>('service');
@@ -795,8 +837,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
             selectedRequestId={undefined}
             onSelectRequest={(req: any) => {
               setHighlightService(req.service);
-              // Find matching topo node and select it
-              const matchingNode = topoData?.nodes.find((n: TopoNode) => n.service === req.service);
+              // Find matching topo node — map request service to node ID
+              const matchingNode = findNodeForRequest(topoData?.nodes || [], req);
               if (matchingNode) {
                 setSelectedNode(matchingNode);
               }
@@ -1055,7 +1097,11 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               const groupColor = groupColorMap.get(n.group) || '#94A3B8';
               const isHovered = hoveredNode === n.id;
               const isSelected = selectedNode?.id === n.id;
-              const isHighlighted = highlightService === n.service;
+              const isHighlighted = highlightService != null && (
+                n.service === highlightService ||
+                n.id.includes(highlightService) ||
+                n.label.toLowerCase().includes(highlightService)
+              );
               const dimmedByNode = hoveredNode && !connectedNodes.has(n.id);
               const dimmedByCluster = hoveredCluster && n.group !== hoveredCluster;
               const dimmed = dimmedByNode || dimmedByCluster;

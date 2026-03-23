@@ -307,7 +307,11 @@ func main() {
 			log.Printf("proxy: TLS certs unavailable (%v) — starting HTTP only", certsErr)
 			certs = nil
 		}
-		gateway.StartProxy(routes, certs)
+		gateway.StartProxyWithOpts(routes, certs, gateway.ProxyOpts{
+			RequestLog:  requestLog,
+			Stats:       requestStats,
+			Broadcaster: adminAPI.Broadcaster(),
+		})
 
 		// DNS servers resolve *.localhost.<domain> → 127.0.0.1
 		go gateway.StartDNSServer(15353, "localhost."+autotendDomain)

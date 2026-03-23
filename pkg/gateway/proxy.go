@@ -13,6 +13,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // ProxyRoute defines a single routing rule for the reverse proxy.
@@ -26,8 +27,11 @@ type ProxyRoute struct {
 // ProxyServer is a virtual-host reverse proxy that routes requests
 // to backend services based on Host header and path prefix.
 type ProxyServer struct {
-	routes []ProxyRoute
-	mux    http.Handler
+	routes      []ProxyRoute
+	mux         http.Handler
+	requestLog  *RequestLog
+	stats       *RequestStats
+	broadcaster RequestBroadcaster
 }
 
 // ServicePorts maps logical service names to their listen ports.
@@ -105,15 +109,34 @@ func BuildRoutesWithPorts(autotendDomain, cloudmockDomain string, p ServicePorts
 	}
 }
 
+// ProxyOpts configures the proxy server.
+type ProxyOpts struct {
+	RequestLog  *RequestLog
+	Stats       *RequestStats
+	Broadcaster RequestBroadcaster
+}
+
 // NewProxyServer creates a new reverse proxy server with the given routes.
 func NewProxyServer(routes []ProxyRoute) *ProxyServer {
-	ps := &ProxyServer{routes: routes}
+	return NewProxyServerWithOpts(routes, ProxyOpts{})
+}
+
+// NewProxyServerWithOpts creates a proxy server with logging and broadcasting.
+func NewProxyServerWithOpts(routes []ProxyRoute, opts ProxyOpts) *ProxyServer {
+	ps := &ProxyServer{
+		routes:      routes,
+		requestLog:  opts.RequestLog,
+		stats:       opts.Stats,
+		broadcaster: opts.Broadcaster,
+	}
 	ps.mux = ps.buildHandler()
 	return ps
 }
 
 func (ps *ProxyServer) buildHandler() http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+
 		// Strip port from host header for matching
 		host := r.Host
 		if h, _, err := net.SplitHostPort(host); err == nil {
@@ -127,12 +150,77 @@ func (ps *ProxyServer) buildHandler() http.Handler {
 			if route.Path != "" && !strings.HasPrefix(r.URL.Path, route.Path) {
 				continue
 			}
-			ps.proxyToWithOpts(route.Backend, w, r, route.PreserveHost)
+
+			// Wrap response writer to capture status code
+			rec := &statusRecorder{ResponseWriter: w, statusCode: 200}
+			ps.proxyToWithOpts(route.Backend, rec, r, route.PreserveHost)
+
+			// Log the proxied request
+			ps.logProxyRequest(r, host, route, rec.statusCode, time.Since(start))
 			return
 		}
 
 		http.Error(w, "no route matched", http.StatusNotFound)
 	})
+}
+
+// logProxyRequest records a proxied request in the request log and broadcasts it.
+func (ps *ProxyServer) logProxyRequest(r *http.Request, host string, route ProxyRoute, status int, latency time.Duration) {
+	if ps.requestLog == nil {
+		return
+	}
+
+	// Determine service name from the route host
+	service := "proxy"
+	if strings.Contains(host, "bff") {
+		service = "bff"
+	} else if strings.Contains(host, "graphql") {
+		service = "graphql"
+	} else if strings.Contains(host, "auth") {
+		service = "cognito-idp"
+	} else if strings.Contains(host, "api.") {
+		service = "gateway"
+	} else if strings.Contains(host, "app") || host == route.Host {
+		service = "app"
+	}
+
+	latencyMs := float64(latency.Nanoseconds()) / 1e6
+
+	entry := RequestEntry{
+		ID:        GenerateTraceID(),
+		Timestamp: time.Now(),
+		Service:   service,
+		Action:    r.Method + " " + r.URL.Path,
+		Method:    r.Method,
+		Path:      r.URL.Path,
+		StatusCode: status,
+		Latency:   latency,
+		LatencyMs: latencyMs,
+		TraceID:   r.Header.Get("X-Cloudmock-Trace-Id"),
+	}
+
+	ps.requestLog.Add(entry)
+	if ps.stats != nil {
+		ps.stats.Increment(service)
+	}
+	if ps.broadcaster != nil {
+		ps.broadcaster.Broadcast("request", entry)
+	}
+}
+
+// statusRecorder wraps ResponseWriter to capture the status code.
+type statusRecorder struct {
+	http.ResponseWriter
+	statusCode int
+	written    bool
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	if !r.written {
+		r.statusCode = code
+		r.written = true
+	}
+	r.ResponseWriter.WriteHeader(code)
 }
 
 func (ps *ProxyServer) proxyTo(backend string, w http.ResponseWriter, r *http.Request) {
@@ -284,7 +372,12 @@ func (ps *ProxyServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // It tries port 80 first, falling back to 8080 if unavailable.
 // If tlsCertFile and tlsKeyFile are provided, it also starts HTTPS on 443 (fallback 8443).
 func StartProxy(routes []ProxyRoute, tlsCert *CertPair) {
-	proxy := NewProxyServer(routes)
+	StartProxyWithOpts(routes, tlsCert, ProxyOpts{})
+}
+
+// StartProxyWithOpts starts the proxy with request logging.
+func StartProxyWithOpts(routes []ProxyRoute, tlsCert *CertPair, opts ProxyOpts) {
+	proxy := NewProxyServerWithOpts(routes, opts)
 
 	// Start HTTP
 	go func() {

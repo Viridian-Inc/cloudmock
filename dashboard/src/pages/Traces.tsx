@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'preact/hooks';
 import { api } from '../api';
 import { statusClass } from '../components/StatusBadge';
 import { RefreshIcon, DownloadIcon, ChevRightIcon, CopyIcon } from '../components/Icons';
@@ -243,6 +243,80 @@ export function TracesPage({ showToast }: TracesPageProps) {
   );
 }
 
+function CompareButton({ traceId }: { traceId: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [open]);
+
+  const compareWithAnother = () => {
+    const otherId = prompt('Enter trace ID to compare with:');
+    if (otherId) {
+      location.hash = `#/traces/compare?a=${traceId}&b=${otherId}`;
+    }
+    setOpen(false);
+  };
+
+  const compareWithBaseline = () => {
+    location.hash = `#/traces/compare?a=${traceId}&baseline=true`;
+    setOpen(false);
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+        style={{
+          padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)',
+          background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '11px',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        Compare
+      </button>
+      {open && (
+        <div style={{
+          position: 'absolute', right: 0, top: '100%', marginTop: '4px', zIndex: 100,
+          background: 'var(--bg-primary)', border: '1px solid var(--border)', borderRadius: '6px',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.15)', minWidth: '200px', overflow: 'hidden',
+        }}>
+          <button
+            onClick={compareWithAnother}
+            style={{
+              display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+              background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
+              fontSize: '12px', textAlign: 'left',
+            }}
+            onMouseEnter={(e: any) => e.target.style.background = 'var(--bg-secondary)'}
+            onMouseLeave={(e: any) => e.target.style.background = 'transparent'}
+          >
+            Compare with another trace
+          </button>
+          <button
+            onClick={compareWithBaseline}
+            style={{
+              display: 'block', width: '100%', padding: '8px 12px', border: 'none',
+              background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer',
+              fontSize: '12px', textAlign: 'left',
+            }}
+            onMouseEnter={(e: any) => e.target.style.background = 'var(--bg-secondary)'}
+            onMouseLeave={(e: any) => e.target.style.background = 'transparent'}
+          >
+            Compare with baseline
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface WaterfallViewProps {
   timeline: TimelineSpan[];
   traceDetail: TraceDetail | null;
@@ -291,8 +365,11 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
               <CopyIcon />
             </button>
           </div>
-          <div class="text-sm text-muted">
-            {timeline.length} span{timeline.length !== 1 ? 's' : ''} | {fmtDuration(totalDuration)}
+          <div class="flex items-center" style="gap:8px">
+            <div class="text-sm text-muted">
+              {timeline.length} span{timeline.length !== 1 ? 's' : ''} | {fmtDuration(totalDuration)}
+            </div>
+            <CompareButton traceId={traceSummary.trace_id} />
           </div>
         </div>
       </div>

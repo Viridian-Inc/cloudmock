@@ -124,7 +124,7 @@ export function App() {
       case '/debug': return <DebugAssistantPage showToast={showToast} />;
       case '/metrics': return <MetricsPage />;
       case '/chaos': return <ChaosPage showToast={showToast} />;
-      case '/settings': return <SettingsPage />;
+      case '/settings': return <SettingsPage showToast={showToast} />;
       default: return <HomePage sse={sse} showToast={showToast} />;
     }
   }

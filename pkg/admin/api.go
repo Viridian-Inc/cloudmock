@@ -58,6 +58,8 @@ type API struct {
 	chaosEngine    *gateway.ChaosEngine
 	iacTopology    *IaCTopologyConfig
 	iacTopologyMu  sync.RWMutex
+	deploys        []DeployEvent
+	deploysMu      sync.RWMutex
 	sloEngine      *gateway.SLOEngine
 	mux            *http.ServeMux
 }
@@ -99,6 +101,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/tenants", a.handleTenants)
 	a.mux.HandleFunc("/api/cost", a.handleCost)
 	a.mux.HandleFunc("/api/compare", a.handleCompare)
+	a.mux.HandleFunc("/api/deploys", a.handleDeploys)
 	a.mux.HandleFunc("/api/chaos", a.handleChaos)
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
@@ -1248,6 +1251,62 @@ func (a *API) handleCompare(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// DeployEvent records a deployment for change correlation.
+type DeployEvent struct {
+	ID        string `json:"id"`
+	Timestamp string `json:"timestamp"`
+	Service   string `json:"service"`
+	Commit    string `json:"commit"`
+	Author    string `json:"author"`
+	Message   string `json:"message"`
+	Branch    string `json:"branch"`
+	PR        string `json:"pr,omitempty"`
+}
+
+// handleDeploys manages deploy events for change intelligence.
+// GET /api/deploys — list recent deploys
+// POST /api/deploys — record a new deploy
+func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		a.deploysMu.RLock()
+		result := make([]DeployEvent, len(a.deploys))
+		copy(result, a.deploys)
+		a.deploysMu.RUnlock()
+		writeJSON(w, http.StatusOK, result)
+
+	case http.MethodPost:
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			http.Error(w, "bad request", http.StatusBadRequest)
+			return
+		}
+		var deploy DeployEvent
+		if err := json.Unmarshal(body, &deploy); err != nil {
+			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+		if deploy.Timestamp == "" {
+			deploy.Timestamp = time.Now().Format(time.RFC3339)
+		}
+		if deploy.ID == "" {
+			deploy.ID = fmt.Sprintf("deploy-%d", time.Now().UnixNano())
+		}
+
+		a.deploysMu.Lock()
+		a.deploys = append(a.deploys, deploy)
+		if len(a.deploys) > 100 {
+			a.deploys = a.deploys[len(a.deploys)-100:]
+		}
+		a.deploysMu.Unlock()
+
+		writeJSON(w, http.StatusCreated, deploy)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func max(a, b int) int {
 	if a > b { return a }
 	return b
@@ -1482,6 +1541,22 @@ func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
 		analysis.Anomalies = append(analysis.Anomalies,
 			fmt.Sprintf("High span count (%d) — request fans out across multiple services", len(ctx.Timeline)))
 	}
+
+	// Check for recent deploys near the request time
+	a.deploysMu.RLock()
+	for _, d := range a.deploys {
+		deployTime, err := time.Parse(time.RFC3339, d.Timestamp)
+		if err != nil {
+			continue
+		}
+		diff := entry.Timestamp.Sub(deployTime)
+		if diff > -5*time.Minute && diff < 10*time.Minute {
+			analysis.Anomalies = append(analysis.Anomalies,
+				fmt.Sprintf("Deploy detected near this request: %s by %s (%s) — commit %s",
+					d.Service, d.Author, d.Message, d.Commit))
+		}
+	}
+	a.deploysMu.RUnlock()
 
 	ctx.Analysis = analysis
 	ctx.Narrative = buildNarrative(entry, &ctx, &analysis)

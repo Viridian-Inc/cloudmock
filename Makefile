@@ -86,3 +86,23 @@ docker-up:
 docker-down:
 	@echo "Stopping Docker containers..."
 	@docker-compose down
+
+.PHONY: dev-prod
+dev-prod: ## Start production data plane (Docker Compose)
+	docker compose -f docker/docker-compose.prod.yml up -d
+
+.PHONY: dev-prod-down
+dev-prod-down: ## Stop production data plane
+	docker compose -f docker/docker-compose.prod.yml down
+
+.PHONY: config-import
+config-import: ## Import cloudmock.yml into PostgreSQL
+	go run cmd/configimport/main.go --config cloudmock.yml --pg-url "postgres://cloudmock:cloudmock@localhost:5432/cloudmock"
+
+.PHONY: test-integration
+test-integration: ## Run integration tests (requires Docker)
+	go test -v -cover ./pkg/dataplane/... -count=1
+
+.PHONY: test-unit
+test-unit: ## Run unit tests only (no Docker)
+	go test -v -short -cover ./...

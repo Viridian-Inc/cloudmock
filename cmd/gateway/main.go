@@ -8,6 +8,10 @@ import (
 	"net/http"
 	"os"
 
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/dashboard"
@@ -18,6 +22,9 @@ import (
 	promImpl "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/neureaux/cloudmock/pkg/regression"
+	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
+	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/routing"
@@ -243,6 +250,11 @@ func main() {
 	var traceStore *gateway.TraceStore
 	var sloEngine *gateway.SLOEngine
 
+	// Production-mode clients, hoisted for use by the regression engine.
+	var chClient *chImpl.Client
+	var pgPool *pgxpool.Pool
+	var promClient *promImpl.Client
+
 	switch mode {
 	case "local":
 		requestLog = gateway.NewRequestLog(1000)
@@ -263,19 +275,20 @@ func main() {
 			Mode:     "local",
 		}
 	case "production":
-		chClient, err := chImpl.NewClient(ctx, cfg.DataPlane.ClickHouse)
+		var err error
+		chClient, err = chImpl.NewClient(ctx, cfg.DataPlane.ClickHouse)
 		if err != nil {
 			log.Fatalf("clickhouse: %v", err)
 		}
 		defer chClient.Close()
 
-		pgPool, err := pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
+		pgPool, err = pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
 		if err != nil {
 			log.Fatalf("postgres: %v", err)
 		}
 		defer pgPool.Close()
 
-		promClient, err := promImpl.NewClient(cfg.DataPlane.Prometheus)
+		promClient, err = promImpl.NewClient(cfg.DataPlane.Prometheus)
 		if err != nil {
 			log.Fatalf("prometheus: %v", err)
 		}
@@ -321,6 +334,36 @@ func main() {
 	adminAPI.SetIAMEngine(engine)
 	if sesService != nil {
 		adminAPI.SetSESStore(sesService.GetStore())
+	}
+
+	// Regression detection engine
+	if cfg.Regression.Enabled {
+		var regStore regression.RegressionStore
+		var regSource regression.MetricSource
+
+		switch mode {
+		case "local":
+			regStore = regmemory.NewStore()
+			regSource = regmemory.NewMetricSource(requestLog, traceStore)
+		case "production":
+			regStore = regpg.NewStore(pgPool)
+			regSource = regression.NewMetricSource(promClient.API(), chClient.Conn())
+		}
+
+		scanInterval, _ := time.ParseDuration(cfg.Regression.ScanInterval)
+		if scanInterval == 0 {
+			scanInterval = 5 * time.Minute
+		}
+		window, _ := time.ParseDuration(cfg.Regression.Window)
+		if window == 0 {
+			window = 15 * time.Minute
+		}
+
+		regEngine := regression.New(regSource, regStore, dp.Config, regression.DefaultAlgorithmConfig(), scanInterval, window)
+		regEngine.Start(ctx)
+		defer regEngine.Stop()
+
+		adminAPI.SetRegressionEngine(regEngine)
 	}
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)

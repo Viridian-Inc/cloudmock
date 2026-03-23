@@ -104,6 +104,13 @@ type OTelConfig struct {
 	ServiceName       string `yaml:"service_name" json:"service_name"`
 }
 
+// RegressionConfig holds regression detection configuration.
+type RegressionConfig struct {
+	Enabled      bool   `yaml:"enabled" json:"enabled"`
+	ScanInterval string `yaml:"scan_interval" json:"scan_interval"`
+	Window       string `yaml:"window" json:"window"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -118,6 +125,7 @@ type Config struct {
 	SLO         SLOConfig                `yaml:"slo"`
 	AdminAuth   AdminAuthConfig          `yaml:"admin_auth"`
 	DataPlane   DataPlaneConfig          `yaml:"dataplane"`
+	Regression  RegressionConfig         `yaml:"regression"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -157,6 +165,11 @@ func Default() *Config {
 		},
 		DataPlane: DataPlaneConfig{
 			Mode: "local",
+		},
+		Regression: RegressionConfig{
+			Enabled:      true,
+			ScanInterval: "5m",
+			Window:       "15m",
 		},
 	}
 }

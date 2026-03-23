@@ -15,6 +15,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/services/lambda"
@@ -73,8 +74,9 @@ type API struct {
 	sloEngine      *gateway.SLOEngine
 	views          []SavedView
 	viewsMu        sync.RWMutex
-	mux            *http.ServeMux
-	dp             *dataplane.DataPlane
+	regressionEngine *regression.Engine
+	mux              *http.ServeMux
+	dp               *dataplane.DataPlane
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -121,6 +123,8 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
 	a.mux.HandleFunc("/api/views", a.handleViews)
+	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
+	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
 
 	return a
 }
@@ -170,6 +174,8 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/explain/", a.handleExplainRequest)
 	a.mux.HandleFunc("/api/chaos/", a.handleChaosRule)
 	a.mux.HandleFunc("/api/views", a.handleViews)
+	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
+	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
 
 	return a
 }
@@ -1637,6 +1643,9 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
+			if a.regressionEngine != nil {
+				a.regressionEngine.OnDeploy(deploy)
+			}
 			writeJSON(w, http.StatusCreated, deploy)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1676,6 +1685,21 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			a.deploys = a.deploys[len(a.deploys)-100:]
 		}
 		a.deploysMu.Unlock()
+
+		if a.regressionEngine != nil {
+			ts, _ := time.Parse(time.RFC3339, deploy.Timestamp)
+			if ts.IsZero() {
+				ts = time.Now()
+			}
+			a.regressionEngine.OnDeploy(dataplane.DeployEvent{
+				ID:          deploy.ID,
+				Service:     deploy.Service,
+				CommitSHA:   deploy.Commit,
+				Author:      deploy.Author,
+				Description: deploy.Message,
+				DeployedAt:  ts,
+			})
+		}
 
 		writeJSON(w, http.StatusCreated, deploy)
 
@@ -1836,6 +1860,85 @@ func (a *API) SetChaosEngine(engine *gateway.ChaosEngine) {
 // ChaosEngine returns the configured chaos engine.
 func (a *API) ChaosEngine() *gateway.ChaosEngine {
 	return a.chaosEngine
+}
+
+// SetRegressionEngine sets the regression detection engine for the admin API.
+func (a *API) SetRegressionEngine(engine *regression.Engine) {
+	a.regressionEngine = engine
+}
+
+// handleRegressions handles regression API endpoints:
+//
+//	GET  /api/regressions          — list regressions with optional filters
+//	GET  /api/regressions/{id}     — get a single regression by ID
+//	POST /api/regressions/{id}/dismiss — dismiss a regression
+func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
+	if a.regressionEngine == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	// Strip the base prefix to determine sub-path.
+	path := strings.TrimPrefix(r.URL.Path, "/api/regressions")
+	path = strings.TrimPrefix(path, "/")
+
+	switch {
+	// POST /api/regressions/{id}/dismiss
+	case r.Method == http.MethodPost && strings.HasSuffix(path, "/dismiss"):
+		id := strings.TrimSuffix(path, "/dismiss")
+		if id == "" {
+			http.Error(w, "missing regression id", http.StatusBadRequest)
+			return
+		}
+		if err := a.regressionEngine.Store().UpdateStatus(r.Context(), id, "dismissed"); err != nil {
+			if err == regression.ErrNotFound {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "dismissed"})
+
+	// GET /api/regressions/{id}
+	case r.Method == http.MethodGet && path != "":
+		reg, err := a.regressionEngine.Store().Get(r.Context(), path)
+		if err != nil {
+			if err == regression.ErrNotFound {
+				http.Error(w, "not found", http.StatusNotFound)
+				return
+			}
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		writeJSON(w, http.StatusOK, reg)
+
+	// GET /api/regressions
+	case r.Method == http.MethodGet:
+		filter := regression.RegressionFilter{
+			Service:  r.URL.Query().Get("service"),
+			DeployID: r.URL.Query().Get("deploy_id"),
+			Severity: regression.Severity(r.URL.Query().Get("severity")),
+			Status:   r.URL.Query().Get("status"),
+		}
+		if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+			if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
+				filter.Limit = l
+			}
+		}
+		results, err := a.regressionEngine.Store().List(r.Context(), filter)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		if results == nil {
+			results = []regression.Regression{}
+		}
+		writeJSON(w, http.StatusOK, results)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 // handleChaos handles GET /api/chaos (list rules) and POST /api/chaos (create rule).

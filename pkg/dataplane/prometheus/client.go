@@ -22,3 +22,8 @@ func NewClient(cfg config.PrometheusConfig) (*Client, error) {
 	}
 	return &Client{api: promv1.NewAPI(client)}, nil
 }
+
+// API returns the underlying Prometheus v1 API.
+func (c *Client) API() promv1.API {
+	return c.api
+}

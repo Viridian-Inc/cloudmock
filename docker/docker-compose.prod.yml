@@ -1,0 +1,66 @@
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./init/clickhouse:/docker-entrypoint-initdb.d
+    environment:
+      CLICKHOUSE_DB: cloudmock
+
+  postgres:
+    image: postgres:16-alpine
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d
+    environment:
+      POSTGRES_DB: cloudmock
+      POSTGRES_USER: cloudmock
+      POSTGRES_PASSWORD: cloudmock
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./config/recording-rules.yml:/etc/prometheus/rules/slo.yml
+      - prometheus-data:/prometheus
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.97.0
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    volumes:
+      - ./config/otel-collector.yml:/etc/otelcol-contrib/config.yaml
+
+  cloudmock:
+    build:
+      context: ..
+      dockerfile: docker/gateway.Dockerfile
+    ports:
+      - "4566:4566"
+      - "4500:4500"
+      - "4599:4599"
+    environment:
+      CLOUDMOCK_DATAPLANE_MODE: production
+      CLOUDMOCK_CLICKHOUSE_ENDPOINT: clickhouse:9000
+      CLOUDMOCK_POSTGRESQL_URL: postgres://cloudmock:cloudmock@postgres:5432/cloudmock
+      CLOUDMOCK_PROMETHEUS_URL: http://prometheus:9090
+      CLOUDMOCK_OTEL_ENDPOINT: otel-collector:4317
+    depends_on:
+      - clickhouse
+      - postgres
+      - prometheus
+      - otel-collector
+
+volumes:
+  clickhouse-data:
+  postgres-data:
+  prometheus-data:

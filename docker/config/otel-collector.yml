@@ -1,0 +1,50 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+  attributes:
+    actions:
+      - key: tenant_id
+        from_attribute: http.request.header.x-tenant-id
+        action: upsert
+      - key: org_id
+        from_attribute: http.request.header.x-enterprise-id
+        action: upsert
+  filter:
+    spans:
+      exclude:
+        match_type: regexp
+        attributes:
+          - key: http.target
+            value: "^/(favicon|__hmr|assets/)"
+
+exporters:
+  clickhouse:
+    endpoint: tcp://clickhouse:9000
+    database: cloudmock
+    traces_table_name: spans
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+  prometheus:
+    endpoint: 0.0.0.0:8889
+    namespace: cloudmock
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch, attributes, filter]
+      exporters: [clickhouse]
+    metrics:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [prometheus]

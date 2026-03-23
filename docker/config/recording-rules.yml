@@ -1,0 +1,16 @@
+groups:
+  - name: slo
+    interval: 30s
+    rules:
+      - record: slo_error_budget_remaining
+        expr: |
+          1 - (
+            sum(rate(cloudmock_http_request_errors_total[1h])) by (service, action)
+            /
+            sum(rate(cloudmock_http_requests_total[1h])) by (service, action)
+          )
+      - record: slo_burn_rate
+        expr: |
+          sum(rate(cloudmock_http_request_errors_total[5m])) by (service, action)
+          /
+          sum(rate(cloudmock_http_requests_total[5m])) by (service, action)

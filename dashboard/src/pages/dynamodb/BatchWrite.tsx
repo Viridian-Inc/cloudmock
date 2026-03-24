@@ -100,10 +100,10 @@ export function BatchWrite({ tableName, showToast, onComplete }: BatchWriteProps
           )}
           {writing && (
             <div style="margin-top:12px">
-              <div style="background:var(--n200);border-radius:4px;height:8px;overflow:hidden">
-                <div style={`background:var(--primary-green);height:100%;width:${(progress / total) * 100}%;transition:width 0.2s`} />
+              <div style="background:var(--bg-tertiary);border-radius:4px;height:8px;overflow:hidden">
+                <div style={`background:var(--success);height:100%;width:${(progress / total) * 100}%;transition:width 0.2s`} />
               </div>
-              <div style="font-size:12px;color:var(--n500);margin-top:4px">{progress} / {total} items</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{progress} / {total} items</div>
             </div>
           )}
         </Modal>

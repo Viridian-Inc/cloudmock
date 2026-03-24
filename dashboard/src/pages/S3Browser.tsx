@@ -263,17 +263,17 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
             <span style="font-weight:700;font-size:15px">Buckets</span>
             <div class="flex gap-2">
               <button class="btn-icon btn-sm btn-ghost" title="Refresh" onClick={loadBuckets}
-                style="border:1px solid var(--n300);border-radius:var(--radius-md)">
+                style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <RefreshIcon />
               </button>
               <button class="btn-icon btn-sm btn-ghost" title="Create Bucket" onClick={() => setShowCreateBucket(true)}
-                style="border:1px solid var(--n300);border-radius:var(--radius-md)">
+                style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <PlusIcon />
               </button>
             </div>
           </div>
           <div style="position:relative">
-            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--n400)" />
+            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" />
             <input class="input w-full" placeholder="Filter buckets..." value={bucketSearch}
               onInput={(e) => setBucketSearch((e.target as HTMLInputElement).value)}
               style="padding-left:30px;font-size:13px" />
@@ -289,7 +289,7 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
             </div>
           ))}
           {displayBuckets.length === 0 && (
-            <div style="padding:24px;text-align:center;font-size:13px;color:var(--n400)">
+            <div style="padding:24px;text-align:center;font-size:13px;color:var(--text-tertiary)">
               No buckets found
             </div>
           )}
@@ -302,7 +302,7 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
           <div class="empty-state">
             <div style="font-size:48px;opacity:0.3">S3</div>
             <div style="margin-top:12px;font-size:16px;font-weight:500">Select a bucket to browse objects</div>
-            <div style="margin-top:4px;font-size:13px;color:var(--n400)">Or create a new bucket to get started</div>
+            <div style="margin-top:4px;font-size:13px;color:var(--text-tertiary)">Or create a new bucket to get started</div>
           </div>
         ) : (
           <div>
@@ -310,11 +310,11 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
               <div>
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">{selectedBucket}</h2>
                 {/* Breadcrumb */}
-                <div style="display:flex;gap:4px;align-items:center;font-size:13px;color:var(--n500)">
+                <div style="display:flex;gap:4px;align-items:center;font-size:13px;color:var(--text-secondary)">
                   <span style="cursor:pointer;color:var(--brand-blue)" onClick={() => navigateBreadcrumb(-1)}>/</span>
                   {breadcrumbParts.map((part, i) => (
                     <span key={i}>
-                      <span style="color:var(--n400)">/</span>
+                      <span style="color:var(--text-tertiary)">/</span>
                       <span style="cursor:pointer;color:var(--brand-blue)" onClick={() => navigateBreadcrumb(i)}>{part}</span>
                     </span>
                   ))}
@@ -334,14 +334,14 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
             </div>
 
             <div style="margin-bottom:12px;position:relative">
-              <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--n400)" />
+              <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" />
               <input class="input w-full" placeholder="Filter objects..." value={search}
                 onInput={(e) => setSearch((e.target as HTMLInputElement).value)}
                 style="padding-left:30px;font-size:13px" />
             </div>
 
             {loading ? (
-              <div style="padding:32px;text-align:center;color:var(--n400)">Loading...</div>
+              <div style="padding:32px;text-align:center;color:var(--text-tertiary)">Loading...</div>
             ) : (
               <table class="data-table" style="width:100%">
                 <thead>
@@ -374,10 +374,10 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
                         <td style="font-family:var(--font-mono);font-size:12px">
                           {isFolder(obj) ? '--' : formatBytes(obj.size)}
                         </td>
-                        <td style="font-size:12px;color:var(--n500)">
+                        <td style="font-size:12px;color:var(--text-secondary)">
                           {obj.lastModified ? formatDate(obj.lastModified) : '--'}
                         </td>
-                        <td style="font-family:var(--font-mono);font-size:11px;color:var(--n400);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                        <td style="font-family:var(--font-mono);font-size:11px;color:var(--text-tertiary);max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
                           {obj.etag || '--'}
                         </td>
                         <td>
@@ -392,7 +392,7 @@ export function S3BrowserPage({ showToast }: S3BrowserProps) {
                     ))}
                   {objects.length === 0 && (
                     <tr>
-                      <td colSpan={5} style="text-align:center;padding:24px;color:var(--n400)">
+                      <td colSpan={5} style="text-align:center;padding:24px;color:var(--text-tertiary)">
                         {prefix ? 'No objects in this prefix' : 'Bucket is empty'}
                       </td>
                     </tr>

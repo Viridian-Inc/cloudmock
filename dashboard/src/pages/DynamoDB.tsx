@@ -394,17 +394,17 @@ function DynamoDBCore({ showToast }: DynamoDBPageProps) {
           <div class="empty-state">
             <DatabaseIcon width="48" height="48" />
             <div style="margin-top:12px;font-size:16px;font-weight:500">Select a table to browse items</div>
-            <div style="margin-top:4px;font-size:13px;color:var(--n400)">Or create a new table to get started</div>
-            <div style="margin-top:16px;font-size:12px;color:var(--n400)">
-              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+N</kbd> New Item
+            <div style="margin-top:4px;font-size:13px;color:var(--text-tertiary)">Or create a new table to get started</div>
+            <div style="margin-top:16px;font-size:12px;color:var(--text-tertiary)">
+              <kbd style="padding:2px 6px;background:var(--bg-secondary);border-radius:4px;font-family:var(--font-mono)">Ctrl+N</kbd> New Item
               &nbsp;&middot;&nbsp;
-              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+F</kbd> Search
+              <kbd style="padding:2px 6px;background:var(--bg-secondary);border-radius:4px;font-family:var(--font-mono)">Ctrl+F</kbd> Search
               &nbsp;&middot;&nbsp;
-              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+R</kbd> Refresh
+              <kbd style="padding:2px 6px;background:var(--bg-secondary);border-radius:4px;font-family:var(--font-mono)">Ctrl+R</kbd> Refresh
               &nbsp;&middot;&nbsp;
-              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Ctrl+T</kbd> Terminal
+              <kbd style="padding:2px 6px;background:var(--bg-secondary);border-radius:4px;font-family:var(--font-mono)">Ctrl+T</kbd> Terminal
               &nbsp;&middot;&nbsp;
-              <kbd style="padding:2px 6px;background:var(--n100);border-radius:4px;font-family:var(--font-mono)">Tab</kbd> Switch Tabs
+              <kbd style="padding:2px 6px;background:var(--bg-secondary);border-radius:4px;font-family:var(--font-mono)">Tab</kbd> Switch Tabs
             </div>
           </div>
         ) : (
@@ -574,10 +574,10 @@ function DynamoDBCore({ showToast }: DynamoDBPageProps) {
           {truncateProgress ? (
             <div>
               <p style="margin-bottom:12px">Deleting items from <strong>{truncateConfirm}</strong>...</p>
-              <div style="background:var(--n200);border-radius:4px;height:8px;overflow:hidden">
+              <div style="background:var(--bg-tertiary);border-radius:4px;height:8px;overflow:hidden">
                 <div style={`background:var(--error);height:100%;width:${truncateProgress.total > 0 ? (truncateProgress.done / truncateProgress.total) * 100 : 0}%;transition:width 0.2s`} />
               </div>
-              <div style="font-size:12px;color:var(--n500);margin-top:6px">
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:6px">
                 {truncateProgress.done} / {truncateProgress.total} items deleted
               </div>
             </div>

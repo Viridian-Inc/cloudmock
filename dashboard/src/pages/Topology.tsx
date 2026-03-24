@@ -850,7 +850,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
         >
           <defs>
             <pattern id="topo-grid" width="30" height="30" patternUnits="userSpaceOnUse">
-              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#E2E8F0" stroke-width="0.5" />
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(74, 229, 248, 0.06)" stroke-width="0.5" />
             </pattern>
             <marker id="topo-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
               <polygon points="0 0, 8 3, 0 6" fill="#CBD5E1" />
@@ -1001,8 +1001,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         width={labelW}
                         height={14}
                         rx={3}
-                        fill="white"
-                        stroke={highlighted ? '#3B82F6' : '#E2E8F0'}
+                        fill="#0c1322"
+                        stroke={highlighted ? '#097FF5' : 'rgba(74, 229, 248, 0.12)'}
                         stroke-width="0.5"
                       />
                       <text
@@ -1012,7 +1012,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         dominant-baseline="central"
                         font-size="8"
                         font-family="var(--font-sans)"
-                        fill={highlighted ? '#3B82F6' : '#94A3B8'}
+                        fill={highlighted ? '#097FF5' : '#8b95a5'}
                         style={{ pointerEvents: 'none' }}
                       >
                         {labelText}
@@ -1146,7 +1146,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     width={RES_W}
                     height={RES_H}
                     rx={10}
-                    fill={isHighlighted ? `${groupColor}30` : isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
+                    fill={isHighlighted ? `${groupColor}30` : isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : '#0c1322'}
                     stroke={isHighlighted ? groupColor : isSelected ? groupColor : isPulsing ? groupColor : isHovered ? groupColor : `${groupColor}50`}
                     stroke-width={isHighlighted ? 3.5 : isSelected ? 3 : isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }}
@@ -1169,7 +1169,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     font-size="11.5"
                     font-weight="600"
                     font-family="var(--font-sans)"
-                    fill="#1E293B"
+                    fill="#f0f2f5"
                     style={{ pointerEvents: 'none' }}
                   >
                     {truncated}
@@ -1181,7 +1181,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                     dominant-baseline="central"
                     font-size="8.5"
                     font-family="var(--font-sans)"
-                    fill="#94A3B8"
+                    fill="#8b95a5"
                     style={{ pointerEvents: 'none' }}
                   >
                     {n.type}
@@ -1216,7 +1216,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         text-anchor="middle"
                         font-size="8.5"
                         font-family="var(--font-sans)"
-                        fill="#94A3B8"
+                        fill="#8b95a5"
                       >
                         {n.service} | {n.type}
                       </text>
@@ -1233,8 +1233,8 @@ export function TopologyPage({ sse }: TopologyPageProps) {
               width={minimapW}
               height={minimapH}
               rx={4}
-              fill="white"
-              stroke="#E2E8F0"
+              fill="#0c1322"
+              stroke="rgba(74, 229, 248, 0.12)"
               stroke-width="1"
               opacity="0.92"
             />
@@ -1306,10 +1306,10 @@ export function TopologyPage({ sse }: TopologyPageProps) {
           onClick={() => setPanelOpen(!panelOpen)}
           style={{
             position: 'absolute', top: 8, left: panelOpen ? 308 : 8, zIndex: 10,
-            width: 28, height: 28, borderRadius: 6, border: '1px solid var(--n200)',
-            background: 'white', cursor: 'pointer', display: 'flex',
+            width: 28, height: 28, borderRadius: 6, border: '1px solid var(--border-default)',
+            background: 'var(--bg-secondary)', cursor: 'pointer', display: 'flex',
             alignItems: 'center', justifyContent: 'center', fontSize: 12,
-            color: 'var(--n500)', boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+            color: 'var(--text-secondary)', boxShadow: 'var(--shadow-sm)',
             transition: 'left 0.2s ease',
           }}
           title={panelOpen ? 'Hide request panel' : 'Show request panel'}

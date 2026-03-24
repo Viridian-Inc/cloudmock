@@ -112,9 +112,9 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
       {/* Status banner */}
       <div style={{
         padding: '12px 16px', borderRadius: '8px', marginBottom: '20px', fontSize: '13px', fontWeight: 600,
-        background: state.active ? 'rgba(239, 68, 68, 0.1)' : 'rgba(34, 197, 94, 0.1)',
-        border: `1px solid ${state.active ? 'rgba(239, 68, 68, 0.3)' : 'rgba(34, 197, 94, 0.3)'}`,
-        color: state.active ? '#ef4444' : '#22c55e',
+        background: state.active ? 'var(--error-50)' : 'var(--primary-green-50)',
+        border: `1px solid ${state.active ? 'rgba(255, 78, 94, 0.3)' : 'rgba(54, 217, 130, 0.3)'}`,
+        color: state.active ? 'var(--error)' : 'var(--success)',
       }}>
         {state.active ? 'Fault injection is ACTIVE -- requests may be affected' : 'No active rules -- all requests pass through normally'}
       </div>
@@ -128,7 +128,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
               key={p.label}
               onClick={() => createRule(p.rule)}
               style={{
-                padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border)',
+                padding: '6px 12px', borderRadius: '6px', border: '1px solid var(--border-default)',
                 background: 'var(--bg-secondary)', color: 'var(--text-primary)', cursor: 'pointer',
                 fontSize: '12px', whiteSpace: 'nowrap',
               }}
@@ -144,7 +144,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
         <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Create Rule</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '12px', marginBottom: '12px' }}>
           <label style={{ fontSize: '12px' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.7 }}>Service</div>
+            <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Service</div>
             <input
               type="text"
               value={form.service}
@@ -154,7 +154,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
             />
           </label>
           <label style={{ fontSize: '12px' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.7 }}>Action</div>
+            <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Action</div>
             <input
               type="text"
               value={form.action}
@@ -164,7 +164,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
             />
           </label>
           <label style={{ fontSize: '12px' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.7 }}>Fault Type</div>
+            <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Fault Type</div>
             <select
               value={form.type}
               onChange={(e: any) => setForm({ ...form, type: e.target.value })}
@@ -176,7 +176,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
           {form.type === 'error' && (
             <>
               <label style={{ fontSize: '12px' }}>
-                <div style={{ marginBottom: '4px', opacity: 0.7 }}>Status Code</div>
+                <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Status Code</div>
                 <input
                   type="number"
                   value={form.errorCode}
@@ -185,7 +185,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
                 />
               </label>
               <label style={{ fontSize: '12px' }}>
-                <div style={{ marginBottom: '4px', opacity: 0.7 }}>Error Message</div>
+                <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Error Message</div>
                 <input
                   type="text"
                   value={form.errorMsg}
@@ -197,7 +197,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
           )}
           {form.type === 'latency' && (
             <label style={{ fontSize: '12px' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>Latency (ms)</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Latency (ms)</div>
               <input
                 type="number"
                 value={form.latencyMs}
@@ -207,7 +207,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
             </label>
           )}
           <label style={{ fontSize: '12px' }}>
-            <div style={{ marginBottom: '4px', opacity: 0.7 }}>Percentage ({form.percentage}%)</div>
+            <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Percentage ({form.percentage}%)</div>
             <input
               type="range"
               min="0"
@@ -222,7 +222,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
           onClick={() => createRule(form)}
           style={{
             padding: '8px 16px', borderRadius: '6px', border: 'none',
-            background: '#3b82f6', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
+            background: 'var(--brand-blue)', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
           }}
         >
           Create Rule
@@ -237,8 +237,8 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
             <button
               onClick={disableAll}
               style={{
-                padding: '4px 12px', borderRadius: '4px', border: '1px solid var(--border)',
-                background: 'transparent', color: '#ef4444', cursor: 'pointer', fontSize: '12px',
+                padding: '4px 12px', borderRadius: '4px', border: '1px solid var(--border-default)',
+                background: 'transparent', color: 'var(--error)', cursor: 'pointer', fontSize: '12px',
               }}
             >
               Disable All
@@ -247,7 +247,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
         </div>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border-subtle)' }}>
               <th style={thStyle}>ID</th>
               <th style={thStyle}>Service</th>
               <th style={thStyle}>Action</th>
@@ -260,7 +260,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
           </thead>
           <tbody>
             {state.rules.map(r => (
-              <tr key={r.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr key={r.id} style={{ borderBottom: '1px solid var(--border-subtle)' }}>
                 <td style={tdStyle}><code style={{ fontSize: '11px' }}>{r.id}</code></td>
                 <td style={tdStyle}>{r.service}</td>
                 <td style={tdStyle}>{r.action}</td>
@@ -279,7 +279,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
                     onClick={() => toggleRule(r)}
                     style={{
                       width: '40px', height: '22px', borderRadius: '11px', border: 'none', cursor: 'pointer',
-                      background: r.enabled ? '#22c55e' : 'var(--border)',
+                      background: r.enabled ? 'var(--success)' : 'var(--border-default)',
                       position: 'relative', transition: 'background 0.2s',
                     }}
                   >
@@ -293,7 +293,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
                 <td style={{ ...tdStyle, textAlign: 'center' }}>
                   <button
                     onClick={() => deleteRule(r.id)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}
                     title="Delete rule"
                   >
                     x
@@ -302,7 +302,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
               </tr>
             ))}
             {state.rules.length === 0 && (
-              <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No chaos rules configured. Create one above or use a preset.</td></tr>
+              <tr><td colSpan={8} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)' }}>No chaos rules configured. Create one above or use a preset.</td></tr>
             )}
           </tbody>
         </table>
@@ -313,20 +313,20 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
 
 function typeColor(type: string) {
   switch (type) {
-    case 'error': return { bg: 'rgba(239, 68, 68, 0.1)', fg: '#ef4444' };
-    case 'latency': return { bg: 'rgba(245, 158, 11, 0.1)', fg: '#f59e0b' };
+    case 'error': return { bg: 'var(--error-50)', fg: 'var(--error)' };
+    case 'latency': return { bg: 'var(--warning-50)', fg: 'var(--warning)' };
     case 'timeout': return { bg: 'rgba(168, 85, 247, 0.1)', fg: '#a855f7' };
-    case 'blackhole': return { bg: 'rgba(107, 114, 128, 0.1)', fg: '#6b7280' };
+    case 'blackhole': return { bg: 'rgba(107, 114, 128, 0.1)', fg: 'var(--text-tertiary)' };
     default: return { bg: 'var(--bg-secondary)', fg: 'var(--text-primary)' };
   }
 }
 
 const inputStyle: any = {
-  width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)',
+  width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-default)',
   background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '12px', boxSizing: 'border-box',
 };
 
-const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, opacity: 0.8 };
+const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)' };
 const tdStyle: any = { padding: '8px' };
 
 // Export a hook that other components can use to check if chaos is active.

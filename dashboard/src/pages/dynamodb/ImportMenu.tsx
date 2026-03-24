@@ -142,24 +142,24 @@ export function ImportMenu({ tableName, showToast, onComplete }: ImportMenuProps
             <button class="btn btn-ghost" onClick={() => fileRef.current?.click()}>
               <UploadIcon /> Choose File (JSON or CSV)
             </button>
-            {fileName && <span style="margin-left:12px;font-size:13px;color:var(--n500)">{fileName}</span>}
+            {fileName && <span style="margin-left:12px;font-size:13px;color:var(--text-secondary)">{fileName}</span>}
           </div>
 
           {importing && (
             <div style="margin-bottom:16px">
-              <div style="background:var(--n200);border-radius:4px;height:8px;overflow:hidden">
-                <div style={`background:var(--primary-green);height:100%;width:${(progress / total) * 100}%;transition:width 0.2s`} />
+              <div style="background:var(--bg-tertiary);border-radius:4px;height:8px;overflow:hidden">
+                <div style={`background:var(--success);height:100%;width:${(progress / total) * 100}%;transition:width 0.2s`} />
               </div>
-              <div style="font-size:12px;color:var(--n500);margin-top:4px">{progress} / {total} items{errors > 0 ? ` (${errors} errors)` : ''}</div>
+              <div style="font-size:12px;color:var(--text-secondary);margin-top:4px">{progress} / {total} items{errors > 0 ? ` (${errors} errors)` : ''}</div>
             </div>
           )}
 
           {preview && !importing && (
             <div>
-              <div style="font-size:13px;color:var(--n600);margin-bottom:8px">
+              <div style="font-size:13px;color:var(--text-secondary);margin-bottom:8px">
                 Preview: {preview.length} items from <strong>{fileName}</strong>
               </div>
-              <div style="max-height:200px;overflow:auto;background:var(--n900);color:var(--n300);padding:12px;border-radius:var(--radius-md);font-family:var(--font-mono);font-size:12px">
+              <div style="max-height:200px;overflow:auto;background:var(--bg-primary);color:var(--text-secondary);padding:12px;border-radius:var(--radius-md);font-family:var(--font-mono);font-size:12px">
                 {JSON.stringify(preview.slice(0, 3), null, 2)}
                 {preview.length > 3 && `\n... and ${preview.length - 3} more`}
               </div>

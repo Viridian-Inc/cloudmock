@@ -15,12 +15,12 @@ function getCompareParams() {
 }
 
 const inputStyle: any = {
-  padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)',
+  padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-default)',
   background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '12px', boxSizing: 'border-box',
   width: '280px',
 };
 
-const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, opacity: 0.8 };
+const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)' };
 const tdStyle: any = { padding: '8px' };
 
 export function TraceComparePage() {
@@ -58,8 +58,8 @@ export function TraceComparePage() {
   const showInput = !paramA && !loading && !result;
 
   function deltaStyle(delta: number) {
-    if (delta > 0) return { color: '#ef4444' }; // slower = red
-    if (delta < 0) return { color: '#22c55e' }; // faster = green
+    if (delta > 0) return { color: 'var(--error)' }; // slower = red
+    if (delta < 0) return { color: 'var(--success)' }; // faster = green
     return {};
   }
 
@@ -78,7 +78,7 @@ export function TraceComparePage() {
         <div class="card" style={{ padding: '16px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <label style={{ fontSize: '12px' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>Trace A</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Trace A</div>
               <input
                 type="text"
                 value={traceA}
@@ -89,7 +89,7 @@ export function TraceComparePage() {
             </label>
             {!isBaseline && (
               <label style={{ fontSize: '12px' }}>
-                <div style={{ marginBottom: '4px', opacity: 0.7 }}>Trace B</div>
+                <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Trace B</div>
                 <input
                   type="text"
                   value={traceB}
@@ -111,7 +111,7 @@ export function TraceComparePage() {
               onClick={handleSubmit}
               style={{
                 padding: '8px 16px', borderRadius: '6px', border: 'none',
-                background: '#3b82f6', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
+                background: 'var(--brand-blue)', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
               }}
             >
               Compare
@@ -122,19 +122,19 @@ export function TraceComparePage() {
 
       {/* Loading */}
       {loading && (
-        <div style={{ padding: '48px', textAlign: 'center', opacity: 0.5 }}>
-          <div class="spinner" style={{ margin: '0 auto 12px', width: '24px', height: '24px', border: '3px solid var(--border)', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ padding: '48px', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+          <div class="spinner" style={{ margin: '0 auto 12px', width: '24px', height: '24px', border: '3px solid var(--border-default)', borderTopColor: 'var(--brand-blue)', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
           Comparing traces...
         </div>
       )}
 
       {/* Error */}
       {error && (
-        <div class="card" style={{ padding: '16px', color: '#ef4444', marginBottom: '20px' }}>
+        <div class="card" style={{ padding: '16px', color: 'var(--error)', marginBottom: '20px' }}>
           Error: {error}
           <button
             onClick={() => { setError(null); setResult(null); location.hash = '#/traces/compare'; }}
-            style={{ marginLeft: '12px', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '12px' }}
+            style={{ marginLeft: '12px', padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '12px' }}
           >
             Try Again
           </button>
@@ -148,7 +148,7 @@ export function TraceComparePage() {
           <div style={{ marginBottom: '16px' }}>
             <button
               onClick={() => { setResult(null); setError(null); location.hash = '#/traces/compare'; }}
-              style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '12px' }}
+              style={{ padding: '4px 10px', borderRadius: '4px', border: '1px solid var(--border-default)', background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '12px' }}
             >
               New Comparison
             </button>
@@ -159,41 +159,41 @@ export function TraceComparePage() {
             <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Summary</h3>
             <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px' }}>
               <div>
-                <span style={{ opacity: 0.7 }}>Latency A: </span>
+                <span style={{ color: 'var(--text-secondary)' }}>Latency A: </span>
                 <span class="font-mono">{fmtDuration(result.latency_a ?? result.total_latency_a)}</span>
               </div>
               <div>
-                <span style={{ opacity: 0.7 }}>Latency B: </span>
+                <span style={{ color: 'var(--text-secondary)' }}>Latency B: </span>
                 <span class="font-mono">{fmtDuration(result.latency_b ?? result.total_latency_b)}</span>
               </div>
               <div>
-                <span style={{ opacity: 0.7 }}>Delta: </span>
+                <span style={{ color: 'var(--text-secondary)' }}>Delta: </span>
                 <span class="font-mono" style={deltaStyle(result.delta ?? result.total_delta ?? 0)}>
                   {formatDelta(result.delta ?? result.total_delta ?? 0)}
                 </span>
               </div>
               {(result.slower ?? result.slower_count) != null && (
                 <div>
-                  <span style={{ color: '#ef4444', fontWeight: 600 }}>{result.slower ?? result.slower_count}</span>
-                  <span style={{ opacity: 0.7 }}> slower</span>
+                  <span style={{ color: 'var(--error)', fontWeight: 600 }}>{result.slower ?? result.slower_count}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}> slower</span>
                 </div>
               )}
               {(result.faster ?? result.faster_count) != null && (
                 <div>
-                  <span style={{ color: '#22c55e', fontWeight: 600 }}>{result.faster ?? result.faster_count}</span>
-                  <span style={{ opacity: 0.7 }}> faster</span>
+                  <span style={{ color: 'var(--success)', fontWeight: 600 }}>{result.faster ?? result.faster_count}</span>
+                  <span style={{ color: 'var(--text-secondary)' }}> faster</span>
                 </div>
               )}
               {(result.added ?? result.added_count) != null && (
                 <div>
                   <span style={{ fontWeight: 600 }}>{result.added ?? result.added_count}</span>
-                  <span style={{ opacity: 0.7 }}> added</span>
+                  <span style={{ color: 'var(--text-secondary)' }}> added</span>
                 </div>
               )}
               {(result.removed ?? result.removed_count) != null && (
                 <div>
                   <span style={{ fontWeight: 600 }}>{result.removed ?? result.removed_count}</span>
-                  <span style={{ opacity: 0.7 }}> removed</span>
+                  <span style={{ color: 'var(--text-secondary)' }}> removed</span>
                 </div>
               )}
             </div>
@@ -205,7 +205,7 @@ export function TraceComparePage() {
               <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600 }}>Matched Spans ({result.matches.length})</h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                     <th style={thStyle}>Service</th>
                     <th style={thStyle}>Action</th>
                     <th style={thStyle}>Latency A</th>
@@ -216,7 +216,7 @@ export function TraceComparePage() {
                 </thead>
                 <tbody>
                   {result.matches.map((m: any, i: number) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-default)' }}>
                       <td style={tdStyle}><span style={{ fontWeight: 600 }}>{m.service}</span></td>
                       <td style={tdStyle} class="font-mono text-sm">{m.action}</td>
                       <td style={tdStyle} class="font-mono text-sm">{fmtDuration(m.latency_a ?? m.duration_a)}</td>
@@ -228,12 +228,12 @@ export function TraceComparePage() {
                         {m.status_change ? (
                           <span style={{
                             display: 'inline-block', padding: '2px 6px', borderRadius: '4px', fontSize: '11px', fontWeight: 600,
-                            background: 'rgba(245, 158, 11, 0.1)', color: '#f59e0b',
+                            background: 'var(--warning-50)', color: 'var(--warning)',
                           }}>
                             {m.status_change}
                           </span>
                         ) : (
-                          <span style={{ opacity: 0.4 }}>-</span>
+                          <span style={{ color: 'var(--text-tertiary)' }}>-</span>
                         )}
                       </td>
                     </tr>
@@ -246,12 +246,12 @@ export function TraceComparePage() {
           {/* Only in A */}
           {result.only_in_a && result.only_in_a.length > 0 && (
             <div class="card" style={{ padding: '16px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: '#ef4444' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: 'var(--error)' }}>
                 Only in A ({result.only_in_a.length})
               </h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                     <th style={thStyle}>Service</th>
                     <th style={thStyle}>Action</th>
                     <th style={thStyle}>Duration</th>
@@ -259,7 +259,7 @@ export function TraceComparePage() {
                 </thead>
                 <tbody>
                   {result.only_in_a.map((s: any, i: number) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-default)' }}>
                       <td style={tdStyle}><span style={{ fontWeight: 600 }}>{s.service}</span></td>
                       <td style={tdStyle} class="font-mono text-sm">{s.action}</td>
                       <td style={tdStyle} class="font-mono text-sm">{fmtDuration(s.duration_ms ?? s.duration)}</td>
@@ -273,12 +273,12 @@ export function TraceComparePage() {
           {/* Only in B */}
           {result.only_in_b && result.only_in_b.length > 0 && (
             <div class="card" style={{ padding: '16px', marginBottom: '20px' }}>
-              <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: '#3b82f6' }}>
+              <h3 style={{ margin: '0 0 12px', fontSize: '14px', fontWeight: 600, color: 'var(--brand-blue)' }}>
                 Only in B ({result.only_in_b.length})
               </h3>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                  <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
                     <th style={thStyle}>Service</th>
                     <th style={thStyle}>Action</th>
                     <th style={thStyle}>Duration</th>
@@ -286,7 +286,7 @@ export function TraceComparePage() {
                 </thead>
                 <tbody>
                   {result.only_in_b.map((s: any, i: number) => (
-                    <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-default)' }}>
                       <td style={tdStyle}><span style={{ fontWeight: 600 }}>{s.service}</span></td>
                       <td style={tdStyle} class="font-mono text-sm">{s.action}</td>
                       <td style={tdStyle} class="font-mono text-sm">{fmtDuration(s.duration_ms ?? s.duration)}</td>

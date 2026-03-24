@@ -56,7 +56,7 @@ export function TableList({
               class="btn-icon btn-sm btn-ghost"
               title="Refresh"
               onClick={onRefresh}
-              style="border:1px solid var(--n300);border-radius:var(--radius-md)"
+              style="border:1px solid var(--border-default);border-radius:var(--radius-md)"
             >
               <RefreshIcon />
             </button>
@@ -75,7 +75,7 @@ export function TableList({
       </div>
       <div class="ddb-sidebar-list">
         {filtered.length === 0 ? (
-          <div style="padding:24px;text-align:center;color:var(--n400);font-size:13px">No tables found</div>
+          <div style="padding:24px;text-align:center;color:var(--text-tertiary);font-size:13px">No tables found</div>
         ) : filtered.map(t => (
           <div
             key={t}

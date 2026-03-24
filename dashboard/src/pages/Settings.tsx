@@ -9,11 +9,11 @@ interface SettingsPageProps {
 }
 
 const inputStyle: any = {
-  width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border)',
+  width: '100%', padding: '6px 8px', borderRadius: '4px', border: '1px solid var(--border-default)',
   background: 'var(--bg-primary)', color: 'var(--text-primary)', fontSize: '12px', boxSizing: 'border-box',
 };
 
-const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, opacity: 0.8 };
+const thStyle: any = { padding: '8px', textAlign: 'left', fontWeight: 500, color: 'var(--text-secondary)' };
 const tdStyle: any = { padding: '8px' };
 
 const WEBHOOK_EVENTS = ['incident.created', 'incident.resolved'] as const;
@@ -129,7 +129,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
           onClick={() => setShowForm(!showForm)}
           style={{
             padding: '6px 14px', borderRadius: '6px', border: 'none',
-            background: '#3b82f6', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
+            background: 'var(--brand-blue)', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
           }}
         >
           {showForm ? 'Cancel' : 'Add Webhook'}
@@ -140,7 +140,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
         <div class="card" style={{ padding: '16px', marginBottom: '20px' }}>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
             <label style={{ fontSize: '12px' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>URL</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>URL</div>
               <input
                 type="text"
                 value={form.url}
@@ -150,7 +150,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
               />
             </label>
             <label style={{ fontSize: '12px' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>Type</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Type</div>
               <select
                 value={form.type}
                 onChange={(e: any) => setForm({ ...form, type: e.target.value })}
@@ -162,7 +162,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
               </select>
             </label>
             <div style={{ fontSize: '12px' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>Events</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Events</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 {WEBHOOK_EVENTS.map(ev => (
                   <label key={ev} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
@@ -177,7 +177,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
               </div>
             </div>
             <label style={{ fontSize: '12px', gridColumn: '1 / -1' }}>
-              <div style={{ marginBottom: '4px', opacity: 0.7 }}>Headers (JSON)</div>
+              <div style={{ marginBottom: '4px', color: 'var(--text-secondary)' }}>Headers (JSON)</div>
               <textarea
                 value={form.headers}
                 onInput={(e: any) => setForm({ ...form, headers: e.target.value })}
@@ -190,7 +190,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
             onClick={handleCreate}
             style={{
               padding: '8px 16px', borderRadius: '6px', border: 'none',
-              background: '#3b82f6', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
+              background: 'var(--brand-blue)', color: 'white', cursor: 'pointer', fontWeight: 600, fontSize: '13px',
             }}
           >
             Create Webhook
@@ -201,7 +201,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
       <div class="card" style={{ padding: '16px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
               <th style={thStyle}>URL</th>
               <th style={thStyle}>Type</th>
               <th style={thStyle}>Events</th>
@@ -211,7 +211,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
           </thead>
           <tbody>
             {webhooks.map((wh: any) => (
-              <tr key={wh.id} style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr key={wh.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
                 <td style={{ ...tdStyle, maxWidth: '280px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   <code style={{ fontSize: '11px' }}>{wh.url}</code>
                 </td>
@@ -229,7 +229,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
                     onClick={() => toggleActive(wh)}
                     style={{
                       width: '40px', height: '22px', borderRadius: '11px', border: 'none', cursor: 'pointer',
-                      background: wh.active !== false ? '#22c55e' : 'var(--border)',
+                      background: wh.active !== false ? 'var(--success)' : 'var(--border-default)',
                       position: 'relative', transition: 'background 0.2s',
                     }}
                   >
@@ -244,7 +244,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
                   <button
                     onClick={() => handleTest(wh.id)}
                     style={{
-                      padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border)',
+                      padding: '3px 8px', borderRadius: '4px', border: '1px solid var(--border-default)',
                       background: 'transparent', color: 'var(--text-primary)', cursor: 'pointer', fontSize: '11px',
                       marginRight: '4px',
                     }}
@@ -253,7 +253,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
                   </button>
                   <button
                     onClick={() => handleDelete(wh.id)}
-                    style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}
+                    style={{ background: 'none', border: 'none', color: 'var(--error)', cursor: 'pointer', fontSize: '16px', padding: '2px 6px' }}
                     title="Delete webhook"
                   >
                     x
@@ -262,7 +262,7 @@ function WebhooksTab({ showToast }: { showToast: (msg: string) => void }) {
               </tr>
             ))}
             {webhooks.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No webhooks configured. Click "Add Webhook" to create one.</td></tr>
+              <tr><td colSpan={5} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)' }}>No webhooks configured. Click "Add Webhook" to create one.</td></tr>
             )}
           </tbody>
         </table>
@@ -291,13 +291,13 @@ function UsersTab({ showToast }: { showToast: (msg: string) => void }) {
   };
 
   if (users === null) {
-    return <div style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>Loading users...</div>;
+    return <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)' }}>Loading users...</div>;
   }
 
   if (users.length === 0) {
     return (
       <div class="card" style={{ padding: '24px', textAlign: 'center' }}>
-        <p style={{ opacity: 0.6, margin: 0 }}>Auth not enabled -- no users found.</p>
+        <p style={{ color: 'var(--text-tertiary)', margin: 0 }}>Auth not enabled -- no users found.</p>
       </div>
     );
   }
@@ -306,7 +306,7 @@ function UsersTab({ showToast }: { showToast: (msg: string) => void }) {
     <div class="card" style={{ padding: '16px' }}>
       <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
         <thead>
-          <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
             <th style={thStyle}>Email</th>
             <th style={thStyle}>Name</th>
             <th style={thStyle}>Role</th>
@@ -316,7 +316,7 @@ function UsersTab({ showToast }: { showToast: (msg: string) => void }) {
         </thead>
         <tbody>
           {users.map((u: any) => (
-            <tr key={u.id} style={{ borderBottom: '1px solid var(--border)' }}>
+            <tr key={u.id} style={{ borderBottom: '1px solid var(--border-default)' }}>
               <td style={tdStyle}>{u.email}</td>
               <td style={tdStyle}>{u.name || '-'}</td>
               <td style={tdStyle}>
@@ -380,7 +380,7 @@ function AuditTab() {
       <div class="card" style={{ padding: '16px' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
-            <tr style={{ borderBottom: '1px solid var(--border)' }}>
+            <tr style={{ borderBottom: '1px solid var(--border-default)' }}>
               <th style={thStyle}>Timestamp</th>
               <th style={thStyle}>Actor</th>
               <th style={thStyle}>Action</th>
@@ -389,7 +389,7 @@ function AuditTab() {
           </thead>
           <tbody>
             {entries.map((entry: any, i: number) => (
-              <tr key={entry.id || i} style={{ borderBottom: '1px solid var(--border)' }}>
+              <tr key={entry.id || i} style={{ borderBottom: '1px solid var(--border-default)' }}>
                 <td style={tdStyle} class="font-mono text-sm">{fmtTime(entry.timestamp)}</td>
                 <td style={tdStyle}>{entry.actor || '-'}</td>
                 <td style={tdStyle}>
@@ -399,7 +399,7 @@ function AuditTab() {
               </tr>
             ))}
             {entries.length === 0 && (
-              <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', opacity: 0.5 }}>No audit entries found.</td></tr>
+              <tr><td colSpan={4} style={{ padding: '24px', textAlign: 'center', color: 'var(--text-tertiary)' }}>No audit entries found.</td></tr>
             )}
           </tbody>
         </table>

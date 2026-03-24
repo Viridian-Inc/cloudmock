@@ -160,7 +160,7 @@ export function ItemBrowser({
         left += colWidths[columns[i]] || 150;
       }
     }
-    return `position:sticky;left:${left}px;z-index:2;background:var(--sticky-col-bg, var(--n50))`;
+    return `position:sticky;left:${left}px;z-index:2;background:var(--sticky-col-bg, var(--bg-primary))`;
   }
 
   function getStickyCellStyle(col: string, colIndex: number): string {
@@ -237,7 +237,7 @@ export function ItemBrowser({
           <table class="ddb-items-table">
             <thead>
               <tr>
-                <th style="width:40px;text-align:center;position:sticky;left:0;z-index:3;background:var(--sticky-col-bg, var(--n50))">
+                <th style="width:40px;text-align:center;position:sticky;left:0;z-index:3;background:var(--sticky-col-bg, var(--bg-primary))">
                   <input
                     type="checkbox"
                     checked={selected.size === sortedItems.length && sortedItems.length > 0}

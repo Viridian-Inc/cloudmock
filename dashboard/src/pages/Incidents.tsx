@@ -28,7 +28,7 @@ function severityColor(sev: string): string {
     case 'critical': return 'var(--error)';
     case 'warning': return 'var(--warning)';
     case 'info': return 'var(--brand-blue)';
-    default: return 'var(--n500)';
+    default: return 'var(--text-secondary)';
   }
 }
 
@@ -45,8 +45,8 @@ function statusColor(status: string): string {
   switch (status) {
     case 'active': return 'var(--error)';
     case 'acknowledged': return 'var(--warning)';
-    case 'resolved': return 'var(--primary-green)';
-    default: return 'var(--n500)';
+    case 'resolved': return 'var(--success)';
+    default: return 'var(--text-secondary)';
   }
 }
 

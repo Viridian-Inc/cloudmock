@@ -21,7 +21,7 @@ function severityColor(sev: string): string {
     case 'critical': return 'var(--error)';
     case 'warning': return 'var(--warning)';
     case 'info': return 'var(--brand-blue)';
-    default: return 'var(--n500)';
+    default: return 'var(--text-secondary)';
   }
 }
 
@@ -39,12 +39,12 @@ const ALGORITHM_COLORS: Record<string, { bg: string; fg: string }> = {
   error:    { bg: 'rgba(255,154,75,0.15)',  fg: 'var(--warning)' },
   tenant:   { bg: 'rgba(167,139,250,0.12)', fg: '#7C3AED' },
   cache:    { bg: 'rgba(9,127,245,0.1)',    fg: 'var(--brand-blue)' },
-  fanout:   { bg: 'rgba(2,150,98,0.1)',     fg: 'var(--primary-green)' },
+  fanout:   { bg: 'rgba(2,150,98,0.1)',     fg: 'var(--success)' },
   payload:  { bg: 'rgba(254,195,7,0.15)',   fg: '#B8860B' },
 };
 
 function algorithmStyle(algo: string) {
-  const c = ALGORITHM_COLORS[algo] || { bg: 'rgba(100,116,139,0.1)', fg: 'var(--n500)' };
+  const c = ALGORITHM_COLORS[algo] || { bg: 'rgba(100,116,139,0.1)', fg: 'var(--text-secondary)' };
   return { background: c.bg, color: c.fg };
 }
 
@@ -121,9 +121,9 @@ export function RegressionsPage() {
   }
 
   function formatChange(pct: number | undefined | null): { text: string; color: string } {
-    if (pct === undefined || pct === null) return { text: '—', color: 'var(--n500)' };
+    if (pct === undefined || pct === null) return { text: '—', color: 'var(--text-secondary)' };
     const sign = pct >= 0 ? '+' : '';
-    const color = pct > 0 ? 'var(--error)' : pct < 0 ? 'var(--primary-green)' : 'var(--n500)';
+    const color = pct > 0 ? 'var(--error)' : pct < 0 ? 'var(--success)' : 'var(--text-secondary)';
     return { text: `${sign}${pct.toFixed(1)}%`, color };
   }
 

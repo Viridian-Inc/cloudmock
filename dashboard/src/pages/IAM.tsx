@@ -89,7 +89,7 @@ export function IAMPage({ showToast }: IAMPageProps) {
               {history.length === 0 ? (
                 <div class="text-sm text-muted" style="text-align:center;padding:24px">No evaluations yet</div>
               ) : history.map((h: any) => (
-                <div style="padding:8px 0;border-bottom:1px solid var(--n100);font-size:13px">
+                <div style="padding:8px 0;border-bottom:1px solid var(--bg-secondary);font-size:13px">
                   <div class="flex items-center gap-2">
                     <span class={`status-pill ${h.decision === 'ALLOW' ? 'status-2xx' : 'status-5xx'}`} style="font-size:11px">{h.decision}</span>
                     <span class="font-mono">{h.action}</span>

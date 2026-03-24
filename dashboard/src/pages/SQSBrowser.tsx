@@ -220,17 +220,17 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
             <span style="font-weight:700;font-size:15px">Queues</span>
             <div class="flex gap-2">
               <button class="btn-icon btn-sm btn-ghost" title="Refresh" onClick={loadQueues}
-                style="border:1px solid var(--n300);border-radius:var(--radius-md)">
+                style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <RefreshIcon />
               </button>
               <button class="btn-icon btn-sm btn-ghost" title="Create Queue" onClick={() => setShowCreateQueue(true)}
-                style="border:1px solid var(--n300);border-radius:var(--radius-md)">
+                style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <PlusIcon />
               </button>
             </div>
           </div>
           <div style="position:relative">
-            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--n400)" />
+            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" />
             <input class="input w-full" placeholder="Filter queues..." value={queueSearch}
               onInput={(e) => setQueueSearch((e.target as HTMLInputElement).value)}
               style="padding-left:30px;font-size:13px" />
@@ -246,7 +246,7 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
             </div>
           ))}
           {displayQueues.length === 0 && (
-            <div style="padding:24px;text-align:center;font-size:13px;color:var(--n400)">
+            <div style="padding:24px;text-align:center;font-size:13px;color:var(--text-tertiary)">
               No queues found
             </div>
           )}
@@ -259,14 +259,14 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
           <div class="empty-state">
             <div style="font-size:48px;opacity:0.3">SQS</div>
             <div style="margin-top:12px;font-size:16px;font-weight:500">Select a queue to inspect messages</div>
-            <div style="margin-top:4px;font-size:13px;color:var(--n400)">Or create a new queue to get started</div>
+            <div style="margin-top:4px;font-size:13px;color:var(--text-tertiary)">Or create a new queue to get started</div>
           </div>
         ) : (
           <div>
             <div class="ddb-header">
               <div>
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">{selectedQueue.name}</h2>
-                <div style="font-size:13px;color:var(--n500);font-family:var(--font-mono)">{selectedQueue.url}</div>
+                <div style="font-size:13px;color:var(--text-secondary);font-family:var(--font-mono)">{selectedQueue.url}</div>
               </div>
               <div class="flex gap-2">
                 <button class="btn btn-primary btn-sm" onClick={() => receiveMessages(selectedQueue)}>
@@ -291,7 +291,7 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
             </div>
 
             {loading && messages.length === 0 && (
-              <div style="padding:32px;text-align:center;color:var(--n400)">Polling...</div>
+              <div style="padding:32px;text-align:center;color:var(--text-tertiary)">Polling...</div>
             )}
 
             <div style="display:flex;flex-direction:column;gap:8px">
@@ -300,11 +300,11 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
                   <div class="card-header" style="padding:10px 16px;display:flex;justify-content:space-between;align-items:center">
                     <div>
                       <span style="font-weight:600;font-size:13px">ID: </span>
-                      <span style="font-family:var(--font-mono);font-size:12px;color:var(--n500)">{msg.MessageId}</span>
+                      <span style="font-family:var(--font-mono);font-size:12px;color:var(--text-secondary)">{msg.MessageId}</span>
                     </div>
                     <div class="flex gap-2" style="align-items:center">
                       {msg.Attributes?.SentTimestamp && (
-                        <span style="font-size:11px;color:var(--n400)">
+                        <span style="font-size:11px;color:var(--text-tertiary)">
                           {new Date(parseInt(msg.Attributes.SentTimestamp, 10)).toLocaleString()}
                         </span>
                       )}
@@ -322,7 +322,7 @@ export function SQSBrowserPage({ showToast }: SQSBrowserProps) {
                 </div>
               ))}
               {messages.length === 0 && !loading && (
-                <div style="text-align:center;padding:48px;color:var(--n400);font-size:13px">
+                <div style="text-align:center;padding:48px;color:var(--text-tertiary);font-size:13px">
                   Click "Receive" to poll messages from the queue
                 </div>
               )}

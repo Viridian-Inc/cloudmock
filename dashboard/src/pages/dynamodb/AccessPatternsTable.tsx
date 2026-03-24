@@ -367,10 +367,10 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
     return (
       <div style="margin-bottom:16px">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-          <span style="font-size:14px;font-weight:700;color:var(--n800)">Access Patterns Matrix</span>
+          <span style="font-size:14px;font-weight:700;color:var(--text-primary)">Access Patterns Matrix</span>
         </div>
-        <div style="padding:24px;text-align:center;background:var(--n50);border:1px dashed var(--n300);border-radius:var(--radius-md)">
-          <div style="font-size:13px;color:var(--n500);margin-bottom:12px">
+        <div style="padding:24px;text-align:center;background:var(--bg-primary);border:1px dashed var(--border-default);border-radius:var(--radius-md)">
+          <div style="font-size:13px;color:var(--text-secondary);margin-bottom:12px">
             No access patterns defined yet. Add patterns to visualize which queries work on which indexes.
           </div>
           <div style="display:flex;gap:8px;justify-content:center">
@@ -397,7 +397,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
   return (
     <div style="margin-bottom:16px;position:relative" ref={wrapRef}>
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-        <span style="font-size:14px;font-weight:700;color:var(--n800)">Access Patterns Matrix</span>
+        <span style="font-size:14px;font-weight:700;color:var(--text-primary)">Access Patterns Matrix</span>
         <div style="display:flex;gap:6px">
           <button class="btn btn-ghost btn-sm" onClick={suggestPatterns} disabled={suggesting}>
             {suggesting ? 'Scanning...' : 'Suggest'}
@@ -420,7 +420,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
                   <th key={p.id}>
                     <div style="display:flex;flex-direction:column;gap:2px;min-width:100px">
                       <span class="font-mono" style="font-size:11px">{label.pk}</span>
-                      {label.sk && <span class="font-mono" style="font-size:10px;color:var(--n400)">{label.sk}</span>}
+                      {label.sk && <span class="font-mono" style="font-size:10px;color:var(--text-tertiary)">{label.sk}</span>}
                       <button
                         style="background:none;border:none;color:var(--error);cursor:pointer;font-size:10px;align-self:flex-end;padding:0"
                         onClick={() => removePattern(p.id)}
@@ -441,7 +441,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
                       <span class="font-mono" style="font-weight:700">{index.displayName}</span>
                       <span class={`ddb-ap-badge ddb-ap-badge-${index.type.toLowerCase()}`}>{index.type}</span>
                     </div>
-                    <div style="font-size:10px;color:var(--n400);margin-top:2px">
+                    <div style="font-size:10px;color:var(--text-tertiary);margin-top:2px">
                       PK:{index.pk}{index.sk ? ` SK:${index.sk}` : ''}
                     </div>
                   </div>
@@ -464,7 +464,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
                       {!compatible ? (
                         <span class="ap-cell-cross" title="Pattern SK not supported on this index">&#10007;</span>
                       ) : !result?.queried ? (
-                        <span style="color:var(--n400);font-size:12px;cursor:pointer" title="Click to run query">? click</span>
+                        <span style="color:var(--text-tertiary);font-size:12px;cursor:pointer" title="Click to run query">? click</span>
                       ) : result.matches ? (
                         <span class="ap-cell-check">&#10003; {result.count} item{result.count !== 1 ? 's' : ''}</span>
                       ) : (
@@ -493,7 +493,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
             <span>
               Results: {activeCellResult.count} item{activeCellResult.count !== 1 ? 's' : ''}
               {activeIndex && activePattern && (
-                <span style="color:var(--n400);margin-left:8px;font-weight:400">
+                <span style="color:var(--text-tertiary);margin-left:8px;font-weight:400">
                   on {activeIndex.displayName}
                 </span>
               )}
@@ -516,7 +516,7 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
                 {JSON.stringify(activeCellResult.items, null, 2)}
               </div>
             ) : (
-              <div style="padding:16px;text-align:center;color:var(--n400);font-size:13px">
+              <div style="padding:16px;text-align:center;color:var(--text-tertiary);font-size:13px">
                 No matching items
               </div>
             )}

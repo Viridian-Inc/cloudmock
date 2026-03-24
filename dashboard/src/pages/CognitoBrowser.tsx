@@ -57,7 +57,7 @@ function statusBadge(status: string) {
     COMPROMISED: 'var(--error, #ff4e5e)',
     RESET_REQUIRED: 'var(--warning, #f59e0b)',
   };
-  const color = colors[status] || 'var(--n400)';
+  const color = colors[status] || 'var(--text-tertiary)';
   return (
     <span style={{
       display: 'inline-block',
@@ -238,13 +238,13 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
             <span style="font-weight:700;font-size:15px">User Pools</span>
             <div class="flex gap-2">
               <button class="btn-icon btn-sm btn-ghost" title="Refresh" onClick={loadPools}
-                style="border:1px solid var(--n300);border-radius:var(--radius-md)">
+                style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <RefreshIcon />
               </button>
             </div>
           </div>
           <div style="position:relative">
-            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--n400)" />
+            <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" />
             <input class="input w-full" placeholder="Filter pools..." value={poolSearch}
               onInput={(e) => setPoolSearch((e.target as HTMLInputElement).value)}
               style="padding-left:30px;font-size:13px" />
@@ -257,13 +257,13 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
               onClick={() => selectPool(pool)}>
               <div style="overflow:hidden">
                 <div class="name" title={pool.Name}>{pool.Name}</div>
-                <div style="font-size:10px;color:var(--n400);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{pool.Id}</div>
+                <div style="font-size:10px;color:var(--text-tertiary);font-family:var(--font-mono);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{pool.Id}</div>
               </div>
               <span class="count">{poolUserCounts[pool.Id] ?? '...'}</span>
             </div>
           ))}
           {displayPools.length === 0 && (
-            <div style="padding:24px;text-align:center;font-size:13px;color:var(--n400)">
+            <div style="padding:24px;text-align:center;font-size:13px;color:var(--text-tertiary)">
               No user pools found
             </div>
           )}
@@ -276,7 +276,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
           <div class="empty-state">
             <div style="font-size:48px;opacity:0.3">Cognito</div>
             <div style="margin-top:12px;font-size:16px;font-weight:500">Select a user pool to manage users</div>
-            <div style="margin-top:4px;font-size:13px;color:var(--n400)">User pools are listed in the sidebar</div>
+            <div style="margin-top:4px;font-size:13px;color:var(--text-tertiary)">User pools are listed in the sidebar</div>
           </div>
         ) : selectedUser ? (
           /* User detail view */
@@ -291,7 +291,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">{selectedUser.Username}</h2>
                 <div style="display:flex;gap:8px;align-items:center">
                   {statusBadge(selectedUser.UserStatus)}
-                  <span style="font-size:13px;color:var(--n500)">
+                  <span style="font-size:13px;color:var(--text-secondary)">
                     {selectedUser.Enabled ? 'Enabled' : 'Disabled'}
                   </span>
                 </div>
@@ -330,7 +330,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
                     ))}
                     {(!selectedUser.Attributes || selectedUser.Attributes.length === 0) && (
                       <tr>
-                        <td colSpan={2} style="text-align:center;color:var(--n400);padding:16px">No attributes</td>
+                        <td colSpan={2} style="text-align:center;color:var(--text-tertiary);padding:16px">No attributes</td>
                       </tr>
                     )}
                   </tbody>
@@ -368,7 +368,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
             <div class="ddb-header">
               <div>
                 <h2 style="font-size:20px;font-weight:700;margin-bottom:4px">{selectedPool.Name}</h2>
-                <div style="font-size:13px;color:var(--n500);font-family:var(--font-mono)">{selectedPool.Id}</div>
+                <div style="font-size:13px;color:var(--text-secondary);font-family:var(--font-mono)">{selectedPool.Id}</div>
               </div>
               <div class="flex gap-2">
                 <button class="btn btn-primary btn-sm" onClick={() => setShowCreateUser(true)}>
@@ -381,14 +381,14 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
             </div>
 
             <div style="margin-bottom:12px;position:relative">
-              <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--n400)" />
+              <SearchIcon style="position:absolute;left:8px;top:50%;transform:translateY(-50%);color:var(--text-tertiary)" />
               <input class="input w-full" placeholder="Filter users..." value={userSearch}
                 onInput={(e) => setUserSearch((e.target as HTMLInputElement).value)}
                 style="padding-left:30px;font-size:13px" />
             </div>
 
             {loading ? (
-              <div style="padding:32px;text-align:center;color:var(--n400)">Loading...</div>
+              <div style="padding:32px;text-align:center;color:var(--text-tertiary)">Loading...</div>
             ) : (
               <table class="data-table" style="width:100%">
                 <thead>
@@ -411,7 +411,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
                       </td>
                       <td style="font-size:13px">{getUserAttr(user, 'email') || '--'}</td>
                       <td>{statusBadge(user.UserStatus)}</td>
-                      <td style="font-size:12px;color:var(--n500)">{formatDate(user.UserCreateDate)}</td>
+                      <td style="font-size:12px;color:var(--text-secondary)">{formatDate(user.UserCreateDate)}</td>
                       <td>
                         <div class="flex gap-2">
                           {user.UserStatus !== 'CONFIRMED' && (
@@ -434,7 +434,7 @@ export function CognitoBrowserPage({ showToast }: CognitoBrowserProps) {
                   ))}
                   {displayUsers.length === 0 && (
                     <tr>
-                      <td colSpan={5} style="text-align:center;padding:24px;color:var(--n400)">
+                      <td colSpan={5} style="text-align:center;padding:24px;color:var(--text-tertiary)">
                         No users in this pool
                       </td>
                     </tr>

@@ -162,7 +162,7 @@ export function ItemEditor({ item, tableDesc, onSave, onDelete, onDuplicate, onC
                   value={attr.key}
                   onInput={(e) => updateAttr(idx, { key: (e.target as HTMLInputElement).value })}
                   disabled={isKey}
-                  style={isKey ? 'background:var(--n100);font-weight:600' : ''}
+                  style={isKey ? 'background:var(--bg-secondary);font-weight:600' : ''}
                 />
                 <select
                   class="select ddb-form-type"

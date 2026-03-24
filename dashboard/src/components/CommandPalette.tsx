@@ -79,7 +79,7 @@ export function CommandPalette({ services, onClose }: CommandPaletteProps) {
             </div>
           ))}
           {commands.length === 0 && (
-            <div style="padding:24px;text-align:center;color:var(--n400);font-size:14px">No results</div>
+            <div style="padding:24px;text-align:center;color:var(--text-tertiary);font-size:14px">No results</div>
           )}
         </div>
       </div>

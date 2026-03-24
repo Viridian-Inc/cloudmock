@@ -106,3 +106,7 @@ test-integration: ## Run integration tests (requires Docker)
 .PHONY: test-unit
 test-unit: ## Run unit tests only (no Docker)
 	go test -v -short -cover ./...
+
+.PHONY: test-race
+test-race: ## Run tests with race detector
+	go test -race -count=1 -short ./...

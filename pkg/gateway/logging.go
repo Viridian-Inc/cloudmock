@@ -2,7 +2,6 @@ package gateway
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -399,7 +398,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 					RequestBody:    entry.RequestBody,
 					ResponseBody:   entry.ResponseBody,
 				}
-				_ = opts.DataPlane.RequestW.Write(context.Background(), dpEntry)
+				_ = opts.DataPlane.RequestW.Write(r.Context(), dpEntry)
 			}
 
 			// Emit an OTel span for each request.

@@ -616,13 +616,22 @@ func main() {
 	sig := <-sigCh
 	log.Printf("received %v, shutting down...", sig)
 
+	// Cancel the root context so background goroutines (e.g. SLO callbacks) stop.
+	rootCancel()
+
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	gwServer.Shutdown(shutdownCtx)   //nolint:errcheck
-	adminServer.Shutdown(shutdownCtx) //nolint:errcheck
+	if err := gwServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("gateway shutdown error: %v", err)
+	}
+	if err := adminServer.Shutdown(shutdownCtx); err != nil {
+		log.Printf("admin shutdown error: %v", err)
+	}
 	if dashServer != nil {
-		dashServer.Shutdown(shutdownCtx) //nolint:errcheck
+		if err := dashServer.Shutdown(shutdownCtx); err != nil {
+			log.Printf("dashboard shutdown error: %v", err)
+		}
 	}
 
 	// Explicit resource cleanup (replaces deferred calls).
@@ -630,7 +639,9 @@ func main() {
 		regEngine.Stop()
 	}
 	if otelShutdown != nil {
-		otelShutdown(shutdownCtx) //nolint:errcheck
+		if err := otelShutdown(shutdownCtx); err != nil {
+			log.Printf("otel shutdown error: %v", err)
+		}
 	}
 	if duckClient != nil {
 		duckClient.Close()

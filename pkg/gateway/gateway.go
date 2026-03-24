@@ -7,6 +7,7 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/config"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -15,6 +16,7 @@ import (
 type Gateway struct {
 	cfg      *config.Config
 	registry *routing.Registry
+	plugins  *plugin.Manager
 	mux      *http.ServeMux
 	store    *iampkg.Store
 	engine   *iampkg.Engine
@@ -30,7 +32,7 @@ func New(cfg *config.Config, registry *routing.Registry) *Gateway {
 
 	g.mux.HandleFunc("/_cloudmock/health", g.handleHealth)
 	g.mux.HandleFunc("/_cloudmock/services", g.handleServices)
-	g.mux.HandleFunc("/", g.handleAWSRequest)
+	g.mux.HandleFunc("/", g.handleRequest)
 
 	return g
 }
@@ -41,6 +43,13 @@ func NewWithIAM(cfg *config.Config, registry *routing.Registry, store *iampkg.St
 	g.store = store
 	g.engine = engine
 	return g
+}
+
+// SetPluginManager attaches a plugin manager to the gateway.
+// When set, the gateway will attempt to route requests to plugins before
+// falling back to the legacy service registry.
+func (g *Gateway) SetPluginManager(pm *plugin.Manager) {
+	g.plugins = pm
 }
 
 // ServeHTTP implements http.Handler.
@@ -71,10 +80,84 @@ func (g *Gateway) handleServices(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(data)
 }
 
+// handleRequest is the unified entry point for all incoming requests.
+// It first attempts path-based plugin routing (for k8s, ArgoCD, etc.),
+// then falls back to AWS service detection via the legacy registry.
+func (g *Gateway) handleRequest(w http.ResponseWriter, r *http.Request) {
+	// 1. Try path-based plugin routing first (for non-AWS protocols like k8s, ArgoCD).
+	if g.plugins != nil {
+		if p, _ := g.plugins.LookupByPath(r.URL.Path); p != nil {
+			g.handlePluginRequest(w, r, p)
+			return
+		}
+	}
+
+	// 2. AWS-style routing: detect service from headers/credentials.
+	g.handleAWSRequest(w, r)
+}
+
+// handlePluginRequest dispatches a request to a plugin and writes the response.
+func (g *Gateway) handlePluginRequest(w http.ResponseWriter, r *http.Request, p plugin.Plugin) {
+	body, err := service.ParseRequestBody(r)
+	if err != nil {
+		http.Error(w, "failed to read request body", http.StatusBadRequest)
+		return
+	}
+
+	headers := make(map[string]string)
+	for k := range r.Header {
+		headers[k] = r.Header.Get(k)
+	}
+	queryParams := make(map[string]string)
+	for k, v := range r.URL.Query() {
+		if len(v) > 0 {
+			queryParams[k] = v[0]
+		}
+	}
+
+	// Build auth context from IAM if available.
+	var authCtx *plugin.AuthContext
+	identity, _ := g.authenticateRequest(r)
+	if identity != nil {
+		authCtx = &plugin.AuthContext{
+			UserID:      identity.UserID,
+			AccountID:   identity.AccountID,
+			ARN:         identity.ARN,
+			AccessKeyID: identity.AccessKeyID,
+			IsRoot:      identity.IsRoot,
+		}
+	}
+
+	req := &plugin.Request{
+		Action:      routing.DetectAction(r),
+		Body:        body,
+		Headers:     headers,
+		QueryParams: queryParams,
+		Path:        r.URL.Path,
+		Method:      r.Method,
+		Auth:        authCtx,
+	}
+
+	resp, err := p.HandleRequest(r.Context(), req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for k, v := range resp.Headers {
+		w.Header().Set(k, v)
+	}
+	w.WriteHeader(resp.StatusCode)
+	if resp.Body != nil {
+		_, _ = w.Write(resp.Body)
+	}
+}
+
 func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	// 1. Detect the target service.
 	svcName := routing.DetectService(r)
 	if svcName == "" {
+		// If plugin manager is available, try name-based plugin lookup as last resort.
 		awsErr := service.NewAWSError(
 			"MissingAuthenticationToken",
 			"No service could be detected from the request. Ensure a valid Authorization header is present.",
@@ -84,7 +167,15 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Look up service in registry.
+	// 2. Try plugin manager first (for migrated services), then legacy registry.
+	if g.plugins != nil {
+		if p, _ := g.plugins.Lookup(svcName); p != nil {
+			g.handlePluginRequest(w, r, p)
+			return
+		}
+	}
+
+	// 3. Fall back to legacy registry.
 	svc, err := g.registry.Lookup(svcName)
 	if err != nil {
 		awsErr := service.NewAWSError(
@@ -96,7 +187,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 3. Read request body.
+	// 4. Read request body.
 	body, err := service.ParseRequestBody(r)
 	if err != nil {
 		awsErr := service.NewAWSError("InvalidRequest", "Failed to read request body.", http.StatusBadRequest)
@@ -104,7 +195,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 4. Build RequestContext.
+	// 5. Build RequestContext.
 	action := routing.DetectAction(r)
 	params := make(map[string]string)
 	for k, v := range r.URL.Query() {
@@ -123,7 +214,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		Service:    svcName,
 	}
 
-	// 5. Authenticate request.
+	// 6. Authenticate request.
 	identity, authErr := g.authenticateRequest(r)
 	if authErr != nil {
 		_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
@@ -140,7 +231,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 6. Dispatch to service.
+	// 7. Dispatch to service.
 	resp, svcErr := svc.HandleRequest(ctx)
 	if svcErr != nil {
 		if awsErr, ok := svcErr.(*service.AWSError); ok {
@@ -155,7 +246,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 7. Write success response.
+	// 8. Write success response.
 	for k, v := range resp.Headers {
 		w.Header().Set(k, v)
 	}

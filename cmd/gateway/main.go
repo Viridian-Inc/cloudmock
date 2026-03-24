@@ -49,6 +49,9 @@ import (
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/integration"
+	"github.com/neureaux/cloudmock/pkg/plugin"
+	argoplugin "github.com/neureaux/cloudmock/plugins/argocd"
+	k8splugin "github.com/neureaux/cloudmock/plugins/kubernetes"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
 	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
@@ -94,6 +97,7 @@ func main() {
 	defer rootCancel()
 
 	configPath := flag.String("config", "", "path to cloudmock YAML config file")
+	pluginDir := flag.String("plugin-dir", "", "directory containing external plugin binaries (default: ~/.cloudmock/plugins/)")
 	flag.Parse()
 
 	var cfg *config.Config
@@ -507,7 +511,46 @@ func main() {
 		incService.SetWebhookDispatcher(whDispatcher)
 	}
 
+	// Plugin manager — enables hybrid in-process / external plugin routing.
+	pluginMgr := plugin.NewManager(slog.Default())
+	adminAPI.SetPluginManager(pluginMgr)
+
+	// Bridge all registered services (eager + lazy) from the legacy registry
+	// into the plugin system via ServiceAdapter. This makes every AWS service
+	// available through the unified plugin interface while keeping the legacy
+	// registry as a fallback.
+	for _, svc := range registry.List() {
+		adapter := plugin.NewServiceAdapter(svc, cfg.Region, cfg.AccountID)
+		if err := pluginMgr.RegisterServiceAdapter(rootCtx, adapter); err != nil {
+			slog.Warn("failed to register service as plugin", "service", svc.Name(), "error", err)
+		}
+	}
+	slog.Info("bridged legacy services to plugin system", "count", len(pluginMgr.Names()))
+
+	// Register Kubernetes API emulation plugin.
+	k8sPlugin := k8splugin.New()
+	if err := pluginMgr.RegisterInProcess(rootCtx, k8sPlugin); err != nil {
+		slog.Error("failed to register kubernetes plugin", "error", err)
+	}
+
+	// Register ArgoCD API emulation plugin, wired to k8s for sync operations.
+	argoPlugin := argoplugin.New(k8sPlugin)
+	if err := pluginMgr.RegisterInProcess(rootCtx, argoPlugin); err != nil {
+		slog.Error("failed to register argocd plugin", "error", err)
+	}
+
+	// Load external plugins from filesystem.
+	extPluginDir := *pluginDir
+	if extPluginDir == "" {
+		home, _ := os.UserHomeDir()
+		extPluginDir = filepath.Join(home, ".cloudmock", "plugins")
+	}
+	if err := plugin.LoadExternalPlugins(rootCtx, pluginMgr, extPluginDir, slog.Default()); err != nil {
+		slog.Warn("failed to load external plugins", "dir", extPluginDir, "error", err)
+	}
+
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
+	gw.SetPluginManager(pluginMgr)
 	var handler http.Handler = gw
 	// Wrap with chaos middleware for fault injection
 	handler = gateway.ChaosMiddleware(handler, chaosEngine)

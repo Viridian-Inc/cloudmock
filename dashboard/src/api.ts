@@ -246,4 +246,79 @@ export async function deletePreference(namespace: string, key: string): Promise<
   });
 }
 
+// --- Plugin System ---
+
+export interface PluginInfo {
+  name: string;
+  version: string;
+  protocol: string;
+  mode: string;
+  healthy: boolean;
+  actions: string[];
+  api_paths?: string[];
+  metadata?: Record<string, string>;
+}
+
+export async function fetchPlugins(): Promise<PluginInfo[]> {
+  return api<PluginInfo[]>('/api/plugins');
+}
+
+export async function fetchPluginHealth(name: string) {
+  return api(`/api/plugins/${encodeURIComponent(name)}/health`);
+}
+
+// --- Kubernetes API (via gateway) ---
+
+export async function k8sGet<T = any>(path: string): Promise<T> {
+  const res = await fetch(GW_BASE + path);
+  if (!res.ok) throw new Error(`K8s API error: ${res.status}`);
+  return res.json();
+}
+
+export async function k8sCreate<T = any>(path: string, body: any): Promise<T> {
+  const res = await fetch(GW_BASE + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`K8s API error: ${res.status}`);
+  return res.json();
+}
+
+export async function k8sDelete(path: string): Promise<void> {
+  const res = await fetch(GW_BASE + path, { method: 'DELETE' });
+  if (!res.ok) throw new Error(`K8s API error: ${res.status}`);
+}
+
+// --- ArgoCD API (via gateway) ---
+
+export async function argoGet<T = any>(path: string): Promise<T> {
+  const res = await fetch(GW_BASE + path, {
+    headers: { 'Authorization': 'Bearer cloudmock-argocd-token' },
+  });
+  if (!res.ok) throw new Error(`ArgoCD API error: ${res.status}`);
+  return res.json();
+}
+
+export async function argoPost<T = any>(path: string, body?: any): Promise<T> {
+  const res = await fetch(GW_BASE + path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer cloudmock-argocd-token',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`ArgoCD API error: ${res.status}`);
+  return res.json();
+}
+
+export async function argoDelete(path: string): Promise<void> {
+  const res = await fetch(GW_BASE + path, {
+    method: 'DELETE',
+    headers: { 'Authorization': 'Bearer cloudmock-argocd-token' },
+  });
+  if (!res.ok) throw new Error(`ArgoCD API error: ${res.status}`);
+}
+
 export { ADMIN_BASE, GW_BASE };

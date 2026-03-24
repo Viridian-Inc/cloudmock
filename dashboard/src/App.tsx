@@ -28,6 +28,8 @@ import { IncidentsPage } from './pages/Incidents';
 import { RegressionsPage } from './pages/Regressions';
 import { SettingsPage } from './pages/Settings';
 import { TraceComparePage } from './pages/TraceCompare';
+import { KubernetesPage } from './pages/Kubernetes';
+import { ArgoCDPage } from './pages/ArgoCD';
 
 let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -95,6 +97,9 @@ export function App() {
     { id: '/cognito', label: 'Cognito', icon: 'users' },
     { id: '/iam', label: 'IAM', icon: 'shield' },
     { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
+    // Cloud-Native
+    { id: '/kubernetes', label: 'Kubernetes', icon: 'topology' },
+    { id: '/argocd', label: 'ArgoCD', icon: 'trendDown' },
     // Other (ungrouped)
     { id: '/', label: 'Home', icon: 'home' },
     { id: '/resources', label: 'Resources', icon: 'resources' },
@@ -129,6 +134,8 @@ export function App() {
       case '/debug': return <DebugAssistantPage showToast={showToast} />;
       case '/metrics': return <MetricsPage />;
       case '/chaos': return <ChaosPage showToast={showToast} />;
+      case '/kubernetes': return <KubernetesPage showToast={showToast} />;
+      case '/argocd': return <ArgoCDPage showToast={showToast} />;
       case '/settings': return <SettingsPage showToast={showToast} />;
       default: return <HomePage sse={sse} showToast={showToast} />;
     }

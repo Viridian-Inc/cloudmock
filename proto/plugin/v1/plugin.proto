@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package cloudmock.plugin.v1;
+
+option go_package = "github.com/neureaux/cloudmock/pkg/plugin/pluginpb";
+
+// ServicePlugin is the interface every CloudMock plugin must implement.
+// In-process Go plugins use a direct adapter; external plugins communicate
+// over gRPC using this service definition.
+service ServicePlugin {
+  // Init is called once when the plugin is loaded. The plugin receives
+  // configuration and should perform any setup needed before handling requests.
+  rpc Init(InitRequest) returns (InitResponse);
+
+  // Shutdown is called when the core is stopping. The plugin should release
+  // resources and exit cleanly.
+  rpc Shutdown(ShutdownRequest) returns (ShutdownResponse);
+
+  // HealthCheck returns the plugin's current health status.
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Describe returns metadata about the plugin — name, version, protocol,
+  // supported actions, and the URL path patterns it handles.
+  rpc Describe(DescribeRequest) returns (PluginDescriptor);
+
+  // HandleRequest processes a single request and returns a response.
+  rpc HandleRequest(ServiceRequest) returns (ServiceResponse);
+
+  // StreamRequest processes a request that produces a stream of responses
+  // (e.g., Kubernetes watch, SSE, long-poll).
+  rpc StreamRequest(ServiceRequest) returns (stream ServiceResponse);
+}
+
+// InitRequest carries configuration from the core to the plugin at startup.
+message InitRequest {
+  // config is a JSON-encoded map of plugin-specific configuration.
+  bytes config = 1;
+  // data_dir is a path the plugin can use for persistent storage.
+  string data_dir = 2;
+  // log_level controls plugin logging verbosity.
+  string log_level = 3;
+}
+
+message InitResponse {
+  bool ok = 1;
+  string error = 2;
+}
+
+message ShutdownRequest {}
+
+message ShutdownResponse {}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  enum Status {
+    UNKNOWN = 0;
+    HEALTHY = 1;
+    DEGRADED = 2;
+    UNHEALTHY = 3;
+  }
+  Status status = 1;
+  string message = 2;
+}
+
+message DescribeRequest {}
+
+// PluginDescriptor tells the core how to route requests to this plugin.
+message PluginDescriptor {
+  // name is the plugin identifier, e.g. "s3", "kubernetes", "argocd".
+  string name = 1;
+  // version is the plugin version in semver format.
+  string version = 2;
+  // protocol describes the wire protocol: "aws-json", "aws-query",
+  // "aws-rest-json", "aws-rest-xml", "k8s-api", "argocd-api".
+  string protocol = 3;
+  // actions lists the operations this plugin supports (e.g., "CreateBucket", "GetObject").
+  repeated string actions = 4;
+  // api_paths lists URL path patterns this plugin handles.
+  // Used by the core for path-based routing (e.g., "/api/v1/*", "/apis/*").
+  // AWS plugins typically leave this empty and rely on SigV4/header-based routing.
+  repeated string api_paths = 5;
+  // metadata holds arbitrary key-value data about the plugin.
+  map<string, string> metadata = 6;
+}
+
+// ServiceRequest carries an incoming HTTP request from the core to a plugin.
+message ServiceRequest {
+  string action = 1;
+  bytes body = 2;
+  map<string, string> headers = 3;
+  map<string, string> query_params = 4;
+  string path = 5;
+  string method = 6;
+  AuthContext auth = 7;
+}
+
+// ServiceResponse carries a plugin's response back to the core.
+message ServiceResponse {
+  int32 status_code = 1;
+  bytes body = 2;
+  map<string, string> headers = 3;
+}
+
+// AuthContext carries the authenticated identity from the core to the plugin.
+// The core handles authentication; plugins receive the resolved identity.
+message AuthContext {
+  string user_id = 1;
+  string account_id = 2;
+  string arn = 3;
+  string access_key_id = 4;
+  bool is_root = 5;
+  repeated string roles = 6;
+  map<string, string> claims = 7;
+}

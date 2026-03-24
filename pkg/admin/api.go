@@ -23,6 +23,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
@@ -102,6 +103,7 @@ type API struct {
 	authSecret       []byte
 	webhookDispatcher *webhook.Dispatcher
 	reportGenerator   *report.Generator
+	pluginManager     *plugin.Manager
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
 	prefsMu          sync.RWMutex
@@ -162,6 +164,8 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/users", a.handleUsers)
 	a.mux.HandleFunc("/api/users/", a.handleUserByID)
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
+	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
+	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
 
 	return a
 }
@@ -233,6 +237,8 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/users", a.handleUsers)
 	a.mux.HandleFunc("/api/users/", a.handleUserByID)
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
+	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
+	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
 
 	return a
 }
@@ -2064,6 +2070,60 @@ func (a *API) SetReportGenerator(g *report.Generator) {
 // SetWebhookDispatcher sets the webhook dispatcher for the admin API.
 func (a *API) SetWebhookDispatcher(d *webhook.Dispatcher) {
 	a.webhookDispatcher = d
+}
+
+// SetPluginManager sets the plugin manager for the admin API to expose plugin info.
+func (a *API) SetPluginManager(pm *plugin.Manager) {
+	a.pluginManager = pm
+}
+
+// handlePlugins serves GET /api/plugins — lists all registered plugins.
+func (a *API) handlePlugins(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if a.pluginManager == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+	writeJSON(w, http.StatusOK, a.pluginManager.List())
+}
+
+// handlePluginByName serves GET /api/plugins/{name}/health — plugin health check.
+func (a *API) handlePluginByName(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if a.pluginManager == nil {
+		writeError(w, http.StatusNotFound, "plugin system not enabled")
+		return
+	}
+
+	// Parse /api/plugins/{name} or /api/plugins/{name}/health
+	path := strings.TrimPrefix(r.URL.Path, "/api/plugins/")
+	parts := strings.SplitN(path, "/", 2)
+	name := parts[0]
+
+	if len(parts) == 2 && parts[1] == "health" {
+		results := a.pluginManager.HealthCheckAll(r.Context())
+		if result, ok := results[name]; ok {
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
+		writeError(w, http.StatusNotFound, fmt.Sprintf("plugin %q not found", name))
+		return
+	}
+
+	// Return plugin info
+	for _, info := range a.pluginManager.List() {
+		if info.Name == name {
+			writeJSON(w, http.StatusOK, info)
+			return
+		}
+	}
+	writeError(w, http.StatusNotFound, fmt.Sprintf("plugin %q not found", name))
 }
 
 // SetProfilingEngine sets the profiling engine for the admin API.

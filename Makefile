@@ -1,4 +1,4 @@
-.PHONY: build build-gateway build-cli build-tools build-dashboard test lint clean proto docker docker-push docker-up docker-down release help
+.PHONY: build build-gateway build-cli build-tools build-plugins build-plugin-example build-dashboard test lint clean proto docker docker-push docker-up docker-down release help
 
 VERSION ?= 1.0.0
 
@@ -8,6 +8,7 @@ help:
 	@echo "  build-gateway   - Build the gateway binary"
 	@echo "  build-cli       - Build the CLI binary"
 	@echo "  build-tools     - Build AWS tool wrappers and CI helper"
+	@echo "  build-plugins   - Build external plugin binaries"
 	@echo "  build-dashboard - Build the web dashboard"
 	@echo "  test            - Run all tests"
 	@echo "  lint            - Run golangci-lint"
@@ -19,7 +20,7 @@ help:
 	@echo "  docker-down     - Stop Docker containers"
 	@echo "  release         - Build cross-platform release binaries"
 
-build: build-gateway build-cli build-tools
+build: build-gateway build-cli build-tools build-plugins
 
 build-gateway:
 	@echo "Building gateway..."
@@ -40,6 +41,14 @@ build-tools:
 	@go build -o bin/cloudmock-chalice ./tools/cloudmock-chalice
 	@go build -o bin/cloudmock-copilot ./tools/cloudmock-copilot
 	@go build -o bin/cloudmock-ci ./tools/cloudmock-ci
+
+build-plugins: build-plugin-example
+	@echo "Plugins built (in-process plugins are compiled into gateway)"
+
+build-plugin-example:
+	@echo "Building example plugin..."
+	@mkdir -p bin/plugins
+	@go build -o bin/plugins/example ./plugins/example/cmd
 
 test:
 	@echo "Running tests..."

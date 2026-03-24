@@ -22,6 +22,7 @@ const navGroups: NavGroup[] = [
   { label: 'Observe', ids: ['/console', '/services', '/requests', '/traces', '/metrics'] },
   { label: 'Respond', ids: ['/incidents', '/regressions', '/debug'] },
   { label: 'Resources', ids: ['/dynamodb', '/s3', '/sqs', '/lambda', '/cognito', '/iam', '/mail'] },
+  { label: 'Cloud-Native', ids: ['/kubernetes', '/argocd'] },
 ];
 
 const bottomIds = new Set(['/settings', '/chaos']);

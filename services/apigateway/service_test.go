@@ -27,7 +27,7 @@ func newAPIGatewayHandler(t *testing.T) http.Handler {
 }
 
 // apigwReq builds an HTTP request targeting the API Gateway service.
-func apigwReq(t *testing.T, method, path string, body interface{}) *http.Request {
+func apigwReq(t *testing.T, method, path string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func apigwReq(t *testing.T, method, path string, body interface{}) *http.Request
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -87,9 +87,9 @@ func rootResourceID(t *testing.T, handler http.Handler, apiID string) string {
 		t.Fatalf("GetResources: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 	m := decodeJSON(t, w.Body.String())
-	items, _ := m["items"].([]interface{})
+	items, _ := m["items"].([]any)
 	for _, item := range items {
-		r := item.(map[string]interface{})
+		r := item.(map[string]any)
 		if r["path"].(string) == "/" {
 			return r["id"].(string)
 		}
@@ -122,7 +122,7 @@ func TestAPIGateway_CreateRestApiAndGetRestApis(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	items, ok := m["items"].([]interface{})
+	items, ok := m["items"].([]any)
 	if !ok {
 		t.Fatalf("GetRestApis: missing items\nbody: %s", w.Body.String())
 	}
@@ -133,7 +133,7 @@ func TestAPIGateway_CreateRestApiAndGetRestApis(t *testing.T) {
 	// Verify both IDs appear.
 	found := make(map[string]bool)
 	for _, item := range items {
-		api := item.(map[string]interface{})
+		api := item.(map[string]any)
 		found[api["id"].(string)] = true
 	}
 	for _, id := range []string{id1, id2} {
@@ -207,14 +207,14 @@ func TestAPIGateway_CreateResourceAndGetResources(t *testing.T) {
 		t.Fatalf("GetResources: expected 200, got %d\nbody: %s", wList.Code, wList.Body.String())
 	}
 	mList := decodeJSON(t, wList.Body.String())
-	items, _ := mList["items"].([]interface{})
+	items, _ := mList["items"].([]any)
 	if len(items) != 3 {
 		t.Errorf("GetResources: expected 3 resources (root + /pets + /pets/{petId}), got %d", len(items))
 	}
 
 	paths := make(map[string]bool)
 	for _, item := range items {
-		r := item.(map[string]interface{})
+		r := item.(map[string]any)
 		paths[r["path"].(string)] = true
 	}
 	for _, want := range []string{"/", "/pets", "/pets/{petId}"} {
@@ -337,7 +337,7 @@ func TestAPIGateway_PutIntegration(t *testing.T) {
 		t.Fatalf("GetMethod after integration: expected 200, got %d", wGet.Code)
 	}
 	mGet := decodeJSON(t, wGet.Body.String())
-	integration, ok := mGet["methodIntegration"].(map[string]interface{})
+	integration, ok := mGet["methodIntegration"].(map[string]any)
 	if !ok {
 		t.Fatalf("GetMethod: missing methodIntegration\nbody: %s", wGet.Body.String())
 	}
@@ -381,7 +381,7 @@ func TestAPIGateway_DeploymentAndStage(t *testing.T) {
 		t.Fatalf("GetDeployments: expected 200, got %d\nbody: %s", wGetDeploys.Code, wGetDeploys.Body.String())
 	}
 	mDeployList := decodeJSON(t, wGetDeploys.Body.String())
-	deployItems, _ := mDeployList["items"].([]interface{})
+	deployItems, _ := mDeployList["items"].([]any)
 	if len(deployItems) != 1 {
 		t.Errorf("GetDeployments: expected 1 deployment, got %d", len(deployItems))
 	}
@@ -414,11 +414,11 @@ func TestAPIGateway_DeploymentAndStage(t *testing.T) {
 		t.Fatalf("GetStages: expected 200, got %d\nbody: %s", wGetStages.Code, wGetStages.Body.String())
 	}
 	mStageList := decodeJSON(t, wGetStages.Body.String())
-	stageItems, _ := mStageList["item"].([]interface{})
+	stageItems, _ := mStageList["item"].([]any)
 	if len(stageItems) != 1 {
 		t.Errorf("GetStages: expected 1 stage, got %d", len(stageItems))
 	}
-	firstStage, _ := stageItems[0].(map[string]interface{})
+	firstStage, _ := stageItems[0].(map[string]any)
 	if firstStage["stageName"].(string) != "prod" {
 		t.Errorf("GetStages: expected stageName=prod, got %s", firstStage["stageName"])
 	}
@@ -435,10 +435,10 @@ func TestAPIGateway_DeleteRestApi(t *testing.T) {
 	wList := httptest.NewRecorder()
 	handler.ServeHTTP(wList, apigwReq(t, http.MethodGet, "/restapis", nil))
 	m := decodeJSON(t, wList.Body.String())
-	items, _ := m["items"].([]interface{})
+	items, _ := m["items"].([]any)
 	found := false
 	for _, item := range items {
-		if item.(map[string]interface{})["id"].(string) == apiID {
+		if item.(map[string]any)["id"].(string) == apiID {
 			found = true
 			break
 		}
@@ -472,9 +472,9 @@ func TestAPIGateway_DeleteRestApi(t *testing.T) {
 	wList2 := httptest.NewRecorder()
 	handler.ServeHTTP(wList2, apigwReq(t, http.MethodGet, "/restapis", nil))
 	m2 := decodeJSON(t, wList2.Body.String())
-	items2, _ := m2["items"].([]interface{})
+	items2, _ := m2["items"].([]any)
 	for _, item := range items2 {
-		if item.(map[string]interface{})["id"].(string) == apiID {
+		if item.(map[string]any)["id"].(string) == apiID {
 			t.Errorf("GetRestApis: API %s should not appear after deletion", apiID)
 		}
 	}

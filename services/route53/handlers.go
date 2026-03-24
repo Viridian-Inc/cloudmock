@@ -22,7 +22,7 @@ func newUUID() string {
 }
 
 // xmlOK returns a 200 XML response.
-func xmlOK(body interface{}) (*service.Response, error) {
+func xmlOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -31,7 +31,7 @@ func xmlOK(body interface{}) (*service.Response, error) {
 }
 
 // xmlCreated returns a 201 XML response.
-func xmlCreated(body interface{}) (*service.Response, error) {
+func xmlCreated(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusCreated,
 		Body:       body,

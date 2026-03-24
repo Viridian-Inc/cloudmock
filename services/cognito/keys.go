@@ -55,11 +55,11 @@ func (ks *KeyStore) PublicKey() *rsa.PublicKey {
 }
 
 // JWK returns the public key in JWK format.
-func (ks *KeyStore) JWK() map[string]interface{} {
+func (ks *KeyStore) JWK() map[string]any {
 	ks.mu.RLock()
 	defer ks.mu.RUnlock()
 
-	return map[string]interface{}{
+	return map[string]any{
 		"kty": "RSA",
 		"kid": ks.kid,
 		"use": "sig",

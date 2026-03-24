@@ -326,12 +326,12 @@ func TestAPIClientDoJSON(t *testing.T) {
 		assert.Contains(t, r.Header.Get("Authorization"), "testservice")
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"Id": "test-123"})
+		json.NewEncoder(w).Encode(map[string]any{"Id": "test-123"})
 	}))
 	defer server.Close()
 
 	client := NewAPIClient(server.URL, "us-east-1", "test", "test")
-	result, err := client.DoJSON("testservice", "TestService", "TestAction", map[string]interface{}{"Name": "foo"})
+	result, err := client.DoJSON("testservice", "TestService", "TestAction", map[string]any{"Name": "foo"})
 	require.NoError(t, err)
 	assert.Equal(t, "test-123", result["Id"])
 }
@@ -347,7 +347,7 @@ func TestAPIClientDoQuery(t *testing.T) {
 		assert.Equal(t, "10.0.0.0/16", values.Get("CidrBlock"))
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{"VpcId": "vpc-123"})
+		json.NewEncoder(w).Encode(map[string]any{"VpcId": "vpc-123"})
 	}))
 	defer server.Close()
 
@@ -380,7 +380,7 @@ func TestAPIClientErrorHandling(t *testing.T) {
 	defer server.Close()
 
 	client := NewAPIClient(server.URL, "us-east-1", "test", "test")
-	_, err := client.DoJSON("dynamodb", "DynamoDB_20120810", "DescribeTable", map[string]interface{}{"TableName": "missing"})
+	_, err := client.DoJSON("dynamodb", "DynamoDB_20120810", "DescribeTable", map[string]any{"TableName": "missing"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "404")
 }
@@ -392,7 +392,7 @@ func TestAPIClientErrorHandling(t *testing.T) {
 
 func newTestCloudmockServer() *httptest.Server {
 	// In-memory store for resources, keyed by service/resourceType/id.
-	store := make(map[string]map[string]interface{})
+	store := make(map[string]map[string]any)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Detect service from Authorization header.
@@ -431,7 +431,7 @@ func newTestCloudmockServer() *httptest.Server {
 
 		// Process JSON-protocol request.
 		if action != "" {
-			var params map[string]interface{}
+			var params map[string]any
 			if r.Body != nil {
 				// Re-read body for JSON parsing.
 				bodyBytes := make([]byte, 4096)
@@ -439,7 +439,7 @@ func newTestCloudmockServer() *httptest.Server {
 				json.Unmarshal(bodyBytes[:n], &params)
 			}
 			if params == nil {
-				params = make(map[string]interface{})
+				params = make(map[string]any)
 			}
 			handleJSONAction(w, service, action, params, store)
 			return
@@ -450,7 +450,7 @@ func newTestCloudmockServer() *httptest.Server {
 	}))
 }
 
-func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]interface{}) {
+func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]any) {
 	path := r.URL.Path
 	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
 	bucket := parts[0]
@@ -458,7 +458,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 
 	switch r.Method {
 	case "PUT":
-		store[key] = map[string]interface{}{
+		store[key] = map[string]any{
 			"bucket": bucket,
 			"arn":    fmt.Sprintf("arn:aws:s3:::%s", bucket),
 			"region": "us-east-1",
@@ -481,7 +481,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 	case "GET":
 		if path == "/" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]interface{}{"Buckets": []interface{}{}})
+			json.NewEncoder(w).Encode(map[string]any{"Buckets": []any{}})
 			return
 		}
 		if data, ok := store[key]; ok {
@@ -493,14 +493,14 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 	}
 }
 
-func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]interface{}, store map[string]map[string]interface{}) {
+func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]any, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 
 	switch {
 	case strings.HasPrefix(action, "Create"):
 		id := fmt.Sprintf("%s-%s-001", service, strings.ToLower(action[6:]))
 		key := fmt.Sprintf("%s/%s/%s", service, action, id)
-		data := map[string]interface{}{}
+		data := map[string]any{}
 		for k, v := range params {
 			data[k] = v
 		}
@@ -515,7 +515,7 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 				data["TableStatus"] = "ACTIVE"
 			}
 			store[key] = data
-			json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+			json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 			return
 		}
 		store[key] = data
@@ -527,10 +527,10 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			tableName, _ := params["TableName"].(string)
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
-				json.NewEncoder(w).Encode(map[string]interface{}{"Table": data})
+				json.NewEncoder(w).Encode(map[string]any{"Table": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
@@ -538,7 +538,7 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"__type": "ResourceNotFoundException"})
+		json.NewEncoder(w).Encode(map[string]any{"__type": "ResourceNotFoundException"})
 
 	case strings.HasPrefix(action, "Delete"):
 		switch service {
@@ -547,24 +547,24 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
 				delete(store, key)
-				json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+				json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
 			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 
-func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]interface{}) {
+func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch {
@@ -572,7 +572,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		cidr := values.Get("CidrBlock")
 		vpcID := "vpc-test001"
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
-		data := map[string]interface{}{
+		data := map[string]any{
 			"VpcId":              vpcID,
 			"CidrBlock":         cidr,
 			"Arn":               fmt.Sprintf("arn:aws:ec2:us-east-1:000000000000:vpc/%s", vpcID),
@@ -590,7 +590,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 			json.NewEncoder(w).Encode(data)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
@@ -601,17 +601,17 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
 		if _, ok := store[key]; ok {
 			delete(store, key)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			json.NewEncoder(w).Encode(map[string]any{})
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
 		}
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 

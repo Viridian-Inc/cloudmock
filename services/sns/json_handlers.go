@@ -47,7 +47,7 @@ func (s *SNSService) handleJSON(ctx *service.RequestContext) (*service.Response,
 }
 
 // snsParseJSONBody reads the request body and unmarshals it into the given target.
-func snsParseJSONBody(ctx *service.RequestContext, target interface{}) error {
+func snsParseJSONBody(ctx *service.RequestContext, target any) error {
 	body := ctx.Body
 	if len(body) == 0 && ctx.RawRequest != nil && ctx.RawRequest.Body != nil {
 		var err error
@@ -63,7 +63,7 @@ func snsParseJSONBody(ctx *service.RequestContext, target interface{}) error {
 }
 
 // snsJSONOK wraps a response body in a 200 JSON response.
-func snsJSONOK(body interface{}) (*service.Response, error) {
+func snsJSONOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -131,7 +131,7 @@ func jsonDeleteTopic(ctx *service.RequestContext, store *Store) (*service.Respon
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
-	return snsJSONOK(map[string]interface{}{})
+	return snsJSONOK(map[string]any{})
 }
 
 // ---- ListTopics ----
@@ -222,7 +222,7 @@ func jsonSetTopicAttributes(ctx *service.RequestContext, store *Store) (*service
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
-	return snsJSONOK(map[string]interface{}{})
+	return snsJSONOK(map[string]any{})
 }
 
 // ---- Subscribe ----
@@ -283,7 +283,7 @@ func jsonUnsubscribe(ctx *service.RequestContext, store *Store) (*service.Respon
 			"Subscription does not exist.", http.StatusNotFound))
 	}
 
-	return snsJSONOK(map[string]interface{}{})
+	return snsJSONOK(map[string]any{})
 }
 
 // ---- ListSubscriptions ----
@@ -426,7 +426,7 @@ func jsonTagResource(ctx *service.RequestContext, store *Store) (*service.Respon
 			"Resource does not exist.", http.StatusNotFound))
 	}
 
-	return snsJSONOK(map[string]interface{}{})
+	return snsJSONOK(map[string]any{})
 }
 
 // ---- UntagResource ----
@@ -450,5 +450,5 @@ func jsonUntagResource(ctx *service.RequestContext, store *Store) (*service.Resp
 			"Resource does not exist.", http.StatusNotFound))
 	}
 
-	return snsJSONOK(map[string]interface{}{})
+	return snsJSONOK(map[string]any{})
 }

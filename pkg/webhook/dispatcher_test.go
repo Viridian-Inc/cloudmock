@@ -63,7 +63,7 @@ func TestDispatcher_Fire_Slack(t *testing.T) {
 
 	require.Len(t, bodies, 1)
 
-	var m map[string]interface{}
+	var m map[string]any
 	require.NoError(t, json.Unmarshal(bodies[0], &m))
 	assert.Contains(t, m["text"], "Latency spike in svc-auth")
 }
@@ -103,7 +103,7 @@ func TestDispatcher_Fire_PagerDuty(t *testing.T) {
 	srv.mu.Unlock()
 	require.Len(t, bodies, 1)
 
-	var m map[string]interface{}
+	var m map[string]any
 	require.NoError(t, json.Unmarshal(bodies[0], &m))
 	assert.Equal(t, "trigger", m["event_action"])
 }
@@ -134,7 +134,7 @@ func TestDispatcher_Fire_Generic(t *testing.T) {
 	srv.mu.Unlock()
 	require.Len(t, bodies, 1)
 
-	var m map[string]interface{}
+	var m map[string]any
 	require.NoError(t, json.Unmarshal(bodies[0], &m))
 	assert.Equal(t, "incident.resolved", m["event"])
 }

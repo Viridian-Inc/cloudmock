@@ -108,7 +108,7 @@ func (s *ConfigStore) SetConfig(ctx context.Context, cfg *config.Config) error {
 func (s *ConfigStore) ListDeploys(ctx context.Context, filter dataplane.DeployFilter) ([]dataplane.DeployEvent, error) {
 	query := `SELECT id, service, version, commit_sha, author, description, deployed_at, metadata
 		 FROM deploys`
-	var args []interface{}
+	var args []any
 	argN := 1
 
 	if filter.Service != "" {

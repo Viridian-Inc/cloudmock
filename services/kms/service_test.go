@@ -28,7 +28,7 @@ func newKMSGateway(t *testing.T) http.Handler {
 }
 
 // kmsReq builds a JSON POST request targeting the KMS service via X-Amz-Target.
-func kmsReq(t *testing.T, action string, body interface{}) *http.Request {
+func kmsReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -53,9 +53,9 @@ func kmsReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -77,7 +77,7 @@ func TestKMS_CreateKey(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	meta, ok := m["KeyMetadata"].(map[string]interface{})
+	meta, ok := m["KeyMetadata"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateKey: missing KeyMetadata in response\nbody: %s", w.Body.String())
 	}
@@ -111,7 +111,7 @@ func TestKMS_CreateKey_DefaultKeyUsage(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	meta := m["KeyMetadata"].(map[string]interface{})
+	meta := m["KeyMetadata"].(map[string]any)
 	keyUsage, _ := meta["KeyUsage"].(string)
 	if keyUsage != "ENCRYPT_DECRYPT" {
 		t.Errorf("CreateKey: expected KeyUsage=ENCRYPT_DECRYPT, got %q", keyUsage)
@@ -130,7 +130,7 @@ func TestKMS_DescribeKey(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wCreate.Code, wCreate.Body.String())
 	}
 	mCreate := decodeJSON(t, wCreate.Body.String())
-	keyID := mCreate["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mCreate["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Describe the key.
 	wDesc := httptest.NewRecorder()
@@ -141,7 +141,7 @@ func TestKMS_DescribeKey(t *testing.T) {
 	}
 
 	mDesc := decodeJSON(t, wDesc.Body.String())
-	meta := mDesc["KeyMetadata"].(map[string]interface{})
+	meta := mDesc["KeyMetadata"].(map[string]any)
 	if meta["KeyId"].(string) != keyID {
 		t.Errorf("DescribeKey: expected KeyId=%q, got %q", keyID, meta["KeyId"])
 	}
@@ -177,7 +177,7 @@ func TestKMS_ListKeys(t *testing.T) {
 			t.Fatalf("setup CreateKey %d: %d %s", i, wc.Code, wc.Body.String())
 		}
 		mc := decodeJSON(t, wc.Body.String())
-		keyIDs = append(keyIDs, mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string))
+		keyIDs = append(keyIDs, mc["KeyMetadata"].(map[string]any)["KeyId"].(string))
 	}
 
 	// List keys.
@@ -189,7 +189,7 @@ func TestKMS_ListKeys(t *testing.T) {
 	}
 
 	ml := decodeJSON(t, wl.Body.String())
-	keys, ok := ml["Keys"].([]interface{})
+	keys, ok := ml["Keys"].([]any)
 	if !ok {
 		t.Fatalf("ListKeys: missing Keys in response\nbody: %s", wl.Body.String())
 	}
@@ -200,7 +200,7 @@ func TestKMS_ListKeys(t *testing.T) {
 	// Verify both created key IDs appear in the list.
 	listed := make(map[string]bool)
 	for _, k := range keys {
-		entry := k.(map[string]interface{})
+		entry := k.(map[string]any)
 		listed[entry["KeyId"].(string)] = true
 	}
 	for _, id := range keyIDs {
@@ -222,7 +222,7 @@ func TestKMS_EncryptDecrypt_RoundTrip(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Encrypt plaintext.
 	originalText := "hello, KMS world!"
@@ -294,7 +294,7 @@ func TestKMS_CreateAlias(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Create an alias.
 	wa := httptest.NewRecorder()
@@ -334,7 +334,7 @@ func TestKMS_ListAliases(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	wa := httptest.NewRecorder()
 	handler.ServeHTTP(wa, kmsReq(t, "CreateAlias", map[string]string{
@@ -354,14 +354,14 @@ func TestKMS_ListAliases(t *testing.T) {
 	}
 
 	ml := decodeJSON(t, wl.Body.String())
-	aliases, ok := ml["Aliases"].([]interface{})
+	aliases, ok := ml["Aliases"].([]any)
 	if !ok || len(aliases) == 0 {
 		t.Fatalf("ListAliases: expected non-empty Aliases\nbody: %s", wl.Body.String())
 	}
 
 	found := false
 	for _, a := range aliases {
-		entry := a.(map[string]interface{})
+		entry := a.(map[string]any)
 		if entry["AliasName"].(string) == "alias/list-test" {
 			found = true
 			break
@@ -384,7 +384,7 @@ func TestKMS_EnableDisableKey(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Disable the key.
 	wd := httptest.NewRecorder()
@@ -400,7 +400,7 @@ func TestKMS_EnableDisableKey(t *testing.T) {
 		t.Fatalf("DescribeKey after disable: %d %s", wdesc.Code, wdesc.Body.String())
 	}
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	state := mdesc["KeyMetadata"].(map[string]interface{})["KeyState"].(string)
+	state := mdesc["KeyMetadata"].(map[string]any)["KeyState"].(string)
 	if state != "Disabled" {
 		t.Errorf("DisableKey: expected KeyState=Disabled, got %q", state)
 	}
@@ -416,7 +416,7 @@ func TestKMS_EnableDisableKey(t *testing.T) {
 	wdesc2 := httptest.NewRecorder()
 	handler.ServeHTTP(wdesc2, kmsReq(t, "DescribeKey", map[string]string{"KeyId": keyID}))
 	mdesc2 := decodeJSON(t, wdesc2.Body.String())
-	state2 := mdesc2["KeyMetadata"].(map[string]interface{})["KeyState"].(string)
+	state2 := mdesc2["KeyMetadata"].(map[string]any)["KeyState"].(string)
 	if state2 != "Enabled" {
 		t.Errorf("EnableKey: expected KeyState=Enabled, got %q", state2)
 	}
@@ -434,11 +434,11 @@ func TestKMS_ScheduleKeyDeletion(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Schedule deletion.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, kmsReq(t, "ScheduleKeyDeletion", map[string]interface{}{
+	handler.ServeHTTP(ws, kmsReq(t, "ScheduleKeyDeletion", map[string]any{
 		"KeyId":               keyID,
 		"PendingWindowInDays": 7,
 	}))
@@ -458,7 +458,7 @@ func TestKMS_ScheduleKeyDeletion(t *testing.T) {
 	wdesc := httptest.NewRecorder()
 	handler.ServeHTTP(wdesc, kmsReq(t, "DescribeKey", map[string]string{"KeyId": keyID}))
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	state := mdesc["KeyMetadata"].(map[string]interface{})["KeyState"].(string)
+	state := mdesc["KeyMetadata"].(map[string]any)["KeyState"].(string)
 	if state != "PendingDeletion" {
 		t.Errorf("ScheduleKeyDeletion: expected KeyState=PendingDeletion, got %q", state)
 	}
@@ -476,7 +476,7 @@ func TestKMS_EncryptByAlias(t *testing.T) {
 		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	keyID := mc["KeyMetadata"].(map[string]interface{})["KeyId"].(string)
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
 
 	// Create alias.
 	wa := httptest.NewRecorder()

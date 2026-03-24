@@ -9,7 +9,7 @@ import (
 // ResourceStore is a thread-safe in-memory store for generic AWS resources.
 type ResourceStore struct {
 	mu        sync.RWMutex
-	resources map[string]map[string]map[string]interface{} // resourceType -> id -> fields
+	resources map[string]map[string]map[string]any // resourceType -> id -> fields
 	tags      map[string]map[string]string                  // resourceArn -> tags
 	counters  map[string]int                                // for generating sequential IDs
 }
@@ -17,7 +17,7 @@ type ResourceStore struct {
 // NewResourceStore creates an empty ResourceStore.
 func NewResourceStore() *ResourceStore {
 	return &ResourceStore{
-		resources: make(map[string]map[string]map[string]interface{}),
+		resources: make(map[string]map[string]map[string]any),
 		tags:      make(map[string]map[string]string),
 		counters:  make(map[string]int),
 	}
@@ -32,15 +32,15 @@ func (s *ResourceStore) nextID(prefix string) string {
 
 // Create stores a new resource and returns the generated ID.
 // The idPrefix is used for ID generation (e.g., "vpc" produces "vpc-00000001").
-func (s *ResourceStore) Create(resourceType, idPrefix string, fields map[string]interface{}) string {
+func (s *ResourceStore) Create(resourceType, idPrefix string, fields map[string]any) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	id := s.nextID(idPrefix)
 	if s.resources[resourceType] == nil {
-		s.resources[resourceType] = make(map[string]map[string]interface{})
+		s.resources[resourceType] = make(map[string]map[string]any)
 	}
-	stored := make(map[string]interface{}, len(fields)+1)
+	stored := make(map[string]any, len(fields)+1)
 	for k, v := range fields {
 		stored[k] = v
 	}
@@ -49,7 +49,7 @@ func (s *ResourceStore) Create(resourceType, idPrefix string, fields map[string]
 }
 
 // Get returns the fields for a resource, or an error if it does not exist.
-func (s *ResourceStore) Get(resourceType, id string) (map[string]interface{}, error) {
+func (s *ResourceStore) Get(resourceType, id string) (map[string]any, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -62,7 +62,7 @@ func (s *ResourceStore) Get(resourceType, id string) (map[string]interface{}, er
 		return nil, fmt.Errorf("resource not found: %s/%s", resourceType, id)
 	}
 	// Return a copy
-	out := make(map[string]interface{}, len(fields))
+	out := make(map[string]any, len(fields))
 	for k, v := range fields {
 		out[k] = v
 	}
@@ -86,14 +86,14 @@ func (s *ResourceStore) Delete(resourceType, id string) error {
 }
 
 // List returns all resources of the given type.
-func (s *ResourceStore) List(resourceType string) []map[string]interface{} {
+func (s *ResourceStore) List(resourceType string) []map[string]any {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	byType := s.resources[resourceType]
-	result := make([]map[string]interface{}, 0, len(byType))
+	result := make([]map[string]any, 0, len(byType))
 	for _, fields := range byType {
-		cp := make(map[string]interface{}, len(fields))
+		cp := make(map[string]any, len(fields))
 		for k, v := range fields {
 			cp[k] = v
 		}
@@ -103,7 +103,7 @@ func (s *ResourceStore) List(resourceType string) []map[string]interface{} {
 }
 
 // Update merges the given updates into an existing resource's fields.
-func (s *ResourceStore) Update(resourceType, id string, updates map[string]interface{}) error {
+func (s *ResourceStore) Update(resourceType, id string, updates map[string]any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

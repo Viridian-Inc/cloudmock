@@ -54,7 +54,7 @@ type cfnFullTemplate struct {
 type cfnFullResource struct {
 	Type       string                 `json:"Type"`
 	DependsOn  json.RawMessage        `json:"DependsOn"`
-	Properties map[string]interface{} `json:"Properties"`
+	Properties map[string]any `json:"Properties"`
 }
 
 // ProvisionStack parses a CFN template and creates real resources in dependency order.
@@ -104,9 +104,9 @@ func (p *Provisioner) ProvisionStack(templateBody string, params map[string]stri
 
 		// Resolve intrinsic functions in properties.
 		resolvedProps := resolveIntrinsics(res.Properties, resolvedParams, provisioned)
-		propsMap, _ := resolvedProps.(map[string]interface{})
+		propsMap, _ := resolvedProps.(map[string]any)
 		if propsMap == nil {
-			propsMap = make(map[string]interface{})
+			propsMap = make(map[string]any)
 		}
 
 		pr, err := p.createResource(logicalId, res.Type, propsMap)
@@ -141,7 +141,7 @@ func (p *Provisioner) DeleteResources(resources []ProvisionedResource) {
 }
 
 // createResource dispatches to the appropriate service based on resource type.
-func (p *Provisioner) createResource(logicalId, resourceType string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createResource(logicalId, resourceType string, props map[string]any) (*ProvisionedResource, error) {
 	switch resourceType {
 	case "AWS::S3::Bucket":
 		return p.createS3Bucket(logicalId, props)
@@ -198,7 +198,7 @@ func (p *Provisioner) deleteResource(res ProvisionedResource) error {
 
 // ---- S3 ----
 
-func (p *Provisioner) createS3Bucket(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createS3Bucket(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	bucketName := stringProp(props, "BucketName")
 	if bucketName == "" {
 		// Auto-generate a bucket name like CFN does.
@@ -260,7 +260,7 @@ func (p *Provisioner) deleteS3Bucket(res ProvisionedResource) error {
 
 // ---- DynamoDB ----
 
-func (p *Provisioner) createDynamoDBTable(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createDynamoDBTable(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	tableName := stringProp(props, "TableName")
 	if tableName == "" {
 		tableName = logicalId + "-" + newUUID()[:8]
@@ -272,7 +272,7 @@ func (p *Provisioner) createDynamoDBTable(logicalId string, props map[string]int
 	}
 
 	// Build a CreateTable JSON body.
-	body := map[string]interface{}{
+	body := map[string]any{
 		"TableName": tableName,
 	}
 
@@ -367,7 +367,7 @@ func (p *Provisioner) deleteDynamoDBTable(res ProvisionedResource) error {
 
 // ---- SQS ----
 
-func (p *Provisioner) createSQSQueue(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createSQSQueue(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	queueName := stringProp(props, "QueueName")
 	if queueName == "" {
 		queueName = logicalId + "-" + newUUID()[:8]
@@ -440,7 +440,7 @@ func (p *Provisioner) deleteSQSQueue(res ProvisionedResource) error {
 
 // ---- SNS ----
 
-func (p *Provisioner) createSNSTopic(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createSNSTopic(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	topicName := stringProp(props, "TopicName")
 	if topicName == "" {
 		topicName = logicalId + "-" + newUUID()[:8]
@@ -511,7 +511,7 @@ func (p *Provisioner) deleteSNSTopic(res ProvisionedResource) error {
 
 // ---- Lambda ----
 
-func (p *Provisioner) createLambdaFunction(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createLambdaFunction(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	funcName := stringProp(props, "FunctionName")
 	if funcName == "" {
 		funcName = logicalId + "-" + newUUID()[:8]
@@ -522,7 +522,7 @@ func (p *Provisioner) createLambdaFunction(logicalId string, props map[string]in
 		return nil, fmt.Errorf("lambda service not found: %w", err)
 	}
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"FunctionName": funcName,
 		"Runtime":      stringPropDefault(props, "Runtime", "nodejs18.x"),
 		"Handler":      stringPropDefault(props, "Handler", "index.handler"),
@@ -577,7 +577,7 @@ func (p *Provisioner) createLambdaFunction(logicalId string, props map[string]in
 
 // ---- IAM Role ----
 
-func (p *Provisioner) createIAMRole(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createIAMRole(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	roleName := stringProp(props, "RoleName")
 	if roleName == "" {
 		roleName = logicalId + "-" + newUUID()[:8]
@@ -658,7 +658,7 @@ func (p *Provisioner) deleteIAMRole(res ProvisionedResource) error {
 
 // ---- IAM Policy ----
 
-func (p *Provisioner) createIAMPolicy(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createIAMPolicy(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	policyName := stringProp(props, "PolicyName")
 	if policyName == "" {
 		policyName = logicalId + "-" + newUUID()[:8]
@@ -737,7 +737,7 @@ func (p *Provisioner) deleteIAMPolicy(res ProvisionedResource) error {
 
 // ---- EC2 VPC ----
 
-func (p *Provisioner) createEC2VPC(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createEC2VPC(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	cidrBlock := stringPropDefault(props, "CidrBlock", "10.0.0.0/16")
 
 	svc, err := p.locator.Lookup("ec2")
@@ -785,7 +785,7 @@ func (p *Provisioner) createEC2VPC(logicalId string, props map[string]interface{
 
 // ---- EC2 Subnet ----
 
-func (p *Provisioner) createEC2Subnet(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createEC2Subnet(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	vpcId := stringProp(props, "VpcId")
 	cidrBlock := stringPropDefault(props, "CidrBlock", "10.0.1.0/24")
 
@@ -838,7 +838,7 @@ func (p *Provisioner) createEC2Subnet(logicalId string, props map[string]interfa
 
 // ---- EC2 SecurityGroup ----
 
-func (p *Provisioner) createEC2SecurityGroup(logicalId string, props map[string]interface{}) (*ProvisionedResource, error) {
+func (p *Provisioner) createEC2SecurityGroup(logicalId string, props map[string]any) (*ProvisionedResource, error) {
 	groupName := stringPropDefault(props, "GroupName", logicalId)
 	description := stringPropDefault(props, "GroupDescription", logicalId+" security group")
 	vpcId := stringProp(props, "VpcId")
@@ -894,9 +894,9 @@ func (p *Provisioner) createEC2SecurityGroup(logicalId string, props map[string]
 
 // resolveIntrinsics recursively resolves Ref, Fn::Sub, Fn::GetAtt, Fn::Join, Fn::Select
 // in a template value tree.
-func resolveIntrinsics(value interface{}, params map[string]string, resources map[string]*ProvisionedResource) interface{} {
+func resolveIntrinsics(value any, params map[string]string, resources map[string]*ProvisionedResource) any {
 	switch v := value.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		// Check for intrinsic functions.
 		if ref, ok := v["Ref"]; ok {
 			if refStr, ok := ref.(string); ok {
@@ -917,14 +917,14 @@ func resolveIntrinsics(value interface{}, params map[string]string, resources ma
 		}
 
 		// Not an intrinsic — recurse into all keys.
-		result := make(map[string]interface{}, len(v))
+		result := make(map[string]any, len(v))
 		for key, val := range v {
 			result[key] = resolveIntrinsics(val, params, resources)
 		}
 		return result
 
-	case []interface{}:
-		result := make([]interface{}, len(v))
+	case []any:
+		result := make([]any, len(v))
 		for i, item := range v {
 			result[i] = resolveIntrinsics(item, params, resources)
 		}
@@ -949,16 +949,16 @@ func resolveRef(refName string, params map[string]string, resources map[string]*
 }
 
 // resolveFnSub resolves Fn::Sub with ${VarName} substitution.
-func resolveFnSub(value interface{}, params map[string]string, resources map[string]*ProvisionedResource) string {
+func resolveFnSub(value any, params map[string]string, resources map[string]*ProvisionedResource) string {
 	switch v := value.(type) {
 	case string:
 		return substituteVars(v, params, resources)
-	case []interface{}:
+	case []any:
 		// Fn::Sub with explicit variable map: ["template", {"Var": "value"}]
 		if len(v) >= 1 {
 			tmplStr, _ := v[0].(string)
 			if len(v) >= 2 {
-				if varMap, ok := v[1].(map[string]interface{}); ok {
+				if varMap, ok := v[1].(map[string]any); ok {
 					// Merge variable map into params.
 					merged := make(map[string]string, len(params))
 					for k, pv := range params {
@@ -999,9 +999,9 @@ func substituteVars(template string, params map[string]string, resources map[str
 }
 
 // resolveFnGetAtt resolves Fn::GetAtt to an attribute of a provisioned resource.
-func resolveFnGetAtt(value interface{}, resources map[string]*ProvisionedResource) string {
+func resolveFnGetAtt(value any, resources map[string]*ProvisionedResource) string {
 	switch v := value.(type) {
-	case []interface{}:
+	case []any:
 		if len(v) >= 2 {
 			logicalId, _ := v[0].(string)
 			attrName, _ := v[1].(string)
@@ -1031,13 +1031,13 @@ func resolveGetAtt(logicalId, attrName string, resources map[string]*Provisioned
 }
 
 // resolveFnJoin resolves Fn::Join: [delimiter, [values...]].
-func resolveFnJoin(value interface{}, params map[string]string, resources map[string]*ProvisionedResource) string {
-	arr, ok := value.([]interface{})
+func resolveFnJoin(value any, params map[string]string, resources map[string]*ProvisionedResource) string {
+	arr, ok := value.([]any)
 	if !ok || len(arr) < 2 {
 		return ""
 	}
 	delimiter, _ := arr[0].(string)
-	values, ok := arr[1].([]interface{})
+	values, ok := arr[1].([]any)
 	if !ok {
 		return ""
 	}
@@ -1051,8 +1051,8 @@ func resolveFnJoin(value interface{}, params map[string]string, resources map[st
 }
 
 // resolveFnSelect resolves Fn::Select: [index, [values...]].
-func resolveFnSelect(value interface{}, params map[string]string, resources map[string]*ProvisionedResource) interface{} {
-	arr, ok := value.([]interface{})
+func resolveFnSelect(value any, params map[string]string, resources map[string]*ProvisionedResource) any {
+	arr, ok := value.([]any)
 	if !ok || len(arr) < 2 {
 		return ""
 	}
@@ -1063,7 +1063,7 @@ func resolveFnSelect(value interface{}, params map[string]string, resources map[
 	case string:
 		fmt.Sscanf(idx, "%d", &index)
 	}
-	values, ok := arr[1].([]interface{})
+	values, ok := arr[1].([]any)
 	if !ok || index < 0 || index >= len(values) {
 		return ""
 	}
@@ -1156,9 +1156,9 @@ func topoSort(resources map[string]cfnFullResource) ([]string, error) {
 }
 
 // findRefs recursively scans a value tree for Ref and Fn::GetAtt references to other resources.
-func findRefs(value interface{}, resources map[string]cfnFullResource, deps map[string]bool) {
+func findRefs(value any, resources map[string]cfnFullResource, deps map[string]bool) {
 	switch v := value.(type) {
-	case map[string]interface{}:
+	case map[string]any:
 		if ref, ok := v["Ref"]; ok {
 			if refStr, ok := ref.(string); ok {
 				if _, isResource := resources[refStr]; isResource {
@@ -1168,7 +1168,7 @@ func findRefs(value interface{}, resources map[string]cfnFullResource, deps map[
 		}
 		if getAtt, ok := v["Fn::GetAtt"]; ok {
 			switch ga := getAtt.(type) {
-			case []interface{}:
+			case []any:
 				if len(ga) >= 1 {
 					if logicalId, ok := ga[0].(string); ok {
 						if _, isResource := resources[logicalId]; isResource {
@@ -1192,7 +1192,7 @@ func findRefs(value interface{}, resources map[string]cfnFullResource, deps map[
 		for _, val := range v {
 			findRefs(val, resources, deps)
 		}
-	case []interface{}:
+	case []any:
 		for _, item := range v {
 			findRefs(item, resources, deps)
 		}
@@ -1200,12 +1200,12 @@ func findRefs(value interface{}, resources map[string]cfnFullResource, deps map[
 }
 
 // findSubRefs extracts resource references from Fn::Sub template strings.
-func findSubRefs(value interface{}, resources map[string]cfnFullResource, deps map[string]bool) {
+func findSubRefs(value any, resources map[string]cfnFullResource, deps map[string]bool) {
 	var tmplStr string
 	switch v := value.(type) {
 	case string:
 		tmplStr = v
-	case []interface{}:
+	case []any:
 		if len(v) >= 1 {
 			tmplStr, _ = v[0].(string)
 		}
@@ -1268,7 +1268,7 @@ func extractXMLField(resp *service.Response, fieldName string) string {
 		b, err := json.Marshal(resp.Body)
 		if err == nil {
 			// Search for the field in various casings.
-			var data map[string]interface{}
+			var data map[string]any
 			if json.Unmarshal(b, &data) == nil {
 				return findInMap(data, fieldName)
 			}
@@ -1298,7 +1298,7 @@ func findXMLTag(xml, tag string) string {
 }
 
 // findInMap recursively searches a map for a key (case-insensitive).
-func findInMap(data map[string]interface{}, key string) string {
+func findInMap(data map[string]any, key string) string {
 	lowerKey := strings.ToLower(key)
 	for k, v := range data {
 		if strings.ToLower(k) == lowerKey {
@@ -1306,7 +1306,7 @@ func findInMap(data map[string]interface{}, key string) string {
 				return s
 			}
 		}
-		if sub, ok := v.(map[string]interface{}); ok {
+		if sub, ok := v.(map[string]any); ok {
 			if found := findInMap(sub, key); found != "" {
 				return found
 			}
@@ -1323,7 +1323,7 @@ func (p *Provisioner) fakeAuth(svcName string) string {
 }
 
 // stringProp extracts a string property from a CFN Properties map.
-func stringProp(props map[string]interface{}, key string) string {
+func stringProp(props map[string]any, key string) string {
 	v, ok := props[key]
 	if !ok {
 		return ""
@@ -1336,7 +1336,7 @@ func stringProp(props map[string]interface{}, key string) string {
 }
 
 // stringPropDefault extracts a string property with a default fallback.
-func stringPropDefault(props map[string]interface{}, key, defaultVal string) string {
+func stringPropDefault(props map[string]any, key, defaultVal string) string {
 	if s := stringProp(props, key); s != "" {
 		return s
 	}

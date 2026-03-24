@@ -117,8 +117,8 @@ func (s *EventSourceMappingStore) StopAll() {
 // ---- Event source mapping API handlers ----
 
 // eventSourceMappingResponse builds the JSON response for an event source mapping.
-func eventSourceMappingResponse(m *EventSourceMapping) map[string]interface{} {
-	return map[string]interface{}{
+func eventSourceMappingResponse(m *EventSourceMapping) map[string]any {
+	return map[string]any{
 		"UUID":                           m.UUID,
 		"EventSourceArn":                 m.EventSourceArn,
 		"FunctionArn":                    m.FunctionArn,
@@ -227,12 +227,12 @@ func handleListEventSourceMappings(ctx *service.RequestContext, svc *LambdaServi
 	functionName := q.Get("FunctionName")
 
 	mappings := svc.esmStore.List(eventSourceArn, functionName)
-	entries := make([]map[string]interface{}, 0, len(mappings))
+	entries := make([]map[string]any, 0, len(mappings))
 	for _, m := range mappings {
 		entries = append(entries, eventSourceMappingResponse(m))
 	}
 
-	return jsonOK(map[string]interface{}{
+	return jsonOK(map[string]any{
 		"EventSourceMappings": entries,
 	})
 }
@@ -287,9 +287,9 @@ func pollAndInvoke(svc *LambdaService, mapping *EventSourceMapping, queueName st
 	}
 
 	// Build SQS event payload.
-	records := make([]map[string]interface{}, 0, len(msgIDs))
+	records := make([]map[string]any, 0, len(msgIDs))
 	for i := range msgIDs {
-		records = append(records, map[string]interface{}{
+		records = append(records, map[string]any{
 			"messageId":      msgIDs[i],
 			"receiptHandle":  receipts[i],
 			"body":           bodies[i],
@@ -299,7 +299,7 @@ func pollAndInvoke(svc *LambdaService, mapping *EventSourceMapping, queueName st
 		})
 	}
 
-	payload, err := json.Marshal(map[string]interface{}{
+	payload, err := json.Marshal(map[string]any{
 		"Records": records,
 	})
 	if err != nil {

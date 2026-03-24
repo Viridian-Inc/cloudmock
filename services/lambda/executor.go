@@ -132,7 +132,7 @@ func extractZip(data []byte, targetDir string) error {
 // Invoke executes the function with the given event and returns the result.
 func (e *Executor) Invoke(fn *Function, event []byte) ([]byte, error) {
 	if fn.Code == nil || len(fn.Code) == 0 {
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"statusCode": 200,
 			"body":       "cloudmock: no function code, returning mock response",
 		})
@@ -157,7 +157,7 @@ func (e *Executor) Invoke(fn *Function, event []byte) ([]byte, error) {
 	case strings.HasPrefix(runtime, "python"):
 		return e.invokePython(fn, codeDir, handler, event, timeout)
 	default:
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"statusCode": 200,
 			"body":       fmt.Sprintf("cloudmock: runtime %q not available, returning mock response", runtime),
 		})
@@ -169,7 +169,7 @@ func (e *Executor) invokeNode(fn *Function, codeDir, handler string, event []byt
 	// Check if node is available.
 	nodePath, err := exec.LookPath("node")
 	if err != nil {
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"statusCode": 200,
 			"body":       "cloudmock: runtime not available, returning mock response",
 		})
@@ -212,7 +212,7 @@ func (e *Executor) invokePython(fn *Function, codeDir, handler string, event []b
 	// Check if python3 is available.
 	pythonPath, err := exec.LookPath("python3")
 	if err != nil {
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"statusCode": 200,
 			"body":       "cloudmock: runtime not available, returning mock response",
 		})
@@ -305,7 +305,7 @@ func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn 
 				fmt.Sprintf("END RequestId: %s", requestID), "stdout")
 			e.emitLog(fn.FunctionName, requestID,
 				fmt.Sprintf("REPORT RequestId: %s\tDuration: %.2f ms\tTimed Out: true", requestID, float64(duration.Milliseconds())), "stdout")
-			return json.Marshal(map[string]interface{}{
+			return json.Marshal(map[string]any{
 				"errorMessage": fmt.Sprintf("Task timed out after %d.00 seconds", timeoutSec),
 				"errorType":    "TimeoutError",
 			})
@@ -319,7 +319,7 @@ func (e *Executor) execProcess(interpreterPath, wrapperPath, codeDir string, fn 
 			fmt.Sprintf("END RequestId: %s", requestID), "stdout")
 		e.emitLog(fn.FunctionName, requestID,
 			fmt.Sprintf("REPORT RequestId: %s\tDuration: %.2f ms\tError: true", requestID, float64(duration.Milliseconds())), "stdout")
-		return json.Marshal(map[string]interface{}{
+		return json.Marshal(map[string]any{
 			"errorMessage": errMsg,
 			"errorType":    "RuntimeError",
 		})

@@ -255,7 +255,7 @@ func (rr *responseRecorder) Write(b []byte) (int, error) {
 
 // RequestBroadcaster is an optional interface for broadcasting request events.
 type RequestBroadcaster interface {
-	Broadcast(eventType string, data interface{})
+	Broadcast(eventType string, data any)
 }
 
 // LoggingMiddlewareOpts holds optional dependencies for LoggingMiddleware.

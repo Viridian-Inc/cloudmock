@@ -3,9 +3,9 @@ package dynamodb
 import "fmt"
 
 // AttributeValue is the DynamoDB typed value format.
-// We store it as map[string]interface{} matching the JSON wire format.
+// We store it as map[string]any matching the JSON wire format.
 // e.g., {"S": "hello"}, {"N": "42"}, {"BOOL": true}
-type AttributeValue = map[string]interface{}
+type AttributeValue = map[string]any
 
 // Item is a DynamoDB item: a map of attribute names to typed values.
 type Item = map[string]AttributeValue
@@ -32,7 +32,7 @@ type ProvisionedThroughput struct {
 type GSI struct {
 	IndexName             string                 `json:"IndexName"`
 	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	Projection            map[string]interface{} `json:"Projection"`
+	Projection            map[string]any `json:"Projection"`
 	ProvisionedThroughput *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
 }
 
@@ -40,7 +40,7 @@ type GSI struct {
 type LSI struct {
 	IndexName  string                 `json:"IndexName"`
 	KeySchema  []KeySchemaElement      `json:"KeySchema"`
-	Projection map[string]interface{} `json:"Projection"`
+	Projection map[string]any `json:"Projection"`
 }
 
 // Table is the in-memory representation of a DynamoDB table.

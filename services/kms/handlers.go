@@ -112,7 +112,7 @@ func keyToMetadata(k *Key) keyMetadata {
 	}
 }
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -124,7 +124,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
-func parseJSON(body []byte, v interface{}) *service.AWSError {
+func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil // empty body is OK for some actions
 	}

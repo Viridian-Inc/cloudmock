@@ -102,7 +102,7 @@ func doQuery(client *http.Client, endpoint, service, action string, params map[s
 }
 
 // doJSON sends a JSON-protocol POST request (DynamoDB/KMS style).
-func doJSON(client *http.Client, endpoint, service, targetPrefix, action string, params map[string]interface{}) ([]byte, error) {
+func doJSON(client *http.Client, endpoint, service, targetPrefix, action string, params map[string]any) ([]byte, error) {
 	body, err := json.Marshal(params)
 	if err != nil {
 		return nil, err
@@ -383,7 +383,7 @@ func ruleKMSKeyRotation() Rule {
 		Severity:    "medium",
 		Service:     "kms",
 		Check: func(client *http.Client, endpoint string) ([]Finding, error) {
-			body, err := doJSON(client, endpoint, "kms", "TrentService", "ListKeys", map[string]interface{}{})
+			body, err := doJSON(client, endpoint, "kms", "TrentService", "ListKeys", map[string]any{})
 			if err != nil {
 				return nil, err
 			}
@@ -499,7 +499,7 @@ func ruleDynamoDBEncryption() Rule {
 		Severity:    "medium",
 		Service:     "dynamodb",
 		Check: func(client *http.Client, endpoint string) ([]Finding, error) {
-			body, err := doJSON(client, endpoint, "dynamodb", "DynamoDB_20120810", "ListTables", map[string]interface{}{})
+			body, err := doJSON(client, endpoint, "dynamodb", "DynamoDB_20120810", "ListTables", map[string]any{})
 			if err != nil {
 				return nil, err
 			}
@@ -700,7 +700,7 @@ func ruleSecretsRotation() Rule {
 		Severity:    "medium",
 		Service:     "secretsmanager",
 		Check: func(client *http.Client, endpoint string) ([]Finding, error) {
-			body, err := doJSON(client, endpoint, "secretsmanager", "secretsmanager", "ListSecrets", map[string]interface{}{})
+			body, err := doJSON(client, endpoint, "secretsmanager", "secretsmanager", "ListSecrets", map[string]any{})
 			if err != nil {
 				return nil, err
 			}

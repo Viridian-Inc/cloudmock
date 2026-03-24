@@ -87,13 +87,13 @@ var targetPrefixes = map[string]string{
 }
 
 // createResource sends a create request to cloudmock and returns (id, outputs, error).
-func (c *apiClient) createResource(rs *cmschema.ResourceSchema, inputs map[string]interface{}) (string, map[string]interface{}, error) {
+func (c *apiClient) createResource(rs *cmschema.ResourceSchema, inputs map[string]any) (string, map[string]any, error) {
 	protocol := serviceProtocols[rs.ServiceName]
 	if protocol == "" {
 		protocol = "json"
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	var err error
 
 	switch protocol {
@@ -120,7 +120,7 @@ func (c *apiClient) createResource(rs *cmschema.ResourceSchema, inputs map[strin
 	}
 
 	// Merge computed attributes from response into outputs.
-	outputs := make(map[string]interface{})
+	outputs := make(map[string]any)
 	for k, v := range inputs {
 		outputs[k] = v
 	}
@@ -130,7 +130,7 @@ func (c *apiClient) createResource(rs *cmschema.ResourceSchema, inputs map[strin
 }
 
 // readResource reads the current state of a resource from cloudmock.
-func (c *apiClient) readResource(rs *cmschema.ResourceSchema, id string) (map[string]interface{}, error) {
+func (c *apiClient) readResource(rs *cmschema.ResourceSchema, id string) (map[string]any, error) {
 	if rs.ReadAction == "" {
 		return nil, nil
 	}
@@ -140,7 +140,7 @@ func (c *apiClient) readResource(rs *cmschema.ResourceSchema, id string) (map[st
 		protocol = "json"
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	var err error
 
 	switch protocol {
@@ -165,7 +165,7 @@ func (c *apiClient) readResource(rs *cmschema.ResourceSchema, id string) (map[st
 }
 
 // updateResource updates a resource in cloudmock.
-func (c *apiClient) updateResource(rs *cmschema.ResourceSchema, id string, inputs map[string]interface{}) (map[string]interface{}, error) {
+func (c *apiClient) updateResource(rs *cmschema.ResourceSchema, id string, inputs map[string]any) (map[string]any, error) {
 	if rs.UpdateAction == "" {
 		return nil, fmt.Errorf("resource %s does not support updates", rs.TerraformType)
 	}
@@ -238,7 +238,7 @@ func (c *apiClient) deleteResource(rs *cmschema.ResourceSchema, id string) error
 
 // ── HTTP transport methods ──────────────────────────────────────────────────
 
-func (c *apiClient) doJSON(service, targetPrefix, action string, params map[string]interface{}) (map[string]interface{}, error) {
+func (c *apiClient) doJSON(service, targetPrefix, action string, params map[string]any) (map[string]any, error) {
 	body, err := json.Marshal(params)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling request body: %w", err)
@@ -258,7 +258,7 @@ func (c *apiClient) doJSON(service, targetPrefix, action string, params map[stri
 	return c.doAndParse(req)
 }
 
-func (c *apiClient) doQuery(service, action string, params map[string]string) (map[string]interface{}, error) {
+func (c *apiClient) doQuery(service, action string, params map[string]string) (map[string]any, error) {
 	form := url.Values{}
 	form.Set("Action", action)
 	form.Set("Version", "2016-11-15")
@@ -277,7 +277,7 @@ func (c *apiClient) doQuery(service, action string, params map[string]string) (m
 	return c.doAndParse(req)
 }
 
-func (c *apiClient) doRESTCreate(rs *cmschema.ResourceSchema, inputs map[string]interface{}) (map[string]interface{}, error) {
+func (c *apiClient) doRESTCreate(rs *cmschema.ResourceSchema, inputs map[string]any) (map[string]any, error) {
 	switch rs.ServiceName {
 	case "s3":
 		bucket, _ := inputs["bucket"].(string)
@@ -293,7 +293,7 @@ func (c *apiClient) doRESTCreate(rs *cmschema.ResourceSchema, inputs map[string]
 			body, _ := io.ReadAll(resp.Body)
 			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"bucket": bucket,
 		}, nil
 	default:
@@ -301,7 +301,7 @@ func (c *apiClient) doRESTCreate(rs *cmschema.ResourceSchema, inputs map[string]
 	}
 }
 
-func (c *apiClient) doRESTRead(rs *cmschema.ResourceSchema, id string) (map[string]interface{}, error) {
+func (c *apiClient) doRESTRead(rs *cmschema.ResourceSchema, id string) (map[string]any, error) {
 	switch rs.ServiceName {
 	case "s3":
 		resp, err := c.doRESTRaw("s3", "HEAD", "/"+id, nil)
@@ -320,7 +320,7 @@ func (c *apiClient) doRESTRead(rs *cmschema.ResourceSchema, id string) (map[stri
 		if region == "" {
 			region = c.region
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"bucket": id,
 			"region": region,
 			"arn":    fmt.Sprintf("arn:aws:s3:::%s", id),
@@ -379,7 +379,7 @@ func (c *apiClient) setAuthHeader(req *http.Request, service string) {
 	req.Header.Set("X-Amz-Date", time.Now().UTC().Format("20060102T150405Z"))
 }
 
-func (c *apiClient) doAndParse(req *http.Request) (map[string]interface{}, error) {
+func (c *apiClient) doAndParse(req *http.Request) (map[string]any, error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
@@ -396,12 +396,12 @@ func (c *apiClient) doAndParse(req *http.Request) (map[string]interface{}, error
 	}
 
 	if len(respBody) == 0 {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
 
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
-		return map[string]interface{}{"_raw": string(respBody)}, nil
+		return map[string]any{"_raw": string(respBody)}, nil
 	}
 
 	return result, nil
@@ -410,8 +410,8 @@ func (c *apiClient) doAndParse(req *http.Request) (map[string]interface{}, error
 // ── Helper functions ────────────────────────────────────────────────────────
 
 // buildJSONParams converts inputs into PascalCase keyed params for JSON protocol.
-func buildJSONParams(rs *cmschema.ResourceSchema, inputs map[string]interface{}) map[string]interface{} {
-	params := make(map[string]interface{})
+func buildJSONParams(rs *cmschema.ResourceSchema, inputs map[string]any) map[string]any {
+	params := make(map[string]any)
 	for _, attr := range rs.Attributes {
 		if attr.Computed && !attr.Required {
 			continue
@@ -425,7 +425,7 @@ func buildJSONParams(rs *cmschema.ResourceSchema, inputs map[string]interface{})
 }
 
 // buildQueryParams converts inputs into PascalCase keyed string params for query protocol.
-func buildQueryParams(rs *cmschema.ResourceSchema, inputs map[string]interface{}) map[string]string {
+func buildQueryParams(rs *cmschema.ResourceSchema, inputs map[string]any) map[string]string {
 	params := make(map[string]string)
 	for _, attr := range rs.Attributes {
 		if attr.Computed && !attr.Required {
@@ -440,8 +440,8 @@ func buildQueryParams(rs *cmschema.ResourceSchema, inputs map[string]interface{}
 }
 
 // buildIDParam builds a JSON params map containing only the resource identifier.
-func buildIDParam(rs *cmschema.ResourceSchema, id string) map[string]interface{} {
-	params := make(map[string]interface{})
+func buildIDParam(rs *cmschema.ResourceSchema, id string) map[string]any {
+	params := make(map[string]any)
 	if rs.ImportID != "" {
 		apiKey := snakeToPascal(rs.ImportID)
 		params[apiKey] = id
@@ -460,7 +460,7 @@ func buildIDParamQuery(rs *cmschema.ResourceSchema, id string) map[string]string
 }
 
 // extractResourceID determines the resource ID from the API response or inputs.
-func extractResourceID(rs *cmschema.ResourceSchema, result, inputs map[string]interface{}) string {
+func extractResourceID(rs *cmschema.ResourceSchema, result, inputs map[string]any) string {
 	// Try the import ID attribute from inputs first.
 	if rs.ImportID != "" {
 		if val, ok := inputs[rs.ImportID]; ok {
@@ -492,7 +492,7 @@ func extractResourceID(rs *cmschema.ResourceSchema, result, inputs map[string]in
 }
 
 // mergeComputedAttrs sets computed attributes from an API response into the outputs map.
-func mergeComputedAttrs(rs *cmschema.ResourceSchema, outputs, result map[string]interface{}) {
+func mergeComputedAttrs(rs *cmschema.ResourceSchema, outputs, result map[string]any) {
 	for _, attr := range rs.Attributes {
 		if !attr.Computed {
 			continue

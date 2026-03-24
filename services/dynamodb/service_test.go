@@ -26,7 +26,7 @@ func newDDBGateway(t *testing.T) http.Handler {
 }
 
 // ddbReq builds a JSON POST request targeting the DynamoDB service via X-Amz-Target.
-func ddbReq(t *testing.T, action string, body interface{}) *http.Request {
+func ddbReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -49,9 +49,9 @@ func ddbReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -62,7 +62,7 @@ func decodeJSON(t *testing.T, data string) map[string]interface{} {
 func createTestTable(t *testing.T, handler http.Handler, tableName string) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": tableName,
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -80,10 +80,10 @@ func createTestTable(t *testing.T, handler http.Handler, tableName string) {
 }
 
 // putTestItem is a helper that puts an item into a table.
-func putTestItem(t *testing.T, handler http.Handler, tableName string, item map[string]interface{}) {
+func putTestItem(t *testing.T, handler http.Handler, tableName string, item map[string]any) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "PutItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "PutItem", map[string]any{
 		"TableName": tableName,
 		"Item":      item,
 	}))
@@ -99,7 +99,7 @@ func TestDDB_CreateTable_DescribeTable(t *testing.T) {
 
 	// Create table.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": "Users",
 		"KeySchema": []map[string]string{
 			{"AttributeName": "userId", "KeyType": "HASH"},
@@ -115,7 +115,7 @@ func TestDDB_CreateTable_DescribeTable(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	td, ok := m["TableDescription"].(map[string]interface{})
+	td, ok := m["TableDescription"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateTable: missing TableDescription\nbody: %s", w.Body.String())
 	}
@@ -131,7 +131,7 @@ func TestDDB_CreateTable_DescribeTable(t *testing.T) {
 
 	// Describe table.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "Users",
 	}))
 
@@ -140,7 +140,7 @@ func TestDDB_CreateTable_DescribeTable(t *testing.T) {
 	}
 
 	m2 := decodeJSON(t, w2.Body.String())
-	table, ok := m2["Table"].(map[string]interface{})
+	table, ok := m2["Table"].(map[string]any)
 	if !ok {
 		t.Fatalf("DescribeTable: missing Table\nbody: %s", w2.Body.String())
 	}
@@ -154,7 +154,7 @@ func TestDDB_CreateTable_AlreadyExists(t *testing.T) {
 	createTestTable(t, handler, "Dupes")
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": "Dupes",
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -176,20 +176,20 @@ func TestDDB_PutItem_GetItem(t *testing.T) {
 	createTestTable(t, handler, "Items")
 
 	// Put an item.
-	putTestItem(t, handler, "Items", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "user1"},
-		"sk":   map[string]interface{}{"S": "profile"},
-		"name": map[string]interface{}{"S": "Alice"},
-		"age":  map[string]interface{}{"N": "30"},
+	putTestItem(t, handler, "Items", map[string]any{
+		"pk":   map[string]any{"S": "user1"},
+		"sk":   map[string]any{"S": "profile"},
+		"name": map[string]any{"S": "Alice"},
+		"age":  map[string]any{"N": "30"},
 	})
 
 	// Get the item.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "Items",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "user1"},
-			"sk": map[string]interface{}{"S": "profile"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "user1"},
+			"sk": map[string]any{"S": "profile"},
 		},
 	}))
 
@@ -198,17 +198,17 @@ func TestDDB_PutItem_GetItem(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	item, ok := m["Item"].(map[string]interface{})
+	item, ok := m["Item"].(map[string]any)
 	if !ok {
 		t.Fatalf("GetItem: missing Item\nbody: %s", w.Body.String())
 	}
 
-	name := item["name"].(map[string]interface{})
+	name := item["name"].(map[string]any)
 	if name["S"] != "Alice" {
 		t.Errorf("GetItem: expected name.S=Alice, got %v", name["S"])
 	}
 
-	age := item["age"].(map[string]interface{})
+	age := item["age"].(map[string]any)
 	if age["N"] != "30" {
 		t.Errorf("GetItem: expected age.N=30, got %v", age["N"])
 	}
@@ -219,11 +219,11 @@ func TestDDB_GetItem_NotFound(t *testing.T) {
 	createTestTable(t, handler, "Items2")
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "Items2",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "nonexistent"},
-			"sk": map[string]interface{}{"S": "nope"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "nonexistent"},
+			"sk": map[string]any{"S": "nope"},
 		},
 	}))
 
@@ -244,18 +244,18 @@ func TestDDB_DeleteItem(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "DelTest")
 
-	putTestItem(t, handler, "DelTest", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "u1"},
-		"sk": map[string]interface{}{"S": "s1"},
+	putTestItem(t, handler, "DelTest", map[string]any{
+		"pk": map[string]any{"S": "u1"},
+		"sk": map[string]any{"S": "s1"},
 	})
 
 	// Delete the item.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DeleteItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DeleteItem", map[string]any{
 		"TableName": "DelTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 
@@ -265,11 +265,11 @@ func TestDDB_DeleteItem(t *testing.T) {
 
 	// Verify it's gone.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "DelTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 	m := decodeJSON(t, w2.Body.String())
@@ -284,29 +284,29 @@ func TestDDB_UpdateItem_SET(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "UpdTest")
 
-	putTestItem(t, handler, "UpdTest", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "u1"},
-		"sk":   map[string]interface{}{"S": "profile"},
-		"name": map[string]interface{}{"S": "Alice"},
-		"age":  map[string]interface{}{"N": "25"},
+	putTestItem(t, handler, "UpdTest", map[string]any{
+		"pk":   map[string]any{"S": "u1"},
+		"sk":   map[string]any{"S": "profile"},
+		"name": map[string]any{"S": "Alice"},
+		"age":  map[string]any{"N": "25"},
 	})
 
 	// Update with SET expression.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]any{
 		"TableName": "UpdTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "profile"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "profile"},
 		},
 		"UpdateExpression": "SET #n = :name, #a = :age",
 		"ExpressionAttributeNames": map[string]string{
 			"#n": "name",
 			"#a": "age",
 		},
-		"ExpressionAttributeValues": map[string]interface{}{
-			":name": map[string]interface{}{"S": "Bob"},
-			":age":  map[string]interface{}{"N": "30"},
+		"ExpressionAttributeValues": map[string]any{
+			":name": map[string]any{"S": "Bob"},
+			":age":  map[string]any{"N": "30"},
 		},
 		"ReturnValues": "ALL_NEW",
 	}))
@@ -316,33 +316,33 @@ func TestDDB_UpdateItem_SET(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	attrs, ok := m["Attributes"].(map[string]interface{})
+	attrs, ok := m["Attributes"].(map[string]any)
 	if !ok {
 		t.Fatalf("UpdateItem: missing Attributes\nbody: %s", w.Body.String())
 	}
 
-	name := attrs["name"].(map[string]interface{})
+	name := attrs["name"].(map[string]any)
 	if name["S"] != "Bob" {
 		t.Errorf("UpdateItem: expected name.S=Bob, got %v", name["S"])
 	}
 
-	age := attrs["age"].(map[string]interface{})
+	age := attrs["age"].(map[string]any)
 	if age["N"] != "30" {
 		t.Errorf("UpdateItem: expected age.N=30, got %v", age["N"])
 	}
 
 	// Verify via GetItem.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "UpdTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "profile"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "profile"},
 		},
 	}))
 	m2 := decodeJSON(t, w2.Body.String())
-	item := m2["Item"].(map[string]interface{})
-	gotName := item["name"].(map[string]interface{})
+	item := m2["Item"].(map[string]any)
+	gotName := item["name"].(map[string]any)
 	if gotName["S"] != "Bob" {
 		t.Errorf("UpdateItem verify: expected name.S=Bob, got %v", gotName["S"])
 	}
@@ -352,19 +352,19 @@ func TestDDB_UpdateItem_REMOVE(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "RemoveTest")
 
-	putTestItem(t, handler, "RemoveTest", map[string]interface{}{
-		"pk":     map[string]interface{}{"S": "u1"},
-		"sk":     map[string]interface{}{"S": "data"},
-		"field1": map[string]interface{}{"S": "val1"},
-		"field2": map[string]interface{}{"S": "val2"},
+	putTestItem(t, handler, "RemoveTest", map[string]any{
+		"pk":     map[string]any{"S": "u1"},
+		"sk":     map[string]any{"S": "data"},
+		"field1": map[string]any{"S": "val1"},
+		"field2": map[string]any{"S": "val2"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]any{
 		"TableName": "RemoveTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "data"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "data"},
 		},
 		"UpdateExpression": "REMOVE #f",
 		"ExpressionAttributeNames": map[string]string{
@@ -378,7 +378,7 @@ func TestDDB_UpdateItem_REMOVE(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	attrs := m["Attributes"].(map[string]interface{})
+	attrs := m["Attributes"].(map[string]any)
 	if _, exists := attrs["field1"]; exists {
 		t.Errorf("UpdateItem REMOVE: field1 should have been removed")
 	}
@@ -395,32 +395,32 @@ func TestDDB_Query_KeyCondition(t *testing.T) {
 
 	// Insert items with different sort keys.
 	for _, sk := range []string{"a", "b", "c", "d"} {
-		putTestItem(t, handler, "QueryTest", map[string]interface{}{
-			"pk":    map[string]interface{}{"S": "user1"},
-			"sk":    map[string]interface{}{"S": sk},
-			"value": map[string]interface{}{"S": "val-" + sk},
+		putTestItem(t, handler, "QueryTest", map[string]any{
+			"pk":    map[string]any{"S": "user1"},
+			"sk":    map[string]any{"S": sk},
+			"value": map[string]any{"S": "val-" + sk},
 		})
 	}
 
 	// Also insert an item for a different partition key.
-	putTestItem(t, handler, "QueryTest", map[string]interface{}{
-		"pk":    map[string]interface{}{"S": "user2"},
-		"sk":    map[string]interface{}{"S": "x"},
-		"value": map[string]interface{}{"S": "other"},
+	putTestItem(t, handler, "QueryTest", map[string]any{
+		"pk":    map[string]any{"S": "user2"},
+		"sk":    map[string]any{"S": "x"},
+		"value": map[string]any{"S": "other"},
 	})
 
 	// Query for pk = user1 AND sk begins_with b.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]any{
 		"TableName":              "QueryTest",
 		"KeyConditionExpression": "#pk = :pk AND begins_with(#sk, :prefix)",
 		"ExpressionAttributeNames": map[string]string{
 			"#pk": "pk",
 			"#sk": "sk",
 		},
-		"ExpressionAttributeValues": map[string]interface{}{
-			":pk":     map[string]interface{}{"S": "user1"},
-			":prefix": map[string]interface{}{"S": "b"},
+		"ExpressionAttributeValues": map[string]any{
+			":pk":     map[string]any{"S": "user1"},
+			":prefix": map[string]any{"S": "b"},
 		},
 	}))
 
@@ -429,13 +429,13 @@ func TestDDB_Query_KeyCondition(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	items := m["Items"].([]interface{})
+	items := m["Items"].([]any)
 	if len(items) != 1 {
 		t.Fatalf("Query: expected 1 item, got %d\nbody: %s", len(items), w.Body.String())
 	}
 
-	item := items[0].(map[string]interface{})
-	sk := item["sk"].(map[string]interface{})
+	item := items[0].(map[string]any)
+	sk := item["sk"].(map[string]any)
 	if sk["S"] != "b" {
 		t.Errorf("Query: expected sk.S=b, got %v", sk["S"])
 	}
@@ -445,25 +445,25 @@ func TestDDB_Query_EqualityOnly(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "QEqTest")
 
-	putTestItem(t, handler, "QEqTest", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "u1"},
-		"sk": map[string]interface{}{"S": "s1"},
+	putTestItem(t, handler, "QEqTest", map[string]any{
+		"pk": map[string]any{"S": "u1"},
+		"sk": map[string]any{"S": "s1"},
 	})
-	putTestItem(t, handler, "QEqTest", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "u1"},
-		"sk": map[string]interface{}{"S": "s2"},
+	putTestItem(t, handler, "QEqTest", map[string]any{
+		"pk": map[string]any{"S": "u1"},
+		"sk": map[string]any{"S": "s2"},
 	})
-	putTestItem(t, handler, "QEqTest", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "u2"},
-		"sk": map[string]interface{}{"S": "s1"},
+	putTestItem(t, handler, "QEqTest", map[string]any{
+		"pk": map[string]any{"S": "u2"},
+		"sk": map[string]any{"S": "s1"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]any{
 		"TableName":              "QEqTest",
 		"KeyConditionExpression": "pk = :pk",
-		"ExpressionAttributeValues": map[string]interface{}{
-			":pk": map[string]interface{}{"S": "u1"},
+		"ExpressionAttributeValues": map[string]any{
+			":pk": map[string]any{"S": "u1"},
 		},
 	}))
 
@@ -483,20 +483,20 @@ func TestDDB_Query_Between(t *testing.T) {
 	createTestTable(t, handler, "BetweenTest")
 
 	for _, sk := range []string{"001", "050", "100", "150", "200"} {
-		putTestItem(t, handler, "BetweenTest", map[string]interface{}{
-			"pk": map[string]interface{}{"S": "p1"},
-			"sk": map[string]interface{}{"S": sk},
+		putTestItem(t, handler, "BetweenTest", map[string]any{
+			"pk": map[string]any{"S": "p1"},
+			"sk": map[string]any{"S": sk},
 		})
 	}
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]any{
 		"TableName":              "BetweenTest",
 		"KeyConditionExpression": "pk = :pk AND sk BETWEEN :lo AND :hi",
-		"ExpressionAttributeValues": map[string]interface{}{
-			":pk": map[string]interface{}{"S": "p1"},
-			":lo": map[string]interface{}{"S": "050"},
-			":hi": map[string]interface{}{"S": "150"},
+		"ExpressionAttributeValues": map[string]any{
+			":pk": map[string]any{"S": "p1"},
+			":lo": map[string]any{"S": "050"},
+			":hi": map[string]any{"S": "150"},
 		},
 	}))
 
@@ -516,31 +516,31 @@ func TestDDB_Query_SortOrder(t *testing.T) {
 	createTestTable(t, handler, "SortTest")
 
 	for _, sk := range []string{"c", "a", "b"} {
-		putTestItem(t, handler, "SortTest", map[string]interface{}{
-			"pk": map[string]interface{}{"S": "p1"},
-			"sk": map[string]interface{}{"S": sk},
+		putTestItem(t, handler, "SortTest", map[string]any{
+			"pk": map[string]any{"S": "p1"},
+			"sk": map[string]any{"S": sk},
 		})
 	}
 
 	// Forward order.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]any{
 		"TableName":              "SortTest",
 		"KeyConditionExpression": "pk = :pk",
-		"ExpressionAttributeValues": map[string]interface{}{
-			":pk": map[string]interface{}{"S": "p1"},
+		"ExpressionAttributeValues": map[string]any{
+			":pk": map[string]any{"S": "p1"},
 		},
 		"ScanIndexForward": true,
 	}))
 
 	m := decodeJSON(t, w.Body.String())
-	items := m["Items"].([]interface{})
+	items := m["Items"].([]any)
 	if len(items) != 3 {
 		t.Fatalf("Query sort: expected 3 items, got %d", len(items))
 	}
 
-	firstSK := items[0].(map[string]interface{})["sk"].(map[string]interface{})["S"]
-	lastSK := items[2].(map[string]interface{})["sk"].(map[string]interface{})["S"]
+	firstSK := items[0].(map[string]any)["sk"].(map[string]any)["S"]
+	lastSK := items[2].(map[string]any)["sk"].(map[string]any)["S"]
 	if firstSK != "a" || lastSK != "c" {
 		t.Errorf("Query sort forward: expected a..c, got %v..%v", firstSK, lastSK)
 	}
@@ -549,19 +549,19 @@ func TestDDB_Query_SortOrder(t *testing.T) {
 	w2 := httptest.NewRecorder()
 	scanForward := false
 	_ = scanForward
-	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]any{
 		"TableName":              "SortTest",
 		"KeyConditionExpression": "pk = :pk",
-		"ExpressionAttributeValues": map[string]interface{}{
-			":pk": map[string]interface{}{"S": "p1"},
+		"ExpressionAttributeValues": map[string]any{
+			":pk": map[string]any{"S": "p1"},
 		},
 		"ScanIndexForward": false,
 	}))
 
 	m2 := decodeJSON(t, w2.Body.String())
-	items2 := m2["Items"].([]interface{})
-	firstSK2 := items2[0].(map[string]interface{})["sk"].(map[string]interface{})["S"]
-	lastSK2 := items2[2].(map[string]interface{})["sk"].(map[string]interface{})["S"]
+	items2 := m2["Items"].([]any)
+	firstSK2 := items2[0].(map[string]any)["sk"].(map[string]any)["S"]
+	lastSK2 := items2[2].(map[string]any)["sk"].(map[string]any)["S"]
 	if firstSK2 != "c" || lastSK2 != "a" {
 		t.Errorf("Query sort reverse: expected c..a, got %v..%v", firstSK2, lastSK2)
 	}
@@ -574,14 +574,14 @@ func TestDDB_Scan(t *testing.T) {
 	createTestTable(t, handler, "ScanTest")
 
 	for i := 0; i < 5; i++ {
-		putTestItem(t, handler, "ScanTest", map[string]interface{}{
-			"pk": map[string]interface{}{"S": "user"},
-			"sk": map[string]interface{}{"S": string(rune('a' + i))},
+		putTestItem(t, handler, "ScanTest", map[string]any{
+			"pk": map[string]any{"S": "user"},
+			"sk": map[string]any{"S": string(rune('a' + i))},
 		})
 	}
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Scan", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Scan", map[string]any{
 		"TableName": "ScanTest",
 	}))
 
@@ -605,26 +605,26 @@ func TestDDB_Scan_WithFilter(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "ScanFilter")
 
-	putTestItem(t, handler, "ScanFilter", map[string]interface{}{
-		"pk":     map[string]interface{}{"S": "u1"},
-		"sk":     map[string]interface{}{"S": "s1"},
-		"status": map[string]interface{}{"S": "active"},
+	putTestItem(t, handler, "ScanFilter", map[string]any{
+		"pk":     map[string]any{"S": "u1"},
+		"sk":     map[string]any{"S": "s1"},
+		"status": map[string]any{"S": "active"},
 	})
-	putTestItem(t, handler, "ScanFilter", map[string]interface{}{
-		"pk":     map[string]interface{}{"S": "u2"},
-		"sk":     map[string]interface{}{"S": "s1"},
-		"status": map[string]interface{}{"S": "inactive"},
+	putTestItem(t, handler, "ScanFilter", map[string]any{
+		"pk":     map[string]any{"S": "u2"},
+		"sk":     map[string]any{"S": "s1"},
+		"status": map[string]any{"S": "inactive"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "Scan", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "Scan", map[string]any{
 		"TableName":        "ScanFilter",
 		"FilterExpression": "#s = :status",
 		"ExpressionAttributeNames": map[string]string{
 			"#s": "status",
 		},
-		"ExpressionAttributeValues": map[string]interface{}{
-			":status": map[string]interface{}{"S": "active"},
+		"ExpressionAttributeValues": map[string]any{
+			":status": map[string]any{"S": "active"},
 		},
 	}))
 
@@ -646,7 +646,7 @@ func TestDDB_DeleteTable(t *testing.T) {
 	createTestTable(t, handler, "ToDelete")
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DeleteTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DeleteTable", map[string]any{
 		"TableName": "ToDelete",
 	}))
 
@@ -655,14 +655,14 @@ func TestDDB_DeleteTable(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	td := m["TableDescription"].(map[string]interface{})
+	td := m["TableDescription"].(map[string]any)
 	if td["TableStatus"] != "DELETING" {
 		t.Errorf("DeleteTable: expected TableStatus=DELETING, got %v", td["TableStatus"])
 	}
 
 	// Verify table is gone.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "ToDelete",
 	}))
 	if w2.Code != http.StatusBadRequest {
@@ -674,7 +674,7 @@ func TestDDB_DeleteTable_NotFound(t *testing.T) {
 	handler := newDDBGateway(t)
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DeleteTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DeleteTable", map[string]any{
 		"TableName": "NonExistent",
 	}))
 
@@ -700,7 +700,7 @@ func TestDDB_ListTables(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	names, ok := m["TableNames"].([]interface{})
+	names, ok := m["TableNames"].([]any)
 	if !ok {
 		t.Fatalf("ListTables: missing TableNames\nbody: %s", w.Body.String())
 	}
@@ -726,25 +726,25 @@ func TestDDB_BatchWriteItem_BatchGetItem(t *testing.T) {
 
 	// BatchWriteItem: put 3 items.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "BatchWriteItem", map[string]interface{}{
-		"RequestItems": map[string]interface{}{
-			"BatchTest": []map[string]interface{}{
-				{"PutRequest": map[string]interface{}{
-					"Item": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "b1"},
-						"sk": map[string]interface{}{"S": "s1"},
+	handler.ServeHTTP(w, ddbReq(t, "BatchWriteItem", map[string]any{
+		"RequestItems": map[string]any{
+			"BatchTest": []map[string]any{
+				{"PutRequest": map[string]any{
+					"Item": map[string]any{
+						"pk": map[string]any{"S": "b1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				}},
-				{"PutRequest": map[string]interface{}{
-					"Item": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "b2"},
-						"sk": map[string]interface{}{"S": "s1"},
+				{"PutRequest": map[string]any{
+					"Item": map[string]any{
+						"pk": map[string]any{"S": "b2"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				}},
-				{"PutRequest": map[string]interface{}{
-					"Item": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "b3"},
-						"sk": map[string]interface{}{"S": "s1"},
+				{"PutRequest": map[string]any{
+					"Item": map[string]any{
+						"pk": map[string]any{"S": "b3"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				}},
 			},
@@ -756,24 +756,24 @@ func TestDDB_BatchWriteItem_BatchGetItem(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	unprocessed := m["UnprocessedItems"].(map[string]interface{})
+	unprocessed := m["UnprocessedItems"].(map[string]any)
 	if len(unprocessed) != 0 {
 		t.Errorf("BatchWriteItem: expected 0 unprocessed items, got %d", len(unprocessed))
 	}
 
 	// BatchGetItem: get 2 of the 3 items.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "BatchGetItem", map[string]interface{}{
-		"RequestItems": map[string]interface{}{
-			"BatchTest": map[string]interface{}{
-				"Keys": []map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "BatchGetItem", map[string]any{
+		"RequestItems": map[string]any{
+			"BatchTest": map[string]any{
+				"Keys": []map[string]any{
 					{
-						"pk": map[string]interface{}{"S": "b1"},
-						"sk": map[string]interface{}{"S": "s1"},
+						"pk": map[string]any{"S": "b1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 					{
-						"pk": map[string]interface{}{"S": "b3"},
-						"sk": map[string]interface{}{"S": "s1"},
+						"pk": map[string]any{"S": "b3"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				},
 			},
@@ -785,8 +785,8 @@ func TestDDB_BatchWriteItem_BatchGetItem(t *testing.T) {
 	}
 
 	m2 := decodeJSON(t, w2.Body.String())
-	responses := m2["Responses"].(map[string]interface{})
-	batchItems := responses["BatchTest"].([]interface{})
+	responses := m2["Responses"].(map[string]any)
+	batchItems := responses["BatchTest"].([]any)
 	if len(batchItems) != 2 {
 		t.Errorf("BatchGetItem: expected 2 items, got %d", len(batchItems))
 	}
@@ -796,19 +796,19 @@ func TestDDB_BatchWriteItem_Delete(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "BWDel")
 
-	putTestItem(t, handler, "BWDel", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "d1"},
-		"sk": map[string]interface{}{"S": "s1"},
+	putTestItem(t, handler, "BWDel", map[string]any{
+		"pk": map[string]any{"S": "d1"},
+		"sk": map[string]any{"S": "s1"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "BatchWriteItem", map[string]interface{}{
-		"RequestItems": map[string]interface{}{
-			"BWDel": []map[string]interface{}{
-				{"DeleteRequest": map[string]interface{}{
-					"Key": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "d1"},
-						"sk": map[string]interface{}{"S": "s1"},
+	handler.ServeHTTP(w, ddbReq(t, "BatchWriteItem", map[string]any{
+		"RequestItems": map[string]any{
+			"BWDel": []map[string]any{
+				{"DeleteRequest": map[string]any{
+					"Key": map[string]any{
+						"pk": map[string]any{"S": "d1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				}},
 			},
@@ -821,11 +821,11 @@ func TestDDB_BatchWriteItem_Delete(t *testing.T) {
 
 	// Verify deleted.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "BWDel",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "d1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "d1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 	m := decodeJSON(t, w2.Body.String())
@@ -840,19 +840,19 @@ func TestDDB_GetItem_Projection(t *testing.T) {
 	handler := newDDBGateway(t)
 	createTestTable(t, handler, "ProjTest")
 
-	putTestItem(t, handler, "ProjTest", map[string]interface{}{
-		"pk":    map[string]interface{}{"S": "u1"},
-		"sk":    map[string]interface{}{"S": "s1"},
-		"name":  map[string]interface{}{"S": "Alice"},
-		"email": map[string]interface{}{"S": "alice@example.com"},
+	putTestItem(t, handler, "ProjTest", map[string]any{
+		"pk":    map[string]any{"S": "u1"},
+		"sk":    map[string]any{"S": "s1"},
+		"name":  map[string]any{"S": "Alice"},
+		"email": map[string]any{"S": "alice@example.com"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "ProjTest",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "u1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "u1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 		"ProjectionExpression": "#n",
 		"ExpressionAttributeNames": map[string]string{
@@ -865,7 +865,7 @@ func TestDDB_GetItem_Projection(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	item := m["Item"].(map[string]interface{})
+	item := m["Item"].(map[string]any)
 	if _, exists := item["name"]; !exists {
 		t.Error("GetItem projection: name should exist")
 	}
@@ -893,7 +893,7 @@ func TestDDB_CreateTable_WithGSI_DescribeTable(t *testing.T) {
 	handler := newDDBGateway(t)
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": "GSITable",
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -906,7 +906,7 @@ func TestDDB_CreateTable_WithGSI_DescribeTable(t *testing.T) {
 			{"AttributeName": "gsiSk", "AttributeType": "S"},
 		},
 		"BillingMode": "PAY_PER_REQUEST",
-		"GlobalSecondaryIndexes": []map[string]interface{}{
+		"GlobalSecondaryIndexes": []map[string]any{
 			{
 				"IndexName": "gsi-index",
 				"KeySchema": []map[string]string{
@@ -926,7 +926,7 @@ func TestDDB_CreateTable_WithGSI_DescribeTable(t *testing.T) {
 
 	// DescribeTable should show the GSI.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "GSITable",
 	}))
 
@@ -935,12 +935,12 @@ func TestDDB_CreateTable_WithGSI_DescribeTable(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w2.Body.String())
-	table := m["Table"].(map[string]interface{})
-	gsis, ok := table["GlobalSecondaryIndexes"].([]interface{})
+	table := m["Table"].(map[string]any)
+	gsis, ok := table["GlobalSecondaryIndexes"].([]any)
 	if !ok || len(gsis) != 1 {
 		t.Fatalf("DescribeTable: expected 1 GSI, got %v", table["GlobalSecondaryIndexes"])
 	}
-	gsi := gsis[0].(map[string]interface{})
+	gsi := gsis[0].(map[string]any)
 	if gsi["IndexName"] != "gsi-index" {
 		t.Errorf("DescribeTable: expected IndexName=gsi-index, got %v", gsi["IndexName"])
 	}
@@ -954,7 +954,7 @@ func TestDDB_Query_GSI(t *testing.T) {
 
 	// Create table with GSI.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": "GSIQuery",
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -967,7 +967,7 @@ func TestDDB_Query_GSI(t *testing.T) {
 			{"AttributeName": "createdAt", "AttributeType": "S"},
 		},
 		"BillingMode": "PAY_PER_REQUEST",
-		"GlobalSecondaryIndexes": []map[string]interface{}{
+		"GlobalSecondaryIndexes": []map[string]any{
 			{
 				"IndexName": "status-createdAt-index",
 				"KeySchema": []map[string]string{
@@ -985,36 +985,36 @@ func TestDDB_Query_GSI(t *testing.T) {
 	}
 
 	// Put items with different statuses.
-	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
-		"pk":        map[string]interface{}{"S": "order1"},
-		"sk":        map[string]interface{}{"S": "detail"},
-		"status":    map[string]interface{}{"S": "active"},
-		"createdAt": map[string]interface{}{"S": "2024-01-01"},
+	putTestItem(t, handler, "GSIQuery", map[string]any{
+		"pk":        map[string]any{"S": "order1"},
+		"sk":        map[string]any{"S": "detail"},
+		"status":    map[string]any{"S": "active"},
+		"createdAt": map[string]any{"S": "2024-01-01"},
 	})
-	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
-		"pk":        map[string]interface{}{"S": "order2"},
-		"sk":        map[string]interface{}{"S": "detail"},
-		"status":    map[string]interface{}{"S": "active"},
-		"createdAt": map[string]interface{}{"S": "2024-01-02"},
+	putTestItem(t, handler, "GSIQuery", map[string]any{
+		"pk":        map[string]any{"S": "order2"},
+		"sk":        map[string]any{"S": "detail"},
+		"status":    map[string]any{"S": "active"},
+		"createdAt": map[string]any{"S": "2024-01-02"},
 	})
-	putTestItem(t, handler, "GSIQuery", map[string]interface{}{
-		"pk":        map[string]interface{}{"S": "order3"},
-		"sk":        map[string]interface{}{"S": "detail"},
-		"status":    map[string]interface{}{"S": "completed"},
-		"createdAt": map[string]interface{}{"S": "2024-01-03"},
+	putTestItem(t, handler, "GSIQuery", map[string]any{
+		"pk":        map[string]any{"S": "order3"},
+		"sk":        map[string]any{"S": "detail"},
+		"status":    map[string]any{"S": "completed"},
+		"createdAt": map[string]any{"S": "2024-01-03"},
 	})
 
 	// Query GSI for active orders.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]any{
 		"TableName":              "GSIQuery",
 		"IndexName":              "status-createdAt-index",
 		"KeyConditionExpression": "#s = :status",
 		"ExpressionAttributeNames": map[string]string{
 			"#s": "status",
 		},
-		"ExpressionAttributeValues": map[string]interface{}{
-			":status": map[string]interface{}{"S": "active"},
+		"ExpressionAttributeValues": map[string]any{
+			":status": map[string]any{"S": "active"},
 		},
 	}))
 
@@ -1034,7 +1034,7 @@ func TestDDB_Query_GSI_WithSortKeyCondition(t *testing.T) {
 
 	// Create table with GSI.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": "GSISortQuery",
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -1047,7 +1047,7 @@ func TestDDB_Query_GSI_WithSortKeyCondition(t *testing.T) {
 			{"AttributeName": "price", "AttributeType": "N"},
 		},
 		"BillingMode": "PAY_PER_REQUEST",
-		"GlobalSecondaryIndexes": []map[string]interface{}{
+		"GlobalSecondaryIndexes": []map[string]any{
 			{
 				"IndexName": "category-price-index",
 				"KeySchema": []map[string]string{
@@ -1065,34 +1065,34 @@ func TestDDB_Query_GSI_WithSortKeyCondition(t *testing.T) {
 	}
 
 	// Put items.
-	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
-		"pk":       map[string]interface{}{"S": "p1"},
-		"sk":       map[string]interface{}{"S": "s1"},
-		"category": map[string]interface{}{"S": "electronics"},
-		"price":    map[string]interface{}{"N": "100"},
+	putTestItem(t, handler, "GSISortQuery", map[string]any{
+		"pk":       map[string]any{"S": "p1"},
+		"sk":       map[string]any{"S": "s1"},
+		"category": map[string]any{"S": "electronics"},
+		"price":    map[string]any{"N": "100"},
 	})
-	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
-		"pk":       map[string]interface{}{"S": "p2"},
-		"sk":       map[string]interface{}{"S": "s1"},
-		"category": map[string]interface{}{"S": "electronics"},
-		"price":    map[string]interface{}{"N": "200"},
+	putTestItem(t, handler, "GSISortQuery", map[string]any{
+		"pk":       map[string]any{"S": "p2"},
+		"sk":       map[string]any{"S": "s1"},
+		"category": map[string]any{"S": "electronics"},
+		"price":    map[string]any{"N": "200"},
 	})
-	putTestItem(t, handler, "GSISortQuery", map[string]interface{}{
-		"pk":       map[string]interface{}{"S": "p3"},
-		"sk":       map[string]interface{}{"S": "s1"},
-		"category": map[string]interface{}{"S": "electronics"},
-		"price":    map[string]interface{}{"N": "50"},
+	putTestItem(t, handler, "GSISortQuery", map[string]any{
+		"pk":       map[string]any{"S": "p3"},
+		"sk":       map[string]any{"S": "s1"},
+		"category": map[string]any{"S": "electronics"},
+		"price":    map[string]any{"N": "50"},
 	})
 
 	// Query GSI with sort key condition: price > 75.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "Query", map[string]any{
 		"TableName":              "GSISortQuery",
 		"IndexName":              "category-price-index",
 		"KeyConditionExpression": "category = :cat AND price > :minPrice",
-		"ExpressionAttributeValues": map[string]interface{}{
-			":cat":      map[string]interface{}{"S": "electronics"},
-			":minPrice": map[string]interface{}{"N": "75"},
+		"ExpressionAttributeValues": map[string]any{
+			":cat":      map[string]any{"S": "electronics"},
+			":minPrice": map[string]any{"N": "75"},
 		},
 	}))
 
@@ -1107,9 +1107,9 @@ func TestDDB_Query_GSI_WithSortKeyCondition(t *testing.T) {
 	}
 
 	// Verify items are sorted by price ascending (default).
-	items := m["Items"].([]interface{})
-	price0 := items[0].(map[string]interface{})["price"].(map[string]interface{})["N"]
-	price1 := items[1].(map[string]interface{})["price"].(map[string]interface{})["N"]
+	items := m["Items"].([]any)
+	price0 := items[0].(map[string]any)["price"].(map[string]any)["N"]
+	price1 := items[1].(map[string]any)["price"].(map[string]any)["N"]
 	if price0 != "100" || price1 != "200" {
 		t.Errorf("Query GSI sort key: expected prices 100, 200, got %v, %v", price0, price1)
 	}
@@ -1123,32 +1123,32 @@ func TestDDB_TransactWriteItems_PutAndDelete(t *testing.T) {
 	createTestTable(t, handler, "TxTable2")
 
 	// Pre-populate an item to delete.
-	putTestItem(t, handler, "TxTable2", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "del1"},
-		"sk":   map[string]interface{}{"S": "s1"},
-		"data": map[string]interface{}{"S": "to-be-deleted"},
+	putTestItem(t, handler, "TxTable2", map[string]any{
+		"pk":   map[string]any{"S": "del1"},
+		"sk":   map[string]any{"S": "s1"},
+		"data": map[string]any{"S": "to-be-deleted"},
 	})
 
 	// TransactWriteItems: Put into TxTable1, Delete from TxTable2.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]interface{}{
-		"TransactItems": []map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]any{
+		"TransactItems": []map[string]any{
 			{
-				"Put": map[string]interface{}{
+				"Put": map[string]any{
 					"TableName": "TxTable1",
-					"Item": map[string]interface{}{
-						"pk":   map[string]interface{}{"S": "new1"},
-						"sk":   map[string]interface{}{"S": "s1"},
-						"data": map[string]interface{}{"S": "created-in-tx"},
+					"Item": map[string]any{
+						"pk":   map[string]any{"S": "new1"},
+						"sk":   map[string]any{"S": "s1"},
+						"data": map[string]any{"S": "created-in-tx"},
 					},
 				},
 			},
 			{
-				"Delete": map[string]interface{}{
+				"Delete": map[string]any{
 					"TableName": "TxTable2",
-					"Key": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "del1"},
-						"sk": map[string]interface{}{"S": "s1"},
+					"Key": map[string]any{
+						"pk": map[string]any{"S": "del1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				},
 			},
@@ -1161,11 +1161,11 @@ func TestDDB_TransactWriteItems_PutAndDelete(t *testing.T) {
 
 	// Verify put succeeded.
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "TxTable1",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "new1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "new1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 	m := decodeJSON(t, w2.Body.String())
@@ -1175,11 +1175,11 @@ func TestDDB_TransactWriteItems_PutAndDelete(t *testing.T) {
 
 	// Verify delete succeeded.
 	w3 := httptest.NewRecorder()
-	handler.ServeHTTP(w3, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w3, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "TxTable2",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "del1"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "del1"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 	m2 := decodeJSON(t, w3.Body.String())
@@ -1193,39 +1193,39 @@ func TestDDB_TransactWriteItems_ConditionCheckFailure(t *testing.T) {
 	createTestTable(t, handler, "TxCondTable")
 
 	// Put an item with status=active.
-	putTestItem(t, handler, "TxCondTable", map[string]interface{}{
-		"pk":     map[string]interface{}{"S": "item1"},
-		"sk":     map[string]interface{}{"S": "s1"},
-		"status": map[string]interface{}{"S": "active"},
+	putTestItem(t, handler, "TxCondTable", map[string]any{
+		"pk":     map[string]any{"S": "item1"},
+		"sk":     map[string]any{"S": "s1"},
+		"status": map[string]any{"S": "active"},
 	})
 
 	// TransactWriteItems with ConditionCheck that will fail (expects status=completed).
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]interface{}{
-		"TransactItems": []map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]any{
+		"TransactItems": []map[string]any{
 			{
-				"ConditionCheck": map[string]interface{}{
+				"ConditionCheck": map[string]any{
 					"TableName": "TxCondTable",
-					"Key": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "item1"},
-						"sk": map[string]interface{}{"S": "s1"},
+					"Key": map[string]any{
+						"pk": map[string]any{"S": "item1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 					"ConditionExpression": "#s = :expected",
 					"ExpressionAttributeNames": map[string]string{
 						"#s": "status",
 					},
-					"ExpressionAttributeValues": map[string]interface{}{
-						":expected": map[string]interface{}{"S": "completed"},
+					"ExpressionAttributeValues": map[string]any{
+						":expected": map[string]any{"S": "completed"},
 					},
 				},
 			},
 			{
-				"Put": map[string]interface{}{
+				"Put": map[string]any{
 					"TableName": "TxCondTable",
-					"Item": map[string]interface{}{
-						"pk":     map[string]interface{}{"S": "item2"},
-						"sk":     map[string]interface{}{"S": "s1"},
-						"status": map[string]interface{}{"S": "new"},
+					"Item": map[string]any{
+						"pk":     map[string]any{"S": "item2"},
+						"sk":     map[string]any{"S": "s1"},
+						"status": map[string]any{"S": "new"},
 					},
 				},
 			},
@@ -1244,11 +1244,11 @@ func TestDDB_TransactWriteItems_ConditionCheckFailure(t *testing.T) {
 
 	// Verify the Put was rolled back (item2 should not exist).
 	w2 := httptest.NewRecorder()
-	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w2, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "TxCondTable",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "item2"},
-			"sk": map[string]interface{}{"S": "s1"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "item2"},
+			"sk": map[string]any{"S": "s1"},
 		},
 	}))
 	m2 := decodeJSON(t, w2.Body.String())
@@ -1262,35 +1262,35 @@ func TestDDB_TransactGetItems(t *testing.T) {
 	createTestTable(t, handler, "TxGetTable1")
 	createTestTable(t, handler, "TxGetTable2")
 
-	putTestItem(t, handler, "TxGetTable1", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "a1"},
-		"sk":   map[string]interface{}{"S": "s1"},
-		"name": map[string]interface{}{"S": "Alice"},
+	putTestItem(t, handler, "TxGetTable1", map[string]any{
+		"pk":   map[string]any{"S": "a1"},
+		"sk":   map[string]any{"S": "s1"},
+		"name": map[string]any{"S": "Alice"},
 	})
-	putTestItem(t, handler, "TxGetTable2", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "b1"},
-		"sk":   map[string]interface{}{"S": "s1"},
-		"name": map[string]interface{}{"S": "Bob"},
+	putTestItem(t, handler, "TxGetTable2", map[string]any{
+		"pk":   map[string]any{"S": "b1"},
+		"sk":   map[string]any{"S": "s1"},
+		"name": map[string]any{"S": "Bob"},
 	})
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "TransactGetItems", map[string]interface{}{
-		"TransactItems": []map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "TransactGetItems", map[string]any{
+		"TransactItems": []map[string]any{
 			{
-				"Get": map[string]interface{}{
+				"Get": map[string]any{
 					"TableName": "TxGetTable1",
-					"Key": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "a1"},
-						"sk": map[string]interface{}{"S": "s1"},
+					"Key": map[string]any{
+						"pk": map[string]any{"S": "a1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				},
 			},
 			{
-				"Get": map[string]interface{}{
+				"Get": map[string]any{
 					"TableName": "TxGetTable2",
-					"Key": map[string]interface{}{
-						"pk": map[string]interface{}{"S": "b1"},
-						"sk": map[string]interface{}{"S": "s1"},
+					"Key": map[string]any{
+						"pk": map[string]any{"S": "b1"},
+						"sk": map[string]any{"S": "s1"},
 					},
 				},
 			},
@@ -1302,21 +1302,21 @@ func TestDDB_TransactGetItems(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	responses, ok := m["Responses"].([]interface{})
+	responses, ok := m["Responses"].([]any)
 	if !ok || len(responses) != 2 {
 		t.Fatalf("TransactGetItems: expected 2 responses, got %v", m["Responses"])
 	}
 
-	r0 := responses[0].(map[string]interface{})
-	item0 := r0["Item"].(map[string]interface{})
-	name0 := item0["name"].(map[string]interface{})["S"]
+	r0 := responses[0].(map[string]any)
+	item0 := r0["Item"].(map[string]any)
+	name0 := item0["name"].(map[string]any)["S"]
 	if name0 != "Alice" {
 		t.Errorf("TransactGetItems: expected first item name=Alice, got %v", name0)
 	}
 
-	r1 := responses[1].(map[string]interface{})
-	item1 := r1["Item"].(map[string]interface{})
-	name1 := item1["name"].(map[string]interface{})["S"]
+	r1 := responses[1].(map[string]any)
+	item1 := r1["Item"].(map[string]any)
+	name1 := item1["name"].(map[string]any)["S"]
 	if name1 != "Bob" {
 		t.Errorf("TransactGetItems: expected second item name=Bob, got %v", name1)
 	}

@@ -79,6 +79,9 @@ import (
 )
 
 func main() {
+	rootCtx, rootCancel := context.WithCancel(context.Background())
+	defer rootCancel()
+
 	configPath := flag.String("config", "", "path to cloudmock YAML config file")
 	flag.Parse()
 
@@ -466,7 +469,7 @@ func main() {
 		}
 		if sloEngine != nil {
 			sloEngine.SetAlertFunc(func(service, action string, burnRate, budgetUsed float64) {
-				incService.OnSLOBreach(context.Background(), service, action, burnRate, budgetUsed)
+				incService.OnSLOBreach(rootCtx, service, action, burnRate, budgetUsed)
 			})
 		}
 
@@ -524,7 +527,14 @@ func main() {
 		adminHandler = gateway.CORSMiddleware(adminHandler)
 	}
 	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
-	adminServer := &http.Server{Addr: adminAddr, Handler: adminHandler}
+	adminServer := &http.Server{
+		Addr:              adminAddr,
+		Handler:           adminHandler,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	go func() {
 		log.Printf("cloudmock admin API starting on %s", adminAddr)
 		if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -537,7 +547,14 @@ func main() {
 	if cfg.Dashboard.Enabled {
 		dashboardHandler := dashboard.New(cfg.Admin.Port)
 		dashAddr := fmt.Sprintf(":%d", cfg.Dashboard.Port)
-		dashServer = &http.Server{Addr: dashAddr, Handler: dashboardHandler}
+		dashServer = &http.Server{
+			Addr:              dashAddr,
+			Handler:           dashboardHandler,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      60 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
 		go func() {
 			log.Printf("cloudmock dashboard starting on %s", dashAddr)
 			if err := dashServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -576,7 +593,14 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)
-	gwServer := &http.Server{Addr: addr, Handler: loggedGW}
+	gwServer := &http.Server{
+		Addr:              addr,
+		Handler:           loggedGW,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      60 * time.Second,
+		IdleTimeout:       120 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
 	log.Printf("cloudmock gateway starting on %s (region=%s, account=%s, iam_mode=%s, services=%d)",
 		addr, cfg.Region, cfg.AccountID, cfg.IAM.Mode, len(registry.List()))
 

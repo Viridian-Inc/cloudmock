@@ -23,7 +23,7 @@ type createTableRequest struct {
 type gsiDescription struct {
 	IndexName             string                 `json:"IndexName"`
 	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	Projection            map[string]interface{} `json:"Projection"`
+	Projection            map[string]any `json:"Projection"`
 	IndexStatus           string                 `json:"IndexStatus"`
 	ItemCount             int64                  `json:"ItemCount"`
 	IndexSizeBytes        int64                  `json:"IndexSizeBytes"`
@@ -34,7 +34,7 @@ type gsiDescription struct {
 type lsiDescription struct {
 	IndexName      string                 `json:"IndexName"`
 	KeySchema      []KeySchemaElement      `json:"KeySchema"`
-	Projection     map[string]interface{} `json:"Projection"`
+	Projection     map[string]any `json:"Projection"`
 	ItemCount      int64                  `json:"ItemCount"`
 	IndexSizeBytes int64                  `json:"IndexSizeBytes"`
 	IndexArn       string                 `json:"IndexArn"`
@@ -264,7 +264,7 @@ type cancellationReason struct {
 
 // ---- helpers ----
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -276,7 +276,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
-func parseJSON(body []byte, v interface{}) *service.AWSError {
+func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}

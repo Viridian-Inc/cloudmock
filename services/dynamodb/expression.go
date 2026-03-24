@@ -19,7 +19,7 @@ func resolveNames(expr string, names map[string]string) string {
 
 // getAttrValue extracts a scalar value from an AttributeValue for comparison.
 // Returns the string or numeric value and the type indicator.
-func getAttrValue(av AttributeValue) (interface{}, string) {
+func getAttrValue(av AttributeValue) (any, string) {
 	if av == nil {
 		return nil, ""
 	}

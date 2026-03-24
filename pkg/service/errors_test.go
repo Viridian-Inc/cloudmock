@@ -27,7 +27,7 @@ func TestAWSError_JSONMarshal(t *testing.T) {
 	data, marshalErr := json.Marshal(err)
 	require.NoError(t, marshalErr)
 
-	var result map[string]interface{}
+	var result map[string]any
 	require.NoError(t, json.Unmarshal(data, &result))
 
 	assert.Equal(t, "NoSuchBucket", result["__type"])

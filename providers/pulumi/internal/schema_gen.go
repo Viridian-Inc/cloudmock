@@ -11,16 +11,16 @@ import (
 // GeneratePulumiSchema builds a Pulumi package schema JSON structure from
 // the cloudmock schema registry. The resulting map can be marshaled to JSON
 // and returned by the provider's GetSchema RPC.
-func GeneratePulumiSchema(reg *cmschema.Registry) map[string]interface{} {
-	resources := map[string]interface{}{}
+func GeneratePulumiSchema(reg *cmschema.Registry) map[string]any {
+	resources := map[string]any{}
 
 	for _, rs := range reg.All() {
 		token := resourceToken(rs)
 
-		inputProps := map[string]interface{}{}
-		outputProps := map[string]interface{}{}
-		var requiredInputs []interface{}
-		var requiredOutputs []interface{}
+		inputProps := map[string]any{}
+		outputProps := map[string]any{}
+		var requiredInputs []any
+		var requiredOutputs []any
 
 		for _, attr := range rs.Attributes {
 			propSchema := attrToPulumiProperty(attr)
@@ -40,12 +40,12 @@ func GeneratePulumiSchema(reg *cmschema.Registry) map[string]interface{} {
 		}
 
 		// The "id" property is always present on outputs.
-		outputProps["id"] = map[string]interface{}{
+		outputProps["id"] = map[string]any{
 			"type":        "string",
 			"description": "The provider-assigned unique ID for this resource.",
 		}
 
-		resDef := map[string]interface{}{
+		resDef := map[string]any{
 			"description":     fmt.Sprintf("Manages a %s resource in cloudmock.", rs.AWSType),
 			"inputProperties": inputProps,
 			"properties":      outputProps,
@@ -60,23 +60,23 @@ func GeneratePulumiSchema(reg *cmschema.Registry) map[string]interface{} {
 		resources[token] = resDef
 	}
 
-	configProps := map[string]interface{}{
-		"endpoint": map[string]interface{}{
+	configProps := map[string]any{
+		"endpoint": map[string]any{
 			"type":        "string",
 			"description": "The cloudmock gateway endpoint URL.",
 			"default":     "http://localhost:4566",
 		},
-		"region": map[string]interface{}{
+		"region": map[string]any{
 			"type":        "string",
 			"description": "The AWS region for credential scope.",
 			"default":     "us-east-1",
 		},
-		"accessKey": map[string]interface{}{
+		"accessKey": map[string]any{
 			"type":        "string",
 			"description": "The access key for authenticating with cloudmock.",
 			"default":     "test",
 		},
-		"secretKey": map[string]interface{}{
+		"secretKey": map[string]any{
 			"type":        "string",
 			"description": "The secret key for authenticating with cloudmock.",
 			"default":     "test",
@@ -84,31 +84,31 @@ func GeneratePulumiSchema(reg *cmschema.Registry) map[string]interface{} {
 		},
 	}
 
-	schema := map[string]interface{}{
+	schema := map[string]any{
 		"name":        "cloudmock",
 		"displayName": "CloudMock",
 		"version":     "0.1.0",
 		"description": "A Pulumi provider for cloudmock — local AWS service emulation.",
-		"keywords":    []interface{}{"pulumi", "cloudmock", "aws", "mock", "testing"},
+		"keywords":    []any{"pulumi", "cloudmock", "aws", "mock", "testing"},
 		"homepage":    "https://github.com/neureaux/cloudmock",
 		"publisher":   "neureaux",
 		"license":     "Apache-2.0",
 		"repository":  "https://github.com/neureaux/cloudmock",
-		"config": map[string]interface{}{
+		"config": map[string]any{
 			"variables": configProps,
 		},
-		"provider": map[string]interface{}{
+		"provider": map[string]any{
 			"inputProperties": configProps,
 		},
 		"resources": resources,
-		"language": map[string]interface{}{
-			"nodejs": map[string]interface{}{
+		"language": map[string]any{
+			"nodejs": map[string]any{
 				"packageName": "@neureaux/pulumi-cloudmock",
 			},
-			"python": map[string]interface{}{
+			"python": map[string]any{
 				"packageName": "neureaux_pulumi_cloudmock",
 			},
-			"go": map[string]interface{}{
+			"go": map[string]any{
 				"importBasePath": "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock",
 			},
 		},
@@ -158,8 +158,8 @@ func ResourceToken(rs cmschema.ResourceSchema) string {
 }
 
 // attrToPulumiProperty converts a cloudmock attribute schema to a Pulumi property definition.
-func attrToPulumiProperty(attr cmschema.AttributeSchema) map[string]interface{} {
-	prop := map[string]interface{}{
+func attrToPulumiProperty(attr cmschema.AttributeSchema) map[string]any {
+	prop := map[string]any{
 		"description": fmt.Sprintf("The %s attribute.", attr.Name),
 	}
 
@@ -174,12 +174,12 @@ func attrToPulumiProperty(attr cmschema.AttributeSchema) map[string]interface{} 
 		prop["type"] = "number"
 	case "list", "set":
 		prop["type"] = "array"
-		prop["items"] = map[string]interface{}{
+		prop["items"] = map[string]any{
 			"type": "string",
 		}
 	case "map":
 		prop["type"] = "object"
-		prop["additionalProperties"] = map[string]interface{}{
+		prop["additionalProperties"] = map[string]any{
 			"$ref": "pulumi.json#/Any",
 		}
 	default:

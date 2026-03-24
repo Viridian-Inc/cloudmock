@@ -153,7 +153,7 @@ func mapAttrType(t string) tfschema.ValueType {
 
 // makeCreate returns a CreateContext function for the given resource schema.
 func makeCreate(rs cmschema.ResourceSchema) tfschema.CreateContextFunc {
-	return func(ctx context.Context, d *tfschema.ResourceData, meta interface{}) diag.Diagnostics {
+	return func(ctx context.Context, d *tfschema.ResourceData, meta any) diag.Diagnostics {
 		client := meta.(*APIClient)
 
 		protocol := serviceProtocols[rs.ServiceName]
@@ -161,7 +161,7 @@ func makeCreate(rs cmschema.ResourceSchema) tfschema.CreateContextFunc {
 			protocol = "json" // default to JSON
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		var err error
 
 		switch protocol {
@@ -198,7 +198,7 @@ func makeCreate(rs cmschema.ResourceSchema) tfschema.CreateContextFunc {
 
 // makeRead returns a ReadContext function for the given resource schema.
 func makeRead(rs cmschema.ResourceSchema) tfschema.ReadContextFunc {
-	return func(ctx context.Context, d *tfschema.ResourceData, meta interface{}) diag.Diagnostics {
+	return func(ctx context.Context, d *tfschema.ResourceData, meta any) diag.Diagnostics {
 		client := meta.(*APIClient)
 
 		if rs.ReadAction == "" {
@@ -211,7 +211,7 @@ func makeRead(rs cmschema.ResourceSchema) tfschema.ReadContextFunc {
 			protocol = "json"
 		}
 
-		var result map[string]interface{}
+		var result map[string]any
 		var err error
 
 		switch protocol {
@@ -248,7 +248,7 @@ func makeUpdate(rs cmschema.ResourceSchema) tfschema.UpdateContextFunc {
 		return nil // no update support — forces replacement
 	}
 
-	return func(ctx context.Context, d *tfschema.ResourceData, meta interface{}) diag.Diagnostics {
+	return func(ctx context.Context, d *tfschema.ResourceData, meta any) diag.Diagnostics {
 		client := meta.(*APIClient)
 
 		protocol := serviceProtocols[rs.ServiceName]
@@ -283,7 +283,7 @@ func makeUpdate(rs cmschema.ResourceSchema) tfschema.UpdateContextFunc {
 
 // makeDelete returns a DeleteContext function for the given resource schema.
 func makeDelete(rs cmschema.ResourceSchema) tfschema.DeleteContextFunc {
-	return func(ctx context.Context, d *tfschema.ResourceData, meta interface{}) diag.Diagnostics {
+	return func(ctx context.Context, d *tfschema.ResourceData, meta any) diag.Diagnostics {
 		client := meta.(*APIClient)
 
 		if rs.DeleteAction == "" {
@@ -327,8 +327,8 @@ func makeDelete(rs cmschema.ResourceSchema) tfschema.DeleteContextFunc {
 }
 
 // readJSONParams reads all non-computed attributes from ResourceData into a JSON-compatible map.
-func readJSONParams(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[string]interface{} {
-	params := make(map[string]interface{})
+func readJSONParams(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[string]any {
+	params := make(map[string]any)
 	for _, attr := range rs.Attributes {
 		if attr.Computed && !attr.Required {
 			continue
@@ -345,23 +345,23 @@ func readJSONParams(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[st
 }
 
 // coerceValue converts Terraform SDK types into plain Go types that can be JSON-serialized.
-func coerceValue(val interface{}) interface{} {
+func coerceValue(val any) any {
 	switch v := val.(type) {
 	case *tfschema.Set:
 		list := v.List()
-		out := make([]interface{}, len(list))
+		out := make([]any, len(list))
 		for i, item := range list {
 			out[i] = coerceValue(item)
 		}
 		return out
-	case []interface{}:
-		out := make([]interface{}, len(v))
+	case []any:
+		out := make([]any, len(v))
 		for i, item := range v {
 			out[i] = coerceValue(item)
 		}
 		return out
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(v))
+	case map[string]any:
+		out := make(map[string]any, len(v))
 		for k, item := range v {
 			out[k] = coerceValue(item)
 		}
@@ -389,8 +389,8 @@ func readQueryParams(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[s
 }
 
 // readIDParam builds a JSON params map containing only the resource identifier.
-func readIDParam(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[string]interface{} {
-	params := make(map[string]interface{})
+func readIDParam(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[string]any {
+	params := make(map[string]any)
 	if rs.ImportID != "" {
 		apiKey := snakeToPascal(rs.ImportID)
 		params[apiKey] = d.Id()
@@ -409,7 +409,7 @@ func readIDParamQuery(rs cmschema.ResourceSchema, d *tfschema.ResourceData) map[
 }
 
 // doRESTCreate handles REST-protocol create operations (S3 buckets, etc.).
-func doRESTCreate(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.ResourceData) (map[string]interface{}, error) {
+func doRESTCreate(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.ResourceData) (map[string]any, error) {
 	switch rs.ServiceName {
 	case "s3":
 		bucket := d.Get("bucket").(string)
@@ -422,7 +422,7 @@ func doRESTCreate(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.Res
 			body, _ := readResponseBody(resp)
 			return nil, fmt.Errorf("HTTP %d: %s", resp.StatusCode, body)
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"bucket": bucket,
 		}, nil
 	default:
@@ -431,7 +431,7 @@ func doRESTCreate(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.Res
 }
 
 // doRESTRead handles REST-protocol read operations.
-func doRESTRead(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.ResourceData) (map[string]interface{}, error) {
+func doRESTRead(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.ResourceData) (map[string]any, error) {
 	switch rs.ServiceName {
 	case "s3":
 		bucket := d.Id()
@@ -451,7 +451,7 @@ func doRESTRead(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.Resou
 		if region == "" {
 			region = client.region
 		}
-		return map[string]interface{}{
+		return map[string]any{
 			"bucket": bucket,
 			"region": region,
 			"arn":    fmt.Sprintf("arn:aws:s3:::%s", bucket),
@@ -485,7 +485,7 @@ func doRESTDelete(client *APIClient, rs cmschema.ResourceSchema, d *tfschema.Res
 }
 
 // extractResourceID determines the resource ID from the API response or ResourceData.
-func extractResourceID(rs cmschema.ResourceSchema, result map[string]interface{}, d *tfschema.ResourceData) string {
+func extractResourceID(rs cmschema.ResourceSchema, result map[string]any, d *tfschema.ResourceData) string {
 	// Try to get the ID from the import ID attribute in ResourceData first.
 	if rs.ImportID != "" {
 		if val, ok := d.GetOk(rs.ImportID); ok {
@@ -518,7 +518,7 @@ func extractResourceID(rs cmschema.ResourceSchema, result map[string]interface{}
 }
 
 // setComputedAttrs sets computed attribute values from the API response into ResourceData.
-func setComputedAttrs(rs cmschema.ResourceSchema, d *tfschema.ResourceData, result map[string]interface{}) {
+func setComputedAttrs(rs cmschema.ResourceSchema, d *tfschema.ResourceData, result map[string]any) {
 	for _, attr := range rs.Attributes {
 		if !attr.Computed {
 			continue

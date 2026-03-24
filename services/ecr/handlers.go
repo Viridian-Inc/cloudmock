@@ -141,7 +141,7 @@ type describeImageScanFindingsResponse struct {
 		Description string `json:"description"`
 	} `json:"imageScanStatus"`
 	ImageScanFindings struct {
-		Findings           []interface{} `json:"findings"`
+		Findings           []any `json:"findings"`
 		FindingSeverityCounts map[string]int `json:"findingSeverityCounts"`
 	} `json:"imageScanFindings"`
 }
@@ -166,7 +166,7 @@ type listTagsForResourceResponse struct {
 
 // ---- helpers ----
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -178,7 +178,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
-func parseJSON(body []byte, v interface{}) *service.AWSError {
+func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
@@ -437,7 +437,7 @@ func handleDescribeImageScanFindings(ctx *service.RequestContext, store *Store) 
 	resp.ImageId = req.ImageId
 	resp.ImageScanStatus.Status = "COMPLETE"
 	resp.ImageScanStatus.Description = "The scan was completed successfully."
-	resp.ImageScanFindings.Findings = []interface{}{}
+	resp.ImageScanFindings.Findings = []any{}
 	resp.ImageScanFindings.FindingSeverityCounts = map[string]int{}
 
 	return jsonOK(resp)

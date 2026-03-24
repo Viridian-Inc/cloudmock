@@ -27,7 +27,7 @@ func newSMGateway(t *testing.T) http.Handler {
 }
 
 // smReq builds a JSON POST request targeting the Secrets Manager service via X-Amz-Target.
-func smReq(t *testing.T, action string, body interface{}) *http.Request {
+func smReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func smReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -66,7 +66,7 @@ func TestSM_CreateAndGetSecret(t *testing.T) {
 
 	// CreateSecret
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "my-test-secret",
 		"Description":  "A test secret",
 		"SecretString": "supersecret",
@@ -131,7 +131,7 @@ func TestSM_PutSecretValue(t *testing.T) {
 
 	// Create a secret first.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "versioned-secret",
 		"SecretString": "version-one",
 	}))
@@ -158,7 +158,7 @@ func TestSM_PutSecretValue(t *testing.T) {
 		t.Error("PutSecretValue: VersionId should change after putting new value")
 	}
 
-	stages, _ := mp["VersionStages"].([]interface{})
+	stages, _ := mp["VersionStages"].([]any)
 	if len(stages) == 0 || stages[0].(string) != "AWSCURRENT" {
 		t.Errorf("PutSecretValue: expected VersionStages=[AWSCURRENT], got %v", stages)
 	}
@@ -187,7 +187,7 @@ func TestSM_DeleteSecret_ThenGetReturnsNotFound(t *testing.T) {
 
 	// Create a secret.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "doomed-secret",
 		"SecretString": "bye",
 	}))
@@ -197,7 +197,7 @@ func TestSM_DeleteSecret_ThenGetReturnsNotFound(t *testing.T) {
 
 	// Delete it.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, smReq(t, "DeleteSecret", map[string]interface{}{
+	handler.ServeHTTP(wd, smReq(t, "DeleteSecret", map[string]any{
 		"SecretId":                   "doomed-secret",
 		"ForceDeleteWithoutRecovery": true,
 	}))
@@ -238,7 +238,7 @@ func TestSM_ListSecrets(t *testing.T) {
 	names := []string{"list-secret-alpha", "list-secret-beta"}
 	for _, name := range names {
 		wc := httptest.NewRecorder()
-		handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+		handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 			"Name":         name,
 			"SecretString": "value",
 		}))
@@ -255,7 +255,7 @@ func TestSM_ListSecrets(t *testing.T) {
 	}
 
 	ml := decodeJSON(t, wl.Body.String())
-	secretList, ok := ml["SecretList"].([]interface{})
+	secretList, ok := ml["SecretList"].([]any)
 	if !ok {
 		t.Fatalf("ListSecrets: missing SecretList\nbody: %s", wl.Body.String())
 	}
@@ -265,7 +265,7 @@ func TestSM_ListSecrets(t *testing.T) {
 
 	listed := make(map[string]bool)
 	for _, item := range secretList {
-		entry := item.(map[string]interface{})
+		entry := item.(map[string]any)
 		listed[entry["Name"].(string)] = true
 	}
 	for _, name := range names {
@@ -282,7 +282,7 @@ func TestSM_DescribeSecret_WithTags(t *testing.T) {
 
 	// Create a secret with tags.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "tagged-secret",
 		"Description":  "has tags",
 		"SecretString": "value",
@@ -318,13 +318,13 @@ func TestSM_DescribeSecret_WithTags(t *testing.T) {
 	}
 
 	// Verify tags.
-	tags, ok := mdesc["Tags"].([]interface{})
+	tags, ok := mdesc["Tags"].([]any)
 	if !ok || len(tags) == 0 {
 		t.Fatalf("DescribeSecret: expected Tags in response\nbody: %s", wdesc.Body.String())
 	}
 	tagMap := make(map[string]string)
 	for _, item := range tags {
-		t := item.(map[string]interface{})
+		t := item.(map[string]any)
 		tagMap[t["Key"].(string)] = t["Value"].(string)
 	}
 	if tagMap["Env"] != "test" {
@@ -346,7 +346,7 @@ func TestSM_UpdateSecret(t *testing.T) {
 	handler := newSMGateway(t)
 
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "updatable-secret",
 		"Description":  "original desc",
 		"SecretString": "original-value",
@@ -393,7 +393,7 @@ func TestSM_RestoreSecret(t *testing.T) {
 
 	// Create then delete (without force).
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "restore-me",
 		"SecretString": "value",
 	}))
@@ -402,7 +402,7 @@ func TestSM_RestoreSecret(t *testing.T) {
 	}
 
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, smReq(t, "DeleteSecret", map[string]interface{}{
+	handler.ServeHTTP(wd, smReq(t, "DeleteSecret", map[string]any{
 		"SecretId":                   "restore-me",
 		"ForceDeleteWithoutRecovery": false,
 	}))
@@ -440,7 +440,7 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 
 	// Create secret.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]interface{}{
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
 		"Name":         "tag-test-secret",
 		"SecretString": "value",
 	}))
@@ -450,7 +450,7 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 
 	// TagResource.
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, smReq(t, "TagResource", map[string]interface{}{
+	handler.ServeHTTP(wt, smReq(t, "TagResource", map[string]any{
 		"SecretId": "tag-test-secret",
 		"Tags": []map[string]string{
 			{"Key": "Color", "Value": "blue"},
@@ -466,10 +466,10 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 		"SecretId": "tag-test-secret",
 	}))
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	tags, _ := mdesc["Tags"].([]interface{})
+	tags, _ := mdesc["Tags"].([]any)
 	tagMap := make(map[string]string)
 	for _, item := range tags {
-		tag := item.(map[string]interface{})
+		tag := item.(map[string]any)
 		tagMap[tag["Key"].(string)] = tag["Value"].(string)
 	}
 	if tagMap["Color"] != "blue" {
@@ -478,7 +478,7 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 
 	// UntagResource.
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, smReq(t, "UntagResource", map[string]interface{}{
+	handler.ServeHTTP(wu, smReq(t, "UntagResource", map[string]any{
 		"SecretId": "tag-test-secret",
 		"TagKeys":  []string{"Color"},
 	}))
@@ -492,10 +492,10 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 		"SecretId": "tag-test-secret",
 	}))
 	mdesc2 := decodeJSON(t, wdesc2.Body.String())
-	tags2, _ := mdesc2["Tags"].([]interface{})
+	tags2, _ := mdesc2["Tags"].([]any)
 	tagMap2 := make(map[string]string)
 	for _, item := range tags2 {
-		tag := item.(map[string]interface{})
+		tag := item.(map[string]any)
 		tagMap2[tag["Key"].(string)] = tag["Value"].(string)
 	}
 	if _, found := tagMap2["Color"]; found {

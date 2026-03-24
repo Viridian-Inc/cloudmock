@@ -69,20 +69,20 @@ func buildS3EventNotification(eventName, bucket, key string, size int64, etag, a
 	// Map internal event type to AWS event name.
 	awsEventName := strings.Replace(eventName, ":", ":", -1) // already correct format
 
-	record := map[string]interface{}{
+	record := map[string]any{
 		"eventVersion": "2.1",
 		"eventSource":  "aws:s3",
 		"awsRegion":    region,
 		"eventTime":    eventTime.Format(time.RFC3339),
 		"eventName":    awsEventName,
-		"s3": map[string]interface{}{
+		"s3": map[string]any{
 			"s3SchemaVersion": "1.0",
-			"bucket": map[string]interface{}{
+			"bucket": map[string]any{
 				"name":          bucket,
 				"ownerIdentity": map[string]string{"principalId": accountID},
 				"arn":           fmt.Sprintf("arn:aws:s3:::%s", bucket),
 			},
-			"object": map[string]interface{}{
+			"object": map[string]any{
 				"key":  key,
 				"size": size,
 				"eTag": etag,
@@ -90,8 +90,8 @@ func buildS3EventNotification(eventName, bucket, key string, size int64, etag, a
 		},
 	}
 
-	envelope := map[string]interface{}{
-		"Records": []interface{}{record},
+	envelope := map[string]any{
+		"Records": []any{record},
 	}
 
 	data, _ := json.Marshal(envelope)

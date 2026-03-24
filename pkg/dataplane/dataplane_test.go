@@ -91,7 +91,7 @@ func runParityTests(t *testing.T, dp *dataplane.DataPlane) {
 	t.Run("ViewsCRUD", func(t *testing.T) {
 		view := dataplane.SavedView{
 			ID: "test-view", Name: "Test View",
-			Filters:   map[string]interface{}{"service": "bff"},
+			Filters:   map[string]any{"service": "bff"},
 			CreatedBy: "test",
 		}
 		err := dp.Config.SaveView(ctx, view)

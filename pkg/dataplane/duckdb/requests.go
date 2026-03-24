@@ -80,7 +80,7 @@ func (s *RequestStore) Write(ctx context.Context, entry dataplane.RequestEntry) 
 func (s *RequestStore) Query(ctx context.Context, filter dataplane.RequestFilter) ([]dataplane.RequestEntry, error) {
 	var (
 		where []string
-		args  []interface{}
+		args  []any
 	)
 
 	if filter.Service != "" {

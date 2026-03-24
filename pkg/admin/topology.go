@@ -276,7 +276,7 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		}
 		// Use a more flexible type assertion
 		if lsvc, ok := svc.(interface {
-			GetEventSourceMappings() interface{}
+			GetEventSourceMappings() any
 		}); ok {
 			_ = lsvc
 		}

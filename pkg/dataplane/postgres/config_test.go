@@ -124,7 +124,7 @@ func TestConfigStore_Views(t *testing.T) {
 	// Save a view.
 	require.NoError(t, store.SaveView(ctx, dataplane.SavedView{
 		ID: "v1", Name: "Errors", CreatedBy: "alice",
-		Filters:   map[string]interface{}{"status": "error"},
+		Filters:   map[string]any{"status": "error"},
 		CreatedAt: time.Now(),
 	}))
 
@@ -137,7 +137,7 @@ func TestConfigStore_Views(t *testing.T) {
 	// Update existing view.
 	require.NoError(t, store.SaveView(ctx, dataplane.SavedView{
 		ID: "v1", Name: "All Errors", CreatedBy: "alice",
-		Filters:   map[string]interface{}{"status": "error"},
+		Filters:   map[string]any{"status": "error"},
 		CreatedAt: time.Now(),
 	}))
 	views, err = store.ListViews(ctx)

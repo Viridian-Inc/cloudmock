@@ -63,7 +63,7 @@ func providerSchema() map[string]*schema.Schema {
 
 // configureProvider reads the provider configuration and returns an API client
 // that resources use to communicate with the cloudmock gateway.
-func configureProvider(_ context.Context, d *schema.ResourceData) (interface{}, diag.Diagnostics) {
+func configureProvider(_ context.Context, d *schema.ResourceData) (any, diag.Diagnostics) {
 	endpoint := d.Get("endpoint").(string)
 	region := d.Get("region").(string)
 	accessKey := d.Get("access_key").(string)

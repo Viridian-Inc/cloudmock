@@ -12,7 +12,7 @@ import (
 // WebhookDispatcher is the interface used by the incident service to fire
 // outbound webhooks. It matches *webhook.Dispatcher.
 type WebhookDispatcher interface {
-	Fire(ctx context.Context, event string, payload interface{}) error
+	Fire(ctx context.Context, event string, payload any) error
 }
 
 // Service correlates regressions and SLO breaches into grouped incidents.

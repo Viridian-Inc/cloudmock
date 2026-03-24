@@ -95,7 +95,7 @@ func TestLogAndQuery(t *testing.T) {
 		Actor:    "alice",
 		Action:   "deploy.created",
 		Resource: "deploy:d1",
-		Details:  map[string]interface{}{"version": "v1.2.3"},
+		Details:  map[string]any{"version": "v1.2.3"},
 	}))
 	require.NoError(t, l.Log(ctx, audit.Entry{
 		Actor:    "bob",

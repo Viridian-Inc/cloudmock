@@ -73,7 +73,7 @@ func runApply(args []string, endpoint, region, accessKey, secretKey string, reg 
 			continue
 		}
 
-		var manifest map[string]interface{}
+		var manifest map[string]any
 		if err := yaml.Unmarshal(doc, &manifest); err != nil {
 			log.Fatalf("parsing document %d: %v", i, err)
 		}
@@ -233,8 +233,8 @@ func splitYAMLDocs(data []byte) [][]byte {
 }
 
 // metadataName extracts .metadata.name from a manifest map.
-func metadataName(manifest map[string]interface{}) string {
-	if meta, ok := manifest["metadata"].(map[string]interface{}); ok {
+func metadataName(manifest map[string]any) string {
+	if meta, ok := manifest["metadata"].(map[string]any); ok {
 		if name, ok := meta["name"].(string); ok {
 			return name
 		}
@@ -243,12 +243,12 @@ func metadataName(manifest map[string]interface{}) string {
 }
 
 // extractForProvider extracts .spec.forProvider from a manifest map.
-func extractForProvider(manifest map[string]interface{}) map[string]interface{} {
-	spec, ok := manifest["spec"].(map[string]interface{})
+func extractForProvider(manifest map[string]any) map[string]any {
+	spec, ok := manifest["spec"].(map[string]any)
 	if !ok {
 		return nil
 	}
-	fp, ok := spec["forProvider"].(map[string]interface{})
+	fp, ok := spec["forProvider"].(map[string]any)
 	if !ok {
 		return nil
 	}

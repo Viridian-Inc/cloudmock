@@ -186,12 +186,12 @@ func cmdReset(adminAddr string, args []string) {
 	}
 
 	body, _ := io.ReadAll(resp.Body)
-	var result map[string]interface{}
+	var result map[string]any
 	if json.Unmarshal(body, &result) == nil {
 		if *svcName != "" {
 			fmt.Printf("Reset service: %s\n", *svcName)
 		} else {
-			svcs, _ := result["services"].([]interface{})
+			svcs, _ := result["services"].([]any)
 			names := make([]string, 0, len(svcs))
 			for _, s := range svcs {
 				if name, ok := s.(string); ok {
@@ -246,7 +246,7 @@ func cmdConfig(adminAddr string) {
 	}
 	defer resp.Body.Close()
 
-	var cfg map[string]interface{}
+	var cfg map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&cfg); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: failed to decode response: %v\n", err)
 		os.Exit(1)

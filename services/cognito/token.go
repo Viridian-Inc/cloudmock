@@ -11,7 +11,7 @@ import (
 )
 
 // signJWT creates a real RS256-signed JWT from the given claims using the KeyStore.
-func signJWT(ks *KeyStore, claims map[string]interface{}) (string, error) {
+func signJWT(ks *KeyStore, claims map[string]any) (string, error) {
 	header := map[string]string{
 		"alg": "RS256",
 		"kid": ks.KID(),

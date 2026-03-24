@@ -27,7 +27,7 @@ func newCognitoGateway(t *testing.T) http.Handler {
 }
 
 // cognitoReq builds a JSON POST request targeting the Cognito User Pools service via X-Amz-Target.
-func cognitoReq(t *testing.T, action string, body interface{}) *http.Request {
+func cognitoReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -51,9 +51,9 @@ func cognitoReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -67,7 +67,7 @@ func TestCognito_UserPool_CreateListDescribe(t *testing.T) {
 
 	// CreateUserPool
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wc, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "my-test-pool",
 	}))
 	if wc.Code != http.StatusOK {
@@ -75,7 +75,7 @@ func TestCognito_UserPool_CreateListDescribe(t *testing.T) {
 	}
 
 	mc := decodeJSON(t, wc.Body.String())
-	pool, ok := mc["UserPool"].(map[string]interface{})
+	pool, ok := mc["UserPool"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateUserPool: missing UserPool in response\nbody: %s", wc.Body.String())
 	}
@@ -93,20 +93,20 @@ func TestCognito_UserPool_CreateListDescribe(t *testing.T) {
 
 	// ListUserPools
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, cognitoReq(t, "ListUserPools", map[string]interface{}{
+	handler.ServeHTTP(wl, cognitoReq(t, "ListUserPools", map[string]any{
 		"MaxResults": 10,
 	}))
 	if wl.Code != http.StatusOK {
 		t.Fatalf("ListUserPools: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	pools, ok := ml["UserPools"].([]interface{})
+	pools, ok := ml["UserPools"].([]any)
 	if !ok || len(pools) == 0 {
 		t.Fatalf("ListUserPools: expected non-empty UserPools\nbody: %s", wl.Body.String())
 	}
 	found := false
 	for _, p := range pools {
-		entry := p.(map[string]interface{})
+		entry := p.(map[string]any)
 		if entry["Id"].(string) == poolID {
 			found = true
 			break
@@ -118,14 +118,14 @@ func TestCognito_UserPool_CreateListDescribe(t *testing.T) {
 
 	// DescribeUserPool
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, cognitoReq(t, "DescribeUserPool", map[string]interface{}{
+	handler.ServeHTTP(wd, cognitoReq(t, "DescribeUserPool", map[string]any{
 		"UserPoolId": poolID,
 	}))
 	if wd.Code != http.StatusOK {
 		t.Fatalf("DescribeUserPool: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
 	}
 	md := decodeJSON(t, wd.Body.String())
-	poolDesc, ok := md["UserPool"].(map[string]interface{})
+	poolDesc, ok := md["UserPool"].(map[string]any)
 	if !ok {
 		t.Fatalf("DescribeUserPool: missing UserPool in response\nbody: %s", wd.Body.String())
 	}
@@ -144,18 +144,18 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 
 	// Create pool.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "client-test-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
 	mcp := decodeJSON(t, wcp.Body.String())
-	poolID := mcp["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := mcp["UserPool"].(map[string]any)["Id"].(string)
 
 	// CreateUserPoolClient without secret.
 	wcc := httptest.NewRecorder()
-	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
 		"UserPoolId": poolID,
 		"ClientName": "my-app-client",
 		"ExplicitAuthFlows": []string{"ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"},
@@ -164,7 +164,7 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 		t.Fatalf("CreateUserPoolClient: expected 200, got %d\nbody: %s", wcc.Code, wcc.Body.String())
 	}
 	mcc := decodeJSON(t, wcc.Body.String())
-	clientObj, ok := mcc["UserPoolClient"].(map[string]interface{})
+	clientObj, ok := mcc["UserPoolClient"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateUserPoolClient: missing UserPoolClient in response\nbody: %s", wcc.Body.String())
 	}
@@ -181,7 +181,7 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 
 	// CreateUserPoolClient with secret.
 	wccs := httptest.NewRecorder()
-	handler.ServeHTTP(wccs, cognitoReq(t, "CreateUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(wccs, cognitoReq(t, "CreateUserPoolClient", map[string]any{
 		"UserPoolId":     poolID,
 		"ClientName":     "secret-client",
 		"GenerateSecret": true,
@@ -190,7 +190,7 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 		t.Fatalf("CreateUserPoolClient with secret: expected 200, got %d\nbody: %s", wccs.Code, wccs.Body.String())
 	}
 	mccs := decodeJSON(t, wccs.Body.String())
-	secretClient := mccs["UserPoolClient"].(map[string]interface{})
+	secretClient := mccs["UserPoolClient"].(map[string]any)
 	secretVal, _ := secretClient["ClientSecret"].(string)
 	if secretVal == "" {
 		t.Error("CreateUserPoolClient with secret: expected non-empty ClientSecret")
@@ -198,7 +198,7 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 
 	// DescribeUserPoolClient
 	wdc := httptest.NewRecorder()
-	handler.ServeHTTP(wdc, cognitoReq(t, "DescribeUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(wdc, cognitoReq(t, "DescribeUserPoolClient", map[string]any{
 		"UserPoolId": poolID,
 		"ClientId":   clientID,
 	}))
@@ -206,7 +206,7 @@ func TestCognito_UserPoolClient_CreateDescribe(t *testing.T) {
 		t.Fatalf("DescribeUserPoolClient: expected 200, got %d\nbody: %s", wdc.Code, wdc.Body.String())
 	}
 	mdc := decodeJSON(t, wdc.Body.String())
-	clientDesc := mdc["UserPoolClient"].(map[string]interface{})
+	clientDesc := mdc["UserPoolClient"].(map[string]any)
 	if clientDesc["ClientId"].(string) != clientID {
 		t.Errorf("DescribeUserPoolClient: expected ClientId=%q, got %q", clientID, clientDesc["ClientId"])
 	}
@@ -219,18 +219,18 @@ func TestCognito_AdminCreateAndGetUser(t *testing.T) {
 
 	// Create pool.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "user-test-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
 	mcp := decodeJSON(t, wcp.Body.String())
-	poolID := mcp["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := mcp["UserPool"].(map[string]any)["Id"].(string)
 
 	// AdminCreateUser
 	wcu := httptest.NewRecorder()
-	handler.ServeHTTP(wcu, cognitoReq(t, "AdminCreateUser", map[string]interface{}{
+	handler.ServeHTTP(wcu, cognitoReq(t, "AdminCreateUser", map[string]any{
 		"UserPoolId":        poolID,
 		"Username":          "testuser@example.com",
 		"TemporaryPassword": "TempPass123!",
@@ -242,7 +242,7 @@ func TestCognito_AdminCreateAndGetUser(t *testing.T) {
 		t.Fatalf("AdminCreateUser: expected 200, got %d\nbody: %s", wcu.Code, wcu.Body.String())
 	}
 	mcu := decodeJSON(t, wcu.Body.String())
-	user, ok := mcu["User"].(map[string]interface{})
+	user, ok := mcu["User"].(map[string]any)
 	if !ok {
 		t.Fatalf("AdminCreateUser: missing User in response\nbody: %s", wcu.Body.String())
 	}
@@ -257,10 +257,10 @@ func TestCognito_AdminCreateAndGetUser(t *testing.T) {
 	}
 
 	// Check attributes contain sub.
-	attrs, _ := user["Attributes"].([]interface{})
+	attrs, _ := user["Attributes"].([]any)
 	attrMap := make(map[string]string)
 	for _, a := range attrs {
-		entry := a.(map[string]interface{})
+		entry := a.(map[string]any)
 		attrMap[entry["Name"].(string)] = entry["Value"].(string)
 	}
 	if attrMap["sub"] == "" {
@@ -272,7 +272,7 @@ func TestCognito_AdminCreateAndGetUser(t *testing.T) {
 
 	// AdminGetUser
 	wgu := httptest.NewRecorder()
-	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]interface{}{
+	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "testuser@example.com",
 	}))
@@ -286,7 +286,7 @@ func TestCognito_AdminCreateAndGetUser(t *testing.T) {
 
 	// AdminGetUser — not found.
 	wguf := httptest.NewRecorder()
-	handler.ServeHTTP(wguf, cognitoReq(t, "AdminGetUser", map[string]interface{}{
+	handler.ServeHTTP(wguf, cognitoReq(t, "AdminGetUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "nobody@example.com",
 	}))
@@ -302,18 +302,18 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 
 	// Create pool.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "auth-test-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
 	mcp := decodeJSON(t, wcp.Body.String())
-	poolID := mcp["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := mcp["UserPool"].(map[string]any)["Id"].(string)
 
 	// Create client.
 	wcc := httptest.NewRecorder()
-	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
 		"UserPoolId": poolID,
 		"ClientName": "auth-client",
 	}))
@@ -321,11 +321,11 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 		t.Fatalf("setup CreateUserPoolClient: %d %s", wcc.Code, wcc.Body.String())
 	}
 	mcc := decodeJSON(t, wcc.Body.String())
-	clientID := mcc["UserPoolClient"].(map[string]interface{})["ClientId"].(string)
+	clientID := mcc["UserPoolClient"].(map[string]any)["ClientId"].(string)
 
 	// SignUp
 	wsu := httptest.NewRecorder()
-	handler.ServeHTTP(wsu, cognitoReq(t, "SignUp", map[string]interface{}{
+	handler.ServeHTTP(wsu, cognitoReq(t, "SignUp", map[string]any{
 		"ClientId": clientID,
 		"Username": "newuser@example.com",
 		"Password": "NewPass123!",
@@ -347,7 +347,7 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 
 	// Confirm user via AdminConfirmSignUp before auth.
 	wconf := httptest.NewRecorder()
-	handler.ServeHTTP(wconf, cognitoReq(t, "AdminConfirmSignUp", map[string]interface{}{
+	handler.ServeHTTP(wconf, cognitoReq(t, "AdminConfirmSignUp", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "newuser@example.com",
 	}))
@@ -357,7 +357,7 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 
 	// InitiateAuth — USER_PASSWORD_AUTH
 	wia := httptest.NewRecorder()
-	handler.ServeHTTP(wia, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(wia, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -369,7 +369,7 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 		t.Fatalf("InitiateAuth: expected 200, got %d\nbody: %s", wia.Code, wia.Body.String())
 	}
 	mia := decodeJSON(t, wia.Body.String())
-	authResult, ok := mia["AuthenticationResult"].(map[string]interface{})
+	authResult, ok := mia["AuthenticationResult"].(map[string]any)
 	if !ok {
 		t.Fatalf("InitiateAuth: missing AuthenticationResult\nbody: %s", wia.Body.String())
 	}
@@ -397,7 +397,7 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 
 	// InitiateAuth — wrong password
 	wiaf := httptest.NewRecorder()
-	handler.ServeHTTP(wiaf, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(wiaf, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -411,7 +411,7 @@ func TestCognito_SignUpAndInitiateAuth(t *testing.T) {
 
 	// InitiateAuth — unsupported auth flow
 	wiainv := httptest.NewRecorder()
-	handler.ServeHTTP(wiainv, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(wiainv, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "CUSTOM_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -431,17 +431,17 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 
 	// Create pool and client.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "confirm-test-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
 	mcp := decodeJSON(t, wcp.Body.String())
-	poolID := mcp["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := mcp["UserPool"].(map[string]any)["Id"].(string)
 
 	wcc := httptest.NewRecorder()
-	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
 		"UserPoolId": poolID,
 		"ClientName": "confirm-client",
 	}))
@@ -449,11 +449,11 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 		t.Fatalf("setup CreateUserPoolClient: %d %s", wcc.Code, wcc.Body.String())
 	}
 	mcc := decodeJSON(t, wcc.Body.String())
-	clientID := mcc["UserPoolClient"].(map[string]interface{})["ClientId"].(string)
+	clientID := mcc["UserPoolClient"].(map[string]any)["ClientId"].(string)
 
 	// SignUp user.
 	wsu := httptest.NewRecorder()
-	handler.ServeHTTP(wsu, cognitoReq(t, "SignUp", map[string]interface{}{
+	handler.ServeHTTP(wsu, cognitoReq(t, "SignUp", map[string]any{
 		"ClientId": clientID,
 		"Username": "confirm-me@example.com",
 		"Password": "Pass123!",
@@ -464,7 +464,7 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 
 	// Attempt InitiateAuth before confirmation — should fail with UserNotConfirmedException.
 	wiaPre := httptest.NewRecorder()
-	handler.ServeHTTP(wiaPre, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(wiaPre, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -478,7 +478,7 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 
 	// AdminConfirmSignUp.
 	wconf := httptest.NewRecorder()
-	handler.ServeHTTP(wconf, cognitoReq(t, "AdminConfirmSignUp", map[string]interface{}{
+	handler.ServeHTTP(wconf, cognitoReq(t, "AdminConfirmSignUp", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "confirm-me@example.com",
 	}))
@@ -488,7 +488,7 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 
 	// Verify status via AdminGetUser.
 	wgu := httptest.NewRecorder()
-	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]interface{}{
+	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "confirm-me@example.com",
 	}))
@@ -502,7 +502,7 @@ func TestCognito_AdminConfirmSignUp(t *testing.T) {
 
 	// Now InitiateAuth should succeed.
 	wia := httptest.NewRecorder()
-	handler.ServeHTTP(wia, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(wia, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -522,18 +522,18 @@ func TestCognito_DeleteUserPool(t *testing.T) {
 
 	// Create pool.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "delete-test-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
 	mcp := decodeJSON(t, wcp.Body.String())
-	poolID := mcp["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := mcp["UserPool"].(map[string]any)["Id"].(string)
 
 	// Verify it exists.
 	wdesc := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc, cognitoReq(t, "DescribeUserPool", map[string]interface{}{
+	handler.ServeHTTP(wdesc, cognitoReq(t, "DescribeUserPool", map[string]any{
 		"UserPoolId": poolID,
 	}))
 	if wdesc.Code != http.StatusOK {
@@ -542,7 +542,7 @@ func TestCognito_DeleteUserPool(t *testing.T) {
 
 	// Delete pool.
 	wdel := httptest.NewRecorder()
-	handler.ServeHTTP(wdel, cognitoReq(t, "DeleteUserPool", map[string]interface{}{
+	handler.ServeHTTP(wdel, cognitoReq(t, "DeleteUserPool", map[string]any{
 		"UserPoolId": poolID,
 	}))
 	if wdel.Code != http.StatusOK {
@@ -551,7 +551,7 @@ func TestCognito_DeleteUserPool(t *testing.T) {
 
 	// Verify it's gone.
 	wafter := httptest.NewRecorder()
-	handler.ServeHTTP(wafter, cognitoReq(t, "DescribeUserPool", map[string]interface{}{
+	handler.ServeHTTP(wafter, cognitoReq(t, "DescribeUserPool", map[string]any{
 		"UserPoolId": poolID,
 	}))
 	if wafter.Code != http.StatusBadRequest {
@@ -560,7 +560,7 @@ func TestCognito_DeleteUserPool(t *testing.T) {
 
 	// Delete again — should fail.
 	wdel2 := httptest.NewRecorder()
-	handler.ServeHTTP(wdel2, cognitoReq(t, "DeleteUserPool", map[string]interface{}{
+	handler.ServeHTTP(wdel2, cognitoReq(t, "DeleteUserPool", map[string]any{
 		"UserPoolId": poolID,
 	}))
 	if wdel2.Code != http.StatusBadRequest {
@@ -575,16 +575,16 @@ func TestCognito_AdminDeleteUser(t *testing.T) {
 
 	// Setup pool + user.
 	wcp := httptest.NewRecorder()
-	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "del-user-pool",
 	}))
 	if wcp.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
 	}
-	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
 
 	wcu := httptest.NewRecorder()
-	handler.ServeHTTP(wcu, cognitoReq(t, "AdminCreateUser", map[string]interface{}{
+	handler.ServeHTTP(wcu, cognitoReq(t, "AdminCreateUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "to-delete@example.com",
 	}))
@@ -594,7 +594,7 @@ func TestCognito_AdminDeleteUser(t *testing.T) {
 
 	// Delete user.
 	wdu := httptest.NewRecorder()
-	handler.ServeHTTP(wdu, cognitoReq(t, "AdminDeleteUser", map[string]interface{}{
+	handler.ServeHTTP(wdu, cognitoReq(t, "AdminDeleteUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "to-delete@example.com",
 	}))
@@ -604,7 +604,7 @@ func TestCognito_AdminDeleteUser(t *testing.T) {
 
 	// Verify user is gone.
 	wgu := httptest.NewRecorder()
-	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]interface{}{
+	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "to-delete@example.com",
 	}))

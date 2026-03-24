@@ -18,7 +18,7 @@ import (
 // promResponse is a minimal Prometheus HTTP API envelope.
 type promResponse struct {
 	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Data   any `json:"data"`
 }
 
 // vectorData matches the Prometheus instant-query response shape for a vector.
@@ -29,7 +29,7 @@ type vectorData struct {
 
 type vectorSample struct {
 	Metric map[string]string `json:"metric"`
-	Value  [2]interface{}    `json:"value"` // [unixTimestamp, "value"]
+	Value  [2]any    `json:"value"` // [unixTimestamp, "value"]
 }
 
 // buildMockServer creates an httptest.Server that replies to every
@@ -51,7 +51,7 @@ func buildMockServer(t *testing.T, values []float64) *httptest.Server {
 				Result: []vectorSample{
 					{
 						Metric: map[string]string{},
-						Value:  [2]interface{}{ts, formatFloat(v)},
+						Value:  [2]any{ts, formatFloat(v)},
 					},
 				},
 			},

@@ -327,7 +327,7 @@ var _ResourceProvider_serviceDesc = grpc.ServiceDesc{
 
 // ── gRPC method handlers ────────────────────────────────────────────────────
 
-func _ResourceProvider_GetSchema_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_GetSchema_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(GetSchemaRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -336,13 +336,13 @@ func _ResourceProvider_GetSchema_Handler(srv interface{}, ctx context.Context, d
 		return srv.(ResourceProviderServer).GetSchema(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/GetSchema"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).GetSchema(ctx, req.(*GetSchemaRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_CheckConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_CheckConfig_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -351,13 +351,13 @@ func _ResourceProvider_CheckConfig_Handler(srv interface{}, ctx context.Context,
 		return srv.(ResourceProviderServer).CheckConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/CheckConfig"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).CheckConfig(ctx, req.(*CheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_DiffConfig_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_DiffConfig_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DiffRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -366,13 +366,13 @@ func _ResourceProvider_DiffConfig_Handler(srv interface{}, ctx context.Context, 
 		return srv.(ResourceProviderServer).DiffConfig(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/DiffConfig"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).DiffConfig(ctx, req.(*DiffRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Configure_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Configure_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ConfigureRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -381,13 +381,13 @@ func _ResourceProvider_Configure_Handler(srv interface{}, ctx context.Context, d
 		return srv.(ResourceProviderServer).Configure(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Configure"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Configure(ctx, req.(*ConfigureRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Invoke_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Invoke_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(InvokeRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -396,13 +396,13 @@ func _ResourceProvider_Invoke_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Invoke(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Invoke"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Invoke(ctx, req.(*InvokeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_StreamInvoke_Handler(srv interface{}, stream grpc.ServerStream) error {
+func _ResourceProvider_StreamInvoke_Handler(srv any, stream grpc.ServerStream) error {
 	m := new(InvokeRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
@@ -410,7 +410,7 @@ func _ResourceProvider_StreamInvoke_Handler(srv interface{}, stream grpc.ServerS
 	return srv.(ResourceProviderServer).StreamInvoke(m, &resourceProviderStreamInvokeServer{stream})
 }
 
-func _ResourceProvider_Call_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Call_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CallRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -419,13 +419,13 @@ func _ResourceProvider_Call_Handler(srv interface{}, ctx context.Context, dec fu
 		return srv.(ResourceProviderServer).Call(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Call"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Call(ctx, req.(*CallRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Check_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Check_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CheckRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -434,13 +434,13 @@ func _ResourceProvider_Check_Handler(srv interface{}, ctx context.Context, dec f
 		return srv.(ResourceProviderServer).Check(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Check"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Check(ctx, req.(*CheckRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Diff_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Diff_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DiffRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -449,13 +449,13 @@ func _ResourceProvider_Diff_Handler(srv interface{}, ctx context.Context, dec fu
 		return srv.(ResourceProviderServer).Diff(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Diff"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Diff(ctx, req.(*DiffRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Create_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Create_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(CreateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -464,13 +464,13 @@ func _ResourceProvider_Create_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Create(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Create"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Create(ctx, req.(*CreateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Read_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Read_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ReadRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -479,13 +479,13 @@ func _ResourceProvider_Read_Handler(srv interface{}, ctx context.Context, dec fu
 		return srv.(ResourceProviderServer).Read(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Read"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Read(ctx, req.(*ReadRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Update_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Update_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(UpdateRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -494,13 +494,13 @@ func _ResourceProvider_Update_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Update(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Update"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Update(ctx, req.(*UpdateRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Delete_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Delete_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(DeleteRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -509,13 +509,13 @@ func _ResourceProvider_Delete_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Delete(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Delete"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Delete(ctx, req.(*DeleteRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Construct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Construct_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(ConstructRequest)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -524,13 +524,13 @@ func _ResourceProvider_Construct_Handler(srv interface{}, ctx context.Context, d
 		return srv.(ResourceProviderServer).Construct(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Construct"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Construct(ctx, req.(*ConstructRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Cancel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Cancel_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -539,13 +539,13 @@ func _ResourceProvider_Cancel_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Cancel(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Cancel"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Cancel(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_GetPluginInfo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_GetPluginInfo_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -554,13 +554,13 @@ func _ResourceProvider_GetPluginInfo_Handler(srv interface{}, ctx context.Contex
 		return srv.(ResourceProviderServer).GetPluginInfo(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/GetPluginInfo"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).GetPluginInfo(ctx, req.(*emptypb.Empty))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ResourceProvider_Attach_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _ResourceProvider_Attach_Handler(srv any, ctx context.Context, dec func(any) error, interceptor grpc.UnaryServerInterceptor) (any, error) {
 	in := new(PluginAttach)
 	if err := dec(in); err != nil {
 		return nil, err
@@ -569,7 +569,7 @@ func _ResourceProvider_Attach_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(ResourceProviderServer).Attach(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{Server: srv, FullMethod: "/pulumirpc.ResourceProvider/Attach"}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+	handler := func(ctx context.Context, req any) (any, error) {
 		return srv.(ResourceProviderServer).Attach(ctx, req.(*PluginAttach))
 	}
 	return interceptor(ctx, in, info, handler)

@@ -292,7 +292,7 @@ func (p *CloudmockProvider) Update(ctx context.Context, req *UpdateRequest) (*Up
 		return nil, status.Errorf(codes.Internal, "%s", err)
 	}
 
-	outputs := make(map[string]interface{})
+	outputs := make(map[string]any)
 	for k, v := range inputs {
 		outputs[k] = v
 	}
@@ -434,11 +434,11 @@ func extractTypeToken(urn string) string {
 }
 
 // structToMap converts a protobuf Struct to a plain Go map.
-func structToMap(s *structpb.Struct) map[string]interface{} {
+func structToMap(s *structpb.Struct) map[string]any {
 	if s == nil {
-		return make(map[string]interface{})
+		return make(map[string]any)
 	}
-	result := make(map[string]interface{})
+	result := make(map[string]any)
 	for k, v := range s.Fields {
 		result[k] = valueToInterface(v)
 	}
@@ -446,7 +446,7 @@ func structToMap(s *structpb.Struct) map[string]interface{} {
 }
 
 // valueToInterface converts a protobuf Value to a plain Go value.
-func valueToInterface(v *structpb.Value) interface{} {
+func valueToInterface(v *structpb.Value) any {
 	if v == nil {
 		return nil
 	}
@@ -462,7 +462,7 @@ func valueToInterface(v *structpb.Value) interface{} {
 	case *structpb.Value_StructValue:
 		return structToMap(kind.StructValue)
 	case *structpb.Value_ListValue:
-		items := make([]interface{}, len(kind.ListValue.Values))
+		items := make([]any, len(kind.ListValue.Values))
 		for i, item := range kind.ListValue.Values {
 			items[i] = valueToInterface(item)
 		}

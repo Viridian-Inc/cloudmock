@@ -17,7 +17,7 @@ const (
 // Response holds the components of an HTTP response before it is written.
 type Response struct {
 	StatusCode     int
-	Body           interface{}
+	Body           any
 	Format         ResponseFormat
 	Headers        map[string]string
 	RawBody        []byte // if set, write these bytes directly instead of marshaling Body
@@ -25,7 +25,7 @@ type Response struct {
 }
 
 // WriteXMLResponse marshals body as XML and writes it with Content-Type text/xml.
-func WriteXMLResponse(w http.ResponseWriter, statusCode int, body interface{}) error {
+func WriteXMLResponse(w http.ResponseWriter, statusCode int, body any) error {
 	data, err := xml.Marshal(body)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func WriteXMLResponse(w http.ResponseWriter, statusCode int, body interface{}) e
 }
 
 // WriteJSONResponse marshals body as JSON and writes it with Content-Type application/x-amz-json-1.1.
-func WriteJSONResponse(w http.ResponseWriter, statusCode int, body interface{}) error {
+func WriteJSONResponse(w http.ResponseWriter, statusCode int, body any) error {
 	data, err := json.Marshal(body)
 	if err != nil {
 		return err

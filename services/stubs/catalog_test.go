@@ -87,11 +87,11 @@ func TestRegisterAll(t *testing.T) {
 	assert.Equal(t, 73, len(services), "expected 73 services registered")
 }
 
-func decodeBody(t *testing.T, resp *service.Response) map[string]interface{} {
+func decodeBody(t *testing.T, resp *service.Response) map[string]any {
 	t.Helper()
 	b, err := json.Marshal(resp.Body)
 	require.NoError(t, err)
-	var m map[string]interface{}
+	var m map[string]any
 	require.NoError(t, json.Unmarshal(b, &m))
 	return m
 }

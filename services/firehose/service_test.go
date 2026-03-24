@@ -27,7 +27,7 @@ func newFirehoseGateway(t *testing.T) http.Handler {
 }
 
 // firehoseReq builds a JSON POST request targeting the Firehose service via X-Amz-Target.
-func firehoseReq(t *testing.T, action string, body interface{}) *http.Request {
+func firehoseReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func firehoseReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -66,14 +66,14 @@ func TestFirehose_CreateDescribeList(t *testing.T) {
 
 	// CreateDeliveryStream
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, firehoseReq(t, "CreateDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wCreate, firehoseReq(t, "CreateDeliveryStream", map[string]any{
 		"DeliveryStreamName": "my-stream",
 		"DeliveryStreamType": "DirectPut",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::my-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/firehose-role",
 			"Prefix":    "data/",
-			"BufferingHints": map[string]interface{}{
+			"BufferingHints": map[string]any{
 				"IntervalInSeconds": 60,
 				"SizeInMBs":         5,
 			},
@@ -102,7 +102,7 @@ func TestFirehose_CreateDescribeList(t *testing.T) {
 	}
 
 	mDesc := decodeJSON(t, wDesc.Body.String())
-	desc, ok := mDesc["DeliveryStreamDescription"].(map[string]interface{})
+	desc, ok := mDesc["DeliveryStreamDescription"].(map[string]any)
 	if !ok {
 		t.Fatalf("DescribeDeliveryStream: missing DeliveryStreamDescription\nbody: %s", wDesc.Body.String())
 	}
@@ -115,15 +115,15 @@ func TestFirehose_CreateDescribeList(t *testing.T) {
 	if desc["DeliveryStreamARN"] != arn {
 		t.Errorf("DescribeDeliveryStream: ARN mismatch: got %q, want %q", desc["DeliveryStreamARN"], arn)
 	}
-	dests, _ := desc["Destinations"].([]interface{})
+	dests, _ := desc["Destinations"].([]any)
 	if len(dests) != 1 {
 		t.Errorf("DescribeDeliveryStream: expected 1 destination, got %d", len(dests))
 	} else {
-		d := dests[0].(map[string]interface{})
+		d := dests[0].(map[string]any)
 		if d["DestinationId"] == "" {
 			t.Error("DescribeDeliveryStream: DestinationId is empty")
 		}
-		s3Desc, _ := d["S3DestinationDescription"].(map[string]interface{})
+		s3Desc, _ := d["S3DestinationDescription"].(map[string]any)
 		if s3Desc["BucketARN"] != "arn:aws:s3:::my-bucket" {
 			t.Errorf("DescribeDeliveryStream: BucketARN mismatch: %q", s3Desc["BucketARN"])
 		}
@@ -137,7 +137,7 @@ func TestFirehose_CreateDescribeList(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wList.Body.String())
-	streamNames, _ := mList["DeliveryStreamNames"].([]interface{})
+	streamNames, _ := mList["DeliveryStreamNames"].([]any)
 	found := false
 	for _, n := range streamNames {
 		if n.(string) == "my-stream" {
@@ -156,9 +156,9 @@ func TestFirehose_PutRecord(t *testing.T) {
 
 	// CreateDeliveryStream
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
 		"DeliveryStreamName": "put-stream",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::put-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/r",
 		},
@@ -170,7 +170,7 @@ func TestFirehose_PutRecord(t *testing.T) {
 	// PutRecord
 	payload := base64.StdEncoding.EncodeToString([]byte("hello firehose"))
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, firehoseReq(t, "PutRecord", map[string]interface{}{
+	handler.ServeHTTP(wp, firehoseReq(t, "PutRecord", map[string]any{
 		"DeliveryStreamName": "put-stream",
 		"Record": map[string]string{
 			"Data": payload,
@@ -194,9 +194,9 @@ func TestFirehose_PutRecordBatch(t *testing.T) {
 
 	// CreateDeliveryStream
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
 		"DeliveryStreamName": "batch-stream",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::batch-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/r",
 		},
@@ -212,7 +212,7 @@ func TestFirehose_PutRecordBatch(t *testing.T) {
 	}
 
 	wb := httptest.NewRecorder()
-	handler.ServeHTTP(wb, firehoseReq(t, "PutRecordBatch", map[string]interface{}{
+	handler.ServeHTTP(wb, firehoseReq(t, "PutRecordBatch", map[string]any{
 		"DeliveryStreamName": "batch-stream",
 		"Records":            records,
 	}))
@@ -226,12 +226,12 @@ func TestFirehose_PutRecordBatch(t *testing.T) {
 		t.Errorf("PutRecordBatch: expected FailedPutCount=0, got %v", failedCount)
 	}
 
-	responses, _ := mBatch["RequestResponses"].([]interface{})
+	responses, _ := mBatch["RequestResponses"].([]any)
 	if len(responses) != 3 {
 		t.Fatalf("PutRecordBatch: expected 3 responses, got %d", len(responses))
 	}
 	for i, r := range responses {
-		rec := r.(map[string]interface{})
+		rec := r.(map[string]any)
 		if rec["RecordId"] == "" {
 			t.Errorf("PutRecordBatch: response %d missing RecordId", i)
 		}
@@ -245,9 +245,9 @@ func TestFirehose_DeleteDeliveryStream(t *testing.T) {
 
 	// Create
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
 		"DeliveryStreamName": "delete-stream",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::del-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/r",
 		},
@@ -291,9 +291,9 @@ func TestFirehose_Tags(t *testing.T) {
 
 	// Create
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
 		"DeliveryStreamName": "tag-stream",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::tag-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/r",
 		},
@@ -304,7 +304,7 @@ func TestFirehose_Tags(t *testing.T) {
 
 	// TagDeliveryStream
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, firehoseReq(t, "TagDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wt, firehoseReq(t, "TagDeliveryStream", map[string]any{
 		"DeliveryStreamName": "tag-stream",
 		"Tags": []map[string]string{
 			{"Key": "env", "Value": "test"},
@@ -325,14 +325,14 @@ func TestFirehose_Tags(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wl.Body.String())
-	tags, _ := mList["Tags"].([]interface{})
+	tags, _ := mList["Tags"].([]any)
 	if len(tags) != 2 {
 		t.Fatalf("ListTagsForDeliveryStream: expected 2 tags, got %d\nbody: %s", len(tags), wl.Body.String())
 	}
 
 	tagMap := make(map[string]string)
 	for _, tg := range tags {
-		entry := tg.(map[string]interface{})
+		entry := tg.(map[string]any)
 		tagMap[entry["Key"].(string)] = entry["Value"].(string)
 	}
 	if tagMap["env"] != "test" {
@@ -344,7 +344,7 @@ func TestFirehose_Tags(t *testing.T) {
 
 	// UntagDeliveryStream
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, firehoseReq(t, "UntagDeliveryStream", map[string]interface{}{
+	handler.ServeHTTP(wu, firehoseReq(t, "UntagDeliveryStream", map[string]any{
 		"DeliveryStreamName": "tag-stream",
 		"TagKeys":            []string{"env"},
 	}))
@@ -362,11 +362,11 @@ func TestFirehose_Tags(t *testing.T) {
 	}
 
 	mList2 := decodeJSON(t, wl2.Body.String())
-	tags2, _ := mList2["Tags"].([]interface{})
+	tags2, _ := mList2["Tags"].([]any)
 	if len(tags2) != 1 {
 		t.Fatalf("ListTagsForDeliveryStream after untag: expected 1 tag, got %d", len(tags2))
 	}
-	entry := tags2[0].(map[string]interface{})
+	entry := tags2[0].(map[string]any)
 	if entry["Key"].(string) != "team" {
 		t.Errorf("ListTagsForDeliveryStream after untag: expected remaining key=team, got %q", entry["Key"])
 	}
@@ -377,9 +377,9 @@ func TestFirehose_Tags(t *testing.T) {
 func TestFirehose_CreateDeliveryStream_Duplicate(t *testing.T) {
 	handler := newFirehoseGateway(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"DeliveryStreamName": "dup-stream",
-		"S3DestinationConfiguration": map[string]interface{}{
+		"S3DestinationConfiguration": map[string]any{
 			"BucketARN": "arn:aws:s3:::dup-bucket",
 			"RoleARN":   "arn:aws:iam::123456789012:role/r",
 		},

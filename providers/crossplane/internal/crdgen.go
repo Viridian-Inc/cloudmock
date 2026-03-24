@@ -70,7 +70,7 @@ type JSONSchemaProps struct {
 	Required    []string                    `yaml:"required,omitempty"`
 	Items       *JSONSchemaProps             `yaml:"items,omitempty"`
 	AdditionalProperties *JSONSchemaProps    `yaml:"additionalProperties,omitempty"`
-	Default     interface{}                 `yaml:"default,omitempty"`
+	Default     any                 `yaml:"default,omitempty"`
 	XPreserveUnknownFields *bool            `yaml:"x-kubernetes-preserve-unknown-fields,omitempty"`
 }
 

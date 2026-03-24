@@ -75,7 +75,7 @@ func TestEventWiring_SNSToLambda(t *testing.T) {
 	defer server.Close()
 
 	// Step 1: Create a Lambda function (no code — returns mock response).
-	funcReq := map[string]interface{}{
+	funcReq := map[string]any{
 		"FunctionName": "sns-handler",
 		"Runtime":      "nodejs18.x",
 		"Handler":      "index.handler",
@@ -140,7 +140,7 @@ func TestEventWiring_EventBridgeToLambda(t *testing.T) {
 	defer server.Close()
 
 	// Step 1: Create a Lambda function.
-	funcReq := map[string]interface{}{
+	funcReq := map[string]any{
 		"FunctionName": "eb-handler",
 		"Runtime":      "nodejs18.x",
 		"Handler":      "index.handler",
@@ -153,7 +153,7 @@ func TestEventWiring_EventBridgeToLambda(t *testing.T) {
 	readBody(t, resp)
 
 	// Step 2: Create EventBridge rule.
-	putRuleReq := map[string]interface{}{
+	putRuleReq := map[string]any{
 		"Name":         "lambda-rule",
 		"EventPattern": `{"source":["my.app"]}`,
 		"State":        "ENABLED",
@@ -163,7 +163,7 @@ func TestEventWiring_EventBridgeToLambda(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "PutRule failed: %s", body)
 
 	// Step 3: Add Lambda as target.
-	putTargetsReq := map[string]interface{}{
+	putTargetsReq := map[string]any{
 		"Rule": "lambda-rule",
 		"Targets": []map[string]string{
 			{
@@ -177,8 +177,8 @@ func TestEventWiring_EventBridgeToLambda(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "PutTargets failed: %s", body)
 
 	// Step 4: PutEvents.
-	putEventsReq := map[string]interface{}{
-		"Entries": []map[string]interface{}{
+	putEventsReq := map[string]any{
+		"Entries": []map[string]any{
 			{
 				"Source":     "my.app",
 				"DetailType": "TestEvent",
@@ -274,7 +274,7 @@ func TestEventWiring_CloudWatchAlarmToSNS(t *testing.T) {
 }
 
 // doLambdaREST sends a JSON request to a Lambda REST endpoint.
-func doLambdaREST(t *testing.T, server *httptest.Server, method, path string, body interface{}) *http.Response {
+func doLambdaREST(t *testing.T, server *httptest.Server, method, path string, body any) *http.Response {
 	t.Helper()
 
 	var bodyReader *strings.Reader

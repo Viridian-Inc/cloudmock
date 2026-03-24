@@ -90,7 +90,7 @@ func TestCreateFunction_GetFunction_ListFunctions(t *testing.T) {
 	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost, "/2015-03-31/functions", createBody))
 	assert.Equal(t, http.StatusCreated, w.Code, "CreateFunction should return 201")
 
-	var createResp map[string]interface{}
+	var createResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &createResp))
 	assert.Equal(t, "test-function", createResp["FunctionName"])
 	assert.Equal(t, "nodejs20.x", createResp["Runtime"])
@@ -110,9 +110,9 @@ func TestCreateFunction_GetFunction_ListFunctions(t *testing.T) {
 	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet, "/2015-03-31/functions/test-function", ""))
 	assert.Equal(t, http.StatusOK, w.Code, "GetFunction should return 200")
 
-	var getResp map[string]interface{}
+	var getResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &getResp))
-	config := getResp["Configuration"].(map[string]interface{})
+	config := getResp["Configuration"].(map[string]any)
 	assert.Equal(t, "test-function", config["FunctionName"])
 	assert.NotEmpty(t, getResp["Code"])
 
@@ -126,9 +126,9 @@ func TestCreateFunction_GetFunction_ListFunctions(t *testing.T) {
 	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet, "/2015-03-31/functions", ""))
 	assert.Equal(t, http.StatusOK, w.Code, "ListFunctions should return 200")
 
-	var listResp map[string]interface{}
+	var listResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listResp))
-	functions := listResp["Functions"].([]interface{})
+	functions := listResp["Functions"].([]any)
 	assert.Len(t, functions, 1)
 }
 
@@ -225,14 +225,14 @@ func TestInvokeNodeJS(t *testing.T) {
 		"/2015-03-31/functions/node-func/invocations", `{"hello": "world"}`))
 	assert.Equal(t, http.StatusOK, w.Code, "Invoke should return 200")
 
-	var invokeResp map[string]interface{}
+	var invokeResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invokeResp))
 	assert.Equal(t, float64(200), invokeResp["statusCode"])
 
 	// Verify the body contains the input event.
 	bodyStr, ok := invokeResp["body"].(string)
 	require.True(t, ok, "body should be a string")
-	var bodyParsed map[string]interface{}
+	var bodyParsed map[string]any
 	require.NoError(t, json.Unmarshal([]byte(bodyStr), &bodyParsed))
 	assert.Equal(t, "world", bodyParsed["hello"])
 }
@@ -268,7 +268,7 @@ func TestInvokePython(t *testing.T) {
 		"/2015-03-31/functions/python-func/invocations", `{"hello": "world"}`))
 	assert.Equal(t, http.StatusOK, w.Code, "Invoke should return 200")
 
-	var invokeResp map[string]interface{}
+	var invokeResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invokeResp))
 	assert.Equal(t, float64(200), invokeResp["statusCode"])
 }
@@ -302,7 +302,7 @@ func TestUpdateFunctionCode(t *testing.T) {
 	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost,
 		"/2015-03-31/functions/update-code-func/invocations", `{}`))
 	require.Equal(t, http.StatusOK, w.Code)
-	var v1Resp map[string]interface{}
+	var v1Resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &v1Resp))
 	assert.Equal(t, "v1", v1Resp["body"])
 
@@ -323,7 +323,7 @@ func TestUpdateFunctionCode(t *testing.T) {
 	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost,
 		"/2015-03-31/functions/update-code-func/invocations", `{}`))
 	require.Equal(t, http.StatusOK, w.Code)
-	var v2Resp map[string]interface{}
+	var v2Resp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &v2Resp))
 	assert.Equal(t, "v2", v2Resp["body"])
 }
@@ -355,7 +355,7 @@ func TestGetFunctionConfiguration_UpdateFunctionConfiguration(t *testing.T) {
 		"/2015-03-31/functions/config-func/configuration", ""))
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var configResp map[string]interface{}
+	var configResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &configResp))
 	assert.Equal(t, "config-func", configResp["FunctionName"])
 	assert.Equal(t, float64(3), configResp["Timeout"])
@@ -368,7 +368,7 @@ func TestGetFunctionConfiguration_UpdateFunctionConfiguration(t *testing.T) {
 		"/2015-03-31/functions/config-func/configuration", updateBody))
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var updateResp map[string]interface{}
+	var updateResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &updateResp))
 	assert.Equal(t, float64(30), updateResp["Timeout"])
 	assert.Equal(t, float64(512), updateResp["MemorySize"])
@@ -380,7 +380,7 @@ func TestGetFunctionConfiguration_UpdateFunctionConfiguration(t *testing.T) {
 		"/2015-03-31/functions/config-func/configuration", ""))
 	require.Equal(t, http.StatusOK, w.Code)
 
-	var verifyResp map[string]interface{}
+	var verifyResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &verifyResp))
 	assert.Equal(t, float64(30), verifyResp["Timeout"])
 	assert.Equal(t, float64(512), verifyResp["MemorySize"])
@@ -417,7 +417,7 @@ func TestInvokeWithEnvironmentVariables(t *testing.T) {
 		"/2015-03-31/functions/env-func/invocations", `{}`))
 	assert.Equal(t, http.StatusOK, w.Code)
 
-	var invokeResp map[string]interface{}
+	var invokeResp map[string]any
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &invokeResp))
 	assert.Equal(t, "hello-from-env", invokeResp["body"])
 }

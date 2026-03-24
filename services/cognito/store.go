@@ -28,9 +28,9 @@ type UserPool struct {
 	Arn                  string
 	CreationDate         time.Time
 	Status               string
-	Policies             map[string]interface{}
+	Policies             map[string]any
 	AutoVerifiedAttributes []string
-	Schema               []map[string]interface{}
+	Schema               []map[string]any
 	Clients              map[string]*UserPoolClient // keyed by ClientId
 	Users                map[string]*User           // keyed by Username (case-insensitive: stored lowercase)
 }
@@ -128,7 +128,7 @@ func checkPassword(hash []byte, password string) bool {
 // ---- UserPool operations ----
 
 // CreateUserPool creates a new user pool and returns it.
-func (s *Store) CreateUserPool(name string, policies map[string]interface{}, autoVerifiedAttributes []string, schema []map[string]interface{}) (*UserPool, *service.AWSError) {
+func (s *Store) CreateUserPool(name string, policies map[string]any, autoVerifiedAttributes []string, schema []map[string]any) (*UserPool, *service.AWSError) {
 	poolID := newPoolID(s.region)
 	pool := &UserPool{
 		Id:                   poolID,
@@ -490,7 +490,7 @@ func (s *Store) InitiateAuth(clientID, username, password string, keys *KeyStore
 	now := time.Now().UTC()
 	iss := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", s.region, poolID)
 
-	accessClaims := map[string]interface{}{
+	accessClaims := map[string]any{
 		"sub":       user.Sub,
 		"iss":       iss,
 		"client_id": clientID,
@@ -501,7 +501,7 @@ func (s *Store) InitiateAuth(clientID, username, password string, keys *KeyStore
 		"iat":       now.Unix(),
 		"exp":       now.Add(time.Hour).Unix(),
 	}
-	idClaims := map[string]interface{}{
+	idClaims := map[string]any{
 		"sub":               user.Sub,
 		"iss":               iss,
 		"aud":               clientID,
@@ -513,7 +513,7 @@ func (s *Store) InitiateAuth(clientID, username, password string, keys *KeyStore
 		"iat":               now.Unix(),
 		"exp":               now.Add(time.Hour).Unix(),
 	}
-	refreshClaims := map[string]interface{}{
+	refreshClaims := map[string]any{
 		"sub":       user.Sub,
 		"iss":       iss,
 		"token_use": "refresh",

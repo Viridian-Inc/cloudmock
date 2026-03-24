@@ -51,7 +51,7 @@ func (s *SQSService) handleJSON(ctx *service.RequestContext) (*service.Response,
 }
 
 // parseJSONBody reads the request body and unmarshals it into the given target.
-func parseJSONBody(ctx *service.RequestContext, target interface{}) error {
+func parseJSONBody(ctx *service.RequestContext, target any) error {
 	body := ctx.Body
 	if len(body) == 0 && ctx.RawRequest != nil && ctx.RawRequest.Body != nil {
 		var err error
@@ -67,7 +67,7 @@ func parseJSONBody(ctx *service.RequestContext, target interface{}) error {
 }
 
 // jsonOK wraps a response body in a 200 JSON response.
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -145,7 +145,7 @@ func jsonDeleteQueue(ctx *service.RequestContext, store *QueueStore) (*service.R
 			"The specified queue does not exist.", http.StatusBadRequest))
 	}
 
-	return jsonOK(map[string]interface{}{})
+	return jsonOK(map[string]any{})
 }
 
 // ---- ListQueues ----
@@ -289,7 +289,7 @@ func jsonSetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*se
 	}
 	q.mu.Unlock()
 
-	return jsonOK(map[string]interface{}{})
+	return jsonOK(map[string]any{})
 }
 
 // ---- SendMessage ----
@@ -439,7 +439,7 @@ func jsonDeleteMessage(ctx *service.RequestContext, store *QueueStore) (*service
 			"The input receipt handle is invalid.", http.StatusBadRequest))
 	}
 
-	return jsonOK(map[string]interface{}{})
+	return jsonOK(map[string]any{})
 }
 
 // ---- PurgeQueue ----
@@ -460,7 +460,7 @@ func jsonPurgeQueue(ctx *service.RequestContext, store *QueueStore) (*service.Re
 	}
 
 	q.Purge()
-	return jsonOK(map[string]interface{}{})
+	return jsonOK(map[string]any{})
 }
 
 // ---- ChangeMessageVisibility ----
@@ -491,7 +491,7 @@ func jsonChangeMessageVisibility(ctx *service.RequestContext, store *QueueStore)
 			"The input receipt handle is invalid.", http.StatusBadRequest))
 	}
 
-	return jsonOK(map[string]interface{}{})
+	return jsonOK(map[string]any{})
 }
 
 // ---- SendMessageBatch ----

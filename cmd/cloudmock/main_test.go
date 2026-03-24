@@ -16,7 +16,7 @@ func TestCmdStatus(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/health", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"status": "healthy",
 			"services": map[string]bool{
 				"s3":       true,
@@ -49,7 +49,7 @@ func TestCmdServices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/services", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]interface{}{
+		json.NewEncoder(w).Encode([]map[string]any{
 			{"name": "s3", "action_count": 5, "healthy": true},
 			{"name": "sqs", "action_count": 3, "healthy": true},
 		})
@@ -79,7 +79,7 @@ func TestCmdReset_All(t *testing.T) {
 		assert.Equal(t, "/api/reset", r.URL.Path)
 		assert.Equal(t, http.MethodPost, r.Method)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"status":   "reset",
 			"services": []string{"s3", "sqs"},
 		})
@@ -107,7 +107,7 @@ func TestCmdReset_SingleService(t *testing.T) {
 		require.True(t, strings.HasPrefix(r.URL.Path, "/api/services/s3/reset"))
 		assert.Equal(t, http.MethodPost, r.Method)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"status":  "reset",
 			"service": "s3",
 		})
@@ -134,7 +134,7 @@ func TestCmdConfig(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "/api/config", r.URL.Path)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"region":     "us-east-1",
 			"account_id": "000000000000",
 		})

@@ -12,7 +12,7 @@ import (
 func createStreamTable(t *testing.T, handler http.Handler, tableName string) {
 	t.Helper()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
 		"TableName": tableName,
 		"KeySchema": []map[string]string{
 			{"AttributeName": "pk", "KeyType": "HASH"},
@@ -23,7 +23,7 @@ func createStreamTable(t *testing.T, handler http.Handler, tableName string) {
 			{"AttributeName": "sk", "AttributeType": "S"},
 		},
 		"BillingMode": "PAY_PER_REQUEST",
-		"StreamSpecification": map[string]interface{}{
+		"StreamSpecification": map[string]any{
 			"StreamEnabled":  true,
 			"StreamViewType": "NEW_AND_OLD_IMAGES",
 		},
@@ -39,7 +39,7 @@ func TestDDB_CreateTable_WithStream_DescribeTable(t *testing.T) {
 
 	// DescribeTable should show StreamSpecification
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "stream-table",
 	}))
 	if w.Code != http.StatusOK {
@@ -47,9 +47,9 @@ func TestDDB_CreateTable_WithStream_DescribeTable(t *testing.T) {
 	}
 
 	result := decodeJSON(t, w.Body.String())
-	table := result["Table"].(map[string]interface{})
+	table := result["Table"].(map[string]any)
 
-	spec, ok := table["StreamSpecification"].(map[string]interface{})
+	spec, ok := table["StreamSpecification"].(map[string]any)
 	if !ok {
 		t.Fatal("expected StreamSpecification in DescribeTable response")
 	}
@@ -70,30 +70,30 @@ func TestDDB_Stream_PutItem_GetRecords_INSERT(t *testing.T) {
 
 	// Get the stream ARN from DescribeTable
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "ins-stream",
 	}))
-	table := decodeJSON(t, w.Body.String())["Table"].(map[string]interface{})
+	table := decodeJSON(t, w.Body.String())["Table"].(map[string]any)
 	streamARN := table["LatestStreamArn"].(string)
 
 	// DescribeStream
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]any{
 		"StreamArn": streamARN,
 	}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("DescribeStream: expected 200, got %d – %s", w.Code, w.Body.String())
 	}
-	streamDesc := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]interface{})
-	shards := streamDesc["Shards"].([]interface{})
+	streamDesc := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]any)
+	shards := streamDesc["Shards"].([]any)
 	if len(shards) == 0 {
 		t.Fatal("expected at least one shard")
 	}
-	shardId := shards[0].(map[string]interface{})["ShardId"].(string)
+	shardId := shards[0].(map[string]any)["ShardId"].(string)
 
 	// GetShardIterator
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]any{
 		"StreamArn":         streamARN,
 		"ShardId":           shardId,
 		"ShardIteratorType": "TRIM_HORIZON",
@@ -104,26 +104,26 @@ func TestDDB_Stream_PutItem_GetRecords_INSERT(t *testing.T) {
 	iterator := decodeJSON(t, w.Body.String())["ShardIterator"].(string)
 
 	// PutItem
-	putTestItem(t, handler, "ins-stream", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "user1"},
-		"sk": map[string]interface{}{"S": "profile"},
+	putTestItem(t, handler, "ins-stream", map[string]any{
+		"pk": map[string]any{"S": "user1"},
+		"sk": map[string]any{"S": "profile"},
 	})
 
 	// GetRecords
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]any{
 		"ShardIterator": iterator,
 	}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("GetRecords: expected 200, got %d – %s", w.Code, w.Body.String())
 	}
 	recordsResp := decodeJSON(t, w.Body.String())
-	records := recordsResp["Records"].([]interface{})
+	records := recordsResp["Records"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(records))
 	}
 
-	rec := records[0].(map[string]interface{})
+	rec := records[0].(map[string]any)
 	if rec["eventName"] != "INSERT" {
 		t.Errorf("expected INSERT event, got %v", rec["eventName"])
 	}
@@ -137,30 +137,30 @@ func TestDDB_Stream_UpdateItem_MODIFY(t *testing.T) {
 	createStreamTable(t, handler, "mod-stream")
 
 	// Put initial item
-	putTestItem(t, handler, "mod-stream", map[string]interface{}{
-		"pk":   map[string]interface{}{"S": "user1"},
-		"sk":   map[string]interface{}{"S": "profile"},
-		"name": map[string]interface{}{"S": "Alice"},
+	putTestItem(t, handler, "mod-stream", map[string]any{
+		"pk":   map[string]any{"S": "user1"},
+		"sk":   map[string]any{"S": "profile"},
+		"name": map[string]any{"S": "Alice"},
 	})
 
 	// Get stream ARN and iterator (after the INSERT)
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "mod-stream",
 	}))
-	table := decodeJSON(t, w.Body.String())["Table"].(map[string]interface{})
+	table := decodeJSON(t, w.Body.String())["Table"].(map[string]any)
 	streamARN := table["LatestStreamArn"].(string)
 
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]any{
 		"StreamArn": streamARN,
 	}))
-	shards := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]interface{})["Shards"].([]interface{})
-	shardId := shards[0].(map[string]interface{})["ShardId"].(string)
+	shards := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]any)["Shards"].([]any)
+	shardId := shards[0].(map[string]any)["ShardId"].(string)
 
 	// Get iterator at LATEST to skip INSERT
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]any{
 		"StreamArn":         streamARN,
 		"ShardId":           shardId,
 		"ShardIteratorType": "LATEST",
@@ -169,15 +169,15 @@ func TestDDB_Stream_UpdateItem_MODIFY(t *testing.T) {
 
 	// UpdateItem
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]any{
 		"TableName": "mod-stream",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "user1"},
-			"sk": map[string]interface{}{"S": "profile"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "user1"},
+			"sk": map[string]any{"S": "profile"},
 		},
 		"UpdateExpression":          "SET #n = :val",
 		"ExpressionAttributeNames":  map[string]string{"#n": "name"},
-		"ExpressionAttributeValues": map[string]interface{}{":val": map[string]interface{}{"S": "Bob"}},
+		"ExpressionAttributeValues": map[string]any{":val": map[string]any{"S": "Bob"}},
 		"ReturnValues":              "ALL_NEW",
 	}))
 	if w.Code != http.StatusOK {
@@ -186,18 +186,18 @@ func TestDDB_Stream_UpdateItem_MODIFY(t *testing.T) {
 
 	// GetRecords should show MODIFY
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]any{
 		"ShardIterator": iterator,
 	}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("GetRecords: expected 200, got %d – %s", w.Code, w.Body.String())
 	}
-	records := decodeJSON(t, w.Body.String())["Records"].([]interface{})
+	records := decodeJSON(t, w.Body.String())["Records"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(records))
 	}
 
-	rec := records[0].(map[string]interface{})
+	rec := records[0].(map[string]any)
 	if rec["eventName"] != "MODIFY" {
 		t.Errorf("expected MODIFY event, got %v", rec["eventName"])
 	}
@@ -214,28 +214,28 @@ func TestDDB_Stream_DeleteItem_REMOVE(t *testing.T) {
 	createStreamTable(t, handler, "rem-stream")
 
 	// Put item
-	putTestItem(t, handler, "rem-stream", map[string]interface{}{
-		"pk": map[string]interface{}{"S": "user1"},
-		"sk": map[string]interface{}{"S": "profile"},
+	putTestItem(t, handler, "rem-stream", map[string]any{
+		"pk": map[string]any{"S": "user1"},
+		"sk": map[string]any{"S": "profile"},
 	})
 
 	// Get stream ARN and LATEST iterator
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeTable", map[string]any{
 		"TableName": "rem-stream",
 	}))
-	table := decodeJSON(t, w.Body.String())["Table"].(map[string]interface{})
+	table := decodeJSON(t, w.Body.String())["Table"].(map[string]any)
 	streamARN := table["LatestStreamArn"].(string)
 
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeStream", map[string]any{
 		"StreamArn": streamARN,
 	}))
-	shards := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]interface{})["Shards"].([]interface{})
-	shardId := shards[0].(map[string]interface{})["ShardId"].(string)
+	shards := decodeJSON(t, w.Body.String())["StreamDescription"].(map[string]any)["Shards"].([]any)
+	shardId := shards[0].(map[string]any)["ShardId"].(string)
 
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetShardIterator", map[string]any{
 		"StreamArn":         streamARN,
 		"ShardId":           shardId,
 		"ShardIteratorType": "LATEST",
@@ -244,11 +244,11 @@ func TestDDB_Stream_DeleteItem_REMOVE(t *testing.T) {
 
 	// DeleteItem
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DeleteItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DeleteItem", map[string]any{
 		"TableName": "rem-stream",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "user1"},
-			"sk": map[string]interface{}{"S": "profile"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "user1"},
+			"sk": map[string]any{"S": "profile"},
 		},
 	}))
 	if w.Code != http.StatusOK {
@@ -257,15 +257,15 @@ func TestDDB_Stream_DeleteItem_REMOVE(t *testing.T) {
 
 	// GetRecords should show REMOVE
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetRecords", map[string]any{
 		"ShardIterator": iterator,
 	}))
-	records := decodeJSON(t, w.Body.String())["Records"].([]interface{})
+	records := decodeJSON(t, w.Body.String())["Records"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(records))
 	}
 
-	rec := records[0].(map[string]interface{})
+	rec := records[0].(map[string]any)
 	if rec["eventName"] != "REMOVE" {
 		t.Errorf("expected REMOVE event, got %v", rec["eventName"])
 	}
@@ -280,9 +280,9 @@ func TestDDB_TTL_UpdateAndDescribe(t *testing.T) {
 
 	// UpdateTimeToLive
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "UpdateTimeToLive", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "UpdateTimeToLive", map[string]any{
 		"TableName": "ttl-table",
-		"TimeToLiveSpecification": map[string]interface{}{
+		"TimeToLiveSpecification": map[string]any{
 			"AttributeName": "expiresAt",
 			"Enabled":       true,
 		},
@@ -293,7 +293,7 @@ func TestDDB_TTL_UpdateAndDescribe(t *testing.T) {
 
 	// DescribeTimeToLive
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "DescribeTimeToLive", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "DescribeTimeToLive", map[string]any{
 		"TableName": "ttl-table",
 	}))
 	if w.Code != http.StatusOK {
@@ -301,7 +301,7 @@ func TestDDB_TTL_UpdateAndDescribe(t *testing.T) {
 	}
 
 	result := decodeJSON(t, w.Body.String())
-	desc := result["TimeToLiveDescription"].(map[string]interface{})
+	desc := result["TimeToLiveDescription"].(map[string]any)
 	if desc["TimeToLiveStatus"] != "ENABLED" {
 		t.Errorf("expected ENABLED, got %v", desc["TimeToLiveStatus"])
 	}
@@ -316,9 +316,9 @@ func TestDDB_TTL_ExpiredItemDeleted(t *testing.T) {
 
 	// Enable TTL
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "UpdateTimeToLive", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "UpdateTimeToLive", map[string]any{
 		"TableName": "ttl-exp-table",
-		"TimeToLiveSpecification": map[string]interface{}{
+		"TimeToLiveSpecification": map[string]any{
 			"AttributeName": "ttl",
 			"Enabled":       true,
 		},
@@ -329,18 +329,18 @@ func TestDDB_TTL_ExpiredItemDeleted(t *testing.T) {
 
 	// Put item with TTL in the past
 	pastTTL := fmt.Sprintf("%d", time.Now().Unix()-100)
-	putTestItem(t, handler, "ttl-exp-table", map[string]interface{}{
-		"pk":  map[string]interface{}{"S": "expired"},
-		"sk":  map[string]interface{}{"S": "item"},
-		"ttl": map[string]interface{}{"N": pastTTL},
+	putTestItem(t, handler, "ttl-exp-table", map[string]any{
+		"pk":  map[string]any{"S": "expired"},
+		"sk":  map[string]any{"S": "item"},
+		"ttl": map[string]any{"N": pastTTL},
 	})
 
 	// Put item with TTL far in the future (should survive)
 	futureTTL := fmt.Sprintf("%d", time.Now().Unix()+100000)
-	putTestItem(t, handler, "ttl-exp-table", map[string]interface{}{
-		"pk":  map[string]interface{}{"S": "alive"},
-		"sk":  map[string]interface{}{"S": "item"},
-		"ttl": map[string]interface{}{"N": futureTTL},
+	putTestItem(t, handler, "ttl-exp-table", map[string]any{
+		"pk":  map[string]any{"S": "alive"},
+		"sk":  map[string]any{"S": "item"},
+		"ttl": map[string]any{"N": futureTTL},
 	})
 
 	// Wait for TTL reaper (runs every 5 seconds).
@@ -348,11 +348,11 @@ func TestDDB_TTL_ExpiredItemDeleted(t *testing.T) {
 
 	// GetItem for expired item → should be gone
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "ttl-exp-table",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "expired"},
-			"sk": map[string]interface{}{"S": "item"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "expired"},
+			"sk": map[string]any{"S": "item"},
 		},
 	}))
 	if w.Code != http.StatusOK {
@@ -365,11 +365,11 @@ func TestDDB_TTL_ExpiredItemDeleted(t *testing.T) {
 
 	// GetItem for alive item → should still exist
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]interface{}{
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
 		"TableName": "ttl-exp-table",
-		"Key": map[string]interface{}{
-			"pk": map[string]interface{}{"S": "alive"},
-			"sk": map[string]interface{}{"S": "item"},
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "alive"},
+			"sk": map[string]any{"S": "item"},
 		},
 	}))
 	result = decodeJSON(t, w.Body.String())

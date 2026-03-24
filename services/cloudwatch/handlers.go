@@ -685,7 +685,7 @@ func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*serv
 // ---- helper functions ----
 
 // xmlOK wraps a response body in a 200 XML response.
-func xmlOK(body interface{}) (*service.Response, error) {
+func xmlOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,

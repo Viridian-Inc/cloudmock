@@ -27,7 +27,7 @@ func newSFNGateway(t *testing.T) http.Handler {
 }
 
 // sfnReq builds a JSON POST request targeting the Step Functions service via X-Amz-Target.
-func sfnReq(t *testing.T, action string, body interface{}) *http.Request {
+func sfnReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -52,9 +52,9 @@ func sfnReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -71,7 +71,7 @@ func TestSFN_CreateDescribeList(t *testing.T) {
 
 	// CreateStateMachine
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "my-state-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -124,13 +124,13 @@ func TestSFN_CreateDescribeList(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wList.Body.String())
-	machines, ok := mList["stateMachines"].([]interface{})
+	machines, ok := mList["stateMachines"].([]any)
 	if !ok {
 		t.Fatalf("ListStateMachines: missing stateMachines array\nbody: %s", wList.Body.String())
 	}
 	found := false
 	for _, m := range machines {
-		entry := m.(map[string]interface{})
+		entry := m.(map[string]any)
 		if entry["stateMachineArn"] == smArn {
 			found = true
 			break
@@ -148,7 +148,7 @@ func TestSFN_StartAndDescribeExecution(t *testing.T) {
 
 	// Create a state machine first.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "exec-test-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -213,7 +213,7 @@ func TestSFN_ListExecutions(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "list-exec-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -248,7 +248,7 @@ func TestSFN_ListExecutions(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wList.Body.String())
-	execs, ok := mList["executions"].([]interface{})
+	execs, ok := mList["executions"].([]any)
 	if !ok {
 		t.Fatalf("ListExecutions: missing executions array\nbody: %s", wList.Body.String())
 	}
@@ -258,7 +258,7 @@ func TestSFN_ListExecutions(t *testing.T) {
 
 	listed := make(map[string]bool)
 	for _, e := range execs {
-		entry := e.(map[string]interface{})
+		entry := e.(map[string]any)
 		listed[entry["executionArn"].(string)] = true
 	}
 	for _, arn := range execArns {
@@ -275,7 +275,7 @@ func TestSFN_StopExecution(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "stop-exec-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -333,7 +333,7 @@ func TestSFN_GetExecutionHistory(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "history-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -364,7 +364,7 @@ func TestSFN_GetExecutionHistory(t *testing.T) {
 	}
 
 	mHist := decodeJSON(t, wHist.Body.String())
-	events, ok := mHist["events"].([]interface{})
+	events, ok := mHist["events"].([]any)
 	if !ok {
 		t.Fatalf("GetExecutionHistory: missing events array\nbody: %s", wHist.Body.String())
 	}
@@ -373,7 +373,7 @@ func TestSFN_GetExecutionHistory(t *testing.T) {
 	}
 
 	// Check that the first event is ExecutionStarted.
-	firstEvent := events[0].(map[string]interface{})
+	firstEvent := events[0].(map[string]any)
 	if firstEvent["type"] != "ExecutionStarted" {
 		t.Errorf("GetExecutionHistory: expected first event type=ExecutionStarted, got %q", firstEvent["type"])
 	}
@@ -381,7 +381,7 @@ func TestSFN_GetExecutionHistory(t *testing.T) {
 	// Check that there's an ExecutionSucceeded event.
 	foundSucceeded := false
 	for _, e := range events {
-		entry := e.(map[string]interface{})
+		entry := e.(map[string]any)
 		if entry["type"] == "ExecutionSucceeded" {
 			foundSucceeded = true
 			break
@@ -399,7 +399,7 @@ func TestSFN_DeleteStateMachine(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "to-delete-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -435,7 +435,7 @@ func TestSFN_UpdateStateMachine(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "updatable-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/OldRole",
@@ -487,7 +487,7 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 
 	// Create state machine.
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]interface{}{
+	handler.ServeHTTP(wCreate, sfnReq(t, "CreateStateMachine", map[string]any{
 		"name":       "tagging-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",
@@ -502,7 +502,7 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 
 	// TagResource
 	wTag := httptest.NewRecorder()
-	handler.ServeHTTP(wTag, sfnReq(t, "TagResource", map[string]interface{}{
+	handler.ServeHTTP(wTag, sfnReq(t, "TagResource", map[string]any{
 		"resourceArn": smArn,
 		"tags": []map[string]string{
 			{"key": "owner", "value": "alice"},
@@ -522,14 +522,14 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wList.Body.String())
-	tags, ok := mList["tags"].([]interface{})
+	tags, ok := mList["tags"].([]any)
 	if !ok {
 		t.Fatalf("ListTagsForResource: missing tags array\nbody: %s", wList.Body.String())
 	}
 
 	tagMap := make(map[string]string)
 	for _, tagRaw := range tags {
-		tag := tagRaw.(map[string]interface{})
+		tag := tagRaw.(map[string]any)
 		tagMap[tag["key"].(string)] = tag["value"].(string)
 	}
 	if tagMap["owner"] != "alice" {
@@ -541,7 +541,7 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 
 	// UntagResource
 	wUntag := httptest.NewRecorder()
-	handler.ServeHTTP(wUntag, sfnReq(t, "UntagResource", map[string]interface{}{
+	handler.ServeHTTP(wUntag, sfnReq(t, "UntagResource", map[string]any{
 		"resourceArn": smArn,
 		"tagKeys":     []string{"owner"},
 	}))
@@ -555,9 +555,9 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 		"resourceArn": smArn,
 	}))
 	mList2 := decodeJSON(t, wList2.Body.String())
-	tags2 := mList2["tags"].([]interface{})
+	tags2 := mList2["tags"].([]any)
 	for _, tagRaw := range tags2 {
-		tag := tagRaw.(map[string]interface{})
+		tag := tagRaw.(map[string]any)
 		if tag["key"] == "owner" {
 			t.Error("UntagResource: tag 'owner' still present after untagging")
 		}
@@ -569,7 +569,7 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 func TestSFN_CreateStateMachine_AlreadyExists(t *testing.T) {
 	handler := newSFNGateway(t)
 
-	body := map[string]interface{}{
+	body := map[string]any{
 		"name":       "duplicate-machine",
 		"definition": minimalDefinition,
 		"roleArn":    "arn:aws:iam::123456789012:role/StepFunctionsRole",

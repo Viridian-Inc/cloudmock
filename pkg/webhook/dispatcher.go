@@ -33,7 +33,7 @@ func (d *Dispatcher) Store() Store { return d.store }
 // It queries the store for matching configs, formats the payload per webhook
 // type, and POSTs to each URL. Errors are logged but do not fail the caller
 // (best-effort delivery).
-func (d *Dispatcher) Fire(ctx context.Context, event string, payload interface{}) error {
+func (d *Dispatcher) Fire(ctx context.Context, event string, payload any) error {
 	configs, err := d.store.ListByEvent(ctx, event)
 	if err != nil {
 		log.Printf("webhook: list by event %q: %v", event, err)
@@ -53,12 +53,12 @@ func (d *Dispatcher) Fire(ctx context.Context, event string, payload interface{}
 
 // FireToConfig sends a payload directly to a single webhook config, bypassing
 // the store lookup. Useful for test deliveries.
-func (d *Dispatcher) FireToConfig(ctx context.Context, cfg Config, event string, payload interface{}) error {
+func (d *Dispatcher) FireToConfig(ctx context.Context, cfg Config, event string, payload any) error {
 	return d.send(ctx, cfg, event, payload)
 }
 
 // send formats and POSTs the payload to a single webhook config.
-func (d *Dispatcher) send(ctx context.Context, cfg Config, event string, payload interface{}) error {
+func (d *Dispatcher) send(ctx context.Context, cfg Config, event string, payload any) error {
 	body, err := format(cfg.Type, event, payload)
 	if err != nil {
 		return fmt.Errorf("format: %w", err)
@@ -86,7 +86,7 @@ func (d *Dispatcher) send(ctx context.Context, cfg Config, event string, payload
 }
 
 // format dispatches to the appropriate formatter based on webhook type.
-func format(typ, event string, payload interface{}) ([]byte, error) {
+func format(typ, event string, payload any) ([]byte, error) {
 	switch typ {
 	case "slack":
 		return FormatSlack(event, payload)

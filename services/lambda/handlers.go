@@ -12,7 +12,7 @@ import (
 
 // ---- JSON helpers ----
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -20,7 +20,7 @@ func jsonOK(body interface{}) (*service.Response, error) {
 	}, nil
 }
 
-func jsonCreated(body interface{}) (*service.Response, error) {
+func jsonCreated(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusCreated,
 		Body:       body,
@@ -42,8 +42,8 @@ func jsonNoContent() (*service.Response, error) {
 // ---- Response types ----
 
 // functionConfigResponse builds the JSON configuration response for a function.
-func functionConfigResponse(fn *Function) map[string]interface{} {
-	resp := map[string]interface{}{
+func functionConfigResponse(fn *Function) map[string]any {
+	resp := map[string]any{
 		"FunctionName":   fn.FunctionName,
 		"FunctionArn":    fn.FunctionArn,
 		"Runtime":        fn.Runtime,
@@ -173,9 +173,9 @@ func handleGetFunction(ctx *service.RequestContext, store *FunctionStore, name s
 			fmt.Sprintf("Function not found: %s", name), http.StatusNotFound))
 	}
 
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"Configuration": functionConfigResponse(fn),
-		"Code": map[string]interface{}{
+		"Code": map[string]any{
 			"Location": fmt.Sprintf("https://awslambda-%s-tasks.s3.%s.amazonaws.com/snapshots/%s",
 				ctx.Region, ctx.Region, fn.FunctionName),
 		},
@@ -187,12 +187,12 @@ func handleGetFunction(ctx *service.RequestContext, store *FunctionStore, name s
 
 func handleListFunctions(ctx *service.RequestContext, store *FunctionStore) (*service.Response, error) {
 	functions := store.List()
-	configs := make([]map[string]interface{}, 0, len(functions))
+	configs := make([]map[string]any, 0, len(functions))
 	for _, fn := range functions {
 		configs = append(configs, functionConfigResponse(fn))
 	}
 
-	resp := map[string]interface{}{
+	resp := map[string]any{
 		"Functions": configs,
 	}
 	return jsonOK(resp)
@@ -269,7 +269,7 @@ func handleGetFunctionConfiguration(ctx *service.RequestContext, store *Function
 // ---- UpdateFunctionConfiguration ----
 
 func handleUpdateFunctionConfiguration(ctx *service.RequestContext, store *FunctionStore, name string) (*service.Response, error) {
-	var updates map[string]interface{}
+	var updates map[string]any
 	if err := json.Unmarshal(ctx.Body, &updates); err != nil {
 		return jsonErr(service.ErrValidation("invalid request body: " + err.Error()))
 	}
@@ -324,7 +324,7 @@ func handleInvoke(ctx *service.RequestContext, store *FunctionStore, executor *E
 	}
 
 	// Check if result contains an error.
-	var resultMap map[string]interface{}
+	var resultMap map[string]any
 	if json.Unmarshal(result, &resultMap) == nil {
 		if _, hasErr := resultMap["errorMessage"]; hasErr {
 			headers["X-Amz-Function-Error"] = "Unhandled"

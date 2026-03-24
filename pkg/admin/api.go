@@ -346,7 +346,7 @@ func (a *API) handleResetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{"status": "reset", "services": resetNames})
+	writeJSON(w, http.StatusOK, map[string]any{"status": "reset", "services": resetNames})
 }
 
 func (a *API) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -451,7 +451,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]interface{}{"name": v.Name})
+			a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]any{"name": v.Name})
 			writeJSON(w, http.StatusCreated, v)
 		case http.MethodDelete:
 			id := r.URL.Query().Get("id")
@@ -496,7 +496,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		}
 		a.views = append(a.views, v)
 		a.viewsMu.Unlock()
-		a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]interface{}{"name": v.Name})
+		a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]any{"name": v.Name})
 		writeJSON(w, http.StatusCreated, v)
 
 	case http.MethodDelete:
@@ -972,7 +972,7 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 		a.iacTopologyMu.Lock()
 		a.iacTopology = &cfg
 		a.iacTopologyMu.Unlock()
-		writeJSON(w, http.StatusOK, map[string]interface{}{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"status": "ok",
 			"nodes":  len(cfg.Nodes),
 			"edges":  len(cfg.Edges),
@@ -994,7 +994,7 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 // ResourcesResponse is the response body for the /api/resources/:service endpoint.
 type ResourcesResponse struct {
 	Service   string      `json:"service"`
-	Resources interface{} `json:"resources"`
+	Resources any `json:"resources"`
 }
 
 // listActions maps service name → action used to enumerate resources.
@@ -1091,7 +1091,7 @@ func (a *API) handleResources(w http.ResponseWriter, r *http.Request) {
 	action, actionKnown := listActions[serviceName]
 	if !actionKnown {
 		// Service is registered but we don't have a list action for it; return empty.
-		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []any{}})
 		return
 	}
 
@@ -1106,12 +1106,12 @@ func (a *API) handleResources(w http.ResponseWriter, r *http.Request) {
 	resp, svcErr := svc.HandleRequest(ctx)
 	if svcErr != nil {
 		// Return empty resource list on service errors rather than propagating AWS errors.
-		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []any{}})
 		return
 	}
 
 	if resp == nil || resp.Body == nil {
-		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []interface{}{}})
+		writeJSON(w, http.StatusOK, ResourcesResponse{Service: serviceName, Resources: []any{}})
 		return
 	}
 
@@ -1337,7 +1337,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 			rules, _ := a.dp.SLO.Rules(r.Context())
-			writeJSON(w, http.StatusOK, map[string]interface{}{
+			writeJSON(w, http.StatusOK, map[string]any{
 				"windows": status.Windows,
 				"healthy": status.Healthy,
 				"alerts":  status.Alerts,
@@ -1358,8 +1358,8 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]interface{}{"rule_count": len(rules)})
-			writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
+			a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]any{"rule_count": len(rules)})
+			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "rules": len(rules)})
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
@@ -1367,7 +1367,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if a.sloEngine == nil {
-		writeJSON(w, http.StatusOK, map[string]interface{}{"enabled": false})
+		writeJSON(w, http.StatusOK, map[string]any{"enabled": false})
 		return
 	}
 
@@ -1387,8 +1387,8 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.sloEngine.SetRules(rules)
-		a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]interface{}{"rule_count": len(rules)})
-		writeJSON(w, http.StatusOK, map[string]interface{}{"status": "ok", "rules": len(rules)})
+		a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]any{"rule_count": len(rules)})
+		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "rules": len(rules)})
 	default:
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 	}
@@ -1418,7 +1418,7 @@ func (a *API) handleBlastRadius(w http.ResponseWriter, r *http.Request) {
 	affected := bfsNodes(nodeID, upstream) // nodes that depend on this node
 	dependsOn := bfsNodes(nodeID, downstream) // nodes this node depends on
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"node":       nodeID,
 		"affected":   affected,
 		"depends_on": dependsOn,
@@ -1480,7 +1480,7 @@ func (a *API) handleTenants(w http.ResponseWriter, r *http.Request) {
 		if len(tenantReqs) > 0 {
 			avgLatency = totalLatency / float64(len(tenantReqs))
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"tenant_id":    tenantID,
 			"request_count": len(tenantReqs),
 			"error_count":  errorCount,
@@ -1584,7 +1584,7 @@ func (a *API) handleCost(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"total_cost_usd": totalCost,
 		"request_count":  len(entries),
 		"services":       costs,
@@ -1762,7 +1762,7 @@ func (a *API) handleCompare(w http.ResponseWriter, r *http.Request) {
 		regression = true // error rate increased by >5%
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"service":    service,
 		"action":     action,
 		"before":     beforeStats,
@@ -1823,7 +1823,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			if a.regressionEngine != nil {
 				a.regressionEngine.OnDeploy(deploy)
 			}
-			a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]interface{}{"service": deploy.Service})
+			a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]any{"service": deploy.Service})
 			writeJSON(w, http.StatusCreated, deploy)
 		default:
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
@@ -1879,7 +1879,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 
-		a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]interface{}{"service": deploy.Service})
+		a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]any{"service": deploy.Service})
 		writeJSON(w, http.StatusCreated, deploy)
 
 	default:
@@ -2019,7 +2019,7 @@ func (a *API) handleShadowTest(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"target":  req.Target,
 		"count":   len(results),
 		"results": results,
@@ -2083,7 +2083,7 @@ func (a *API) SetAuditLogger(l audit.Logger) {
 
 // auditLog records an audit entry if the audit logger is configured.
 // It is a fire-and-forget helper — errors are silently ignored.
-func (a *API) auditLog(ctx context.Context, action, resource string, details map[string]interface{}) {
+func (a *API) auditLog(ctx context.Context, action, resource string, details map[string]any) {
 	if a.auditLogger == nil {
 		return
 	}
@@ -2266,7 +2266,7 @@ func (a *API) handleChaos(w http.ResponseWriter, r *http.Request) {
 		if rules == nil {
 			rules = []gateway.ChaosRule{}
 		}
-		writeJSON(w, http.StatusOK, map[string]interface{}{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"rules":  rules,
 			"active": a.chaosEngine.HasActiveRules(),
 		})
@@ -2337,7 +2337,7 @@ func (a *API) handleChaosRule(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, v interface{}) {
+func writeJSON(w http.ResponseWriter, status int, v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -2354,7 +2354,7 @@ type ExplainContext struct {
 	Trace          *gateway.TraceContext    `json:"trace,omitempty"`
 	Timeline       []gateway.TimelineSpan  `json:"timeline,omitempty"`
 	SimilarRecent  []gateway.RequestEntry   `json:"similar_recent"`
-	ServiceMetrics interface{}              `json:"service_metrics,omitempty"`
+	ServiceMetrics any              `json:"service_metrics,omitempty"`
 	Topology       *TopologyResponseV2      `json:"topology_context,omitempty"`
 	Analysis       ExplainAnalysis          `json:"analysis"`
 	Narrative      string                   `json:"narrative"`
@@ -2989,7 +2989,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		a.auditLog(r.Context(), "incident.acknowledged", "incident:"+id, map[string]interface{}{"owner": body.Owner})
+		a.auditLog(r.Context(), "incident.acknowledged", "incident:"+id, map[string]any{"owner": body.Owner})
 		writeJSON(w, http.StatusOK, inc)
 		return
 	}
@@ -3064,7 +3064,7 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
-		a.auditLog(r.Context(), "webhook.created", "webhook:"+cfg.ID, map[string]interface{}{"url": cfg.URL})
+		a.auditLog(r.Context(), "webhook.created", "webhook:"+cfg.ID, map[string]any{"url": cfg.URL})
 		writeJSON(w, http.StatusCreated, cfg)
 		return
 	}
@@ -3278,7 +3278,7 @@ func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"token": token,
 		"user":  user,
 	})
@@ -3346,7 +3346,7 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.auditLog(r.Context(), "user.created", "user:"+user.ID, map[string]interface{}{
+	a.auditLog(r.Context(), "user.created", "user:"+user.ID, map[string]any{
 		"email": user.Email,
 		"role":  user.Role,
 	})
@@ -3440,7 +3440,7 @@ func (a *API) handleUserByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.auditLog(r.Context(), "user.role_updated", "user:"+id, map[string]interface{}{
+	a.auditLog(r.Context(), "user.role_updated", "user:"+id, map[string]any{
 		"new_role": req.Role,
 	})
 

@@ -22,7 +22,7 @@ import (
 
 type promResponse struct {
 	Status string      `json:"status"`
-	Data   interface{} `json:"data"`
+	Data   any `json:"data"`
 }
 
 type vectorData struct {
@@ -32,7 +32,7 @@ type vectorData struct {
 
 type vectorSample struct {
 	Metric map[string]string `json:"metric"`
-	Value  [2]interface{}    `json:"value"` // [unixTimestamp, "stringValue"]
+	Value  [2]any    `json:"value"` // [unixTimestamp, "stringValue"]
 }
 
 func floatStr(v float64) string {
@@ -59,7 +59,7 @@ func buildMockServer(t *testing.T, values []float64) *httptest.Server {
 				Result: []vectorSample{
 					{
 						Metric: map[string]string{},
-						Value:  [2]interface{}{ts, floatStr(v)},
+						Value:  [2]any{ts, floatStr(v)},
 					},
 				},
 			},

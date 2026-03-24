@@ -27,7 +27,7 @@ func newKinesisGateway(t *testing.T) http.Handler {
 }
 
 // kinesisReq builds a JSON POST request targeting the Kinesis service via X-Amz-Target.
-func kinesisReq(t *testing.T, action string, body interface{}) *http.Request {
+func kinesisReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func kinesisReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -66,7 +66,7 @@ func TestKinesis_CreateDescribeList(t *testing.T) {
 
 	// CreateStream
 	wCreate := httptest.NewRecorder()
-	handler.ServeHTTP(wCreate, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wCreate, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "my-stream",
 		"ShardCount": 2,
 	}))
@@ -84,7 +84,7 @@ func TestKinesis_CreateDescribeList(t *testing.T) {
 	}
 
 	mDesc := decodeJSON(t, wDesc.Body.String())
-	desc, ok := mDesc["StreamDescription"].(map[string]interface{})
+	desc, ok := mDesc["StreamDescription"].(map[string]any)
 	if !ok {
 		t.Fatalf("DescribeStream: missing StreamDescription\nbody: %s", wDesc.Body.String())
 	}
@@ -98,18 +98,18 @@ func TestKinesis_CreateDescribeList(t *testing.T) {
 	if arn == "" {
 		t.Error("DescribeStream: StreamARN is empty")
 	}
-	shards, _ := desc["Shards"].([]interface{})
+	shards, _ := desc["Shards"].([]any)
 	if len(shards) != 2 {
 		t.Errorf("DescribeStream: expected 2 shards, got %d", len(shards))
 	}
 
 	// Verify each shard has a ShardId and HashKeyRange.
 	for i, sh := range shards {
-		s := sh.(map[string]interface{})
+		s := sh.(map[string]any)
 		if s["ShardId"] == "" {
 			t.Errorf("DescribeStream: shard %d missing ShardId", i)
 		}
-		hkr, ok := s["HashKeyRange"].(map[string]interface{})
+		hkr, ok := s["HashKeyRange"].(map[string]any)
 		if !ok {
 			t.Errorf("DescribeStream: shard %d missing HashKeyRange", i)
 		} else {
@@ -127,7 +127,7 @@ func TestKinesis_CreateDescribeList(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wList.Body.String())
-	streamNames, _ := mList["StreamNames"].([]interface{})
+	streamNames, _ := mList["StreamNames"].([]any)
 	found := false
 	for _, n := range streamNames {
 		if n.(string) == "my-stream" {
@@ -146,7 +146,7 @@ func TestKinesis_PutRecord_GetRecords_RoundTrip(t *testing.T) {
 
 	// CreateStream with 1 shard.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "records-stream",
 		"ShardCount": 1,
 	}))
@@ -197,7 +197,7 @@ func TestKinesis_PutRecord_GetRecords_RoundTrip(t *testing.T) {
 
 	// GetRecords.
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wg, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": iterToken,
 		"Limit":         100,
 	}))
@@ -206,12 +206,12 @@ func TestKinesis_PutRecord_GetRecords_RoundTrip(t *testing.T) {
 	}
 
 	mGet := decodeJSON(t, wg.Body.String())
-	records, _ := mGet["Records"].([]interface{})
+	records, _ := mGet["Records"].([]any)
 	if len(records) != 1 {
 		t.Fatalf("GetRecords: expected 1 record, got %d\nbody: %s", len(records), wg.Body.String())
 	}
 
-	rec := records[0].(map[string]interface{})
+	rec := records[0].(map[string]any)
 	dataB64, _ := rec["Data"].(string)
 	if dataB64 == "" {
 		t.Fatal("GetRecords: record missing Data")
@@ -236,14 +236,14 @@ func TestKinesis_PutRecord_GetRecords_RoundTrip(t *testing.T) {
 
 	// Call GetRecords again with NextShardIterator — should return no new records.
 	wg2 := httptest.NewRecorder()
-	handler.ServeHTTP(wg2, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wg2, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": nextIter,
 	}))
 	if wg2.Code != http.StatusOK {
 		t.Fatalf("GetRecords (next): expected 200, got %d\nbody: %s", wg2.Code, wg2.Body.String())
 	}
 	mGet2 := decodeJSON(t, wg2.Body.String())
-	records2, _ := mGet2["Records"].([]interface{})
+	records2, _ := mGet2["Records"].([]any)
 	if len(records2) != 0 {
 		t.Errorf("GetRecords (next): expected 0 records after consuming all, got %d", len(records2))
 	}
@@ -256,7 +256,7 @@ func TestKinesis_PutRecords(t *testing.T) {
 
 	// CreateStream.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "batch-stream",
 		"ShardCount": 2,
 	}))
@@ -271,7 +271,7 @@ func TestKinesis_PutRecords(t *testing.T) {
 	}
 
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, kinesisReq(t, "PutRecords", map[string]interface{}{
+	handler.ServeHTTP(wp, kinesisReq(t, "PutRecords", map[string]any{
 		"StreamName": "batch-stream",
 		"Records":    records,
 	}))
@@ -285,13 +285,13 @@ func TestKinesis_PutRecords(t *testing.T) {
 		t.Errorf("PutRecords: expected FailedRecordCount=0, got %v", failedCount)
 	}
 
-	results, _ := mPut["Records"].([]interface{})
+	results, _ := mPut["Records"].([]any)
 	if len(results) != 3 {
 		t.Fatalf("PutRecords: expected 3 result records, got %d", len(results))
 	}
 
 	for i, r := range results {
-		rec := r.(map[string]interface{})
+		rec := r.(map[string]any)
 		if rec["ShardId"] == "" {
 			t.Errorf("PutRecords: record %d missing ShardId", i)
 		}
@@ -308,7 +308,7 @@ func TestKinesis_DeleteStream(t *testing.T) {
 
 	// CreateStream.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "delete-stream",
 		"ShardCount": 1,
 	}))
@@ -351,7 +351,7 @@ func TestKinesis_Tags(t *testing.T) {
 
 	// CreateStream.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "tag-stream",
 		"ShardCount": 1,
 	}))
@@ -361,7 +361,7 @@ func TestKinesis_Tags(t *testing.T) {
 
 	// AddTagsToStream.
 	wa := httptest.NewRecorder()
-	handler.ServeHTTP(wa, kinesisReq(t, "AddTagsToStream", map[string]interface{}{
+	handler.ServeHTTP(wa, kinesisReq(t, "AddTagsToStream", map[string]any{
 		"StreamName": "tag-stream",
 		"Tags":       map[string]string{"env": "test", "team": "data"},
 	}))
@@ -379,14 +379,14 @@ func TestKinesis_Tags(t *testing.T) {
 	}
 
 	mList := decodeJSON(t, wl.Body.String())
-	tags, _ := mList["Tags"].([]interface{})
+	tags, _ := mList["Tags"].([]any)
 	if len(tags) != 2 {
 		t.Fatalf("ListTagsForStream: expected 2 tags, got %d\nbody: %s", len(tags), wl.Body.String())
 	}
 
 	tagMap := make(map[string]string)
 	for _, tg := range tags {
-		entry := tg.(map[string]interface{})
+		entry := tg.(map[string]any)
 		tagMap[entry["Key"].(string)] = entry["Value"].(string)
 	}
 	if tagMap["env"] != "test" {
@@ -398,7 +398,7 @@ func TestKinesis_Tags(t *testing.T) {
 
 	// RemoveTagsFromStream.
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, kinesisReq(t, "RemoveTagsFromStream", map[string]interface{}{
+	handler.ServeHTTP(wr, kinesisReq(t, "RemoveTagsFromStream", map[string]any{
 		"StreamName": "tag-stream",
 		"TagKeys":    []string{"env"},
 	}))
@@ -412,11 +412,11 @@ func TestKinesis_Tags(t *testing.T) {
 		"StreamName": "tag-stream",
 	}))
 	mList2 := decodeJSON(t, wl2.Body.String())
-	tags2, _ := mList2["Tags"].([]interface{})
+	tags2, _ := mList2["Tags"].([]any)
 	if len(tags2) != 1 {
 		t.Fatalf("ListTagsForStream after remove: expected 1 tag, got %d", len(tags2))
 	}
-	entry := tags2[0].(map[string]interface{})
+	entry := tags2[0].(map[string]any)
 	if entry["Key"].(string) != "team" {
 		t.Errorf("ListTagsForStream after remove: expected remaining tag key=team, got %q", entry["Key"])
 	}
@@ -429,7 +429,7 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 
 	// CreateStream.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "iter-stream",
 		"ShardCount": 1,
 	}))
@@ -476,7 +476,7 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 
 	// GetRecords with LATEST iterator should only see the second record.
 	wgLatest := httptest.NewRecorder()
-	handler.ServeHTTP(wgLatest, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wgLatest, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": latestToken,
 		"Limit":         100,
 	}))
@@ -484,11 +484,11 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 		t.Fatalf("GetRecords LATEST: %d %s", wgLatest.Code, wgLatest.Body.String())
 	}
 	mGLatest := decodeJSON(t, wgLatest.Body.String())
-	rLatest, _ := mGLatest["Records"].([]interface{})
+	rLatest, _ := mGLatest["Records"].([]any)
 	if len(rLatest) != 1 {
 		t.Fatalf("GetRecords LATEST: expected 1 record, got %d", len(rLatest))
 	}
-	latestData, _ := base64.StdEncoding.DecodeString(rLatest[0].(map[string]interface{})["Data"].(string))
+	latestData, _ := base64.StdEncoding.DecodeString(rLatest[0].(map[string]any)["Data"].(string))
 	if string(latestData) != "after-latest" {
 		t.Errorf("GetRecords LATEST: expected 'after-latest', got %q", string(latestData))
 	}
@@ -507,7 +507,7 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 	thToken := mTH["ShardIterator"].(string)
 
 	wgTH := httptest.NewRecorder()
-	handler.ServeHTTP(wgTH, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wgTH, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": thToken,
 		"Limit":         100,
 	}))
@@ -515,7 +515,7 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 		t.Fatalf("GetRecords TRIM_HORIZON: %d %s", wgTH.Code, wgTH.Body.String())
 	}
 	mGTH := decodeJSON(t, wgTH.Body.String())
-	rTH, _ := mGTH["Records"].([]interface{})
+	rTH, _ := mGTH["Records"].([]any)
 	if len(rTH) != 2 {
 		t.Fatalf("GetRecords TRIM_HORIZON: expected 2 records, got %d", len(rTH))
 	}
@@ -536,12 +536,12 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 	atToken := mAT["ShardIterator"].(string)
 
 	wgAT := httptest.NewRecorder()
-	handler.ServeHTTP(wgAT, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wgAT, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": atToken,
 		"Limit":         100,
 	}))
 	mGAT := decodeJSON(t, wgAT.Body.String())
-	rAT, _ := mGAT["Records"].([]interface{})
+	rAT, _ := mGAT["Records"].([]any)
 	// AT_SEQUENCE_NUMBER should include the record at that sequence number onwards.
 	if len(rAT) != 2 {
 		t.Errorf("GetRecords AT_SEQUENCE_NUMBER: expected 2 records from first seq, got %d", len(rAT))
@@ -562,12 +562,12 @@ func TestKinesis_ShardIteratorTypes(t *testing.T) {
 	afterToken := mAfter["ShardIterator"].(string)
 
 	wgAfter := httptest.NewRecorder()
-	handler.ServeHTTP(wgAfter, kinesisReq(t, "GetRecords", map[string]interface{}{
+	handler.ServeHTTP(wgAfter, kinesisReq(t, "GetRecords", map[string]any{
 		"ShardIterator": afterToken,
 		"Limit":         100,
 	}))
 	mGAfter := decodeJSON(t, wgAfter.Body.String())
-	rAfter, _ := mGAfter["Records"].([]interface{})
+	rAfter, _ := mGAfter["Records"].([]any)
 	if len(rAfter) != 1 {
 		t.Errorf("GetRecords AFTER_SEQUENCE_NUMBER: expected 1 record after first seq, got %d", len(rAfter))
 	}
@@ -579,7 +579,7 @@ func TestKinesis_CreateStream_Duplicate(t *testing.T) {
 	handler := newKinesisGateway(t)
 
 	wc1 := httptest.NewRecorder()
-	handler.ServeHTTP(wc1, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc1, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "dup-stream",
 		"ShardCount": 1,
 	}))
@@ -588,7 +588,7 @@ func TestKinesis_CreateStream_Duplicate(t *testing.T) {
 	}
 
 	wc2 := httptest.NewRecorder()
-	handler.ServeHTTP(wc2, kinesisReq(t, "CreateStream", map[string]interface{}{
+	handler.ServeHTTP(wc2, kinesisReq(t, "CreateStream", map[string]any{
 		"StreamName": "dup-stream",
 		"ShardCount": 1,
 	}))

@@ -28,7 +28,7 @@ func newLogsGateway(t *testing.T) http.Handler {
 }
 
 // logsReq builds a JSON POST request targeting the CloudWatch Logs service via X-Amz-Target.
-func logsReq(t *testing.T, action string, body interface{}) *http.Request {
+func logsReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -52,9 +52,9 @@ func logsReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -73,7 +73,7 @@ func TestLogs_CreateLogGroup_DescribeLogGroups(t *testing.T) {
 
 	// CreateLogGroup
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wc, logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/app/my-service",
 	}))
 	if wc.Code != http.StatusOK {
@@ -82,7 +82,7 @@ func TestLogs_CreateLogGroup_DescribeLogGroups(t *testing.T) {
 
 	// Create a second group for prefix filtering
 	wc2 := httptest.NewRecorder()
-	handler.ServeHTTP(wc2, logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wc2, logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/other/service",
 	}))
 	if wc2.Code != http.StatusOK {
@@ -97,7 +97,7 @@ func TestLogs_CreateLogGroup_DescribeLogGroups(t *testing.T) {
 	}
 
 	md := decodeJSON(t, wd.Body.String())
-	groups, ok := md["logGroups"].([]interface{})
+	groups, ok := md["logGroups"].([]any)
 	if !ok {
 		t.Fatalf("DescribeLogGroups: missing logGroups\nbody: %s", wd.Body.String())
 	}
@@ -106,9 +106,9 @@ func TestLogs_CreateLogGroup_DescribeLogGroups(t *testing.T) {
 	}
 
 	// Verify fields on the first group.
-	var appGroup map[string]interface{}
+	var appGroup map[string]any
 	for _, g := range groups {
-		entry := g.(map[string]interface{})
+		entry := g.(map[string]any)
 		if entry["logGroupName"].(string) == "/app/my-service" {
 			appGroup = entry
 			break
@@ -134,14 +134,14 @@ func TestLogs_CreateLogGroup_DescribeLogGroups(t *testing.T) {
 		t.Fatalf("DescribeLogGroups prefix: expected 200, got %d\nbody: %s", wf.Code, wf.Body.String())
 	}
 	mf := decodeJSON(t, wf.Body.String())
-	filtered, _ := mf["logGroups"].([]interface{})
+	filtered, _ := mf["logGroups"].([]any)
 	if len(filtered) != 1 {
 		t.Errorf("DescribeLogGroups prefix: expected 1 group, got %d", len(filtered))
 	}
 
 	// AlreadyExists check
 	we := httptest.NewRecorder()
-	handler.ServeHTTP(we, logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(we, logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/app/my-service",
 	}))
 	if we.Code != http.StatusBadRequest {
@@ -161,7 +161,7 @@ func TestLogs_CreateLogStream_DescribeLogStreams(t *testing.T) {
 
 	// Create group first.
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wg, logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/stream-test/group",
 	}))
 	if wg.Code != http.StatusOK {
@@ -198,7 +198,7 @@ func TestLogs_CreateLogStream_DescribeLogStreams(t *testing.T) {
 	}
 
 	mds := decodeJSON(t, wds.Body.String())
-	streams, ok := mds["logStreams"].([]interface{})
+	streams, ok := mds["logStreams"].([]any)
 	if !ok {
 		t.Fatalf("DescribeLogStreams: missing logStreams\nbody: %s", wds.Body.String())
 	}
@@ -216,11 +216,11 @@ func TestLogs_CreateLogStream_DescribeLogStreams(t *testing.T) {
 		t.Fatalf("DescribeLogStreams prefix: expected 200, got %d\nbody: %s", wpf.Code, wpf.Body.String())
 	}
 	mpf := decodeJSON(t, wpf.Body.String())
-	filtered, _ := mpf["logStreams"].([]interface{})
+	filtered, _ := mpf["logStreams"].([]any)
 	if len(filtered) != 1 {
 		t.Errorf("DescribeLogStreams prefix: expected 1 stream, got %d", len(filtered))
 	}
-	firstName := filtered[0].(map[string]interface{})["logStreamName"].(string)
+	firstName := filtered[0].(map[string]any)["logStreamName"].(string)
 	if firstName != "stream-alpha" {
 		t.Errorf("DescribeLogStreams prefix: expected stream-alpha, got %q", firstName)
 	}
@@ -242,7 +242,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 	handler := newLogsGateway(t)
 
 	// Setup group and stream.
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/events/group",
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogStream", map[string]string{
@@ -251,7 +251,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 	}))
 
 	ts := nowMs()
-	events := []map[string]interface{}{
+	events := []map[string]any{
 		{"timestamp": ts, "message": "first log line"},
 		{"timestamp": ts + 1, "message": "second log line"},
 		{"timestamp": ts + 2, "message": "third log line"},
@@ -259,7 +259,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 
 	// PutLogEvents
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, logsReq(t, "PutLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wp, logsReq(t, "PutLogEvents", map[string]any{
 		"logGroupName":  "/events/group",
 		"logStreamName": "event-stream",
 		"logEvents":     events,
@@ -276,7 +276,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 
 	// GetLogEvents
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, logsReq(t, "GetLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wg, logsReq(t, "GetLogEvents", map[string]any{
 		"logGroupName":  "/events/group",
 		"logStreamName": "event-stream",
 	}))
@@ -285,7 +285,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 	}
 
 	mg := decodeJSON(t, wg.Body.String())
-	evList, ok := mg["events"].([]interface{})
+	evList, ok := mg["events"].([]any)
 	if !ok {
 		t.Fatalf("GetLogEvents: missing events\nbody: %s", wg.Body.String())
 	}
@@ -294,7 +294,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 	}
 
 	// Verify event fields.
-	first := evList[0].(map[string]interface{})
+	first := evList[0].(map[string]any)
 	if first["message"].(string) != "first log line" {
 		t.Errorf("GetLogEvents: first message = %q, want %q", first["message"], "first log line")
 	}
@@ -312,7 +312,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 
 	// GetLogEvents with time filter — only middle event
 	wf := httptest.NewRecorder()
-	handler.ServeHTTP(wf, logsReq(t, "GetLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wf, logsReq(t, "GetLogEvents", map[string]any{
 		"logGroupName":  "/events/group",
 		"logStreamName": "event-stream",
 		"startTime":     ts + 1,
@@ -322,14 +322,14 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 		t.Fatalf("GetLogEvents filtered: expected 200, got %d\nbody: %s", wf.Code, wf.Body.String())
 	}
 	mf := decodeJSON(t, wf.Body.String())
-	filteredEvs, _ := mf["events"].([]interface{})
+	filteredEvs, _ := mf["events"].([]any)
 	if len(filteredEvs) != 1 {
 		t.Errorf("GetLogEvents filtered: expected 1 event, got %d", len(filteredEvs))
 	}
 
 	// GetLogEvents with limit
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, logsReq(t, "GetLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wl, logsReq(t, "GetLogEvents", map[string]any{
 		"logGroupName":  "/events/group",
 		"logStreamName": "event-stream",
 		"limit":         2,
@@ -338,7 +338,7 @@ func TestLogs_PutLogEvents_GetLogEvents(t *testing.T) {
 		t.Fatalf("GetLogEvents limit: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	limitedEvs, _ := ml["events"].([]interface{})
+	limitedEvs, _ := ml["events"].([]any)
 	if len(limitedEvs) != 2 {
 		t.Errorf("GetLogEvents limit: expected 2 events, got %d", len(limitedEvs))
 	}
@@ -350,7 +350,7 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 	handler := newLogsGateway(t)
 
 	// Setup
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/filter/group",
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogStream", map[string]string{
@@ -365,20 +365,20 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 	ts := nowMs()
 
 	// Put events into stream 1
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]any{
 		"logGroupName":  "/filter/group",
 		"logStreamName": "filter-stream-1",
-		"logEvents": []map[string]interface{}{
+		"logEvents": []map[string]any{
 			{"timestamp": ts, "message": "ERROR: disk full"},
 			{"timestamp": ts + 1, "message": "INFO: service started"},
 		},
 	}))
 
 	// Put events into stream 2
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]any{
 		"logGroupName":  "/filter/group",
 		"logStreamName": "filter-stream-2",
-		"logEvents": []map[string]interface{}{
+		"logEvents": []map[string]any{
 			{"timestamp": ts + 2, "message": "ERROR: out of memory"},
 			{"timestamp": ts + 3, "message": "DEBUG: checkpoint"},
 		},
@@ -386,7 +386,7 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 
 	// FilterLogEvents — match "ERROR" across all streams
 	wf := httptest.NewRecorder()
-	handler.ServeHTTP(wf, logsReq(t, "FilterLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wf, logsReq(t, "FilterLogEvents", map[string]any{
 		"logGroupName":  "/filter/group",
 		"filterPattern": "ERROR",
 	}))
@@ -395,7 +395,7 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 	}
 
 	mf := decodeJSON(t, wf.Body.String())
-	evs, ok := mf["events"].([]interface{})
+	evs, ok := mf["events"].([]any)
 	if !ok {
 		t.Fatalf("FilterLogEvents: missing events\nbody: %s", wf.Body.String())
 	}
@@ -403,7 +403,7 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 		t.Errorf("FilterLogEvents ERROR: expected 2 events, got %d", len(evs))
 	}
 	for _, e := range evs {
-		msg := e.(map[string]interface{})["message"].(string)
+		msg := e.(map[string]any)["message"].(string)
 		if !strings.Contains(msg, "ERROR") {
 			t.Errorf("FilterLogEvents: unexpected event message %q (expected ERROR match)", msg)
 		}
@@ -411,7 +411,7 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 
 	// FilterLogEvents — match nothing
 	wn := httptest.NewRecorder()
-	handler.ServeHTTP(wn, logsReq(t, "FilterLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wn, logsReq(t, "FilterLogEvents", map[string]any{
 		"logGroupName":  "/filter/group",
 		"filterPattern": "CRITICAL",
 	}))
@@ -419,14 +419,14 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 		t.Fatalf("FilterLogEvents no match: expected 200, got %d\nbody: %s", wn.Code, wn.Body.String())
 	}
 	mn := decodeJSON(t, wn.Body.String())
-	noEvs, _ := mn["events"].([]interface{})
+	noEvs, _ := mn["events"].([]any)
 	if len(noEvs) != 0 {
 		t.Errorf("FilterLogEvents no match: expected 0 events, got %d", len(noEvs))
 	}
 
 	// FilterLogEvents — specific stream only
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, logsReq(t, "FilterLogEvents", map[string]interface{}{
+	handler.ServeHTTP(ws, logsReq(t, "FilterLogEvents", map[string]any{
 		"logGroupName":   "/filter/group",
 		"filterPattern":  "ERROR",
 		"logStreamNames": []string{"filter-stream-1"},
@@ -435,21 +435,21 @@ func TestLogs_FilterLogEvents(t *testing.T) {
 		t.Fatalf("FilterLogEvents stream filter: expected 200, got %d\nbody: %s", ws.Code, ws.Body.String())
 	}
 	ms := decodeJSON(t, ws.Body.String())
-	streamEvs, _ := ms["events"].([]interface{})
+	streamEvs, _ := ms["events"].([]any)
 	if len(streamEvs) != 1 {
 		t.Errorf("FilterLogEvents stream filter: expected 1 event, got %d", len(streamEvs))
 	}
 
 	// FilterLogEvents — no pattern (returns all events)
 	wa := httptest.NewRecorder()
-	handler.ServeHTTP(wa, logsReq(t, "FilterLogEvents", map[string]interface{}{
+	handler.ServeHTTP(wa, logsReq(t, "FilterLogEvents", map[string]any{
 		"logGroupName": "/filter/group",
 	}))
 	if wa.Code != http.StatusOK {
 		t.Fatalf("FilterLogEvents all: expected 200, got %d\nbody: %s", wa.Code, wa.Body.String())
 	}
 	ma := decodeJSON(t, wa.Body.String())
-	allEvs, _ := ma["events"].([]interface{})
+	allEvs, _ := ma["events"].([]any)
 	if len(allEvs) != 4 {
 		t.Errorf("FilterLogEvents all: expected 4 events, got %d", len(allEvs))
 	}
@@ -461,17 +461,17 @@ func TestLogs_DeleteStreamAndGroup(t *testing.T) {
 	handler := newLogsGateway(t)
 
 	// Setup group + stream + events
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/delete-test/group",
 	}))
 	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogStream", map[string]string{
 		"logGroupName":  "/delete-test/group",
 		"logStreamName": "to-delete",
 	}))
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "PutLogEvents", map[string]any{
 		"logGroupName":  "/delete-test/group",
 		"logStreamName": "to-delete",
-		"logEvents": []map[string]interface{}{
+		"logEvents": []map[string]any{
 			{"timestamp": nowMs(), "message": "some event"},
 		},
 	}))
@@ -495,7 +495,7 @@ func TestLogs_DeleteStreamAndGroup(t *testing.T) {
 		t.Fatalf("DescribeLogStreams after delete: %d %s", wdesc.Code, wdesc.Body.String())
 	}
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	remainingStreams, _ := mdesc["logStreams"].([]interface{})
+	remainingStreams, _ := mdesc["logStreams"].([]any)
 	if len(remainingStreams) != 0 {
 		t.Errorf("DeleteLogStream: stream still appears in DescribeLogStreams")
 	}
@@ -517,7 +517,7 @@ func TestLogs_DeleteStreamAndGroup(t *testing.T) {
 
 	// DeleteLogGroup
 	wdg := httptest.NewRecorder()
-	handler.ServeHTTP(wdg, logsReq(t, "DeleteLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wdg, logsReq(t, "DeleteLogGroup", map[string]any{
 		"logGroupName": "/delete-test/group",
 	}))
 	if wdg.Code != http.StatusOK {
@@ -533,14 +533,14 @@ func TestLogs_DeleteStreamAndGroup(t *testing.T) {
 		t.Fatalf("DescribeLogGroups after delete: %d %s", wdg2.Code, wdg2.Body.String())
 	}
 	mdg2 := decodeJSON(t, wdg2.Body.String())
-	remainingGroups, _ := mdg2["logGroups"].([]interface{})
+	remainingGroups, _ := mdg2["logGroups"].([]any)
 	if len(remainingGroups) != 0 {
 		t.Errorf("DeleteLogGroup: group still appears in DescribeLogGroups")
 	}
 
 	// DeleteLogGroup — not found
 	wne2 := httptest.NewRecorder()
-	handler.ServeHTTP(wne2, logsReq(t, "DeleteLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wne2, logsReq(t, "DeleteLogGroup", map[string]any{
 		"logGroupName": "/delete-test/group",
 	}))
 	if wne2.Code != http.StatusBadRequest {
@@ -554,13 +554,13 @@ func TestLogs_RetentionPolicy(t *testing.T) {
 	handler := newLogsGateway(t)
 
 	// Create group
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/retention/group",
 	}))
 
 	// PutRetentionPolicy
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, logsReq(t, "PutRetentionPolicy", map[string]interface{}{
+	handler.ServeHTTP(wp, logsReq(t, "PutRetentionPolicy", map[string]any{
 		"logGroupName":    "/retention/group",
 		"retentionInDays": 30,
 	}))
@@ -577,11 +577,11 @@ func TestLogs_RetentionPolicy(t *testing.T) {
 		t.Fatalf("DescribeLogGroups: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
 	}
 	md := decodeJSON(t, wd.Body.String())
-	groups, _ := md["logGroups"].([]interface{})
+	groups, _ := md["logGroups"].([]any)
 	if len(groups) != 1 {
 		t.Fatalf("DescribeLogGroups: expected 1 group, got %d", len(groups))
 	}
-	retentionVal := groups[0].(map[string]interface{})["retentionInDays"]
+	retentionVal := groups[0].(map[string]any)["retentionInDays"]
 	// JSON numbers decode as float64
 	if retention, ok := retentionVal.(float64); !ok || int(retention) != 30 {
 		t.Errorf("PutRetentionPolicy: expected retentionInDays=30, got %v", retentionVal)
@@ -589,7 +589,7 @@ func TestLogs_RetentionPolicy(t *testing.T) {
 
 	// PutRetentionPolicy — invalid value
 	winv := httptest.NewRecorder()
-	handler.ServeHTTP(winv, logsReq(t, "PutRetentionPolicy", map[string]interface{}{
+	handler.ServeHTTP(winv, logsReq(t, "PutRetentionPolicy", map[string]any{
 		"logGroupName":    "/retention/group",
 		"retentionInDays": 0,
 	}))
@@ -599,7 +599,7 @@ func TestLogs_RetentionPolicy(t *testing.T) {
 
 	// DeleteRetentionPolicy
 	wdr := httptest.NewRecorder()
-	handler.ServeHTTP(wdr, logsReq(t, "DeleteRetentionPolicy", map[string]interface{}{
+	handler.ServeHTTP(wdr, logsReq(t, "DeleteRetentionPolicy", map[string]any{
 		"logGroupName": "/retention/group",
 	}))
 	if wdr.Code != http.StatusOK {
@@ -612,12 +612,12 @@ func TestLogs_RetentionPolicy(t *testing.T) {
 		"logGroupNamePrefix": "/retention/",
 	}))
 	md2 := decodeJSON(t, wd2.Body.String())
-	groups2, _ := md2["logGroups"].([]interface{})
+	groups2, _ := md2["logGroups"].([]any)
 	if len(groups2) != 1 {
 		t.Fatalf("DescribeLogGroups after delete retention: expected 1 group, got %d", len(groups2))
 	}
 	// retentionInDays is omitempty — should be absent or 0 after deletion
-	retAfterDelete := groups2[0].(map[string]interface{})["retentionInDays"]
+	retAfterDelete := groups2[0].(map[string]any)["retentionInDays"]
 	if retAfterDelete != nil {
 		if r, ok := retAfterDelete.(float64); ok && int(r) != 0 {
 			t.Errorf("DeleteRetentionPolicy: expected retentionInDays to be 0 or absent, got %v", r)
@@ -631,7 +631,7 @@ func TestLogs_TagOperations(t *testing.T) {
 	handler := newLogsGateway(t)
 
 	// Create group with initial tags
-	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]interface{}{
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
 		"logGroupName": "/tags/group",
 		"tags": map[string]string{
 			"Env": "production",
@@ -647,7 +647,7 @@ func TestLogs_TagOperations(t *testing.T) {
 		t.Fatalf("ListTagsLogGroup: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	tags, ok := ml["tags"].(map[string]interface{})
+	tags, ok := ml["tags"].(map[string]any)
 	if !ok {
 		t.Fatalf("ListTagsLogGroup: missing tags\nbody: %s", wl.Body.String())
 	}
@@ -657,7 +657,7 @@ func TestLogs_TagOperations(t *testing.T) {
 
 	// TagLogGroup — add more tags
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, logsReq(t, "TagLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wt, logsReq(t, "TagLogGroup", map[string]any{
 		"logGroupName": "/tags/group",
 		"tags": map[string]string{
 			"Team":    "platform",
@@ -674,7 +674,7 @@ func TestLogs_TagOperations(t *testing.T) {
 		"logGroupName": "/tags/group",
 	}))
 	ml2 := decodeJSON(t, wl2.Body.String())
-	tags2 := ml2["tags"].(map[string]interface{})
+	tags2 := ml2["tags"].(map[string]any)
 	if len(tags2) != 3 {
 		t.Errorf("TagLogGroup: expected 3 tags, got %d", len(tags2))
 	}
@@ -684,7 +684,7 @@ func TestLogs_TagOperations(t *testing.T) {
 
 	// UntagLogGroup — remove Version
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, logsReq(t, "UntagLogGroup", map[string]interface{}{
+	handler.ServeHTTP(wu, logsReq(t, "UntagLogGroup", map[string]any{
 		"logGroupName": "/tags/group",
 		"tags":         []string{"Version"},
 	}))
@@ -698,7 +698,7 @@ func TestLogs_TagOperations(t *testing.T) {
 		"logGroupName": "/tags/group",
 	}))
 	ml3 := decodeJSON(t, wl3.Body.String())
-	tags3 := ml3["tags"].(map[string]interface{})
+	tags3 := ml3["tags"].(map[string]any)
 	if len(tags3) != 2 {
 		t.Errorf("UntagLogGroup: expected 2 tags, got %d", len(tags3))
 	}

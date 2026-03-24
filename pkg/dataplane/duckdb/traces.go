@@ -172,7 +172,7 @@ func (s *TraceStore) Get(ctx context.Context, traceID string) (*dataplane.TraceC
 func (s *TraceStore) Search(ctx context.Context, filter dataplane.TraceFilter) ([]dataplane.TraceSummary, error) {
 	var (
 		where []string
-		args  []interface{}
+		args  []any
 	)
 	if filter.Service != "" {
 		where = append(where, "service_name = ?")

@@ -27,7 +27,7 @@ func newECSGateway(t *testing.T) http.Handler {
 }
 
 // ecsReq builds a JSON POST request targeting the ECS service via X-Amz-Target.
-func ecsReq(t *testing.T, action string, body interface{}) *http.Request {
+func ecsReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func ecsReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -66,7 +66,7 @@ func TestECS_ClusterLifecycle(t *testing.T) {
 
 	// CreateCluster.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "my-cluster",
 		"tags": []map[string]string{
 			{"key": "env", "value": "test"},
@@ -77,7 +77,7 @@ func TestECS_ClusterLifecycle(t *testing.T) {
 	}
 
 	mc := decodeJSON(t, wc.Body.String())
-	cluster, ok := mc["cluster"].(map[string]interface{})
+	cluster, ok := mc["cluster"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateCluster: missing cluster in response\nbody: %s", wc.Body.String())
 	}
@@ -99,7 +99,7 @@ func TestECS_ClusterLifecycle(t *testing.T) {
 		t.Fatalf("ListClusters: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	clusterArns, ok := ml["clusterArns"].([]interface{})
+	clusterArns, ok := ml["clusterArns"].([]any)
 	if !ok || len(clusterArns) == 0 {
 		t.Fatalf("ListClusters: expected non-empty clusterArns\nbody: %s", wl.Body.String())
 	}
@@ -116,30 +116,30 @@ func TestECS_ClusterLifecycle(t *testing.T) {
 
 	// DescribeClusters — by name.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, ecsReq(t, "DescribeClusters", map[string]interface{}{
+	handler.ServeHTTP(wd, ecsReq(t, "DescribeClusters", map[string]any{
 		"clusters": []string{"my-cluster"},
 	}))
 	if wd.Code != http.StatusOK {
 		t.Fatalf("DescribeClusters: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
 	}
 	md := decodeJSON(t, wd.Body.String())
-	clusters, ok := md["clusters"].([]interface{})
+	clusters, ok := md["clusters"].([]any)
 	if !ok || len(clusters) == 0 {
 		t.Fatalf("DescribeClusters: expected non-empty clusters\nbody: %s", wd.Body.String())
 	}
-	entry := clusters[0].(map[string]interface{})
+	entry := clusters[0].(map[string]any)
 	if entry["clusterName"].(string) != "my-cluster" {
 		t.Errorf("DescribeClusters: expected clusterName=my-cluster, got %q", entry["clusterName"])
 	}
 
 	// DescribeClusters — all (no filter).
 	wda := httptest.NewRecorder()
-	handler.ServeHTTP(wda, ecsReq(t, "DescribeClusters", map[string]interface{}{}))
+	handler.ServeHTTP(wda, ecsReq(t, "DescribeClusters", map[string]any{}))
 	if wda.Code != http.StatusOK {
 		t.Fatalf("DescribeClusters all: expected 200, got %d\nbody: %s", wda.Code, wda.Body.String())
 	}
 	mda := decodeJSON(t, wda.Body.String())
-	allClusters, ok := mda["clusters"].([]interface{})
+	allClusters, ok := mda["clusters"].([]any)
 	if !ok || len(allClusters) == 0 {
 		t.Fatalf("DescribeClusters all: expected non-empty clusters")
 	}
@@ -152,16 +152,16 @@ func TestECS_TaskDefinitionLifecycle(t *testing.T) {
 
 	// Register revision 1.
 	wr1 := httptest.NewRecorder()
-	handler.ServeHTTP(wr1, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wr1, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "web-app",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{
 				"name":      "web",
 				"image":     "nginx:latest",
 				"cpu":       256,
 				"memory":    512,
 				"essential": true,
-				"portMappings": []map[string]interface{}{
+				"portMappings": []map[string]any{
 					{"containerPort": 80, "hostPort": 80, "protocol": "tcp"},
 				},
 			},
@@ -175,7 +175,7 @@ func TestECS_TaskDefinitionLifecycle(t *testing.T) {
 		t.Fatalf("RegisterTaskDefinition rev1: expected 200, got %d\nbody: %s", wr1.Code, wr1.Body.String())
 	}
 	mr1 := decodeJSON(t, wr1.Body.String())
-	td1, ok := mr1["taskDefinition"].(map[string]interface{})
+	td1, ok := mr1["taskDefinition"].(map[string]any)
 	if !ok {
 		t.Fatalf("RegisterTaskDefinition rev1: missing taskDefinition\nbody: %s", wr1.Body.String())
 	}
@@ -195,9 +195,9 @@ func TestECS_TaskDefinitionLifecycle(t *testing.T) {
 
 	// Register revision 2 — verify increment.
 	wr2 := httptest.NewRecorder()
-	handler.ServeHTTP(wr2, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wr2, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "web-app",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{"name": "web", "image": "nginx:1.25", "cpu": 256, "memory": 512, "essential": true},
 		},
 		"networkMode": "awsvpc",
@@ -208,7 +208,7 @@ func TestECS_TaskDefinitionLifecycle(t *testing.T) {
 		t.Fatalf("RegisterTaskDefinition rev2: expected 200, got %d\nbody: %s", wr2.Code, wr2.Body.String())
 	}
 	mr2 := decodeJSON(t, wr2.Body.String())
-	td2 := mr2["taskDefinition"].(map[string]interface{})
+	td2 := mr2["taskDefinition"].(map[string]any)
 	if td2["revision"].(float64) != 2 {
 		t.Errorf("RegisterTaskDefinition rev2: expected revision=2, got %v", td2["revision"])
 	}
@@ -219,40 +219,40 @@ func TestECS_TaskDefinitionLifecycle(t *testing.T) {
 
 	// DescribeTaskDefinition — by family:revision.
 	wdesc := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeTaskDefinition", map[string]any{
 		"taskDefinition": "web-app:1",
 	}))
 	if wdesc.Code != http.StatusOK {
 		t.Fatalf("DescribeTaskDefinition: expected 200, got %d\nbody: %s", wdesc.Code, wdesc.Body.String())
 	}
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	tdDesc := mdesc["taskDefinition"].(map[string]interface{})
+	tdDesc := mdesc["taskDefinition"].(map[string]any)
 	if tdDesc["revision"].(float64) != 1 {
 		t.Errorf("DescribeTaskDefinition: expected revision=1")
 	}
 
 	// ListTaskDefinitions — all.
 	wlist := httptest.NewRecorder()
-	handler.ServeHTTP(wlist, ecsReq(t, "ListTaskDefinitions", map[string]interface{}{}))
+	handler.ServeHTTP(wlist, ecsReq(t, "ListTaskDefinitions", map[string]any{}))
 	if wlist.Code != http.StatusOK {
 		t.Fatalf("ListTaskDefinitions: expected 200, got %d\nbody: %s", wlist.Code, wlist.Body.String())
 	}
 	mlist := decodeJSON(t, wlist.Body.String())
-	tdArns, ok := mlist["taskDefinitionArns"].([]interface{})
+	tdArns, ok := mlist["taskDefinitionArns"].([]any)
 	if !ok || len(tdArns) < 2 {
 		t.Fatalf("ListTaskDefinitions: expected 2+ ARNs, got %v\nbody: %s", tdArns, wlist.Body.String())
 	}
 
 	// ListTaskDefinitions — family prefix.
 	wprefix := httptest.NewRecorder()
-	handler.ServeHTTP(wprefix, ecsReq(t, "ListTaskDefinitions", map[string]interface{}{
+	handler.ServeHTTP(wprefix, ecsReq(t, "ListTaskDefinitions", map[string]any{
 		"familyPrefix": "web-app",
 	}))
 	if wprefix.Code != http.StatusOK {
 		t.Fatalf("ListTaskDefinitions prefix: expected 200, got %d\nbody: %s", wprefix.Code, wprefix.Body.String())
 	}
 	mprefix := decodeJSON(t, wprefix.Body.String())
-	prefixArns, ok := mprefix["taskDefinitionArns"].([]interface{})
+	prefixArns, ok := mprefix["taskDefinitionArns"].([]any)
 	if !ok || len(prefixArns) == 0 {
 		t.Fatalf("ListTaskDefinitions prefix: expected results for web-app prefix\nbody: %s", wprefix.Body.String())
 	}
@@ -265,7 +265,7 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 
 	// Need a cluster first.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "svc-cluster",
 	}))
 	if wc.Code != http.StatusOK {
@@ -274,9 +274,9 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 
 	// Register a task definition.
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "svc-task",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{"name": "app", "image": "myapp:latest", "cpu": 256, "memory": 512, "essential": true},
 		},
 	}))
@@ -286,7 +286,7 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 
 	// CreateService.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]interface{}{
+	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]any{
 		"cluster":        "svc-cluster",
 		"serviceName":    "my-service",
 		"taskDefinition": "svc-task:1",
@@ -297,7 +297,7 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 		t.Fatalf("CreateService: expected 200, got %d\nbody: %s", ws.Code, ws.Body.String())
 	}
 	ms := decodeJSON(t, ws.Body.String())
-	svc, ok := ms["service"].(map[string]interface{})
+	svc, ok := ms["service"].(map[string]any)
 	if !ok {
 		t.Fatalf("CreateService: missing service\nbody: %s", ws.Body.String())
 	}
@@ -317,21 +317,21 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 
 	// ListServices.
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, ecsReq(t, "ListServices", map[string]interface{}{
+	handler.ServeHTTP(wl, ecsReq(t, "ListServices", map[string]any{
 		"cluster": "svc-cluster",
 	}))
 	if wl.Code != http.StatusOK {
 		t.Fatalf("ListServices: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	svcARNs, ok := ml["serviceArns"].([]interface{})
+	svcARNs, ok := ml["serviceArns"].([]any)
 	if !ok || len(svcARNs) == 0 {
 		t.Fatalf("ListServices: expected non-empty serviceArns\nbody: %s", wl.Body.String())
 	}
 
 	// DescribeServices.
 	wdesc := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeServices", map[string]interface{}{
+	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeServices", map[string]any{
 		"cluster":  "svc-cluster",
 		"services": []string{"my-service"},
 	}))
@@ -339,11 +339,11 @@ func TestECS_ServiceLifecycle(t *testing.T) {
 		t.Fatalf("DescribeServices: expected 200, got %d\nbody: %s", wdesc.Code, wdesc.Body.String())
 	}
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	svcs, ok := mdesc["services"].([]interface{})
+	svcs, ok := mdesc["services"].([]any)
 	if !ok || len(svcs) == 0 {
 		t.Fatalf("DescribeServices: expected non-empty services\nbody: %s", wdesc.Body.String())
 	}
-	svcEntry := svcs[0].(map[string]interface{})
+	svcEntry := svcs[0].(map[string]any)
 	if svcEntry["serviceName"].(string) != "my-service" {
 		t.Errorf("DescribeServices: expected serviceName=my-service")
 	}
@@ -356,7 +356,7 @@ func TestECS_TaskLifecycle(t *testing.T) {
 
 	// Setup cluster + task definition.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "task-cluster",
 	}))
 	if wc.Code != http.StatusOK {
@@ -364,9 +364,9 @@ func TestECS_TaskLifecycle(t *testing.T) {
 	}
 
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "runner-task",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{"name": "runner", "image": "myrunner:latest", "cpu": 256, "memory": 512, "essential": true},
 		},
 	}))
@@ -376,7 +376,7 @@ func TestECS_TaskLifecycle(t *testing.T) {
 
 	// RunTask.
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, ecsReq(t, "RunTask", map[string]interface{}{
+	handler.ServeHTTP(wr, ecsReq(t, "RunTask", map[string]any{
 		"cluster":        "task-cluster",
 		"taskDefinition": "runner-task:1",
 		"count":          2,
@@ -385,11 +385,11 @@ func TestECS_TaskLifecycle(t *testing.T) {
 		t.Fatalf("RunTask: expected 200, got %d\nbody: %s", wr.Code, wr.Body.String())
 	}
 	mr := decodeJSON(t, wr.Body.String())
-	tasks, ok := mr["tasks"].([]interface{})
+	tasks, ok := mr["tasks"].([]any)
 	if !ok || len(tasks) != 2 {
 		t.Fatalf("RunTask: expected 2 tasks, got %v\nbody: %s", tasks, wr.Body.String())
 	}
-	task0 := tasks[0].(map[string]interface{})
+	task0 := tasks[0].(map[string]any)
 	taskARN, _ := task0["taskArn"].(string)
 	if taskARN == "" {
 		t.Fatal("RunTask: missing taskArn")
@@ -403,21 +403,21 @@ func TestECS_TaskLifecycle(t *testing.T) {
 
 	// ListTasks.
 	wlist := httptest.NewRecorder()
-	handler.ServeHTTP(wlist, ecsReq(t, "ListTasks", map[string]interface{}{
+	handler.ServeHTTP(wlist, ecsReq(t, "ListTasks", map[string]any{
 		"cluster": "task-cluster",
 	}))
 	if wlist.Code != http.StatusOK {
 		t.Fatalf("ListTasks: expected 200, got %d\nbody: %s", wlist.Code, wlist.Body.String())
 	}
 	mlist := decodeJSON(t, wlist.Body.String())
-	taskARNs, ok := mlist["taskArns"].([]interface{})
+	taskARNs, ok := mlist["taskArns"].([]any)
 	if !ok || len(taskARNs) < 2 {
 		t.Fatalf("ListTasks: expected 2+ task ARNs, got %v\nbody: %s", taskARNs, wlist.Body.String())
 	}
 
 	// DescribeTasks.
 	wdesc := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeTasks", map[string]interface{}{
+	handler.ServeHTTP(wdesc, ecsReq(t, "DescribeTasks", map[string]any{
 		"cluster": "task-cluster",
 		"tasks":   []string{taskARN},
 	}))
@@ -425,18 +425,18 @@ func TestECS_TaskLifecycle(t *testing.T) {
 		t.Fatalf("DescribeTasks: expected 200, got %d\nbody: %s", wdesc.Code, wdesc.Body.String())
 	}
 	mdesc := decodeJSON(t, wdesc.Body.String())
-	describedTasks, ok := mdesc["tasks"].([]interface{})
+	describedTasks, ok := mdesc["tasks"].([]any)
 	if !ok || len(describedTasks) == 0 {
 		t.Fatalf("DescribeTasks: expected non-empty tasks\nbody: %s", wdesc.Body.String())
 	}
-	dt := describedTasks[0].(map[string]interface{})
+	dt := describedTasks[0].(map[string]any)
 	if dt["taskArn"].(string) != taskARN {
 		t.Errorf("DescribeTasks: ARN mismatch")
 	}
 
 	// StopTask.
 	wstop := httptest.NewRecorder()
-	handler.ServeHTTP(wstop, ecsReq(t, "StopTask", map[string]interface{}{
+	handler.ServeHTTP(wstop, ecsReq(t, "StopTask", map[string]any{
 		"cluster": "task-cluster",
 		"task":    taskARN,
 		"reason":  "testing stop",
@@ -445,7 +445,7 @@ func TestECS_TaskLifecycle(t *testing.T) {
 		t.Fatalf("StopTask: expected 200, got %d\nbody: %s", wstop.Code, wstop.Body.String())
 	}
 	mstop := decodeJSON(t, wstop.Body.String())
-	stoppedTask := mstop["task"].(map[string]interface{})
+	stoppedTask := mstop["task"].(map[string]any)
 	if stoppedTask["lastStatus"].(string) != "STOPPED" {
 		t.Errorf("StopTask: expected lastStatus=STOPPED, got %q", stoppedTask["lastStatus"])
 	}
@@ -461,7 +461,7 @@ func TestECS_UpdateService(t *testing.T) {
 
 	// Setup.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "update-cluster",
 	}))
 	if wc.Code != http.StatusOK {
@@ -469,9 +469,9 @@ func TestECS_UpdateService(t *testing.T) {
 	}
 
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wt, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "update-task",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{"name": "app", "image": "myapp:v1", "cpu": 256, "memory": 512, "essential": true},
 		},
 	}))
@@ -480,7 +480,7 @@ func TestECS_UpdateService(t *testing.T) {
 	}
 
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]interface{}{
+	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]any{
 		"cluster":        "update-cluster",
 		"serviceName":    "update-svc",
 		"taskDefinition": "update-task:1",
@@ -492,9 +492,9 @@ func TestECS_UpdateService(t *testing.T) {
 
 	// Register a new task definition revision.
 	wt2 := httptest.NewRecorder()
-	handler.ServeHTTP(wt2, ecsReq(t, "RegisterTaskDefinition", map[string]interface{}{
+	handler.ServeHTTP(wt2, ecsReq(t, "RegisterTaskDefinition", map[string]any{
 		"family": "update-task",
-		"containerDefinitions": []map[string]interface{}{
+		"containerDefinitions": []map[string]any{
 			{"name": "app", "image": "myapp:v2", "cpu": 256, "memory": 512, "essential": true},
 		},
 	}))
@@ -505,7 +505,7 @@ func TestECS_UpdateService(t *testing.T) {
 	// UpdateService — change desired count and task definition.
 	desiredCount := 5
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, ecsReq(t, "UpdateService", map[string]interface{}{
+	handler.ServeHTTP(wu, ecsReq(t, "UpdateService", map[string]any{
 		"cluster":        "update-cluster",
 		"service":        "update-svc",
 		"desiredCount":   desiredCount,
@@ -515,7 +515,7 @@ func TestECS_UpdateService(t *testing.T) {
 		t.Fatalf("UpdateService: expected 200, got %d\nbody: %s", wu.Code, wu.Body.String())
 	}
 	mu := decodeJSON(t, wu.Body.String())
-	updatedSvc, ok := mu["service"].(map[string]interface{})
+	updatedSvc, ok := mu["service"].(map[string]any)
 	if !ok {
 		t.Fatalf("UpdateService: missing service\nbody: %s", wu.Body.String())
 	}
@@ -534,7 +534,7 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 
 	// Setup cluster.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "del-cluster",
 	}))
 	if wc.Code != http.StatusOK {
@@ -543,7 +543,7 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 
 	// Setup service.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]interface{}{
+	handler.ServeHTTP(ws, ecsReq(t, "CreateService", map[string]any{
 		"cluster":        "del-cluster",
 		"serviceName":    "del-svc",
 		"taskDefinition": "some-task:1",
@@ -555,7 +555,7 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 
 	// DeleteService.
 	wds := httptest.NewRecorder()
-	handler.ServeHTTP(wds, ecsReq(t, "DeleteService", map[string]interface{}{
+	handler.ServeHTTP(wds, ecsReq(t, "DeleteService", map[string]any{
 		"cluster": "del-cluster",
 		"service": "del-svc",
 		"force":   true,
@@ -564,7 +564,7 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 		t.Fatalf("DeleteService: expected 200, got %d\nbody: %s", wds.Code, wds.Body.String())
 	}
 	mds := decodeJSON(t, wds.Body.String())
-	delSvc, ok := mds["service"].(map[string]interface{})
+	delSvc, ok := mds["service"].(map[string]any)
 	if !ok {
 		t.Fatalf("DeleteService: missing service in response\nbody: %s", wds.Body.String())
 	}
@@ -574,28 +574,28 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 
 	// Verify service is gone — ListServices should be empty.
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, ecsReq(t, "ListServices", map[string]interface{}{
+	handler.ServeHTTP(wl, ecsReq(t, "ListServices", map[string]any{
 		"cluster": "del-cluster",
 	}))
 	if wl.Code != http.StatusOK {
 		t.Fatalf("ListServices after delete: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
 	ml := decodeJSON(t, wl.Body.String())
-	svcARNs, _ := ml["serviceArns"].([]interface{})
+	svcARNs, _ := ml["serviceArns"].([]any)
 	if len(svcARNs) != 0 {
 		t.Errorf("ListServices: expected 0 services after delete, got %d", len(svcARNs))
 	}
 
 	// DeleteCluster.
 	wdc := httptest.NewRecorder()
-	handler.ServeHTTP(wdc, ecsReq(t, "DeleteCluster", map[string]interface{}{
+	handler.ServeHTTP(wdc, ecsReq(t, "DeleteCluster", map[string]any{
 		"cluster": "del-cluster",
 	}))
 	if wdc.Code != http.StatusOK {
 		t.Fatalf("DeleteCluster: expected 200, got %d\nbody: %s", wdc.Code, wdc.Body.String())
 	}
 	mdc := decodeJSON(t, wdc.Body.String())
-	delCluster, ok := mdc["cluster"].(map[string]interface{})
+	delCluster, ok := mdc["cluster"].(map[string]any)
 	if !ok {
 		t.Fatalf("DeleteCluster: missing cluster in response\nbody: %s", wdc.Body.String())
 	}
@@ -605,15 +605,15 @@ func TestECS_DeleteServiceAndCluster(t *testing.T) {
 
 	// Verify cluster is gone.
 	wlc := httptest.NewRecorder()
-	handler.ServeHTTP(wlc, ecsReq(t, "DescribeClusters", map[string]interface{}{
+	handler.ServeHTTP(wlc, ecsReq(t, "DescribeClusters", map[string]any{
 		"clusters": []string{"del-cluster"},
 	}))
 	if wlc.Code != http.StatusOK {
 		t.Fatalf("DescribeClusters after delete: expected 200, got %d\nbody: %s", wlc.Code, wlc.Body.String())
 	}
 	mlc := decodeJSON(t, wlc.Body.String())
-	remainingClusters, _ := mlc["clusters"].([]interface{})
-	failures, _ := mlc["failures"].([]interface{})
+	remainingClusters, _ := mlc["clusters"].([]any)
+	failures, _ := mlc["failures"].([]any)
 	if len(remainingClusters) != 0 || len(failures) == 0 {
 		t.Errorf("DescribeClusters after delete: expected 0 clusters and 1 failure, got clusters=%d failures=%d",
 			len(remainingClusters), len(failures))
@@ -627,18 +627,18 @@ func TestECS_TagOperations(t *testing.T) {
 
 	// Create a cluster and use its ARN for tagging.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]interface{}{
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
 		"clusterName": "tag-cluster",
 	}))
 	if wc.Code != http.StatusOK {
 		t.Fatalf("setup CreateCluster: %d %s", wc.Code, wc.Body.String())
 	}
 	mc := decodeJSON(t, wc.Body.String())
-	clusterARN := mc["cluster"].(map[string]interface{})["clusterArn"].(string)
+	clusterARN := mc["cluster"].(map[string]any)["clusterArn"].(string)
 
 	// TagResource.
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, ecsReq(t, "TagResource", map[string]interface{}{
+	handler.ServeHTTP(wt, ecsReq(t, "TagResource", map[string]any{
 		"resourceArn": clusterARN,
 		"tags": []map[string]string{
 			{"key": "team", "value": "platform"},
@@ -651,20 +651,20 @@ func TestECS_TagOperations(t *testing.T) {
 
 	// ListTagsForResource.
 	wlt := httptest.NewRecorder()
-	handler.ServeHTTP(wlt, ecsReq(t, "ListTagsForResource", map[string]interface{}{
+	handler.ServeHTTP(wlt, ecsReq(t, "ListTagsForResource", map[string]any{
 		"resourceArn": clusterARN,
 	}))
 	if wlt.Code != http.StatusOK {
 		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", wlt.Code, wlt.Body.String())
 	}
 	mlt := decodeJSON(t, wlt.Body.String())
-	tags, ok := mlt["tags"].([]interface{})
+	tags, ok := mlt["tags"].([]any)
 	if !ok {
 		t.Fatalf("ListTagsForResource: missing tags\nbody: %s", wlt.Body.String())
 	}
 	tagMap := make(map[string]string)
 	for _, tg := range tags {
-		entry := tg.(map[string]interface{})
+		entry := tg.(map[string]any)
 		tagMap[entry["key"].(string)] = entry["value"].(string)
 	}
 	if tagMap["team"] != "platform" {
@@ -676,7 +676,7 @@ func TestECS_TagOperations(t *testing.T) {
 
 	// UntagResource.
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, ecsReq(t, "UntagResource", map[string]interface{}{
+	handler.ServeHTTP(wu, ecsReq(t, "UntagResource", map[string]any{
 		"resourceArn": clusterARN,
 		"tagKeys":     []string{"team"},
 	}))
@@ -686,13 +686,13 @@ func TestECS_TagOperations(t *testing.T) {
 
 	// Verify tag removed.
 	wlt2 := httptest.NewRecorder()
-	handler.ServeHTTP(wlt2, ecsReq(t, "ListTagsForResource", map[string]interface{}{
+	handler.ServeHTTP(wlt2, ecsReq(t, "ListTagsForResource", map[string]any{
 		"resourceArn": clusterARN,
 	}))
 	mlt2 := decodeJSON(t, wlt2.Body.String())
-	tags2, _ := mlt2["tags"].([]interface{})
+	tags2, _ := mlt2["tags"].([]any)
 	for _, tg := range tags2 {
-		entry := tg.(map[string]interface{})
+		entry := tg.(map[string]any)
 		if entry["key"].(string) == "team" {
 			t.Error("UntagResource: team tag should have been removed")
 		}
@@ -700,7 +700,7 @@ func TestECS_TagOperations(t *testing.T) {
 	// project tag should still exist.
 	found := false
 	for _, tg := range tags2 {
-		entry := tg.(map[string]interface{})
+		entry := tg.(map[string]any)
 		if entry["key"].(string) == "project" {
 			found = true
 		}

@@ -33,7 +33,7 @@ func TestSubscribeAndPublishSync(t *testing.T) {
 	event := &Event{
 		Source:    "s3",
 		Type:      "s3:ObjectCreated:Put",
-		Detail:    map[string]interface{}{"bucket": "my-bucket", "key": "my-key"},
+		Detail:    map[string]any{"bucket": "my-bucket", "key": "my-key"},
 		Time:      time.Now(),
 		Region:    "us-east-1",
 		AccountID: "123456789012",

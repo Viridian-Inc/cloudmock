@@ -36,7 +36,7 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 		return defaultDomains, err
 	}
 	var raw struct {
-		Config map[string]interface{} `yaml:"config"`
+		Config map[string]any `yaml:"config"`
 	}
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return defaultDomains, fmt.Errorf("parse %s: %w", path, err)
@@ -45,7 +45,7 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 	if !ok {
 		return defaultDomains, fmt.Errorf("no autotend-backend:domains in %s", path)
 	}
-	domainsMap, ok := domainsRaw.(map[string]interface{})
+	domainsMap, ok := domainsRaw.(map[string]any)
 	if !ok {
 		return defaultDomains, fmt.Errorf("domains is not a map in %s", path)
 	}

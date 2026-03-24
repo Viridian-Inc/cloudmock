@@ -11,7 +11,7 @@ type Entry struct {
 	Actor     string                 `json:"actor"`
 	Action    string                 `json:"action"`
 	Resource  string                 `json:"resource"`
-	Details   map[string]interface{} `json:"details,omitempty"`
+	Details   map[string]any `json:"details,omitempty"`
 	Timestamp time.Time              `json:"timestamp"`
 }
 

@@ -37,8 +37,8 @@ func (b *EventBroadcaster) Unsubscribe(ch chan string) {
 
 // Broadcast sends a JSON-encoded event to all connected clients.
 // If a client's channel is full, the event is dropped for that client.
-func (b *EventBroadcaster) Broadcast(eventType string, data interface{}) {
-	payload, err := json.Marshal(map[string]interface{}{
+func (b *EventBroadcaster) Broadcast(eventType string, data any) {
+	payload, err := json.Marshal(map[string]any{
 		"type": eventType,
 		"data": data,
 	})

@@ -28,7 +28,7 @@ func TestGeneratePulumiSchema_ValidJSON(t *testing.T) {
 	schemaJSON, err := GeneratePulumiSchemaJSON(reg)
 	require.NoError(t, err)
 
-	var schema map[string]interface{}
+	var schema map[string]any
 	err = json.Unmarshal(schemaJSON, &schema)
 	require.NoError(t, err)
 
@@ -41,7 +41,7 @@ func TestGeneratePulumiSchema_HasExpectedResources(t *testing.T) {
 	reg := DefaultRegistry()
 	schema := GeneratePulumiSchema(reg)
 
-	resources, ok := schema["resources"].(map[string]interface{})
+	resources, ok := schema["resources"].(map[string]any)
 	require.True(t, ok, "schema should have resources map")
 
 	// Check that key resources exist.
@@ -61,13 +61,13 @@ func TestGeneratePulumiSchema_ResourceProperties(t *testing.T) {
 	reg := DefaultRegistry()
 	schema := GeneratePulumiSchema(reg)
 
-	resources := schema["resources"].(map[string]interface{})
-	bucket := resources["cloudmock:s3:Bucket"].(map[string]interface{})
+	resources := schema["resources"].(map[string]any)
+	bucket := resources["cloudmock:s3:Bucket"].(map[string]any)
 
-	inputProps := bucket["inputProperties"].(map[string]interface{})
+	inputProps := bucket["inputProperties"].(map[string]any)
 	assert.Contains(t, inputProps, "bucket")
 
-	outputProps := bucket["properties"].(map[string]interface{})
+	outputProps := bucket["properties"].(map[string]any)
 	assert.Contains(t, outputProps, "bucket")
 	assert.Contains(t, outputProps, "arn")
 	assert.Contains(t, outputProps, "id")
@@ -90,31 +90,31 @@ func TestGeneratePulumiSchema_TypeMapping(t *testing.T) {
 	})
 
 	schema := GeneratePulumiSchema(reg)
-	resources := schema["resources"].(map[string]interface{})
+	resources := schema["resources"].(map[string]any)
 
 	// The token for this resource.
 	token := "cloudmock:test:Widget"
-	res, ok := resources[token].(map[string]interface{})
+	res, ok := resources[token].(map[string]any)
 	require.True(t, ok, "expected resource %s", token)
 
-	props := res["inputProperties"].(map[string]interface{})
+	props := res["inputProperties"].(map[string]any)
 
-	nameP := props["name"].(map[string]interface{})
+	nameP := props["name"].(map[string]any)
 	assert.Equal(t, "string", nameP["type"])
 
-	countP := props["count"].(map[string]interface{})
+	countP := props["count"].(map[string]any)
 	assert.Equal(t, "integer", countP["type"])
 
-	enabledP := props["enabled"].(map[string]interface{})
+	enabledP := props["enabled"].(map[string]any)
 	assert.Equal(t, "boolean", enabledP["type"])
 
-	ratioP := props["ratio"].(map[string]interface{})
+	ratioP := props["ratio"].(map[string]any)
 	assert.Equal(t, "number", ratioP["type"])
 
-	itemsP := props["items"].(map[string]interface{})
+	itemsP := props["items"].(map[string]any)
 	assert.Equal(t, "array", itemsP["type"])
 
-	tagsP := props["tags"].(map[string]interface{})
+	tagsP := props["tags"].(map[string]any)
 	assert.Equal(t, "object", tagsP["type"])
 }
 
@@ -122,8 +122,8 @@ func TestGeneratePulumiSchema_Config(t *testing.T) {
 	reg := cmschema.NewRegistry()
 	schema := GeneratePulumiSchema(reg)
 
-	config := schema["config"].(map[string]interface{})
-	vars := config["variables"].(map[string]interface{})
+	config := schema["config"].(map[string]any)
+	vars := config["variables"].(map[string]any)
 
 	assert.Contains(t, vars, "endpoint")
 	assert.Contains(t, vars, "region")
@@ -175,7 +175,7 @@ func TestGetSchema(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, resp.Schema)
 
-	var schema map[string]interface{}
+	var schema map[string]any
 	err = json.Unmarshal([]byte(resp.Schema), &schema)
 	require.NoError(t, err)
 	assert.Equal(t, "cloudmock", schema["name"])
@@ -184,7 +184,7 @@ func TestGetSchema(t *testing.T) {
 func TestConfigure(t *testing.T) {
 	p := newTestProvider(t)
 
-	args, _ := structpb.NewStruct(map[string]interface{}{
+	args, _ := structpb.NewStruct(map[string]any{
 		"endpoint":  "http://localhost:5555",
 		"region":    "eu-west-1",
 		"accessKey": "mykey",
@@ -239,7 +239,7 @@ func TestCheck_ValidatesRequiredFields(t *testing.T) {
 func TestCheck_PassesWithRequiredFields(t *testing.T) {
 	p := newTestProvider(t)
 
-	news, _ := structpb.NewStruct(map[string]interface{}{
+	news, _ := structpb.NewStruct(map[string]any{
 		"bucket": "my-bucket",
 	})
 
@@ -261,7 +261,7 @@ func TestGetPluginInfo(t *testing.T) {
 // ── Integration Tests: CRUD against mock cloudmock server ───────────────────
 
 func newTestCloudmockServer() *httptest.Server {
-	store := make(map[string]map[string]interface{})
+	store := make(map[string]map[string]any)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
@@ -294,14 +294,14 @@ func newTestCloudmockServer() *httptest.Server {
 		}
 
 		if action != "" {
-			var params map[string]interface{}
+			var params map[string]any
 			if r.Body != nil {
 				bodyBytes := make([]byte, 4096)
 				n, _ := r.Body.Read(bodyBytes)
 				json.Unmarshal(bodyBytes[:n], &params)
 			}
 			if params == nil {
-				params = make(map[string]interface{})
+				params = make(map[string]any)
 			}
 			handleJSONAction(w, service, action, params, store)
 			return
@@ -312,7 +312,7 @@ func newTestCloudmockServer() *httptest.Server {
 	}))
 }
 
-func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]interface{}) {
+func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]any) {
 	path := r.URL.Path
 	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
 	bucket := parts[0]
@@ -320,7 +320,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 
 	switch r.Method {
 	case "PUT":
-		store[key] = map[string]interface{}{
+		store[key] = map[string]any{
 			"bucket": bucket,
 			"arn":    fmt.Sprintf("arn:aws:s3:::%s", bucket),
 			"region": "us-east-1",
@@ -350,7 +350,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 	}
 }
 
-func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]interface{}, store map[string]map[string]interface{}) {
+func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]any, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 
 	switch {
@@ -360,20 +360,20 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			tableName, _ := params["TableName"].(string)
 			if tableName != "" {
 				key := fmt.Sprintf("dynamodb/table/%s", tableName)
-				data := map[string]interface{}{}
+				data := map[string]any{}
 				for k, v := range params {
 					data[k] = v
 				}
 				data["TableArn"] = fmt.Sprintf("arn:aws:dynamodb:us-east-1:000000000000:table/%s", tableName)
 				data["TableStatus"] = "ACTIVE"
 				store[key] = data
-				json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+				json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 				return
 			}
 		}
 		id := fmt.Sprintf("%s-%s-001", service, strings.ToLower(action[6:]))
 		key := fmt.Sprintf("%s/%s/%s", service, action, id)
-		data := map[string]interface{}{}
+		data := map[string]any{}
 		for k, v := range params {
 			data[k] = v
 		}
@@ -386,10 +386,10 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			tableName, _ := params["TableName"].(string)
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
-				json.NewEncoder(w).Encode(map[string]interface{}{"Table": data})
+				json.NewEncoder(w).Encode(map[string]any{"Table": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
@@ -397,7 +397,7 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"__type": "ResourceNotFoundException"})
+		json.NewEncoder(w).Encode(map[string]any{"__type": "ResourceNotFoundException"})
 
 	case strings.HasPrefix(action, "Delete"):
 		switch service {
@@ -406,24 +406,24 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
 				delete(store, key)
-				json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+				json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
 			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 
-func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]interface{}) {
+func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch {
@@ -431,7 +431,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		cidr := values.Get("CidrBlock")
 		vpcID := "vpc-test001"
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
-		data := map[string]interface{}{
+		data := map[string]any{
 			"VpcId":              vpcID,
 			"CidrBlock":         cidr,
 			"Arn":               fmt.Sprintf("arn:aws:ec2:us-east-1:000000000000:vpc/%s", vpcID),
@@ -449,7 +449,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 			json.NewEncoder(w).Encode(data)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
@@ -460,17 +460,17 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
 		if _, ok := store[key]; ok {
 			delete(store, key)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			json.NewEncoder(w).Encode(map[string]any{})
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
 		}
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 
@@ -495,7 +495,7 @@ func setupTestProviderWithServer(t *testing.T, serverURL string) *CloudmockProvi
 	t.Helper()
 	p := newTestProvider(t)
 
-	args, _ := structpb.NewStruct(map[string]interface{}{
+	args, _ := structpb.NewStruct(map[string]any{
 		"endpoint":  serverURL,
 		"region":    "us-east-1",
 		"accessKey": "test",
@@ -513,7 +513,7 @@ func TestCreate_S3Bucket(t *testing.T) {
 
 	p := setupTestProviderWithServer(t, server.URL)
 
-	props, _ := structpb.NewStruct(map[string]interface{}{
+	props, _ := structpb.NewStruct(map[string]any{
 		"bucket": "test-bucket",
 	})
 
@@ -535,7 +535,7 @@ func TestCreateReadDelete_S3Bucket(t *testing.T) {
 	ctx := context.Background()
 
 	// Create.
-	props, _ := structpb.NewStruct(map[string]interface{}{
+	props, _ := structpb.NewStruct(map[string]any{
 		"bucket": "lifecycle-bucket",
 	})
 	createResp, err := p.Create(ctx, &CreateRequest{
@@ -581,7 +581,7 @@ func TestCreateReadDelete_EC2VPC(t *testing.T) {
 	ctx := context.Background()
 
 	// Create.
-	props, _ := structpb.NewStruct(map[string]interface{}{
+	props, _ := structpb.NewStruct(map[string]any{
 		"cidr_block": "10.0.0.0/16",
 	})
 	createResp, err := p.Create(ctx, &CreateRequest{
@@ -613,11 +613,11 @@ func TestCreateReadDelete_EC2VPC(t *testing.T) {
 func TestDiff_DetectsChanges(t *testing.T) {
 	p := newTestProvider(t)
 
-	olds, _ := structpb.NewStruct(map[string]interface{}{
+	olds, _ := structpb.NewStruct(map[string]any{
 		"cidr_block":         "10.0.0.0/16",
 		"enable_dns_support": true,
 	})
-	news, _ := structpb.NewStruct(map[string]interface{}{
+	news, _ := structpb.NewStruct(map[string]any{
 		"cidr_block":         "10.0.0.0/16",
 		"enable_dns_support": false,
 	})
@@ -636,10 +636,10 @@ func TestDiff_DetectsChanges(t *testing.T) {
 func TestDiff_ForceNewOnCIDRChange(t *testing.T) {
 	p := newTestProvider(t)
 
-	olds, _ := structpb.NewStruct(map[string]interface{}{
+	olds, _ := structpb.NewStruct(map[string]any{
 		"cidr_block": "10.0.0.0/16",
 	})
-	news, _ := structpb.NewStruct(map[string]interface{}{
+	news, _ := structpb.NewStruct(map[string]any{
 		"cidr_block": "172.16.0.0/16",
 	})
 

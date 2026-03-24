@@ -13,9 +13,9 @@ import (
 
 type createUserPoolRequest struct {
 	PoolName               string                   `json:"PoolName"`
-	Policies               map[string]interface{}   `json:"Policies"`
+	Policies               map[string]any   `json:"Policies"`
 	AutoVerifiedAttributes []string                 `json:"AutoVerifiedAttributes"`
-	Schema                 []map[string]interface{} `json:"Schema"`
+	Schema                 []map[string]any `json:"Schema"`
 }
 
 type userPoolResponse struct {
@@ -220,7 +220,7 @@ func attributeSliceToMap(attrs []userAttributeInput) map[string]string {
 	return m
 }
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -240,7 +240,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
-func parseJSON(body []byte, v interface{}) *service.AWSError {
+func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}

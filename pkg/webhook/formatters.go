@@ -25,7 +25,7 @@ type slackText struct {
 }
 
 // FormatSlack formats an incident event as a Slack incoming-webhook payload.
-func FormatSlack(event string, payload interface{}) ([]byte, error) {
+func FormatSlack(event string, payload any) ([]byte, error) {
 	inc, err := toIncident(payload)
 	if err != nil {
 		return nil, err
@@ -78,7 +78,7 @@ type pagerDutyDetails struct {
 }
 
 // FormatPagerDuty formats an incident event as a PagerDuty Events API v2 payload.
-func FormatPagerDuty(event string, payload interface{}) ([]byte, error) {
+func FormatPagerDuty(event string, payload any) ([]byte, error) {
 	inc, err := toIncident(payload)
 	if err != nil {
 		return nil, err
@@ -117,7 +117,7 @@ type genericPayload struct {
 }
 
 // FormatGeneric wraps the incident in a simple envelope and marshals it to JSON.
-func FormatGeneric(event string, payload interface{}) ([]byte, error) {
+func FormatGeneric(event string, payload any) ([]byte, error) {
 	inc, err := toIncident(payload)
 	if err != nil {
 		return nil, err
@@ -133,8 +133,8 @@ func FormatGeneric(event string, payload interface{}) ([]byte, error) {
 
 // toIncident coerces the payload to *incident.Incident.
 // It accepts *incident.Incident or incident.Incident directly, and falls back
-// to a JSON round-trip for other types (e.g. map[string]interface{}).
-func toIncident(payload interface{}) (*incident.Incident, error) {
+// to a JSON round-trip for other types (e.g. map[string]any).
+func toIncident(payload any) (*incident.Incident, error) {
 	switch v := payload.(type) {
 	case *incident.Incident:
 		return v, nil

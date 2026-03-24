@@ -26,7 +26,7 @@ type DeployFilter struct {
 type SavedView struct {
 	ID        string
 	Name      string
-	Filters   map[string]interface{}
+	Filters   map[string]any
 	CreatedBy string
 	CreatedAt time.Time
 }

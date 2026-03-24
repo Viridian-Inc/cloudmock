@@ -115,7 +115,7 @@ func (s *CognitoService) handleOIDCDiscovery(ctx *service.RequestContext, path s
 	baseURL := s.baseURL(ctx)
 	issuer := fmt.Sprintf("%s/%s", baseURL, poolID)
 
-	doc := map[string]interface{}{
+	doc := map[string]any{
 		"issuer":                                issuer,
 		"authorization_endpoint":                baseURL + "/oauth2/authorize",
 		"token_endpoint":                        baseURL + "/oauth2/token",
@@ -138,8 +138,8 @@ func (s *CognitoService) handleOIDCDiscovery(ctx *service.RequestContext, path s
 
 // handleJWKS returns the JWKS (public key set) for JWT verification.
 func (s *CognitoService) handleJWKS(ctx *service.RequestContext) (*service.Response, error) {
-	jwks := map[string]interface{}{
-		"keys": []interface{}{s.keys.JWK()},
+	jwks := map[string]any{
+		"keys": []any{s.keys.JWK()},
 	}
 	body, _ := json.Marshal(jwks)
 	return &service.Response{
@@ -306,7 +306,7 @@ func (s *CognitoService) handleClientCredentialsGrant(ctx *service.RequestContex
 	now := time.Now().UTC()
 	iss := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", s.store.region, pool.Id)
 
-	accessClaims := map[string]interface{}{
+	accessClaims := map[string]any{
 		"sub":       clientID,
 		"iss":       iss,
 		"client_id": clientID,
@@ -322,7 +322,7 @@ func (s *CognitoService) handleClientCredentialsGrant(ctx *service.RequestContex
 		return oauthError("server_error", "Failed to generate token.", http.StatusInternalServerError)
 	}
 
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"access_token": accessToken,
 		"token_type":   "Bearer",
 		"expires_in":   3600,
@@ -405,7 +405,7 @@ func (s *CognitoService) handleUserInfo(ctx *service.RequestContext) (*service.R
 		return oauthError("invalid_token", "User not found.", http.StatusUnauthorized)
 	}
 
-	info := map[string]interface{}{
+	info := map[string]any{
 		"sub":      user.Sub,
 		"username": user.Username,
 	}
@@ -428,7 +428,7 @@ func (s *CognitoService) generateTokens(poolID, clientID string, user *User) (*o
 	now := time.Now().UTC()
 	iss := fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", s.store.region, poolID)
 
-	accessClaims := map[string]interface{}{
+	accessClaims := map[string]any{
 		"sub":       user.Sub,
 		"iss":       iss,
 		"client_id": clientID,
@@ -440,7 +440,7 @@ func (s *CognitoService) generateTokens(poolID, clientID string, user *User) (*o
 		"username":  user.Username,
 	}
 
-	idClaims := map[string]interface{}{
+	idClaims := map[string]any{
 		"sub":               user.Sub,
 		"iss":               iss,
 		"aud":               clientID,
@@ -453,7 +453,7 @@ func (s *CognitoService) generateTokens(poolID, clientID string, user *User) (*o
 		"cognito:username":  user.Username,
 	}
 
-	refreshClaims := map[string]interface{}{
+	refreshClaims := map[string]any{
 		"sub":       user.Sub,
 		"iss":       iss,
 		"token_use": "refresh",
@@ -494,7 +494,7 @@ type oauthTokens struct {
 
 // oauthTokenResponse creates a standard OAuth token response.
 func oauthTokenResponse(tokens *oauthTokens) (*service.Response, error) {
-	body, _ := json.Marshal(map[string]interface{}{
+	body, _ := json.Marshal(map[string]any{
 		"access_token":  tokens.AccessToken,
 		"id_token":      tokens.IDToken,
 		"refresh_token": tokens.RefreshToken,
@@ -562,7 +562,7 @@ func poolIDFromIssuer(iss string) string {
 }
 
 // decodeJWTPayload decodes the payload section of a JWT without verifying the signature.
-func decodeJWTPayload(token string) (map[string]interface{}, error) {
+func decodeJWTPayload(token string) (map[string]any, error) {
 	parts := strings.Split(token, ".")
 	if len(parts) != 3 {
 		return nil, fmt.Errorf("invalid JWT: expected 3 parts, got %d", len(parts))
@@ -571,7 +571,7 @@ func decodeJWTPayload(token string) (map[string]interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("decode payload: %w", err)
 	}
-	var claims map[string]interface{}
+	var claims map[string]any
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		return nil, fmt.Errorf("unmarshal claims: %w", err)
 	}

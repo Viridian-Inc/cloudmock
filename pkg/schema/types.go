@@ -23,7 +23,7 @@ type AttributeSchema struct {
 	Required bool
 	Computed bool        // server-generated (ARN, ID, timestamps)
 	ForceNew bool        // changing requires replacement
-	Default  interface{}
+	Default  any
 	RefTo    string // references another resource (e.g., "cloudmock_vpc.id")
 }
 

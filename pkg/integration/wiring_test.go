@@ -43,7 +43,7 @@ func TestWireIntegrations_S3EventToSQS(t *testing.T) {
 	bus.PublishSync(&eventbus.Event{
 		Source:    "s3",
 		Type:      "s3:ObjectCreated:Put",
-		Detail:    map[string]interface{}{"bucket": "test-bucket", "key": "file.txt", "size": int64(1024), "etag": "abc123"},
+		Detail:    map[string]any{"bucket": "test-bucket", "key": "file.txt", "size": int64(1024), "etag": "abc123"},
 		Time:      time.Now(),
 		Region:    "us-east-1",
 		AccountID: "000000000000",
@@ -54,23 +54,23 @@ func TestWireIntegrations_S3EventToSQS(t *testing.T) {
 	require.Len(t, msgs, 1)
 
 	// Verify the message is valid AWS S3 event notification JSON
-	var envelope map[string]interface{}
+	var envelope map[string]any
 	require.NoError(t, json.Unmarshal([]byte(msgs[0]), &envelope))
 
-	records, ok := envelope["Records"].([]interface{})
+	records, ok := envelope["Records"].([]any)
 	require.True(t, ok)
 	require.Len(t, records, 1)
 
-	record := records[0].(map[string]interface{})
+	record := records[0].(map[string]any)
 	assert.Equal(t, "aws:s3", record["eventSource"])
 	assert.Equal(t, "us-east-1", record["awsRegion"])
 	assert.Equal(t, "s3:ObjectCreated:Put", record["eventName"])
 
-	s3Detail := record["s3"].(map[string]interface{})
-	bucket := s3Detail["bucket"].(map[string]interface{})
+	s3Detail := record["s3"].(map[string]any)
+	bucket := s3Detail["bucket"].(map[string]any)
 	assert.Equal(t, "test-bucket", bucket["name"])
 
-	obj := s3Detail["object"].(map[string]interface{})
+	obj := s3Detail["object"].(map[string]any)
 	assert.Equal(t, "file.txt", obj["key"])
 	assert.Equal(t, float64(1024), obj["size"])
 }
@@ -86,17 +86,17 @@ func TestWireIntegrations_S3DeleteEvent(t *testing.T) {
 	bus.PublishSync(&eventbus.Event{
 		Source: "s3",
 		Type:   "s3:ObjectRemoved:Delete",
-		Detail: map[string]interface{}{"bucket": "my-bucket", "key": "deleted.txt", "size": int64(0), "etag": ""},
+		Detail: map[string]any{"bucket": "my-bucket", "key": "deleted.txt", "size": int64(0), "etag": ""},
 		Time:   time.Now(),
 	})
 
 	msgs := sqs.messages["s3-events-my-bucket"]
 	require.Len(t, msgs, 1)
 
-	var envelope map[string]interface{}
+	var envelope map[string]any
 	require.NoError(t, json.Unmarshal([]byte(msgs[0]), &envelope))
-	records := envelope["Records"].([]interface{})
-	record := records[0].(map[string]interface{})
+	records := envelope["Records"].([]any)
+	record := records[0].(map[string]any)
 	assert.Equal(t, "s3:ObjectRemoved:Delete", record["eventName"])
 }
 
@@ -110,7 +110,7 @@ func TestWireIntegrations_NoSQSRegistered(t *testing.T) {
 	bus.PublishSync(&eventbus.Event{
 		Source: "s3",
 		Type:   "s3:ObjectCreated:Put",
-		Detail: map[string]interface{}{"bucket": "test", "key": "k"},
+		Detail: map[string]any{"bucket": "test", "key": "k"},
 		Time:   time.Now(),
 	})
 }
@@ -127,7 +127,7 @@ func TestWireIntegrations_NonS3EventIgnored(t *testing.T) {
 	bus.PublishSync(&eventbus.Event{
 		Source: "dynamodb",
 		Type:   "dynamodb:StreamRecord",
-		Detail: map[string]interface{}{},
+		Detail: map[string]any{},
 		Time:   time.Now(),
 	})
 

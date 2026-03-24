@@ -37,18 +37,18 @@ func setupPoolAndUser(t *testing.T, handler http.Handler) (string, string) {
 
 	// Create pool.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "CreateUserPool", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "CreateUserPool", map[string]any{
 		"PoolName": "oauth-test-pool",
 	}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("setup CreateUserPool: %d %s", w.Code, w.Body.String())
 	}
 	m := decodeJSON(t, w.Body.String())
-	poolID := m["UserPool"].(map[string]interface{})["Id"].(string)
+	poolID := m["UserPool"].(map[string]any)["Id"].(string)
 
 	// Create client.
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "CreateUserPoolClient", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "CreateUserPoolClient", map[string]any{
 		"UserPoolId":        poolID,
 		"ClientName":        "oauth-client",
 		"GenerateSecret":    true,
@@ -58,11 +58,11 @@ func setupPoolAndUser(t *testing.T, handler http.Handler) (string, string) {
 		t.Fatalf("setup CreateUserPoolClient: %d %s", w.Code, w.Body.String())
 	}
 	m = decodeJSON(t, w.Body.String())
-	clientID := m["UserPoolClient"].(map[string]interface{})["ClientId"].(string)
+	clientID := m["UserPoolClient"].(map[string]any)["ClientId"].(string)
 
 	// SignUp user.
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "SignUp", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "SignUp", map[string]any{
 		"ClientId": clientID,
 		"Username": "oauthuser@example.com",
 		"Password": "TestPass123!",
@@ -76,7 +76,7 @@ func setupPoolAndUser(t *testing.T, handler http.Handler) (string, string) {
 
 	// Confirm user.
 	w = httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "AdminConfirmSignUp", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "AdminConfirmSignUp", map[string]any{
 		"UserPoolId": poolID,
 		"Username":   "oauthuser@example.com",
 	}))
@@ -151,7 +151,7 @@ func TestOAuth_OIDCDiscovery(t *testing.T) {
 		t.Fatalf("OIDC discovery: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 
-	var doc map[string]interface{}
+	var doc map[string]any
 	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
 		t.Fatalf("OIDC discovery: unmarshal: %v", err)
 	}
@@ -186,7 +186,7 @@ func TestOAuth_InitiateAuth_VerifiableJWT(t *testing.T) {
 
 	// Authenticate.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -199,7 +199,7 @@ func TestOAuth_InitiateAuth_VerifiableJWT(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	authResult := m["AuthenticationResult"].(map[string]interface{})
+	authResult := m["AuthenticationResult"].(map[string]any)
 	accessToken := authResult["AccessToken"].(string)
 	idToken := authResult["IdToken"].(string)
 
@@ -293,7 +293,7 @@ func TestOAuth_TokenEndpoint_AuthorizationCode(t *testing.T) {
 		t.Fatalf("Token endpoint: expected 200, got %d\nbody: %s", wToken.Code, wToken.Body.String())
 	}
 
-	var tokenResp map[string]interface{}
+	var tokenResp map[string]any
 	if err := json.Unmarshal(wToken.Body.Bytes(), &tokenResp); err != nil {
 		t.Fatalf("Token endpoint: unmarshal: %v", err)
 	}
@@ -329,7 +329,7 @@ func TestOAuth_TokenEndpoint_RefreshToken(t *testing.T) {
 
 	// Get initial tokens via InitiateAuth.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, cognitoReq(t, "InitiateAuth", map[string]interface{}{
+	handler.ServeHTTP(w, cognitoReq(t, "InitiateAuth", map[string]any{
 		"AuthFlow": "USER_PASSWORD_AUTH",
 		"ClientId": clientID,
 		"AuthParameters": map[string]string{
@@ -342,7 +342,7 @@ func TestOAuth_TokenEndpoint_RefreshToken(t *testing.T) {
 	}
 
 	m := decodeJSON(t, w.Body.String())
-	refreshToken := m["AuthenticationResult"].(map[string]interface{})["RefreshToken"].(string)
+	refreshToken := m["AuthenticationResult"].(map[string]any)["RefreshToken"].(string)
 
 	// Refresh tokens.
 	refreshForm := url.Values{
@@ -356,7 +356,7 @@ func TestOAuth_TokenEndpoint_RefreshToken(t *testing.T) {
 		t.Fatalf("Refresh token: expected 200, got %d\nbody: %s", wRefresh.Code, wRefresh.Body.String())
 	}
 
-	var tokenResp map[string]interface{}
+	var tokenResp map[string]any
 	if err := json.Unmarshal(wRefresh.Body.Bytes(), &tokenResp); err != nil {
 		t.Fatalf("Refresh token: unmarshal: %v", err)
 	}
@@ -431,7 +431,7 @@ func verifyJWTSignature(t *testing.T, token string, pubKey *rsa.PublicKey, label
 }
 
 // decodeJWTClaims decodes the payload of a JWT without verifying the signature.
-func decodeJWTClaims(t *testing.T, token string) map[string]interface{} {
+func decodeJWTClaims(t *testing.T, token string) map[string]any {
 	t.Helper()
 
 	parts := strings.Split(token, ".")
@@ -444,7 +444,7 @@ func decodeJWTClaims(t *testing.T, token string) map[string]interface{} {
 		t.Fatalf("decode payload: %v", err)
 	}
 
-	var claims map[string]interface{}
+	var claims map[string]any
 	if err := json.Unmarshal(payload, &claims); err != nil {
 		t.Fatalf("unmarshal claims: %v", err)
 	}

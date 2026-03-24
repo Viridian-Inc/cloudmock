@@ -12,7 +12,7 @@ import (
 
 // ---- helpers ----
 
-func jsonOK(body interface{}) (*service.Response, error) {
+func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -24,7 +24,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
-func parseJSON(body []byte, v interface{}) *service.AWSError {
+func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
@@ -636,7 +636,7 @@ func matchesEventPattern(pattern string, event *PutEvent) bool {
 	}
 
 	// Parse the pattern as JSON.
-	var patternMap map[string]interface{}
+	var patternMap map[string]any
 	if err := json.Unmarshal([]byte(pattern), &patternMap); err != nil {
 		return false
 	}
@@ -644,7 +644,7 @@ func matchesEventPattern(pattern string, event *PutEvent) bool {
 	// Check "source" filter — AWS EventBridge matches if the event source
 	// is in the pattern's source list.
 	if sourceFilter, ok := patternMap["source"]; ok {
-		sourceList, ok := sourceFilter.([]interface{})
+		sourceList, ok := sourceFilter.([]any)
 		if !ok {
 			return false
 		}
@@ -662,7 +662,7 @@ func matchesEventPattern(pattern string, event *PutEvent) bool {
 
 	// Check "detail-type" filter.
 	if dtFilter, ok := patternMap["detail-type"]; ok {
-		dtList, ok := dtFilter.([]interface{})
+		dtList, ok := dtFilter.([]any)
 		if !ok {
 			return false
 		}

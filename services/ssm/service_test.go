@@ -26,7 +26,7 @@ func newSSMGateway(t *testing.T) http.Handler {
 }
 
 // ssmReq builds a JSON POST request targeting the SSM service via X-Amz-Target.
-func ssmReq(t *testing.T, action string, body interface{}) *http.Request {
+func ssmReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -49,9 +49,9 @@ func ssmReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -65,7 +65,7 @@ func TestSSM_PutAndGetParameter(t *testing.T) {
 
 	// PutParameter
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
 		"Name":        "/app/config/db-host",
 		"Value":       "localhost",
 		"Type":        "String",
@@ -87,7 +87,7 @@ func TestSSM_PutAndGetParameter(t *testing.T) {
 
 	// GetParameter
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]interface{}{
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]any{
 		"Name":           "/app/config/db-host",
 		"WithDecryption": false,
 	}))
@@ -96,7 +96,7 @@ func TestSSM_PutAndGetParameter(t *testing.T) {
 	}
 
 	mg := decodeJSON(t, wg.Body.String())
-	param, ok := mg["Parameter"].(map[string]interface{})
+	param, ok := mg["Parameter"].(map[string]any)
 	if !ok {
 		t.Fatalf("GetParameter: missing Parameter in response\nbody: %s", wg.Body.String())
 	}
@@ -125,7 +125,7 @@ func TestSSM_SecureString(t *testing.T) {
 
 	// PutParameter with SecureString
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
 		"Name":  "/app/secrets/api-key",
 		"Value": "supersecret123",
 		"Type":  "SecureString",
@@ -136,7 +136,7 @@ func TestSSM_SecureString(t *testing.T) {
 
 	// GetParameter with WithDecryption=true
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]interface{}{
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]any{
 		"Name":           "/app/secrets/api-key",
 		"WithDecryption": true,
 	}))
@@ -145,7 +145,7 @@ func TestSSM_SecureString(t *testing.T) {
 	}
 
 	mg := decodeJSON(t, wg.Body.String())
-	param := mg["Parameter"].(map[string]interface{})
+	param := mg["Parameter"].(map[string]any)
 	if param["Type"].(string) != "SecureString" {
 		t.Errorf("SecureString: expected Type=SecureString, got %q", param["Type"])
 	}
@@ -173,7 +173,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 
 	for _, p := range params {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]interface{}{
+		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]any{
 			"Name":  p.name,
 			"Value": p.value,
 			"Type":  "String",
@@ -185,7 +185,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 
 	// GetParametersByPath for /app/prod, non-recursive (should get db-host, db-port but not cache/host)
 	wpath := httptest.NewRecorder()
-	handler.ServeHTTP(wpath, ssmReq(t, "GetParametersByPath", map[string]interface{}{
+	handler.ServeHTTP(wpath, ssmReq(t, "GetParametersByPath", map[string]any{
 		"Path":      "/app/prod",
 		"Recursive": false,
 	}))
@@ -194,7 +194,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 	}
 
 	mpath := decodeJSON(t, wpath.Body.String())
-	pathParams, ok := mpath["Parameters"].([]interface{})
+	pathParams, ok := mpath["Parameters"].([]any)
 	if !ok {
 		t.Fatalf("GetParametersByPath: missing Parameters\nbody: %s", wpath.Body.String())
 	}
@@ -205,7 +205,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 	// Verify the names returned
 	names := make(map[string]bool)
 	for _, item := range pathParams {
-		p := item.(map[string]interface{})
+		p := item.(map[string]any)
 		names[p["Name"].(string)] = true
 	}
 	if !names["/app/prod/db-host"] {
@@ -220,7 +220,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 
 	// GetParametersByPath for /app/prod, recursive (should include cache/host too)
 	wrec := httptest.NewRecorder()
-	handler.ServeHTTP(wrec, ssmReq(t, "GetParametersByPath", map[string]interface{}{
+	handler.ServeHTTP(wrec, ssmReq(t, "GetParametersByPath", map[string]any{
 		"Path":      "/app/prod",
 		"Recursive": true,
 	}))
@@ -229,7 +229,7 @@ func TestSSM_GetParametersByPath(t *testing.T) {
 	}
 
 	mrec := decodeJSON(t, wrec.Body.String())
-	recParams := mrec["Parameters"].([]interface{})
+	recParams := mrec["Parameters"].([]any)
 	if len(recParams) != 3 {
 		t.Errorf("GetParametersByPath recursive: expected 3 params, got %d", len(recParams))
 	}
@@ -242,7 +242,7 @@ func TestSSM_DeleteParameter_ThenGetReturnsNotFound(t *testing.T) {
 
 	// PutParameter
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
 		"Name":  "/doomed/param",
 		"Value": "bye",
 		"Type":  "String",
@@ -253,7 +253,7 @@ func TestSSM_DeleteParameter_ThenGetReturnsNotFound(t *testing.T) {
 
 	// DeleteParameter
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, ssmReq(t, "DeleteParameter", map[string]interface{}{
+	handler.ServeHTTP(wd, ssmReq(t, "DeleteParameter", map[string]any{
 		"Name": "/doomed/param",
 	}))
 	if wd.Code != http.StatusOK {
@@ -262,7 +262,7 @@ func TestSSM_DeleteParameter_ThenGetReturnsNotFound(t *testing.T) {
 
 	// GetParameter should return ParameterNotFound (400)
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]interface{}{
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]any{
 		"Name": "/doomed/param",
 	}))
 	if wg.Code != http.StatusBadRequest {
@@ -283,7 +283,7 @@ func TestSSM_PutParameter_OverwriteIncrementsVersion(t *testing.T) {
 
 	// First put
 	wp1 := httptest.NewRecorder()
-	handler.ServeHTTP(wp1, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp1, ssmReq(t, "PutParameter", map[string]any{
 		"Name":  "/versioned/param",
 		"Value": "version-one",
 		"Type":  "String",
@@ -298,7 +298,7 @@ func TestSSM_PutParameter_OverwriteIncrementsVersion(t *testing.T) {
 
 	// Second put without overwrite → should fail
 	wp2 := httptest.NewRecorder()
-	handler.ServeHTTP(wp2, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp2, ssmReq(t, "PutParameter", map[string]any{
 		"Name":      "/versioned/param",
 		"Value":     "version-two",
 		"Type":      "String",
@@ -314,7 +314,7 @@ func TestSSM_PutParameter_OverwriteIncrementsVersion(t *testing.T) {
 
 	// Third put with overwrite=true → should succeed and version=2
 	wp3 := httptest.NewRecorder()
-	handler.ServeHTTP(wp3, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp3, ssmReq(t, "PutParameter", map[string]any{
 		"Name":      "/versioned/param",
 		"Value":     "version-two",
 		"Type":      "String",
@@ -330,14 +330,14 @@ func TestSSM_PutParameter_OverwriteIncrementsVersion(t *testing.T) {
 
 	// Verify via GetParameter
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]interface{}{
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]any{
 		"Name": "/versioned/param",
 	}))
 	if wg.Code != http.StatusOK {
 		t.Fatalf("GetParameter after overwrite: %d %s", wg.Code, wg.Body.String())
 	}
 	mg := decodeJSON(t, wg.Body.String())
-	param := mg["Parameter"].(map[string]interface{})
+	param := mg["Parameter"].(map[string]any)
 	if param["Value"].(string) != "version-two" {
 		t.Errorf("GetParameter after overwrite: expected Value=version-two, got %q", param["Value"])
 	}
@@ -354,7 +354,7 @@ func TestSSM_GetParameters_WithInvalidNames(t *testing.T) {
 	// Create some parameters
 	for _, name := range []string{"/valid/param1", "/valid/param2"} {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]interface{}{
+		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]any{
 			"Name":  name,
 			"Value": "value",
 			"Type":  "String",
@@ -366,7 +366,7 @@ func TestSSM_GetParameters_WithInvalidNames(t *testing.T) {
 
 	// GetParameters with some valid and some invalid names
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, ssmReq(t, "GetParameters", map[string]interface{}{
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameters", map[string]any{
 		"Names": []string{"/valid/param1", "/valid/param2", "/does/not/exist", "/also/missing"},
 	}))
 	if wg.Code != http.StatusOK {
@@ -376,7 +376,7 @@ func TestSSM_GetParameters_WithInvalidNames(t *testing.T) {
 	mg := decodeJSON(t, wg.Body.String())
 
 	// Check found parameters
-	params, ok := mg["Parameters"].([]interface{})
+	params, ok := mg["Parameters"].([]any)
 	if !ok {
 		t.Fatalf("GetParameters: missing Parameters\nbody: %s", wg.Body.String())
 	}
@@ -385,7 +385,7 @@ func TestSSM_GetParameters_WithInvalidNames(t *testing.T) {
 	}
 
 	// Check invalid parameters
-	invalid, ok := mg["InvalidParameters"].([]interface{})
+	invalid, ok := mg["InvalidParameters"].([]any)
 	if !ok {
 		t.Fatalf("GetParameters: missing InvalidParameters\nbody: %s", wg.Body.String())
 	}
@@ -412,7 +412,7 @@ func TestSSM_DescribeParameters(t *testing.T) {
 
 	// Create a parameter with description
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]interface{}{
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
 		"Name":        "/describe/test",
 		"Value":       "secret-value",
 		"Type":        "SecureString",
@@ -430,7 +430,7 @@ func TestSSM_DescribeParameters(t *testing.T) {
 	}
 
 	md := decodeJSON(t, wd.Body.String())
-	paramList, ok := md["Parameters"].([]interface{})
+	paramList, ok := md["Parameters"].([]any)
 	if !ok {
 		t.Fatalf("DescribeParameters: missing Parameters\nbody: %s", wd.Body.String())
 	}
@@ -439,9 +439,9 @@ func TestSSM_DescribeParameters(t *testing.T) {
 	}
 
 	// Find our parameter in the list
-	var found map[string]interface{}
+	var found map[string]any
 	for _, item := range paramList {
-		p := item.(map[string]interface{})
+		p := item.(map[string]any)
 		if p["Name"].(string) == "/describe/test" {
 			found = p
 			break
@@ -471,7 +471,7 @@ func TestSSM_DeleteParameters(t *testing.T) {
 	// Create two parameters
 	for _, name := range []string{"/batch/param1", "/batch/param2"} {
 		w := httptest.NewRecorder()
-		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]interface{}{
+		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]any{
 			"Name":  name,
 			"Value": "value",
 			"Type":  "String",
@@ -483,7 +483,7 @@ func TestSSM_DeleteParameters(t *testing.T) {
 
 	// DeleteParameters with one valid and one invalid
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, ssmReq(t, "DeleteParameters", map[string]interface{}{
+	handler.ServeHTTP(wd, ssmReq(t, "DeleteParameters", map[string]any{
 		"Names": []string{"/batch/param1", "/batch/param2", "/batch/nonexistent"},
 	}))
 	if wd.Code != http.StatusOK {
@@ -491,8 +491,8 @@ func TestSSM_DeleteParameters(t *testing.T) {
 	}
 
 	md := decodeJSON(t, wd.Body.String())
-	deleted, _ := md["DeletedParameters"].([]interface{})
-	invalid, _ := md["InvalidParameters"].([]interface{})
+	deleted, _ := md["DeletedParameters"].([]any)
+	invalid, _ := md["InvalidParameters"].([]any)
 
 	if len(deleted) != 2 {
 		t.Errorf("DeleteParameters: expected 2 deleted, got %d", len(deleted))

@@ -6,7 +6,7 @@ import "time"
 type Event struct {
 	Source    string                 // service that produced the event, e.g. "s3"
 	Type      string                 // event type, e.g. "s3:ObjectCreated:Put"
-	Detail    map[string]interface{} // event payload
+	Detail    map[string]any // event payload
 	Time      time.Time
 	Region    string
 	AccountID string

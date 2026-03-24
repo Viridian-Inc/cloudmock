@@ -35,7 +35,7 @@ func NewAPIClient(endpoint, region, accessKey, secretKey string) *APIClient {
 
 // DoJSON sends a JSON-protocol request (used by DynamoDB, KMS, etc.).
 // The request is sent as POST with X-Amz-Target header and JSON body.
-func (c *APIClient) DoJSON(service, targetPrefix, action string, params map[string]interface{}) (map[string]interface{}, error) {
+func (c *APIClient) DoJSON(service, targetPrefix, action string, params map[string]any) (map[string]any, error) {
 	body, err := json.Marshal(params)
 	if err != nil {
 		return nil, fmt.Errorf("marshaling request body: %w", err)
@@ -57,7 +57,7 @@ func (c *APIClient) DoJSON(service, targetPrefix, action string, params map[stri
 
 // DoQuery sends a query-protocol request (used by EC2, SQS, etc.).
 // The request is sent as POST with form-encoded Action parameter.
-func (c *APIClient) DoQuery(service, action string, params map[string]string) (map[string]interface{}, error) {
+func (c *APIClient) DoQuery(service, action string, params map[string]string) (map[string]any, error) {
 	form := url.Values{}
 	form.Set("Action", action)
 	form.Set("Version", "2016-11-15") // default version
@@ -78,7 +78,7 @@ func (c *APIClient) DoQuery(service, action string, params map[string]string) (m
 
 // DoREST sends a REST-style request (used by S3, API Gateway, etc.).
 // For S3, bucket operations use path-style URLs.
-func (c *APIClient) DoREST(service, method, path string, body []byte) (map[string]interface{}, error) {
+func (c *APIClient) DoREST(service, method, path string, body []byte) (map[string]any, error) {
 	var bodyReader io.Reader
 	if body != nil {
 		bodyReader = bytes.NewReader(body)
@@ -129,7 +129,7 @@ func (c *APIClient) setAuthHeader(req *http.Request, service string) {
 }
 
 // doAndParse executes the request and parses the JSON response body.
-func (c *APIClient) doAndParse(req *http.Request) (map[string]interface{}, error) {
+func (c *APIClient) doAndParse(req *http.Request) (map[string]any, error) {
 	resp, err := c.http.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("sending request: %w", err)
@@ -147,14 +147,14 @@ func (c *APIClient) doAndParse(req *http.Request) (map[string]interface{}, error
 
 	// If response body is empty, return empty map.
 	if len(respBody) == 0 {
-		return map[string]interface{}{}, nil
+		return map[string]any{}, nil
 	}
 
 	// Try JSON first.
-	var result map[string]interface{}
+	var result map[string]any
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		// Response might be XML — return raw body as a string value.
-		return map[string]interface{}{"_raw": string(respBody)}, nil
+		return map[string]any{"_raw": string(respBody)}, nil
 	}
 
 	return result, nil

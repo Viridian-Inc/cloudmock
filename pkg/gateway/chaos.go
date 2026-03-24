@@ -152,7 +152,7 @@ func ChaosMiddleware(next http.Handler, engine *ChaosEngine) http.Handler {
 				w.Header().Set("Content-Type", "application/json")
 				w.Header().Set("X-Cloudmock-Chaos", rule.ID)
 				w.WriteHeader(code)
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				_ = json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ChaosEngineError",
 					"message": msg,
 					"chaosId": rule.ID,

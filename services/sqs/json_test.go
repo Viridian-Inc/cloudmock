@@ -9,7 +9,7 @@ import (
 )
 
 // sqsJSONReq builds a JSON-protocol POST request targeting the SQS service.
-func sqsJSONReq(t *testing.T, target string, body interface{}) *http.Request {
+func sqsJSONReq(t *testing.T, target string, body any) *http.Request {
 	t.Helper()
 
 	data, err := json.Marshal(body)
@@ -30,7 +30,7 @@ func mustJSONCreateQueue(t *testing.T, handler http.Handler, name string) string
 	t.Helper()
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.CreateQueue", map[string]interface{}{
+	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.CreateQueue", map[string]any{
 		"QueueName": name,
 	}))
 	if w.Code != http.StatusOK {
@@ -66,7 +66,7 @@ func TestSQSJSON_CreateQueueAndListQueues(t *testing.T) {
 
 	// ListQueues
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]interface{}{}))
+	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]any{}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("JSON ListQueues: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -83,7 +83,7 @@ func TestSQSJSON_CreateQueueAndListQueues(t *testing.T) {
 
 	// ListQueues with prefix
 	wf := httptest.NewRecorder()
-	handler.ServeHTTP(wf, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]interface{}{
+	handler.ServeHTTP(wf, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]any{
 		"QueueNamePrefix": "json-queue-1",
 	}))
 	if wf.Code != http.StatusOK {
@@ -106,7 +106,7 @@ func TestSQSJSON_SendAndReceiveMessage(t *testing.T) {
 
 	// SendMessage
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]interface{}{
+	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]any{
 		"QueueUrl":    queueURL,
 		"MessageBody": "hello json",
 	}))
@@ -130,7 +130,7 @@ func TestSQSJSON_SendAndReceiveMessage(t *testing.T) {
 
 	// ReceiveMessage
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":            queueURL,
 		"MaxNumberOfMessages": 1,
 	}))
@@ -165,7 +165,7 @@ func TestSQSJSON_DeleteMessage(t *testing.T) {
 
 	// Send a message.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]interface{}{
+	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]any{
 		"QueueUrl":    queueURL,
 		"MessageBody": "delete me",
 	}))
@@ -175,7 +175,7 @@ func TestSQSJSON_DeleteMessage(t *testing.T) {
 
 	// Receive it.
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":          queueURL,
 		"VisibilityTimeout": 300,
 	}))
@@ -196,7 +196,7 @@ func TestSQSJSON_DeleteMessage(t *testing.T) {
 
 	// Delete the message.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, sqsJSONReq(t, "AmazonSQS.DeleteMessage", map[string]interface{}{
+	handler.ServeHTTP(wd, sqsJSONReq(t, "AmazonSQS.DeleteMessage", map[string]any{
 		"QueueUrl":      queueURL,
 		"ReceiptHandle": receiptHandle,
 	}))
@@ -206,7 +206,7 @@ func TestSQSJSON_DeleteMessage(t *testing.T) {
 
 	// Receive again — should be empty.
 	wr2 := httptest.NewRecorder()
-	handler.ServeHTTP(wr2, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr2, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":            queueURL,
 		"MaxNumberOfMessages": 10,
 	}))
@@ -227,7 +227,7 @@ func TestSQSJSON_DeleteQueue(t *testing.T) {
 
 	// Delete it.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, sqsJSONReq(t, "AmazonSQS.DeleteQueue", map[string]interface{}{
+	handler.ServeHTTP(wd, sqsJSONReq(t, "AmazonSQS.DeleteQueue", map[string]any{
 		"QueueUrl": queueURL,
 	}))
 	if wd.Code != http.StatusOK {
@@ -236,7 +236,7 @@ func TestSQSJSON_DeleteQueue(t *testing.T) {
 
 	// Verify it's gone from list.
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]interface{}{}))
+	handler.ServeHTTP(wl, sqsJSONReq(t, "AmazonSQS.ListQueues", map[string]any{}))
 	body := wl.Body.String()
 	if strings.Contains(body, "json-deletable-queue") {
 		t.Error("ListQueues: queue should not appear after deletion")
@@ -250,7 +250,7 @@ func TestSQSJSON_GetQueueUrl(t *testing.T) {
 	want := mustJSONCreateQueue(t, handler, "json-url-lookup")
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.GetQueueUrl", map[string]interface{}{
+	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.GetQueueUrl", map[string]any{
 		"QueueName": "json-url-lookup",
 	}))
 	if w.Code != http.StatusOK {
@@ -273,7 +273,7 @@ func TestSQSJSON_QueueAttributes(t *testing.T) {
 
 	// Create queue with attributes via JSON.
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.CreateQueue", map[string]interface{}{
+	handler.ServeHTTP(w, sqsJSONReq(t, "AmazonSQS.CreateQueue", map[string]any{
 		"QueueName":  "json-attr-queue",
 		"Attributes": map[string]string{"VisibilityTimeout": "60"},
 	}))
@@ -288,7 +288,7 @@ func TestSQSJSON_QueueAttributes(t *testing.T) {
 
 	// GetQueueAttributes — All.
 	wa := httptest.NewRecorder()
-	handler.ServeHTTP(wa, sqsJSONReq(t, "AmazonSQS.GetQueueAttributes", map[string]interface{}{
+	handler.ServeHTTP(wa, sqsJSONReq(t, "AmazonSQS.GetQueueAttributes", map[string]any{
 		"QueueUrl":       queueURL,
 		"AttributeNames": []string{"All"},
 	}))
@@ -309,7 +309,7 @@ func TestSQSJSON_QueueAttributes(t *testing.T) {
 
 	// SetQueueAttributes.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SetQueueAttributes", map[string]interface{}{
+	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SetQueueAttributes", map[string]any{
 		"QueueUrl":   queueURL,
 		"Attributes": map[string]string{"VisibilityTimeout": "120"},
 	}))
@@ -319,7 +319,7 @@ func TestSQSJSON_QueueAttributes(t *testing.T) {
 
 	// Verify change.
 	wa2 := httptest.NewRecorder()
-	handler.ServeHTTP(wa2, sqsJSONReq(t, "AmazonSQS.GetQueueAttributes", map[string]interface{}{
+	handler.ServeHTTP(wa2, sqsJSONReq(t, "AmazonSQS.GetQueueAttributes", map[string]any{
 		"QueueUrl":       queueURL,
 		"AttributeNames": []string{"VisibilityTimeout"},
 	}))
@@ -341,7 +341,7 @@ func TestSQSJSON_PurgeQueue(t *testing.T) {
 	// Send messages.
 	for i := 0; i < 3; i++ {
 		ws := httptest.NewRecorder()
-		handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]interface{}{
+		handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]any{
 			"QueueUrl":    queueURL,
 			"MessageBody": "msg",
 		}))
@@ -349,7 +349,7 @@ func TestSQSJSON_PurgeQueue(t *testing.T) {
 
 	// Purge.
 	wp := httptest.NewRecorder()
-	handler.ServeHTTP(wp, sqsJSONReq(t, "AmazonSQS.PurgeQueue", map[string]interface{}{
+	handler.ServeHTTP(wp, sqsJSONReq(t, "AmazonSQS.PurgeQueue", map[string]any{
 		"QueueUrl": queueURL,
 	}))
 	if wp.Code != http.StatusOK {
@@ -358,7 +358,7 @@ func TestSQSJSON_PurgeQueue(t *testing.T) {
 
 	// Receive — should be empty.
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":            queueURL,
 		"MaxNumberOfMessages": 10,
 	}))
@@ -379,9 +379,9 @@ func TestSQSJSON_BatchOperations(t *testing.T) {
 
 	// SendMessageBatch.
 	wb := httptest.NewRecorder()
-	handler.ServeHTTP(wb, sqsJSONReq(t, "AmazonSQS.SendMessageBatch", map[string]interface{}{
+	handler.ServeHTTP(wb, sqsJSONReq(t, "AmazonSQS.SendMessageBatch", map[string]any{
 		"QueueUrl": queueURL,
-		"Entries": []map[string]interface{}{
+		"Entries": []map[string]any{
 			{"Id": "msg1", "MessageBody": "body one"},
 			{"Id": "msg2", "MessageBody": "body two"},
 			{"Id": "msg3", "MessageBody": "body three"},
@@ -404,7 +404,7 @@ func TestSQSJSON_BatchOperations(t *testing.T) {
 
 	// Receive all 3.
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":            queueURL,
 		"MaxNumberOfMessages": 10,
 		"VisibilityTimeout":   300,
@@ -420,16 +420,16 @@ func TestSQSJSON_BatchOperations(t *testing.T) {
 	}
 
 	// DeleteMessageBatch.
-	entries := make([]map[string]interface{}, 0, 3)
+	entries := make([]map[string]any, 0, 3)
 	for i, m := range recvResp.Messages {
-		entries = append(entries, map[string]interface{}{
+		entries = append(entries, map[string]any{
 			"Id":            strings.Repeat("d", 1) + string(rune('1'+i)),
 			"ReceiptHandle": m.ReceiptHandle,
 		})
 	}
 
 	wdel := httptest.NewRecorder()
-	handler.ServeHTTP(wdel, sqsJSONReq(t, "AmazonSQS.DeleteMessageBatch", map[string]interface{}{
+	handler.ServeHTTP(wdel, sqsJSONReq(t, "AmazonSQS.DeleteMessageBatch", map[string]any{
 		"QueueUrl": queueURL,
 		"Entries":  entries,
 	}))
@@ -456,13 +456,13 @@ func TestSQSJSON_ChangeMessageVisibility(t *testing.T) {
 
 	// Send and receive.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]interface{}{
+	handler.ServeHTTP(ws, sqsJSONReq(t, "AmazonSQS.SendMessage", map[string]any{
 		"QueueUrl":    queueURL,
 		"MessageBody": "visibility test",
 	}))
 
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]interface{}{
+	handler.ServeHTTP(wr, sqsJSONReq(t, "AmazonSQS.ReceiveMessage", map[string]any{
 		"QueueUrl":          queueURL,
 		"VisibilityTimeout": 300,
 	}))
@@ -478,7 +478,7 @@ func TestSQSJSON_ChangeMessageVisibility(t *testing.T) {
 
 	// ChangeMessageVisibility.
 	wc := httptest.NewRecorder()
-	handler.ServeHTTP(wc, sqsJSONReq(t, "AmazonSQS.ChangeMessageVisibility", map[string]interface{}{
+	handler.ServeHTTP(wc, sqsJSONReq(t, "AmazonSQS.ChangeMessageVisibility", map[string]any{
 		"QueueUrl":          queueURL,
 		"ReceiptHandle":     recvResp.Messages[0].ReceiptHandle,
 		"VisibilityTimeout": 0,

@@ -9,7 +9,7 @@ import (
 )
 
 // snsJSONReq builds a JSON-protocol POST request targeting the SNS service.
-func snsJSONReq(t *testing.T, target string, body interface{}) *http.Request {
+func snsJSONReq(t *testing.T, target string, body any) *http.Request {
 	t.Helper()
 
 	data, err := json.Marshal(body)
@@ -30,7 +30,7 @@ func mustJSONCreateTopic(t *testing.T, handler http.Handler, name string) string
 	t.Helper()
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, snsJSONReq(t, "SNS.CreateTopic", map[string]interface{}{
+	handler.ServeHTTP(w, snsJSONReq(t, "SNS.CreateTopic", map[string]any{
 		"Name": name,
 	}))
 	if w.Code != http.StatusOK {
@@ -54,7 +54,7 @@ func mustJSONSubscribe(t *testing.T, handler http.Handler, topicArn, protocol, e
 	t.Helper()
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, snsJSONReq(t, "SNS.Subscribe", map[string]interface{}{
+	handler.ServeHTTP(w, snsJSONReq(t, "SNS.Subscribe", map[string]any{
 		"TopicArn": topicArn,
 		"Protocol": protocol,
 		"Endpoint": endpoint,
@@ -93,7 +93,7 @@ func TestSNSJSON_CreateTopicAndListTopics(t *testing.T) {
 
 	// ListTopics
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, snsJSONReq(t, "SNS.ListTopics", map[string]interface{}{}))
+	handler.ServeHTTP(w, snsJSONReq(t, "SNS.ListTopics", map[string]any{}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("JSON ListTopics: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
 	}
@@ -128,7 +128,7 @@ func TestSNSJSON_SubscribeAndListSubscriptions(t *testing.T) {
 
 	// ListSubscriptions
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, snsJSONReq(t, "SNS.ListSubscriptions", map[string]interface{}{}))
+	handler.ServeHTTP(w, snsJSONReq(t, "SNS.ListSubscriptions", map[string]any{}))
 	if w.Code != http.StatusOK {
 		t.Fatalf("JSON ListSubscriptions: expected 200, got %d", w.Code)
 	}
@@ -148,7 +148,7 @@ func TestSNSJSON_SubscribeAndListSubscriptions(t *testing.T) {
 
 	// ListSubscriptionsByTopic
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, snsJSONReq(t, "SNS.ListSubscriptionsByTopic", map[string]interface{}{
+	handler.ServeHTTP(wt, snsJSONReq(t, "SNS.ListSubscriptionsByTopic", map[string]any{
 		"TopicArn": topicArn,
 	}))
 	if wt.Code != http.StatusOK {
@@ -172,7 +172,7 @@ func TestSNSJSON_Publish(t *testing.T) {
 	topicArn := mustJSONCreateTopic(t, handler, "json-publish-topic")
 
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, snsJSONReq(t, "SNS.Publish", map[string]interface{}{
+	handler.ServeHTTP(w, snsJSONReq(t, "SNS.Publish", map[string]any{
 		"TopicArn": topicArn,
 		"Message":  "Hello, JSON SNS!",
 		"Subject":  "Test Subject",
@@ -191,7 +191,7 @@ func TestSNSJSON_Publish(t *testing.T) {
 
 	// Publish to non-existent topic.
 	wf := httptest.NewRecorder()
-	handler.ServeHTTP(wf, snsJSONReq(t, "SNS.Publish", map[string]interface{}{
+	handler.ServeHTTP(wf, snsJSONReq(t, "SNS.Publish", map[string]any{
 		"TopicArn": "arn:aws:sns:us-east-1:000000000000:no-such-topic",
 		"Message":  "nope",
 	}))
@@ -209,7 +209,7 @@ func TestSNSJSON_Unsubscribe(t *testing.T) {
 
 	// Unsubscribe.
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, snsJSONReq(t, "SNS.Unsubscribe", map[string]interface{}{
+	handler.ServeHTTP(wu, snsJSONReq(t, "SNS.Unsubscribe", map[string]any{
 		"SubscriptionArn": subArn,
 	}))
 	if wu.Code != http.StatusOK {
@@ -218,7 +218,7 @@ func TestSNSJSON_Unsubscribe(t *testing.T) {
 
 	// Verify it's gone.
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, snsJSONReq(t, "SNS.ListSubscriptions", map[string]interface{}{}))
+	handler.ServeHTTP(wl, snsJSONReq(t, "SNS.ListSubscriptions", map[string]any{}))
 	body := wl.Body.String()
 	if strings.Contains(body, subArn) {
 		t.Error("ListSubscriptions: subscription should not appear after unsubscribe")
@@ -226,7 +226,7 @@ func TestSNSJSON_Unsubscribe(t *testing.T) {
 
 	// Unsubscribe again — should fail.
 	wu2 := httptest.NewRecorder()
-	handler.ServeHTTP(wu2, snsJSONReq(t, "SNS.Unsubscribe", map[string]interface{}{
+	handler.ServeHTTP(wu2, snsJSONReq(t, "SNS.Unsubscribe", map[string]any{
 		"SubscriptionArn": subArn,
 	}))
 	if wu2.Code == http.StatusOK {
@@ -242,7 +242,7 @@ func TestSNSJSON_DeleteTopic(t *testing.T) {
 
 	// Delete.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, snsJSONReq(t, "SNS.DeleteTopic", map[string]interface{}{
+	handler.ServeHTTP(wd, snsJSONReq(t, "SNS.DeleteTopic", map[string]any{
 		"TopicArn": topicArn,
 	}))
 	if wd.Code != http.StatusOK {
@@ -251,14 +251,14 @@ func TestSNSJSON_DeleteTopic(t *testing.T) {
 
 	// Verify gone.
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, snsJSONReq(t, "SNS.ListTopics", map[string]interface{}{}))
+	handler.ServeHTTP(wl, snsJSONReq(t, "SNS.ListTopics", map[string]any{}))
 	if strings.Contains(wl.Body.String(), "json-deletable-topic") {
 		t.Error("ListTopics: topic should not appear after deletion")
 	}
 
 	// Delete again — should fail.
 	wd2 := httptest.NewRecorder()
-	handler.ServeHTTP(wd2, snsJSONReq(t, "SNS.DeleteTopic", map[string]interface{}{
+	handler.ServeHTTP(wd2, snsJSONReq(t, "SNS.DeleteTopic", map[string]any{
 		"TopicArn": topicArn,
 	}))
 	if wd2.Code == http.StatusOK {
@@ -274,7 +274,7 @@ func TestSNSJSON_TopicAttributes(t *testing.T) {
 
 	// GetTopicAttributes.
 	wg := httptest.NewRecorder()
-	handler.ServeHTTP(wg, snsJSONReq(t, "SNS.GetTopicAttributes", map[string]interface{}{
+	handler.ServeHTTP(wg, snsJSONReq(t, "SNS.GetTopicAttributes", map[string]any{
 		"TopicArn": topicArn,
 	}))
 	if wg.Code != http.StatusOK {
@@ -290,7 +290,7 @@ func TestSNSJSON_TopicAttributes(t *testing.T) {
 
 	// SetTopicAttributes.
 	ws := httptest.NewRecorder()
-	handler.ServeHTTP(ws, snsJSONReq(t, "SNS.SetTopicAttributes", map[string]interface{}{
+	handler.ServeHTTP(ws, snsJSONReq(t, "SNS.SetTopicAttributes", map[string]any{
 		"TopicArn":       topicArn,
 		"AttributeName":  "DisplayName",
 		"AttributeValue": "JSON Display Name",
@@ -301,7 +301,7 @@ func TestSNSJSON_TopicAttributes(t *testing.T) {
 
 	// Verify change.
 	wg2 := httptest.NewRecorder()
-	handler.ServeHTTP(wg2, snsJSONReq(t, "SNS.GetTopicAttributes", map[string]interface{}{
+	handler.ServeHTTP(wg2, snsJSONReq(t, "SNS.GetTopicAttributes", map[string]any{
 		"TopicArn": topicArn,
 	}))
 	var attrResp2 struct {
@@ -321,7 +321,7 @@ func TestSNSJSON_TagResource(t *testing.T) {
 
 	// TagResource.
 	wt := httptest.NewRecorder()
-	handler.ServeHTTP(wt, snsJSONReq(t, "SNS.TagResource", map[string]interface{}{
+	handler.ServeHTTP(wt, snsJSONReq(t, "SNS.TagResource", map[string]any{
 		"ResourceArn": topicArn,
 		"Tags": []map[string]string{
 			{"Key": "env", "Value": "test"},
@@ -334,7 +334,7 @@ func TestSNSJSON_TagResource(t *testing.T) {
 
 	// UntagResource.
 	wu := httptest.NewRecorder()
-	handler.ServeHTTP(wu, snsJSONReq(t, "SNS.UntagResource", map[string]interface{}{
+	handler.ServeHTTP(wu, snsJSONReq(t, "SNS.UntagResource", map[string]any{
 		"ResourceArn": topicArn,
 		"TagKeys":     []string{"env"},
 	}))

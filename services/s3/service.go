@@ -259,7 +259,7 @@ func (s *S3Service) GetObjectData(bucket, key string) ([]byte, error) {
 // publishObjectEvent sends an S3 object event to the event bus.
 func (s *S3Service) publishObjectEvent(ctx *service.RequestContext, bucket, key, eventType string) {
 	// Look up object metadata for the event detail.
-	detail := map[string]interface{}{
+	detail := map[string]any{
 		"bucket": bucket,
 		"key":    key,
 	}

@@ -97,13 +97,13 @@ type cfnResource struct {
 }
 
 type cfnOutput struct {
-	Value       interface{} `json:"Value"`
+	Value       any `json:"Value"`
 	Description string      `json:"Description"`
 	Export      *cfnExport  `json:"Export"`
 }
 
 type cfnExport struct {
-	Name interface{} `json:"Name"`
+	Name any `json:"Name"`
 }
 
 // ---- store ----

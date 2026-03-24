@@ -112,7 +112,7 @@ func (s *FunctionStore) UpdateCode(name string, code []byte, codeSha256 string, 
 }
 
 // UpdateConfiguration updates the non-code configuration of a function.
-func (s *FunctionStore) UpdateConfiguration(name string, updates map[string]interface{}) (*Function, error) {
+func (s *FunctionStore) UpdateConfiguration(name string, updates map[string]any) (*Function, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -139,8 +139,8 @@ func (s *FunctionStore) UpdateConfiguration(name string, updates map[string]inte
 	if v, ok := updates["MemorySize"].(float64); ok && v > 0 {
 		f.MemorySize = int(v)
 	}
-	if env, ok := updates["Environment"].(map[string]interface{}); ok {
-		if vars, ok := env["Variables"].(map[string]interface{}); ok {
+	if env, ok := updates["Environment"].(map[string]any); ok {
+		if vars, ok := env["Variables"].(map[string]any); ok {
 			envVars := make(map[string]string, len(vars))
 			for k, v := range vars {
 				if sv, ok := v.(string); ok {

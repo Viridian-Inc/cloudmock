@@ -17,7 +17,7 @@ import (
 // ── Mock cloudmock server ───────────────────────────────────────────────────
 
 func newTestCloudmockServer() *httptest.Server {
-	store := make(map[string]map[string]interface{})
+	store := make(map[string]map[string]any)
 
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		auth := r.Header.Get("Authorization")
@@ -50,14 +50,14 @@ func newTestCloudmockServer() *httptest.Server {
 		}
 
 		if action != "" {
-			var params map[string]interface{}
+			var params map[string]any
 			if r.Body != nil {
 				bodyBytes := make([]byte, 4096)
 				n, _ := r.Body.Read(bodyBytes)
 				json.Unmarshal(bodyBytes[:n], &params)
 			}
 			if params == nil {
-				params = make(map[string]interface{})
+				params = make(map[string]any)
 			}
 			handleJSONAction(w, service, action, params, store)
 			return
@@ -68,7 +68,7 @@ func newTestCloudmockServer() *httptest.Server {
 	}))
 }
 
-func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]interface{}) {
+func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[string]any) {
 	path := r.URL.Path
 	parts := strings.SplitN(strings.TrimPrefix(path, "/"), "/", 2)
 	bucket := parts[0]
@@ -76,7 +76,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 
 	switch r.Method {
 	case "PUT":
-		store[key] = map[string]interface{}{
+		store[key] = map[string]any{
 			"bucket": bucket,
 			"arn":    fmt.Sprintf("arn:aws:s3:::%s", bucket),
 			"region": "us-east-1",
@@ -99,7 +99,7 @@ func handleS3(w http.ResponseWriter, r *http.Request, store map[string]map[strin
 	}
 }
 
-func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]interface{}, store map[string]map[string]interface{}) {
+func handleJSONAction(w http.ResponseWriter, service, action string, params map[string]any, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 
 	switch {
@@ -109,20 +109,20 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			tableName, _ := params["TableName"].(string)
 			if tableName != "" {
 				key := fmt.Sprintf("dynamodb/table/%s", tableName)
-				data := map[string]interface{}{}
+				data := map[string]any{}
 				for k, v := range params {
 					data[k] = v
 				}
 				data["TableArn"] = fmt.Sprintf("arn:aws:dynamodb:us-east-1:000000000000:table/%s", tableName)
 				data["TableStatus"] = "ACTIVE"
 				store[key] = data
-				json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+				json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 				return
 			}
 		}
 		id := fmt.Sprintf("%s-%s-001", service, strings.ToLower(action[6:]))
 		key := fmt.Sprintf("%s/%s/%s", service, action, id)
-		data := map[string]interface{}{}
+		data := map[string]any{}
 		for k, v := range params {
 			data[k] = v
 		}
@@ -135,10 +135,10 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			tableName, _ := params["TableName"].(string)
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
-				json.NewEncoder(w).Encode(map[string]interface{}{"Table": data})
+				json.NewEncoder(w).Encode(map[string]any{"Table": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
@@ -146,7 +146,7 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-		json.NewEncoder(w).Encode(map[string]interface{}{"__type": "ResourceNotFoundException"})
+		json.NewEncoder(w).Encode(map[string]any{"__type": "ResourceNotFoundException"})
 
 	case strings.HasPrefix(action, "Delete"):
 		switch service {
@@ -155,24 +155,24 @@ func handleJSONAction(w http.ResponseWriter, service, action string, params map[
 			key := fmt.Sprintf("dynamodb/table/%s", tableName)
 			if data, ok := store[key]; ok {
 				delete(store, key)
-				json.NewEncoder(w).Encode(map[string]interface{}{"TableDescription": data})
+				json.NewEncoder(w).Encode(map[string]any{"TableDescription": data})
 			} else {
 				w.WriteHeader(http.StatusNotFound)
-				json.NewEncoder(w).Encode(map[string]interface{}{
+				json.NewEncoder(w).Encode(map[string]any{
 					"__type":  "ResourceNotFoundException",
 					"Message": fmt.Sprintf("Table not found: %s", tableName),
 				})
 			}
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 
-func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]interface{}) {
+func handleQueryAction(w http.ResponseWriter, service, action string, values url.Values, store map[string]map[string]any) {
 	w.Header().Set("Content-Type", "application/json")
 
 	switch {
@@ -180,7 +180,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		cidr := values.Get("CidrBlock")
 		vpcID := "vpc-test001"
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
-		data := map[string]interface{}{
+		data := map[string]any{
 			"VpcId":              vpcID,
 			"CidrBlock":         cidr,
 			"Arn":               fmt.Sprintf("arn:aws:ec2:us-east-1:000000000000:vpc/%s", vpcID),
@@ -198,7 +198,7 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 			json.NewEncoder(w).Encode(data)
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
@@ -209,17 +209,17 @@ func handleQueryAction(w http.ResponseWriter, service, action string, values url
 		key := fmt.Sprintf("ec2/vpc/%s", vpcID)
 		if _, ok := store[key]; ok {
 			delete(store, key)
-			json.NewEncoder(w).Encode(map[string]interface{}{})
+			json.NewEncoder(w).Encode(map[string]any{})
 		} else {
 			w.WriteHeader(http.StatusNotFound)
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			json.NewEncoder(w).Encode(map[string]any{
 				"__type":  "ResourceNotFoundException",
 				"Message": fmt.Sprintf("VPC not found: %s", vpcID),
 			})
 		}
 
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 
@@ -266,7 +266,7 @@ func TestReconciler_CreateObserve_S3Bucket(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", s3BucketSchema())
 
 	// Create.
-	id, state, err := r.Create(map[string]interface{}{
+	id, state, err := r.Create(map[string]any{
 		"bucket": "test-bucket",
 	})
 	require.NoError(t, err)
@@ -289,7 +289,7 @@ func TestReconciler_DeleteObserve_S3Bucket(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", s3BucketSchema())
 
 	// Create.
-	_, _, err := r.Create(map[string]interface{}{"bucket": "delete-me"})
+	_, _, err := r.Create(map[string]any{"bucket": "delete-me"})
 	require.NoError(t, err)
 
 	// Delete.
@@ -353,7 +353,7 @@ func TestReconciler_CreateObserve_EC2VPC(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", ec2VPCSchema())
 
 	// Create.
-	id, state, err := r.Create(map[string]interface{}{
+	id, state, err := r.Create(map[string]any{
 		"cidr_block": "10.0.0.0/16",
 	})
 	require.NoError(t, err)
@@ -374,7 +374,7 @@ func TestReconciler_DeleteObserve_EC2VPC(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", ec2VPCSchema())
 
 	// Create.
-	id, _, err := r.Create(map[string]interface{}{"cidr_block": "10.0.0.0/16"})
+	id, _, err := r.Create(map[string]any{"cidr_block": "10.0.0.0/16"})
 	require.NoError(t, err)
 
 	// Delete.
@@ -414,7 +414,7 @@ func TestReconciler_CreateObserve_DynamoDBTable(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", dynamoDBTableSchema())
 
 	// Create.
-	id, state, err := r.Create(map[string]interface{}{
+	id, state, err := r.Create(map[string]any{
 		"table_name": "my-table",
 		"hash_key":   "id",
 	})
@@ -430,7 +430,7 @@ func TestReconciler_DeleteObserve_DynamoDBTable(t *testing.T) {
 	r := NewReconciler(server.URL, "us-east-1", "test", "test", dynamoDBTableSchema())
 
 	// Create.
-	_, _, err := r.Create(map[string]interface{}{
+	_, _, err := r.Create(map[string]any{
 		"table_name": "delete-table",
 		"hash_key":   "pk",
 	})

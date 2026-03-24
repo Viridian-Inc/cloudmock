@@ -47,8 +47,8 @@ func newMockGateway() *httptest.Server {
 	// Lambda: ListFunctions (REST GET /2015-03-31/functions/).
 	mux.HandleFunc("/2015-03-31/functions/", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"Functions": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"Functions": []map[string]any{
 				{"FunctionName": "good-func", "Runtime": "nodejs20.x", "FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:good-func"},
 				{"FunctionName": "old-func", "Runtime": "nodejs14.x", "FunctionArn": "arn:aws:lambda:us-east-1:123456789012:function:old-func"},
 			},
@@ -76,24 +76,24 @@ func handleJSONService(w http.ResponseWriter, r *http.Request, target string) {
 
 	switch {
 	case strings.HasSuffix(target, ".ListKeys"):
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"Keys": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"Keys": []map[string]any{
 				{"KeyId": "key-abc123", "KeyArn": "arn:aws:kms:us-east-1:123456789012:key/key-abc123"},
 			},
 		})
 	case strings.HasSuffix(target, ".ListTables"):
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
 			"TableNames": []string{"users", "orders"},
 		})
 	case strings.HasSuffix(target, ".ListSecrets"):
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"SecretList": []map[string]interface{}{
+		json.NewEncoder(w).Encode(map[string]any{
+			"SecretList": []map[string]any{
 				{"Name": "db-password", "ARN": "arn:aws:secretsmanager:us-east-1:123456789012:secret:db-password", "RotationEnabled": false},
 				{"Name": "api-key", "ARN": "arn:aws:secretsmanager:us-east-1:123456789012:secret:api-key", "RotationEnabled": true},
 			},
 		})
 	default:
-		json.NewEncoder(w).Encode(map[string]interface{}{})
+		json.NewEncoder(w).Encode(map[string]any{})
 	}
 }
 

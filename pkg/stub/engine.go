@@ -98,17 +98,17 @@ func (s *StubService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 	case "listTags":
 		return s.handleListTags(action, params)
 	case "other":
-		return s.successResponse(map[string]interface{}{}), nil
+		return s.successResponse(map[string]any{}), nil
 	default:
-		return s.successResponse(map[string]interface{}{}), nil
+		return s.successResponse(map[string]any{}), nil
 	}
 }
 
 // handleCreate generates an ID, stores the resource, and returns the ID and ARN.
-func (s *StubService) handleCreate(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleCreate(action Action, params map[string]any) (*service.Response, error) {
 	rt, ok := s.model.ResourceTypes[action.ResourceType]
 	if !ok {
-		return s.successResponse(map[string]interface{}{}), nil
+		return s.successResponse(map[string]any{}), nil
 	}
 
 	// Determine ID prefix from the resource type name (lowercase).
@@ -118,13 +118,13 @@ func (s *StubService) handleCreate(action Action, params map[string]interface{})
 	arn := BuildARN(rt.ArnPattern, s.region, s.accountID, id)
 
 	// Store ID and ARN inside the resource.
-	_ = s.store.Update(action.ResourceType, id, map[string]interface{}{
+	_ = s.store.Update(action.ResourceType, id, map[string]any{
 		rt.IdField:  id,
 		"Arn":       arn,
 		"CreatedAt": time.Now().UTC().Format(time.RFC3339),
 	})
 
-	result := map[string]interface{}{
+	result := map[string]any{
 		rt.IdField: id,
 		"Arn":      arn,
 	}
@@ -139,7 +139,7 @@ func (s *StubService) handleCreate(action Action, params map[string]interface{})
 }
 
 // handleDescribe looks up a resource by its ID field.
-func (s *StubService) handleDescribe(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleDescribe(action Action, params map[string]any) (*service.Response, error) {
 	id, err := s.extractID(action, params)
 	if err != nil {
 		return s.errorResponse(), err
@@ -161,13 +161,13 @@ func (s *StubService) handleList(action Action) (*service.Response, error) {
 	items := s.store.List(action.ResourceType)
 	rt := s.model.ResourceTypes[action.ResourceType]
 	listKey := rt.Name + "s" // simple pluralization
-	return s.successResponse(map[string]interface{}{
+	return s.successResponse(map[string]any{
 		listKey: items,
 	}), nil
 }
 
 // handleDelete removes a resource by ID.
-func (s *StubService) handleDelete(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleDelete(action Action, params map[string]any) (*service.Response, error) {
 	id, err := s.extractID(action, params)
 	if err != nil {
 		return s.errorResponse(), err
@@ -180,18 +180,18 @@ func (s *StubService) handleDelete(action Action, params map[string]interface{})
 				http.StatusNotFound)
 	}
 
-	return s.successResponse(map[string]interface{}{}), nil
+	return s.successResponse(map[string]any{}), nil
 }
 
 // handleUpdate merges fields into an existing resource.
-func (s *StubService) handleUpdate(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleUpdate(action Action, params map[string]any) (*service.Response, error) {
 	id, err := s.extractID(action, params)
 	if err != nil {
 		return s.errorResponse(), err
 	}
 
 	// Remove the ID field from the updates.
-	updates := make(map[string]interface{}, len(params))
+	updates := make(map[string]any, len(params))
 	for k, v := range params {
 		if k != action.IdField {
 			updates[k] = v
@@ -211,7 +211,7 @@ func (s *StubService) handleUpdate(action Action, params map[string]interface{})
 }
 
 // handleTag adds tags to a resource.
-func (s *StubService) handleTag(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleTag(action Action, params map[string]any) (*service.Response, error) {
 	arnStr, _ := params["ResourceArn"].(string)
 	if arnStr == "" {
 		// Try Arn field as well
@@ -225,11 +225,11 @@ func (s *StubService) handleTag(action Action, params map[string]interface{}) (*
 	tags := extractTags(params)
 	s.store.Tag(arnStr, tags)
 
-	return s.successResponse(map[string]interface{}{}), nil
+	return s.successResponse(map[string]any{}), nil
 }
 
 // handleUntag removes tags from a resource.
-func (s *StubService) handleUntag(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleUntag(action Action, params map[string]any) (*service.Response, error) {
 	arnStr, _ := params["ResourceArn"].(string)
 	if arnStr == "" {
 		arnStr, _ = params["Arn"].(string)
@@ -242,11 +242,11 @@ func (s *StubService) handleUntag(action Action, params map[string]interface{}) 
 	keys := extractTagKeys(params)
 	s.store.Untag(arnStr, keys)
 
-	return s.successResponse(map[string]interface{}{}), nil
+	return s.successResponse(map[string]any{}), nil
 }
 
 // handleListTags returns tags for a resource.
-func (s *StubService) handleListTags(action Action, params map[string]interface{}) (*service.Response, error) {
+func (s *StubService) handleListTags(action Action, params map[string]any) (*service.Response, error) {
 	arnStr, _ := params["ResourceArn"].(string)
 	if arnStr == "" {
 		arnStr, _ = params["Arn"].(string)
@@ -262,13 +262,13 @@ func (s *StubService) handleListTags(action Action, params map[string]interface{
 		tagList = append(tagList, map[string]string{"Key": k, "Value": v})
 	}
 
-	return s.successResponse(map[string]interface{}{
+	return s.successResponse(map[string]any{
 		"Tags": tagList,
 	}), nil
 }
 
 // extractID pulls the resource ID from the request params using the action's IdField.
-func (s *StubService) extractID(action Action, params map[string]interface{}) (string, error) {
+func (s *StubService) extractID(action Action, params map[string]any) (string, error) {
 	idField := action.IdField
 	if idField == "" {
 		rt := s.model.ResourceTypes[action.ResourceType]
@@ -285,8 +285,8 @@ func (s *StubService) extractID(action Action, params map[string]interface{}) (s
 
 // parseInput extracts input parameters from the request body.
 // It supports JSON and form-encoded (query protocol) bodies.
-func (s *StubService) parseInput(ctx *service.RequestContext) (map[string]interface{}, error) {
-	params := make(map[string]interface{})
+func (s *StubService) parseInput(ctx *service.RequestContext) (map[string]any, error) {
+	params := make(map[string]any)
 
 	if len(ctx.Body) == 0 {
 		return params, nil
@@ -330,7 +330,7 @@ func (s *StubService) parseInput(ctx *service.RequestContext) (map[string]interf
 }
 
 // successResponse builds a Response with the correct format for this service's protocol.
-func (s *StubService) successResponse(body interface{}) *service.Response {
+func (s *StubService) successResponse(body any) *service.Response {
 	return &service.Response{
 		StatusCode: http.StatusOK,
 		Body:       body,
@@ -358,8 +358,8 @@ func (s *StubService) responseFormat() service.ResponseFormat {
 }
 
 // extractTags pulls a tag map from the "Tags" parameter in the request.
-// It handles both []interface{} (list of {Key,Value} maps) and map[string]interface{}.
-func extractTags(params map[string]interface{}) map[string]string {
+// It handles both []any (list of {Key,Value} maps) and map[string]any.
+func extractTags(params map[string]any) map[string]string {
 	tags := make(map[string]string)
 	raw, ok := params["Tags"]
 	if !ok {
@@ -367,9 +367,9 @@ func extractTags(params map[string]interface{}) map[string]string {
 	}
 
 	switch t := raw.(type) {
-	case []interface{}:
+	case []any:
 		for _, item := range t {
-			if m, ok := item.(map[string]interface{}); ok {
+			if m, ok := item.(map[string]any); ok {
 				key, _ := m["Key"].(string)
 				value, _ := m["Value"].(string)
 				if key != "" {
@@ -377,7 +377,7 @@ func extractTags(params map[string]interface{}) map[string]string {
 				}
 			}
 		}
-	case map[string]interface{}:
+	case map[string]any:
 		for k, v := range t {
 			if vs, ok := v.(string); ok {
 				tags[k] = vs
@@ -388,13 +388,13 @@ func extractTags(params map[string]interface{}) map[string]string {
 }
 
 // extractTagKeys pulls a list of tag keys from the "TagKeys" parameter.
-func extractTagKeys(params map[string]interface{}) []string {
+func extractTagKeys(params map[string]any) []string {
 	raw, ok := params["TagKeys"]
 	if !ok {
 		return nil
 	}
 	switch t := raw.(type) {
-	case []interface{}:
+	case []any:
 		keys := make([]string, 0, len(t))
 		for _, item := range t {
 			if s, ok := item.(string); ok {

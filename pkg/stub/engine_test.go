@@ -154,18 +154,18 @@ func queryModel() *stub.ServiceModel {
 	}
 }
 
-func jsonBody(t *testing.T, v interface{}) []byte {
+func jsonBody(t *testing.T, v any) []byte {
 	t.Helper()
 	b, err := json.Marshal(v)
 	require.NoError(t, err)
 	return b
 }
 
-func decodeResponse(t *testing.T, resp *service.Response) map[string]interface{} {
+func decodeResponse(t *testing.T, resp *service.Response) map[string]any {
 	t.Helper()
 	b, err := json.Marshal(resp.Body)
 	require.NoError(t, err)
-	var m map[string]interface{}
+	var m map[string]any
 	require.NoError(t, json.Unmarshal(b, &m))
 	return m
 }
@@ -232,7 +232,7 @@ func TestStubService_CRUDLifecycle(t *testing.T) {
 	})
 	require.NoError(t, err)
 	listed := decodeResponse(t, listResp)
-	widgets, ok := listed["Widgets"].([]interface{})
+	widgets, ok := listed["Widgets"].([]any)
 	require.True(t, ok, "expected Widgets list")
 	assert.Len(t, widgets, 1)
 
@@ -272,7 +272,7 @@ func TestStubService_Tagging(t *testing.T) {
 	// Tag
 	_, err = svc.HandleRequest(&service.RequestContext{
 		Action: "TagResource",
-		Body: jsonBody(t, map[string]interface{}{
+		Body: jsonBody(t, map[string]any{
 			"ResourceArn": arn,
 			"Tags": []map[string]string{
 				{"Key": "env", "Value": "prod"},
@@ -289,14 +289,14 @@ func TestStubService_Tagging(t *testing.T) {
 	})
 	require.NoError(t, err)
 	tagResult := decodeResponse(t, listTagsResp)
-	tags, ok := tagResult["Tags"].([]interface{})
+	tags, ok := tagResult["Tags"].([]any)
 	require.True(t, ok)
 	assert.Len(t, tags, 2)
 
 	// Untag
 	_, err = svc.HandleRequest(&service.RequestContext{
 		Action: "UntagResource",
-		Body: jsonBody(t, map[string]interface{}{
+		Body: jsonBody(t, map[string]any{
 			"ResourceArn": arn,
 			"TagKeys":     []string{"team"},
 		}),
@@ -310,7 +310,7 @@ func TestStubService_Tagging(t *testing.T) {
 	})
 	require.NoError(t, err)
 	tagResult2 := decodeResponse(t, listTagsResp2)
-	tags2, ok := tagResult2["Tags"].([]interface{})
+	tags2, ok := tagResult2["Tags"].([]any)
 	require.True(t, ok)
 	assert.Len(t, tags2, 1)
 }
@@ -484,7 +484,7 @@ func TestStubService_EmptyBody(t *testing.T) {
 
 func TestResourceStore_CreateAndGet(t *testing.T) {
 	store := stub.NewResourceStore()
-	id := store.Create("widget", "wgt", map[string]interface{}{"Name": "test"})
+	id := store.Create("widget", "wgt", map[string]any{"Name": "test"})
 	assert.Equal(t, "wgt-00000001", id)
 
 	fields, err := store.Get("widget", id)

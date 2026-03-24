@@ -84,7 +84,7 @@ func doPost(t *testing.T, server *httptest.Server, svcName, action string, form 
 }
 
 // doJSON sends a JSON POST with X-Amz-Target header (for JSON protocol services).
-func doJSON(t *testing.T, server *httptest.Server, svcName, target string, body interface{}) *http.Response {
+func doJSON(t *testing.T, server *httptest.Server, svcName, target string, body any) *http.Response {
 	t.Helper()
 
 	data, err := json.Marshal(body)
@@ -233,7 +233,7 @@ func TestCrossService_EventBridgeToSQS(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "CreateQueue failed: %s", body)
 
 	// Step 2: Create EventBridge rule matching source "custom.app"
-	putRuleReq := map[string]interface{}{
+	putRuleReq := map[string]any{
 		"Name":         "test-rule",
 		"EventPattern": `{"source":["custom.app"]}`,
 		"State":        "ENABLED",
@@ -243,7 +243,7 @@ func TestCrossService_EventBridgeToSQS(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "PutRule failed: %s", body)
 
 	// Step 3: Add SQS queue as a target
-	putTargetsReq := map[string]interface{}{
+	putTargetsReq := map[string]any{
 		"Rule": "test-rule",
 		"Targets": []map[string]string{
 			{
@@ -257,8 +257,8 @@ func TestCrossService_EventBridgeToSQS(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode, "PutTargets failed: %s", body)
 
 	// Step 4: PutEvents with source "custom.app"
-	putEventsReq := map[string]interface{}{
-		"Entries": []map[string]interface{}{
+	putEventsReq := map[string]any{
+		"Entries": []map[string]any{
 			{
 				"Source":     "custom.app",
 				"DetailType": "MyEvent",
@@ -297,7 +297,7 @@ func TestCrossService_EventBridgeNoMatch(t *testing.T) {
 	readBody(t, resp)
 
 	// Create rule matching source "specific.app"
-	putRuleReq := map[string]interface{}{
+	putRuleReq := map[string]any{
 		"Name":         "specific-rule",
 		"EventPattern": `{"source":["specific.app"]}`,
 		"State":        "ENABLED",
@@ -306,7 +306,7 @@ func TestCrossService_EventBridgeNoMatch(t *testing.T) {
 	readBody(t, resp)
 
 	// Add target
-	putTargetsReq := map[string]interface{}{
+	putTargetsReq := map[string]any{
 		"Rule": "specific-rule",
 		"Targets": []map[string]string{
 			{
@@ -319,8 +319,8 @@ func TestCrossService_EventBridgeNoMatch(t *testing.T) {
 	readBody(t, resp)
 
 	// PutEvents with a DIFFERENT source
-	putEventsReq := map[string]interface{}{
-		"Entries": []map[string]interface{}{
+	putEventsReq := map[string]any{
+		"Entries": []map[string]any{
 			{
 				"Source":     "other.app",
 				"DetailType": "SomeEvent",

@@ -27,7 +27,7 @@ func newEBGateway(t *testing.T) http.Handler {
 }
 
 // ebReq builds a JSON POST request targeting the EventBridge service via X-Amz-Target.
-func ebReq(t *testing.T, action string, body interface{}) *http.Request {
+func ebReq(t *testing.T, action string, body any) *http.Request {
 	t.Helper()
 
 	var bodyBytes []byte
@@ -50,9 +50,9 @@ func ebReq(t *testing.T, action string, body interface{}) *http.Request {
 }
 
 // decodeJSON is a test helper that unmarshals JSON into a map.
-func decodeJSON(t *testing.T, data string) map[string]interface{} {
+func decodeJSON(t *testing.T, data string) map[string]any {
 	t.Helper()
-	var m map[string]interface{}
+	var m map[string]any
 	if err := json.Unmarshal([]byte(data), &m); err != nil {
 		t.Fatalf("decodeJSON: %v\nbody: %s", err, data)
 	}
@@ -63,7 +63,7 @@ func decodeJSON(t *testing.T, data string) map[string]interface{} {
 func mustCreateBus(t *testing.T, handler http.Handler, name string) string {
 	t.Helper()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, ebReq(t, "CreateEventBus", map[string]interface{}{
+	handler.ServeHTTP(w, ebReq(t, "CreateEventBus", map[string]any{
 		"Name": name,
 	}))
 	if w.Code != http.StatusOK {
@@ -80,7 +80,7 @@ func mustCreateBus(t *testing.T, handler http.Handler, name string) string {
 // mustPutRule creates a rule and returns its ARN.
 func mustPutRule(t *testing.T, handler http.Handler, name, busName, pattern string) string {
 	t.Helper()
-	body := map[string]interface{}{
+	body := map[string]any{
 		"Name":         name,
 		"EventPattern": pattern,
 		"State":        "ENABLED",
@@ -137,7 +137,7 @@ func TestEB_ListEventBusesAndCreate(t *testing.T) {
 
 	// DescribeEventBus
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, ebReq(t, "DescribeEventBus", map[string]interface{}{"Name": "my-bus"}))
+	handler.ServeHTTP(wd, ebReq(t, "DescribeEventBus", map[string]any{"Name": "my-bus"}))
 	if wd.Code != http.StatusOK {
 		t.Fatalf("DescribeEventBus: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
 	}
@@ -147,7 +147,7 @@ func TestEB_ListEventBusesAndCreate(t *testing.T) {
 
 	// Creating a duplicate bus must fail.
 	wdup := httptest.NewRecorder()
-	handler.ServeHTTP(wdup, ebReq(t, "CreateEventBus", map[string]interface{}{"Name": "my-bus"}))
+	handler.ServeHTTP(wdup, ebReq(t, "CreateEventBus", map[string]any{"Name": "my-bus"}))
 	if wdup.Code == http.StatusOK {
 		t.Error("CreateEventBus duplicate: expected error, got 200")
 	}
@@ -168,7 +168,7 @@ func TestEB_Rules(t *testing.T) {
 
 	// DescribeRule
 	wr := httptest.NewRecorder()
-	handler.ServeHTTP(wr, ebReq(t, "DescribeRule", map[string]interface{}{"Name": "my-rule"}))
+	handler.ServeHTTP(wr, ebReq(t, "DescribeRule", map[string]any{"Name": "my-rule"}))
 	if wr.Code != http.StatusOK {
 		t.Fatalf("DescribeRule: expected 200, got %d\nbody: %s", wr.Code, wr.Body.String())
 	}
@@ -191,7 +191,7 @@ func TestEB_Rules(t *testing.T) {
 
 	// ListRules
 	wl := httptest.NewRecorder()
-	handler.ServeHTTP(wl, ebReq(t, "ListRules", map[string]interface{}{"NamePrefix": "my-rule"}))
+	handler.ServeHTTP(wl, ebReq(t, "ListRules", map[string]any{"NamePrefix": "my-rule"}))
 	if wl.Code != http.StatusOK {
 		t.Fatalf("ListRules: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
 	}
@@ -208,9 +208,9 @@ func TestEB_Targets(t *testing.T) {
 
 	// PutTargets
 	wpt := httptest.NewRecorder()
-	handler.ServeHTTP(wpt, ebReq(t, "PutTargets", map[string]interface{}{
+	handler.ServeHTTP(wpt, ebReq(t, "PutTargets", map[string]any{
 		"Rule": "target-rule",
-		"Targets": []map[string]interface{}{
+		"Targets": []map[string]any{
 			{"Id": "t1", "Arn": "arn:aws:lambda:us-east-1:000000000000:function:my-fn"},
 			{"Id": "t2", "Arn": "arn:aws:sqs:us-east-1:000000000000:my-queue", "Input": `{"key":"val"}`},
 		},
@@ -225,7 +225,7 @@ func TestEB_Targets(t *testing.T) {
 
 	// ListTargetsByRule
 	wlt := httptest.NewRecorder()
-	handler.ServeHTTP(wlt, ebReq(t, "ListTargetsByRule", map[string]interface{}{"Rule": "target-rule"}))
+	handler.ServeHTTP(wlt, ebReq(t, "ListTargetsByRule", map[string]any{"Rule": "target-rule"}))
 	if wlt.Code != http.StatusOK {
 		t.Fatalf("ListTargetsByRule: expected 200, got %d\nbody: %s", wlt.Code, wlt.Body.String())
 	}
@@ -236,7 +236,7 @@ func TestEB_Targets(t *testing.T) {
 
 	// RemoveTargets
 	wrt := httptest.NewRecorder()
-	handler.ServeHTTP(wrt, ebReq(t, "RemoveTargets", map[string]interface{}{
+	handler.ServeHTTP(wrt, ebReq(t, "RemoveTargets", map[string]any{
 		"Rule": "target-rule",
 		"Ids":  []string{"t1"},
 	}))
@@ -246,7 +246,7 @@ func TestEB_Targets(t *testing.T) {
 
 	// List again — t1 should be gone.
 	wlt2 := httptest.NewRecorder()
-	handler.ServeHTTP(wlt2, ebReq(t, "ListTargetsByRule", map[string]interface{}{"Rule": "target-rule"}))
+	handler.ServeHTTP(wlt2, ebReq(t, "ListTargetsByRule", map[string]any{"Rule": "target-rule"}))
 	if strings.Contains(wlt2.Body.String(), `"t1"`) {
 		t.Errorf("ListTargetsByRule after remove: t1 should be gone\nbody: %s", wlt2.Body.String())
 	}
@@ -261,8 +261,8 @@ func TestEB_PutEvents(t *testing.T) {
 	handler := newEBGateway(t)
 
 	wpe := httptest.NewRecorder()
-	handler.ServeHTTP(wpe, ebReq(t, "PutEvents", map[string]interface{}{
-		"Entries": []map[string]interface{}{
+	handler.ServeHTTP(wpe, ebReq(t, "PutEvents", map[string]any{
+		"Entries": []map[string]any{
 			{
 				"Source":       "myapp",
 				"DetailType":   "UserCreated",
@@ -285,13 +285,13 @@ func TestEB_PutEvents(t *testing.T) {
 		t.Errorf("PutEvents: expected 0 failures, got %v", count)
 	}
 
-	entries, _ := resp["Entries"].([]interface{})
+	entries, _ := resp["Entries"].([]any)
 	if len(entries) != 2 {
 		t.Fatalf("PutEvents: expected 2 result entries, got %d\nbody: %s", len(entries), wpe.Body.String())
 	}
 
 	for i, entry := range entries {
-		e, _ := entry.(map[string]interface{})
+		e, _ := entry.(map[string]any)
 		eventID, _ := e["EventId"].(string)
 		if eventID == "" {
 			t.Errorf("PutEvents: entry %d has empty EventId\nbody: %s", i, wpe.Body.String())
@@ -300,8 +300,8 @@ func TestEB_PutEvents(t *testing.T) {
 
 	// Empty entries must fail.
 	wpef := httptest.NewRecorder()
-	handler.ServeHTTP(wpef, ebReq(t, "PutEvents", map[string]interface{}{
-		"Entries": []interface{}{},
+	handler.ServeHTTP(wpef, ebReq(t, "PutEvents", map[string]any{
+		"Entries": []any{},
 	}))
 	if wpef.Code == http.StatusOK {
 		t.Error("PutEvents with empty Entries: expected error, got 200")
@@ -317,7 +317,7 @@ func TestEB_DeleteRuleAndBus(t *testing.T) {
 
 	// DeleteRule
 	wdr := httptest.NewRecorder()
-	handler.ServeHTTP(wdr, ebReq(t, "DeleteRule", map[string]interface{}{
+	handler.ServeHTTP(wdr, ebReq(t, "DeleteRule", map[string]any{
 		"Name":         "deletable-rule",
 		"EventBusName": "deletable-bus",
 	}))
@@ -327,7 +327,7 @@ func TestEB_DeleteRuleAndBus(t *testing.T) {
 
 	// DescribeRule after deletion must fail.
 	wdr2 := httptest.NewRecorder()
-	handler.ServeHTTP(wdr2, ebReq(t, "DescribeRule", map[string]interface{}{
+	handler.ServeHTTP(wdr2, ebReq(t, "DescribeRule", map[string]any{
 		"Name":         "deletable-rule",
 		"EventBusName": "deletable-bus",
 	}))
@@ -337,14 +337,14 @@ func TestEB_DeleteRuleAndBus(t *testing.T) {
 
 	// Deleting the default bus must fail.
 	wddb := httptest.NewRecorder()
-	handler.ServeHTTP(wddb, ebReq(t, "DeleteEventBus", map[string]interface{}{"Name": "default"}))
+	handler.ServeHTTP(wddb, ebReq(t, "DeleteEventBus", map[string]any{"Name": "default"}))
 	if wddb.Code == http.StatusOK {
 		t.Error("DeleteEventBus default: expected error, got 200")
 	}
 
 	// DeleteEventBus
 	wdb := httptest.NewRecorder()
-	handler.ServeHTTP(wdb, ebReq(t, "DeleteEventBus", map[string]interface{}{"Name": "deletable-bus"}))
+	handler.ServeHTTP(wdb, ebReq(t, "DeleteEventBus", map[string]any{"Name": "deletable-bus"}))
 	if wdb.Code != http.StatusOK {
 		t.Fatalf("DeleteEventBus: expected 200, got %d\nbody: %s", wdb.Code, wdb.Body.String())
 	}
@@ -358,7 +358,7 @@ func TestEB_DeleteRuleAndBus(t *testing.T) {
 
 	// Delete again — must fail.
 	wdb2 := httptest.NewRecorder()
-	handler.ServeHTTP(wdb2, ebReq(t, "DeleteEventBus", map[string]interface{}{"Name": "deletable-bus"}))
+	handler.ServeHTTP(wdb2, ebReq(t, "DeleteEventBus", map[string]any{"Name": "deletable-bus"}))
 	if wdb2.Code == http.StatusOK {
 		t.Error("DeleteEventBus second time: expected error, got 200")
 	}
@@ -372,35 +372,35 @@ func TestEB_EnableDisableRule(t *testing.T) {
 
 	// Disable the rule.
 	wd := httptest.NewRecorder()
-	handler.ServeHTTP(wd, ebReq(t, "DisableRule", map[string]interface{}{"Name": "toggle-rule"}))
+	handler.ServeHTTP(wd, ebReq(t, "DisableRule", map[string]any{"Name": "toggle-rule"}))
 	if wd.Code != http.StatusOK {
 		t.Fatalf("DisableRule: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
 	}
 
 	// Describe — state must be DISABLED.
 	wdesc := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc, ebReq(t, "DescribeRule", map[string]interface{}{"Name": "toggle-rule"}))
+	handler.ServeHTTP(wdesc, ebReq(t, "DescribeRule", map[string]any{"Name": "toggle-rule"}))
 	if !strings.Contains(wdesc.Body.String(), "DISABLED") {
 		t.Errorf("DisableRule: expected state DISABLED\nbody: %s", wdesc.Body.String())
 	}
 
 	// Enable the rule.
 	we := httptest.NewRecorder()
-	handler.ServeHTTP(we, ebReq(t, "EnableRule", map[string]interface{}{"Name": "toggle-rule"}))
+	handler.ServeHTTP(we, ebReq(t, "EnableRule", map[string]any{"Name": "toggle-rule"}))
 	if we.Code != http.StatusOK {
 		t.Fatalf("EnableRule: expected 200, got %d\nbody: %s", we.Code, we.Body.String())
 	}
 
 	// Describe — state must be ENABLED.
 	wdesc2 := httptest.NewRecorder()
-	handler.ServeHTTP(wdesc2, ebReq(t, "DescribeRule", map[string]interface{}{"Name": "toggle-rule"}))
+	handler.ServeHTTP(wdesc2, ebReq(t, "DescribeRule", map[string]any{"Name": "toggle-rule"}))
 	if !strings.Contains(wdesc2.Body.String(), "ENABLED") {
 		t.Errorf("EnableRule: expected state ENABLED\nbody: %s", wdesc2.Body.String())
 	}
 
 	// EnableRule on non-existent rule — must fail.
 	wne := httptest.NewRecorder()
-	handler.ServeHTTP(wne, ebReq(t, "EnableRule", map[string]interface{}{"Name": "no-such-rule"}))
+	handler.ServeHTTP(wne, ebReq(t, "EnableRule", map[string]any{"Name": "no-such-rule"}))
 	if wne.Code == http.StatusOK {
 		t.Error("EnableRule on non-existent rule: expected error, got 200")
 	}

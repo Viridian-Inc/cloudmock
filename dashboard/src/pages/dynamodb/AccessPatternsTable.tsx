@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useRef, useEffect } from 'preact/hooks';
-import { ddbRequest } from '../../api';
+import { ddbRequest, getPreference, setPreference } from '../../api';
 import { Modal } from '../../components/Modal';
 import { PlusIcon, RefreshIcon } from '../../components/Icons';
 import { TableDescription, DDBItem } from './types';
@@ -115,27 +115,23 @@ function buildQueryApiCall(
   return JSON.stringify(params, null, 2);
 }
 
-// --- Storage ---
+// --- Storage (backend preferences API) ---
 
-function storageKey(tableName: string): string {
-  return `ap-patterns-${tableName}`;
-}
-
-function loadPatterns(tableName: string): QueryPattern[] {
+async function loadPatternsAsync(tableName: string): Promise<QueryPattern[]> {
   try {
-    const raw = localStorage.getItem(storageKey(tableName));
-    return raw ? JSON.parse(raw) : [];
+    const data = await getPreference('ddb-patterns', tableName);
+    return Array.isArray(data) ? data : [];
   } catch { return []; }
 }
 
 function savePatterns(tableName: string, patterns: QueryPattern[]) {
-  localStorage.setItem(storageKey(tableName), JSON.stringify(patterns));
+  setPreference('ddb-patterns', tableName, patterns).catch(() => {});
 }
 
 // --- Component ---
 
 export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessPatternsTableProps) {
-  const [patterns, setPatterns] = useState<QueryPattern[]>(() => loadPatterns(tableName));
+  const [patterns, setPatterns] = useState<QueryPattern[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [results, setResults] = useState<Record<string, CellResult>>({});
   const [activeCell, setActiveCell] = useState<{ indexName: string; patternId: string } | null>(null);
@@ -144,6 +140,13 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
   const [codeGenParams, setCodeGenParams] = useState<any>(null);
   const [suggesting, setSuggesting] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Hydrate patterns from backend
+  useEffect(() => {
+    loadPatternsAsync(tableName).then(data => {
+      if (data.length > 0) setPatterns(data);
+    });
+  }, [tableName]);
 
   // Build indexes list
   const indexes = useMemo((): IndexInfo[] => {
@@ -208,9 +211,12 @@ export function AccessPatternsTable({ tableDesc, tableName, showToast }: AccessP
     return true;
   }, []);
 
-  // Persist patterns
+  // Persist patterns (debounced)
   useEffect(() => {
-    savePatterns(tableName, patterns);
+    const timer = setTimeout(() => {
+      if (patterns.length > 0) savePatterns(tableName, patterns);
+    }, 400);
+    return () => clearTimeout(timer);
   }, [patterns, tableName]);
 
   // Run a query for a specific cell

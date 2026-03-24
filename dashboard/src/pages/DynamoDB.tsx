@@ -16,7 +16,7 @@ import { AccessPatterns } from './dynamodb/AccessPatterns';
 import { AccessPatternsTable } from './dynamodb/AccessPatternsTable';
 import { PartiQL } from './dynamodb/PartiQL';
 import { Terminal } from './dynamodb/Terminal';
-import { DDBContext, ddbReducer, initialState, loadPersistedState, usePersistState } from './dynamodb/store';
+import { DDBContext, ddbReducer, initialState, useHydrateState, usePersistState } from './dynamodb/store';
 
 interface DynamoDBPageProps {
   showToast: (msg: string) => void;
@@ -24,8 +24,8 @@ interface DynamoDBPageProps {
 
 // Outer shell: owns the reducer and provides context + session persistence
 export function DynamoDBPage({ showToast }: DynamoDBPageProps) {
-  const persisted = loadPersistedState();
-  const [state, dispatch] = useReducer(ddbReducer, persisted ?? initialState);
+  const [state, dispatch] = useReducer(ddbReducer, initialState);
+  useHydrateState(dispatch);
   usePersistState(state);
 
   return (

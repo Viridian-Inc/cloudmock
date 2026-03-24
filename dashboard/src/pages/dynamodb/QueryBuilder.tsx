@@ -1,7 +1,7 @@
 import { useState, useMemo, useContext } from 'preact/hooks';
 import { DDBItem, TableDescription, FilterCondition, QueryHistoryEntry } from './types';
 import { extractValue, getType, typeBadgeColor, collectColumns } from './utils';
-import { ddbRequest } from '../../api';
+import { ddbRequest, getPreference, setPreference } from '../../api';
 import { PlayIcon, TrashIcon } from '../../components/Icons';
 import { JsonView } from '../../components/JsonView';
 import { CodeGenerator } from './CodeGenerator';
@@ -41,6 +41,7 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
   const [showHistory, setShowHistory] = useState(false);
   const [showCodeGen, setShowCodeGen] = useState(false);
   const [optimizerHint, setOptimizerHint] = useState<{ indexName: string; pkAttr: string; pkValue: string } | null>(null);
+  const [historyCache, setHistoryCache] = useState<QueryHistoryEntry[]>([]);
 
   function patch(p: Partial<import('./store').TabState>) {
     dispatch({ type: 'UPDATE_TAB', index: tabIndex, patch: p });
@@ -197,30 +198,29 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
   }
 
   function saveHistory(type: 'query' | 'scan', count: number) {
-    try {
-      const key = 'ddb-query-history';
-      const existing: QueryHistoryEntry[] = JSON.parse(localStorage.getItem(key) || '[]');
-      const entry: QueryHistoryEntry = {
-        id: Date.now().toString(36),
-        timestamp: Date.now(),
-        table: tableName,
-        type,
-        partitionKey: activeIndex.pk,
-        partitionValue: pkValue,
-        sortCondition: skOp,
-        sortValue: skValue,
-        indexName,
-        resultCount: count,
-      };
-      existing.unshift(entry);
-      localStorage.setItem(key, JSON.stringify(existing.slice(0, 10)));
-    } catch { /* ignore */ }
+    const entry: QueryHistoryEntry = {
+      id: Date.now().toString(36),
+      timestamp: Date.now(),
+      table: tableName,
+      type,
+      partitionKey: activeIndex.pk,
+      partitionValue: pkValue,
+      sortCondition: skOp,
+      sortValue: skValue,
+      indexName,
+      resultCount: count,
+    };
+    // Load current history, prepend entry, save back
+    getPreference('ddb-history', 'queries').then(existing => {
+      const list: QueryHistoryEntry[] = Array.isArray(existing) ? existing : [];
+      list.unshift(entry);
+      setPreference('ddb-history', 'queries', list.slice(0, 10)).catch(() => {});
+    }).catch(() => {});
   }
 
   function loadHistory(): QueryHistoryEntry[] {
-    try {
-      return JSON.parse(localStorage.getItem('ddb-query-history') || '[]');
-    } catch { return []; }
+    // Return cached history; trigger async load
+    return historyCache;
   }
 
   function applyHistory(entry: QueryHistoryEntry) {
@@ -256,7 +256,15 @@ export function QueryBuilder({ tableName, tableDesc, showToast, onEditItem, init
                 onClick={() => patch({ queryMode: 'scan' })}
               >Scan</button>
             </div>
-            <button class="btn btn-ghost btn-sm" onClick={() => setShowHistory(!showHistory)}>
+            <button class="btn btn-ghost btn-sm" onClick={() => {
+              const next = !showHistory;
+              setShowHistory(next);
+              if (next) {
+                getPreference('ddb-history', 'queries').then(data => {
+                  setHistoryCache(Array.isArray(data) ? data : []);
+                }).catch(() => setHistoryCache([]));
+              }
+            }}>
               History
             </button>
           </div>

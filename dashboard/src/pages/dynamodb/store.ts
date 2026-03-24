@@ -1,6 +1,7 @@
 import { createContext } from 'preact';
-import { useContext, useReducer, useEffect } from 'preact/hooks';
+import { useContext, useReducer, useEffect, useRef } from 'preact/hooks';
 import { DDBItem, TableDescription, FilterCondition } from './types';
+import { getPreference, setPreference } from '../../api';
 
 // State for a single open tab
 export interface TabState {
@@ -186,25 +187,45 @@ export function useDDB() {
   return useContext(DDBContext);
 }
 
-// Serialise state to sessionStorage (Sets are not used in TabState anymore)
-const SESSION_KEY = 'cloudmock-ddb-state';
+// Persist state via backend preferences API
 
-export function loadPersistedState(): DDBState | null {
+export async function loadPersistedState(): Promise<DDBState | null> {
   try {
-    const raw = sessionStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as DDBState;
+    const data = await getPreference('ddb-state', 'tabs');
+    if (!data) return null;
+    return data as DDBState;
   } catch {
     return null;
   }
+}
+
+export function useHydrateState(dispatch: (a: DDBAction) => void) {
+  const hydrated = useRef(false);
+  useEffect(() => {
+    if (hydrated.current) return;
+    hydrated.current = true;
+    loadPersistedState().then(saved => {
+      if (saved) dispatch({ type: 'RESTORE', state: saved });
+    });
+  }, [dispatch]);
 }
 
 export function usePersistState(state: DDBState) {
   useEffect(() => {
     const timer = setTimeout(() => {
       try {
-        sessionStorage.setItem(SESSION_KEY, JSON.stringify(state));
-      } catch { /* quota exceeded — ignore */ }
+        const stripped = {
+          ...state,
+          tabs: state.tabs.map(tab => ({
+            ...tab,
+            items: undefined,
+            queryResults: undefined,
+            scanResults: undefined,
+            sqlResults: undefined,
+          })),
+        };
+        setPreference('ddb-state', 'tabs', stripped).catch(() => {});
+      } catch { /* ignore */ }
     }, 500);
     return () => clearTimeout(timer);
   }, [state]);

@@ -1,6 +1,6 @@
 .PHONY: build build-gateway build-cli build-tools build-dashboard test lint clean proto docker docker-push docker-up docker-down release help
 
-VERSION ?= 0.1.0
+VERSION ?= 1.0.0
 
 help:
 	@echo "Available targets:"

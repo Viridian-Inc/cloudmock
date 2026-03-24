@@ -7,7 +7,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"time"
 
@@ -273,6 +275,7 @@ func main() {
 	var duckClient *duckImpl.Client
 	var pgPool *pgxpool.Pool
 	var promClient *promImpl.Client
+	var otelShutdown func(context.Context) error
 
 	switch mode {
 	case "local":
@@ -304,7 +307,6 @@ func main() {
 		if err != nil {
 			log.Fatalf("duckdb: %v", err)
 		}
-		defer duckClient.Close()
 		if err := duckClient.InitSchema(); err != nil {
 			log.Fatalf("duckdb schema: %v", err)
 		}
@@ -313,18 +315,16 @@ func main() {
 		if err != nil {
 			log.Fatalf("postgres: %v", err)
 		}
-		defer pgPool.Close()
 
 		promClient, err = promImpl.NewClient(cfg.DataPlane.Prometheus)
 		if err != nil {
 			log.Fatalf("prometheus: %v", err)
 		}
 
-		shutdown, err := dataplane.InitTracer(ctx, cfg.DataPlane.OTel)
+		otelShutdown, err = dataplane.InitTracer(ctx, cfg.DataPlane.OTel)
 		if err != nil {
 			log.Fatalf("otel: %v", err)
 		}
-		defer shutdown(ctx)
 
 		duckTraces := duckImpl.NewTraceStore(duckClient)
 		duckRequests := duckImpl.NewRequestStore(duckClient)
@@ -433,7 +433,6 @@ func main() {
 
 		regEngine = regression.New(regSource, regStore, dp.Config, regression.DefaultAlgorithmConfig(), scanInterval, window)
 		regEngine.Start(ctx)
-		defer regEngine.Stop()
 
 		adminAPI.SetRegressionEngine(regEngine)
 	}
@@ -525,20 +524,23 @@ func main() {
 		adminHandler = gateway.CORSMiddleware(adminHandler)
 	}
 	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
+	adminServer := &http.Server{Addr: adminAddr, Handler: adminHandler}
 	go func() {
 		log.Printf("cloudmock admin API starting on %s", adminAddr)
-		if err := http.ListenAndServe(adminAddr, adminHandler); err != nil {
+		if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Printf("admin API exited: %v", err)
 		}
 	}()
 
 	// Dashboard
+	var dashServer *http.Server
 	if cfg.Dashboard.Enabled {
 		dashboardHandler := dashboard.New(cfg.Admin.Port)
 		dashAddr := fmt.Sprintf(":%d", cfg.Dashboard.Port)
+		dashServer = &http.Server{Addr: dashAddr, Handler: dashboardHandler}
 		go func() {
 			log.Printf("cloudmock dashboard starting on %s", dashAddr)
-			if err := http.ListenAndServe(dashAddr, dashboardHandler); err != nil {
+			if err := dashServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 				log.Printf("dashboard exited: %v", err)
 			}
 		}()
@@ -574,10 +576,44 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)
+	gwServer := &http.Server{Addr: addr, Handler: loggedGW}
 	log.Printf("cloudmock gateway starting on %s (region=%s, account=%s, iam_mode=%s, services=%d)",
 		addr, cfg.Region, cfg.AccountID, cfg.IAM.Mode, len(registry.List()))
 
-	if err := http.ListenAndServe(addr, loggedGW); err != nil {
-		log.Fatalf("gateway exited: %v", err)
+	go func() {
+		if err := gwServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("gateway: %v", err)
+		}
+	}()
+
+	// Wait for termination signal.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
+	sig := <-sigCh
+	log.Printf("received %v, shutting down...", sig)
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	gwServer.Shutdown(shutdownCtx)   //nolint:errcheck
+	adminServer.Shutdown(shutdownCtx) //nolint:errcheck
+	if dashServer != nil {
+		dashServer.Shutdown(shutdownCtx) //nolint:errcheck
 	}
+
+	// Explicit resource cleanup (replaces deferred calls).
+	if regEngine != nil {
+		regEngine.Stop()
+	}
+	if otelShutdown != nil {
+		otelShutdown(shutdownCtx) //nolint:errcheck
+	}
+	if duckClient != nil {
+		duckClient.Close()
+	}
+	if pgPool != nil {
+		pgPool.Close()
+	}
+
+	log.Printf("shutdown complete")
 }

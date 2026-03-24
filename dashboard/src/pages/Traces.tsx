@@ -331,7 +331,7 @@ interface WaterfallViewProps {
 function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHoveredSpan, selectedSpan, setSelectedSpan, showToast }: WaterfallViewProps) {
   if (timeline.length === 0) {
     return (
-      <div class="waterfall-container" style="padding:24px;text-align:center;color:var(--n400)">
+      <div class="waterfall-container" style="padding:24px;text-align:center;color:var(--text-tertiary)">
         Loading trace timeline...
       </div>
     );
@@ -358,7 +358,7 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
       <div class="waterfall-header">
         <div class="flex items-center justify-between" style="padding:12px 16px">
           <div>
-            <span class="font-mono text-sm" style="color:var(--n400)">Trace: </span>
+            <span class="font-mono text-sm" style="color:var(--text-tertiary)">Trace: </span>
             <span class="font-mono text-sm">{traceSummary.trace_id}</span>
             <button class="btn-icon btn-sm btn-ghost" style="margin-left:4px" title="Copy trace ID"
               onClick={() => { copyToClipboard(traceSummary.trace_id); showToast('Copied trace ID'); }}>
@@ -378,20 +378,20 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
           {/* Ruler */}
           <g transform={`translate(${labelWidth}, 0)`}>
             <line x1="0" y1={rulerHeight} x2={barAreaWidth} y2={rulerHeight}
-              stroke="var(--n200)" stroke-width="1" />
+              stroke="var(--border-default)" stroke-width="1" />
             {ticks.map((t, i) => {
               const x = (t / totalDuration) * barAreaWidth;
               return (
                 <g key={i}>
                   <line x1={x} y1={rulerHeight - 4} x2={x} y2={rulerHeight}
-                    stroke="var(--n400)" stroke-width="1" />
+                    stroke="var(--text-tertiary)" stroke-width="1" />
                   <text x={x} y={rulerHeight - 8} text-anchor="middle"
-                    fill="var(--n400)" font-size="10" font-family="monospace">
+                    fill="var(--text-tertiary)" font-size="10" font-family="monospace">
                     {fmtDuration(t)}
                   </text>
                   {/* Gridline */}
                   <line x1={x} y1={rulerHeight} x2={x} y2={totalHeight}
-                    stroke="var(--n200)" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.5" />
+                    stroke="var(--border-default)" stroke-width="0.5" stroke-dasharray="4,4" opacity="0.5" />
                 </g>
               );
             })}
@@ -417,28 +417,28 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
               >
                 {/* Row background */}
                 <rect x="0" y={y} width={totalWidth} height={rowHeight}
-                  fill={isSelected ? 'var(--n100)' : isHovered ? 'var(--n50)' : 'transparent'} />
+                  fill={isSelected ? 'var(--bg-active)' : isHovered ? 'var(--bg-hover)' : 'transparent'} />
 
                 {/* Row border */}
                 <line x1="0" y1={y + rowHeight} x2={totalWidth} y2={y + rowHeight}
-                  stroke="var(--n200)" stroke-width="0.5" opacity="0.3" />
+                  stroke="var(--border-default)" stroke-width="0.5" opacity="0.3" />
 
                 {/* Service + Action label */}
                 <g transform={`translate(${8 + indent}, ${y})`}>
                   {span.depth > 0 && (
                     <g>
                       <line x1="-4" y1="0" x2="-4" y2={rowHeight / 2}
-                        stroke="var(--n400)" stroke-width="1" opacity="0.4" />
+                        stroke="var(--text-tertiary)" stroke-width="1" opacity="0.4" />
                       <line x1="-4" y1={rowHeight / 2} x2="4" y2={rowHeight / 2}
-                        stroke="var(--n400)" stroke-width="1" opacity="0.4" />
+                        stroke="var(--text-tertiary)" stroke-width="1" opacity="0.4" />
                     </g>
                   )}
                   <circle cx="8" cy={rowHeight / 2} r="4" fill={color} opacity="0.9" />
-                  <text x="18" y={rowHeight / 2 + 4} fill="var(--n800)"
+                  <text x="18" y={rowHeight / 2 + 4} fill="var(--text-primary)"
                     font-size="12" font-weight="600" font-family="var(--font-sans, system-ui)">
                     {span.service || '(root)'}
                   </text>
-                  <text x="18" y={rowHeight / 2 + 4} fill="var(--n400)"
+                  <text x="18" y={rowHeight / 2 + 4} fill="var(--text-tertiary)"
                     font-size="11" font-family="monospace" dx={`${(span.service || '(root)').length * 7.2 + 6}px`}>
                     {span.action}
                   </text>
@@ -453,7 +453,7 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
 
                 {/* Duration label */}
                 <text x={labelWidth + barAreaWidth + 8} y={y + rowHeight / 2 + 4}
-                  fill="var(--n400)" font-size="11" font-family="monospace">
+                  fill="var(--text-tertiary)" font-size="11" font-family="monospace">
                   {fmtDuration(span.duration_ms)}
                 </text>
               </g>

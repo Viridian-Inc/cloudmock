@@ -243,7 +243,7 @@ export function HomePage({ sse, showToast }: HomePageProps) {
                   return (
                     <g>
                       {segments}
-                      <text x={i * 48 + 24} y="118" text-anchor="middle" font-size="8" fill="#94A3B8">{bucket.minute}</text>
+                      <text x={i * 48 + 24} y="118" text-anchor="middle" font-size="8" fill="var(--text-tertiary)">{bucket.minute}</text>
                     </g>
                   );
                 })}

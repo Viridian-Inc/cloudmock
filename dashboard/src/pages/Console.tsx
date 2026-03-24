@@ -96,13 +96,13 @@ const SERVICE_CONFIG: GroupConfig = {
     { id: 'API', label: 'API Layer', color: '#06B6D4' },
     { id: 'Auth', label: 'Auth & Identity', color: '#8B5CF6' },
     { id: 'Compute', label: 'Compute', color: '#3B82F6' },
-    { id: 'Core Data', label: 'Core Domain', color: '#10B981' },
+    { id: 'Core Data', label: 'Core Domain', color: 'var(--success)' },
     { id: 'Features', label: 'Features', color: '#059669' },
     { id: 'Admin', label: 'Admin & Analytics', color: '#6366F1' },
     { id: 'Integrations', label: 'Integrations', color: '#A855F7' },
     { id: 'Facilities', label: 'Facilities', color: '#14B8A6' },
     { id: 'Messaging', label: 'Messaging', color: '#F97316' },
-    { id: 'Storage', label: 'Storage', color: '#F59E0B' },
+    { id: 'Storage', label: 'Storage', color: 'var(--warning)' },
     { id: 'Security', label: 'Security & Config', color: '#6366F1' },
     { id: 'Monitoring', label: 'Monitoring', color: '#EC4899' },
   ],
@@ -405,9 +405,9 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
     const svc = n.requestService || n.service;
     const slo = sloHealth[svc];
     if (!slo) return null;
-    if (slo.healthy === false) return '#EF4444';
-    if (slo.burn_rate > 0.5) return '#F59E0B';
-    return '#10B981';
+    if (slo.healthy === false) return 'var(--error)';
+    if (slo.burn_rate > 0.5) return 'var(--warning)';
+    return 'var(--success)';
   }, [sloHealth]);
 
   // Pan/zoom
@@ -456,9 +456,9 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
   if (!topoData || !layout) {
     return (
       <div class="console-layout">
-        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--n400)' }}>
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-tertiary)' }}>
           <div style={{ textAlign: 'center' }}>
-            <div style={{ width: 24, height: 24, border: '2px solid var(--n200)', borderTopColor: 'var(--brand-blue)', borderRadius: '50%', animation: 'spin 0.6s linear infinite', margin: '0 auto 12px' }} />
+            <div style={{ width: 24, height: 24, border: '2px solid var(--border-default)', borderTopColor: 'var(--brand-blue)', borderRadius: '50%', animation: 'spin 0.6s linear infinite', margin: '0 auto 12px' }} />
             <div style={{ fontSize: 13 }}>Loading topology...</div>
           </div>
         </div>
@@ -518,13 +518,13 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
         >
           <defs>
             <pattern id="console-grid" width="30" height="30" patternUnits="userSpaceOnUse">
-              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="#E2E8F0" stroke-width="0.5" />
+              <path d="M 30 0 L 0 0 0 30" fill="none" stroke="rgba(74,229,248,0.04)" stroke-width="0.5" />
             </pattern>
             <marker id="console-arrow" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill="#CBD5E1" />
+              <polygon points="0 0, 8 3, 0 6" fill="var(--text-tertiary)" />
             </marker>
             <marker id="console-arrow-active" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
-              <polygon points="0 0, 8 3, 0 6" fill="#3B82F6" />
+              <polygon points="0 0, 8 3, 0 6" fill="var(--brand-blue)" />
             </marker>
           </defs>
 
@@ -574,7 +574,7 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
               );
               const dimmed = dimmedByNode || dimmedByCluster;
               const isDashed = edge.discovered === 'traffic';
-              const edgeColor = highlighted ? '#3B82F6' : '#CBD5E1';
+              const edgeColor = highlighted ? 'var(--brand-blue)' : 'var(--text-tertiary)';
 
               const dx = to.cx - from.cx;
               const dy = to.cy - from.cy;
@@ -611,10 +611,10 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
                   {labelText && (
                     <>
                       <rect x={midX - labelW / 2} y={midY - 7} width={labelW} height={14} rx={3}
-                        fill="white" stroke={highlighted ? '#3B82F6' : '#E2E8F0'} stroke-width="0.5" />
+                        fill="var(--bg-secondary)" stroke={highlighted ? 'var(--brand-blue)' : 'var(--border-subtle)'} stroke-width="0.5" />
                       <text x={midX} y={midY + 1} text-anchor="middle" dominant-baseline="central"
                         font-size="8" font-family="var(--font-sans)"
-                        fill={highlighted ? '#3B82F6' : '#94A3B8'} style={{ pointerEvents: 'none' }}>
+                        fill={highlighted ? 'var(--brand-blue)' : 'var(--text-tertiary)'} style={{ pointerEvents: 'none' }}>
                         {labelText}
                       </text>
                     </>
@@ -676,10 +676,10 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
                       fill="none" stroke={healthColor} stroke-width="2" opacity="0.4" />
                   )}
                   {/* Shadow */}
-                  <rect x={n.x + 1} y={n.y + 2} width={nodeW} height={RES_H} rx={10} fill="rgba(0,0,0,0.06)" />
+                  <rect x={n.x + 1} y={n.y + 2} width={nodeW} height={RES_H} rx={10} fill="rgba(0,0,0,0.2)" />
                   {/* Node body */}
                   <rect x={n.x} y={n.y} width={nodeW} height={RES_H} rx={10}
-                    fill={isHighlighted ? `${groupColor}30` : isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'white'}
+                    fill={isHighlighted ? `${groupColor}30` : isSelected ? `${groupColor}25` : isPulsing ? `${groupColor}18` : isHovered ? `${groupColor}20` : 'var(--bg-secondary)'}
                     stroke={strokeColor}
                     stroke-width={isHighlighted ? 3.5 : isSelected ? 3 : isPulsing ? 2.5 : isHovered ? 2.5 : 1.5}
                     style={{ transition: 'all 0.15s ease' }} />
@@ -692,13 +692,13 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
                   )}
                   {/* Name */}
                   <text x={n.x + 14} y={n.y + RES_H / 2 - 4} dominant-baseline="central"
-                    font-size="11.5" font-weight="600" font-family="var(--font-sans)" fill="#1E293B"
+                    font-size="11.5" font-weight="600" font-family="var(--font-sans)" fill="var(--text-primary)"
                     style={{ pointerEvents: 'none' }}>
                     {truncated}
                   </text>
                   {/* Type label */}
                   <text x={n.x + 14} y={n.y + RES_H / 2 + 9} dominant-baseline="central"
-                    font-size="8.5" font-family="var(--font-sans)" fill="#94A3B8"
+                    font-size="8.5" font-family="var(--font-sans)" fill="var(--text-tertiary)"
                     style={{ pointerEvents: 'none' }}>
                     {n.type}
                   </text>
@@ -706,13 +706,13 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
                   {isHovered && (
                     <g style={{ pointerEvents: 'none' }}>
                       <rect x={n.x + nodeW / 2 - 75} y={n.y - 36} width={150} height={30} rx={5}
-                        fill="#0F172A" opacity="0.92" />
+                        fill="var(--bg-elevated)" opacity="0.95" />
                       <text x={n.x + nodeW / 2} y={n.y - 25} text-anchor="middle"
-                        font-size="9.5" font-weight="600" font-family="var(--font-sans)" fill="white">
+                        font-size="9.5" font-weight="600" font-family="var(--font-sans)" fill="var(--text-primary)">
                         {n.label}
                       </text>
                       <text x={n.x + nodeW / 2} y={n.y - 12} text-anchor="middle"
-                        font-size="8.5" font-family="var(--font-sans)" fill="#94A3B8">
+                        font-size="8.5" font-family="var(--font-sans)" fill="var(--text-tertiary)">
                         {n.service} | {n.type}
                       </text>
                     </g>
@@ -724,7 +724,7 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
 
           {/* Minimap */}
           <g transform={`translate(${svgW - minimapW - 16}, ${svgH - minimapH - 16})`}>
-            <rect width={minimapW} height={minimapH} rx={4} fill="white" stroke="#E2E8F0" stroke-width="1" opacity="0.92" />
+            <rect width={minimapW} height={minimapH} rx={4} fill="var(--bg-secondary)" stroke="var(--border-default)" stroke-width="1" opacity="0.92" />
             <g transform={`scale(${minimapScale})`}>
               {layout.positionedGroups.map(g => (
                 <rect key={`mm-c-${g.id}`} x={g.x} y={g.y} width={g.width} height={g.height} rx={4} fill={g.color} opacity={0.15} />
@@ -737,7 +737,7 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
                 const from = nodePos.get(edge.source);
                 const to = nodePos.get(edge.target);
                 if (!from || !to) return null;
-                return <line key={`mme-${i}`} x1={from.cx} y1={from.cy} x2={to.cx} y2={to.cy} stroke="#CBD5E1" stroke-width="1" opacity="0.3" />;
+                return <line key={`mme-${i}`} x1={from.cx} y1={from.cy} x2={to.cx} y2={to.cy} stroke="var(--text-tertiary)" stroke-width="1" opacity="0.3" />;
               })}
             </g>
             <rect
@@ -745,7 +745,7 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
               y={(-transform.y / transform.scale) * minimapScale}
               width={(svgW / transform.scale) * minimapScale}
               height={(svgH / transform.scale) * minimapScale}
-              rx={2} fill="none" stroke="#3B82F6" stroke-width="1.5" opacity="0.6" />
+              rx={2} fill="none" stroke="var(--brand-blue)" stroke-width="1.5" opacity="0.6" />
           </g>
         </svg>
       </div>
@@ -760,7 +760,7 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
             onSelectNode={(n) => setSelectedNode(n)}
           />
         ) : (
-          <div style={{ padding: 24, textAlign: 'center', color: 'var(--n400)' }}>
+          <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-tertiary)' }}>
             <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.3 }}>{'\u2190'}</div>
             <div style={{ fontSize: 13, fontWeight: 500 }}>Select a node</div>
             <div style={{ fontSize: 11, marginTop: 4 }}>Click a node on the topology graph or a request in the explorer to inspect it.</div>

@@ -157,9 +157,9 @@ export function MetricsPage() {
   });
 
   const errorColor = (rate: number) => {
-    if (rate > 0.05) return '#ef4444';
-    if (rate > 0.01) return '#f59e0b';
-    return '#22c55e';
+    if (rate > 0.05) return 'var(--error)';
+    if (rate > 0.01) return 'var(--warning)';
+    return 'var(--success)';
   };
 
   const sortArrow = (field: SortField) => sortField === field ? (sortAsc ? ' \u25B2' : ' \u25BC') : '';
@@ -188,8 +188,8 @@ export function MetricsPage() {
               style={{
                 padding: '6px 16px', background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: '13px', fontWeight: activeTab === t ? 600 : 400,
-                color: activeTab === t ? 'var(--brand-blue, #097FF5)' : 'var(--text-secondary)',
-                borderBottom: activeTab === t ? '2px solid var(--brand-blue, #097FF5)' : '2px solid transparent',
+                color: activeTab === t ? 'var(--text-accent)' : 'var(--text-secondary)',
+                borderBottom: activeTab === t ? '2px solid var(--brand-teal)' : '2px solid transparent',
                 marginBottom: '-2px', textTransform: 'capitalize' as const,
               }}
             >
@@ -216,11 +216,11 @@ export function MetricsPage() {
                 {costRoutes.map((r, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
                     <td style={{ padding: '8px', fontWeight: 500 }}>{r.service}</td>
-                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '11px', fontWeight: 600, color: '#3B82F6' }}>{r.method}</td>
-                    <td style={{ padding: '8px', fontFamily: 'monospace', fontSize: '11px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{r.path}</td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)', fontSize: '11px', fontWeight: 600, color: 'var(--brand-blue)' }}>{r.method}</td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)', fontSize: '11px', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const }}>{r.path}</td>
                     <td style={{ padding: '8px', textAlign: 'right' }}>{r.requests.toLocaleString()}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(r.total_cost)}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtCost(r.avg_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtCost(r.total_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmtCost(r.avg_cost)}</td>
                   </tr>
                 ))}
                 {costRoutes.length === 0 && (
@@ -244,10 +244,10 @@ export function MetricsPage() {
               <tbody>
                 {costTenants.map((t, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td style={{ padding: '8px', fontFamily: 'monospace', fontWeight: 500 }}>{t.tenant_id}</td>
+                    <td style={{ padding: '8px', fontFamily: 'var(--font-mono)', fontWeight: 500 }}>{t.tenant_id}</td>
                     <td style={{ padding: '8px', textAlign: 'right' }}>{t.requests.toLocaleString()}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(t.total_cost)}</td>
-                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{fmtCost(t.avg_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtCost(t.total_cost)}</td>
+                    <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{fmtCost(t.avg_cost)}</td>
                   </tr>
                 ))}
                 {costTenants.length === 0 && (
@@ -278,16 +278,16 @@ export function MetricsPage() {
                     const ts = new Date(b.timestamp);
                     return (
                       <tr key={i} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '6px 8px', fontFamily: 'monospace', fontSize: '11px' }}>
+                        <td style={{ padding: '6px 8px', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
                           {ts.toLocaleDateString([], { month: 'short', day: 'numeric' })} {ts.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </td>
                         <td style={{ padding: '6px 8px', textAlign: 'right' }}>{b.requests.toLocaleString()}</td>
-                        <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'monospace', fontWeight: 600 }}>{fmtCost(b.total_cost)}</td>
+                        <td style={{ padding: '6px 8px', textAlign: 'right', fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{fmtCost(b.total_cost)}</td>
                         <td style={{ padding: '6px 8px' }}>
                           <div style={{ height: '12px', background: 'var(--bg-secondary)', borderRadius: '2px', overflow: 'hidden' }}>
                             <div style={{
                               height: '100%', width: `${barPct}%`,
-                              background: barPct > 75 ? '#ef4444' : barPct > 40 ? '#f59e0b' : '#3B82F6',
+                              background: barPct > 75 ? 'var(--error)' : barPct > 40 ? 'var(--warning)' : 'var(--brand-blue)',
                               borderRadius: '2px', transition: 'width 0.3s ease',
                             }} />
                           </div>
@@ -304,22 +304,22 @@ export function MetricsPage() {
 
       {activeTab === 'latency' && <>
       {/* Summary cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '16px', marginBottom: '24px' }}>
-        <div class="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', opacity: 0.6, marginBottom: '4px' }}>Total Requests (15 min)</div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{totalRequests.toLocaleString()}</div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-value">{totalRequests.toLocaleString()}</div>
+          <div class="stat-label">Total Requests (15 min)</div>
         </div>
-        <div class="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', opacity: 0.6, marginBottom: '4px' }}>Avg Latency</div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{avgLatency} ms</div>
+        <div class="stat-card teal">
+          <div class="stat-value">{avgLatency} ms</div>
+          <div class="stat-label">Avg Latency</div>
         </div>
-        <div class="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', opacity: 0.6, marginBottom: '4px' }}>Error Rate</div>
-          <div style={{ fontSize: '28px', fontWeight: 700, color: parseFloat(errorRatePct) > 5 ? '#ef4444' : parseFloat(errorRatePct) > 1 ? '#f59e0b' : '#22c55e' }}>{errorRatePct}%</div>
+        <div class="stat-card" style={{ }}>
+          <div class="stat-value" style={{ color: parseFloat(errorRatePct) > 5 ? 'var(--error)' : parseFloat(errorRatePct) > 1 ? 'var(--warning)' : 'var(--success)' }}>{errorRatePct}%</div>
+          <div class="stat-label">Error Rate</div>
         </div>
-        <div class="card" style={{ padding: '16px' }}>
-          <div style={{ fontSize: '12px', opacity: 0.6, marginBottom: '4px' }}>Active Services</div>
-          <div style={{ fontSize: '28px', fontWeight: 700 }}>{activeServices}</div>
+        <div class="stat-card green">
+          <div class="stat-value">{activeServices}</div>
+          <div class="stat-label">Active Services</div>
         </div>
       </div>
 
@@ -365,18 +365,18 @@ export function MetricsPage() {
             {/* Lines */}
             {chartData.length > 1 && (
               <>
-                <path d={makeLine('p50')} fill="none" stroke="#22c55e" stroke-width="2" />
-                <path d={makeLine('p95')} fill="none" stroke="#f59e0b" stroke-width="2" />
-                <path d={makeLine('p99')} fill="none" stroke="#ef4444" stroke-width="2" />
+                <path d={makeLine('p50')} fill="none" stroke="var(--success)" stroke-width="2" />
+                <path d={makeLine('p95')} fill="none" stroke="var(--warning)" stroke-width="2" />
+                <path d={makeLine('p99')} fill="none" stroke="var(--error)" stroke-width="2" />
               </>
             )}
 
             {/* Legend */}
-            <circle cx={padL + 10} cy={12} r={4} fill="#22c55e" />
+            <circle cx={padL + 10} cy={12} r={4} fill="var(--success)" />
             <text x={padL + 18} y={15} font-size="10" fill="var(--text-secondary)">P50</text>
-            <circle cx={padL + 52} cy={12} r={4} fill="#f59e0b" />
+            <circle cx={padL + 52} cy={12} r={4} fill="var(--warning)" />
             <text x={padL + 60} y={15} font-size="10" fill="var(--text-secondary)">P95</text>
-            <circle cx={padL + 94} cy={12} r={4} fill="#ef4444" />
+            <circle cx={padL + 94} cy={12} r={4} fill="var(--error)" />
             <text x={padL + 102} y={15} font-size="10" fill="var(--text-secondary)">P99</text>
           </svg>
 
@@ -432,10 +432,10 @@ export function MetricsPage() {
                 style={{ borderBottom: '1px solid var(--border)', cursor: 'pointer', background: selectedService === m.service ? 'var(--bg-secondary)' : 'transparent' }}
               >
                 <td style={{ padding: '8px', fontWeight: 500 }}>{m.service}</td>
-                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{m.p50ms.toFixed(1)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{m.p95ms.toFixed(1)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{m.p99ms.toFixed(1)}</td>
-                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'monospace' }}>{m.avgMs.toFixed(1)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{m.p50ms.toFixed(1)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{m.p95ms.toFixed(1)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{m.p99ms.toFixed(1)}</td>
+                <td style={{ padding: '8px', textAlign: 'right', fontFamily: 'var(--font-mono)' }}>{m.avgMs.toFixed(1)}</td>
                 <td style={{ padding: '8px', textAlign: 'right', color: errorColor(m.errorRate), fontWeight: 600 }}>{(m.errorRate * 100).toFixed(2)}%</td>
                 <td style={{ padding: '8px', textAlign: 'right' }}>{m.totalCalls.toLocaleString()}</td>
               </tr>

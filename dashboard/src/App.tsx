@@ -77,26 +77,31 @@ export function App() {
   }, []);
 
   const navItems: NavItem[] = [
-    { id: '/', label: 'Home', icon: 'home' },
+    // Observe
+    { id: '/console', label: 'Console', icon: 'topology' },
     { id: '/services', label: 'Services', icon: 'services' },
     { id: '/requests', label: 'Requests', icon: 'requests' },
     { id: '/traces', label: 'Traces', icon: 'traces' },
+    { id: '/metrics', label: 'Metrics', icon: 'chart' },
+    // Respond
     { id: '/incidents', label: 'Incidents', icon: 'alert' },
     { id: '/regressions', label: 'Regressions', icon: 'trendDown' },
+    { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
+    // Resources
     { id: '/dynamodb', label: 'DynamoDB', icon: 'database' },
     { id: '/s3', label: 'S3', icon: 'bucket' },
     { id: '/sqs', label: 'SQS', icon: 'queue' },
-    { id: '/cognito', label: 'Cognito', icon: 'users' },
-    { id: '/resources', label: 'Resources', icon: 'resources' },
     { id: '/lambda', label: 'Lambda', icon: 'lambda' },
+    { id: '/cognito', label: 'Cognito', icon: 'users' },
     { id: '/iam', label: 'IAM', icon: 'shield' },
     { id: '/mail', label: 'Mail', icon: 'mail', badge: mailCount || null },
-    { id: '/console', label: 'Console', icon: 'topology' },
+    // Other (ungrouped)
+    { id: '/', label: 'Home', icon: 'home' },
+    { id: '/resources', label: 'Resources', icon: 'resources' },
     { id: '/topology', label: 'Topology', icon: 'topology' },
-    { id: '/debug', label: 'Debug', icon: 'bug', badge: debugErrorCount || null },
-    { id: '/metrics', label: 'Metrics', icon: 'chart' },
-    { id: '/chaos', label: 'Chaos', icon: 'zap', badge: chaosActive ? 1 : null },
+    // Bottom
     { id: '/settings', label: 'Settings', icon: 'settings' },
+    { id: '/chaos', label: 'Chaos', icon: 'zap', badge: chaosActive ? 1 : null },
   ];
 
   function renderPage() {
@@ -130,14 +135,14 @@ export function App() {
   }
 
   return (
-    <div class="layout">
-      <Header connected={sse.connected} health={health} onOpenPalette={() => setPaletteOpen(true)} />
-      <div class="body-wrap">
-        <Sidebar items={navItems} activePath={activePath} serviceCount={services.length} />
-        <main class="main">
+    <div class="app-layout">
+      <Sidebar items={navItems} activePath={activePath} serviceCount={services.length} />
+      <main class="main-content" style={{ display: 'flex', flexDirection: 'column' }}>
+        <Header connected={sse.connected} health={health} onOpenPalette={() => setPaletteOpen(true)} />
+        <div class="main" style={{ flex: 1 }}>
           {renderPage()}
-        </main>
-      </div>
+        </div>
+      </main>
       {paletteOpen && <CommandPalette services={services} onClose={() => setPaletteOpen(false)} />}
       <Toast message={toast} />
     </div>

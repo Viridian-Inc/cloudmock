@@ -37,8 +37,12 @@ function parseFolded(text: string): Frame {
 function hashColor(name: string): string {
   let hash = 0
   for (let i = 0; i < name.length; i++) hash = ((hash << 5) - hash) + name.charCodeAt(i)
-  const h = Math.abs(hash) % 60 + 10  // warm orange/red range
-  return `hsl(${h}, 70%, 55%)`
+  // Blue-teal-cyan range matching brand palette
+  const hues = [200, 210, 185, 195, 220, 175, 230, 165]
+  const h = hues[Math.abs(hash) % hues.length]
+  const s = 55 + (Math.abs(hash >> 4) % 20)
+  const l = 45 + (Math.abs(hash >> 8) % 15)
+  return `hsl(${h}, ${s}%, ${l}%)`
 }
 
 function FlameRow({ frame, total, depth }: { frame: Frame; total: number; depth: number }) {

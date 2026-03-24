@@ -34,6 +34,10 @@ import (
 	"github.com/neureaux/cloudmock/services/ses"
 )
 
+// Version and BuildTime are set via ldflags at build time.
+var Version = "dev"
+var BuildTime = "unknown"
+
 // Resettable is an optional interface that services can implement to support state reset.
 type Resettable interface {
 	Reset()
@@ -48,8 +52,9 @@ type ServiceInfo struct {
 
 // HealthResponse is the response body for the /api/health endpoint.
 type HealthResponse struct {
-	Status   string          `json:"status"`
-	Services map[string]bool `json:"services"`
+	Status    string          `json:"status"`
+	Services  map[string]bool `json:"services"`
+	DataPlane string          `json:"dataplane,omitempty"`
 }
 
 // SavedView represents a named filter preset that users can save and recall.
@@ -114,6 +119,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 		mux:         http.NewServeMux(),
 	}
 
+	a.mux.HandleFunc("/api/version", a.handleVersion)
 	a.mux.HandleFunc("/api/services", a.handleServices)
 	a.mux.HandleFunc("/api/services/", a.handleServiceByName)
 	a.mux.HandleFunc("/api/reset", a.handleResetAll)
@@ -172,6 +178,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 		dp:          dp,
 	}
 
+	a.mux.HandleFunc("/api/version", a.handleVersion)
 	a.mux.HandleFunc("/api/services", a.handleServices)
 	a.mux.HandleFunc("/api/services/", a.handleServiceByName)
 	a.mux.HandleFunc("/api/reset", a.handleResetAll)
@@ -369,7 +376,33 @@ func (a *API) handleHealth(w http.ResponseWriter, r *http.Request) {
 		Services: services,
 	}
 
+	// Check dataplane connectivity when available.
+	if a.dp != nil {
+		dpStatus := "ok"
+		if _, err := a.dp.Config.GetConfig(r.Context()); err != nil {
+			dpStatus = "error"
+			status = "degraded"
+		}
+		resp.DataPlane = dpStatus
+		resp.Status = status
+	}
+
 	writeJSON(w, http.StatusOK, resp)
+}
+
+func (a *API) handleVersion(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{
+		"version":    Version,
+		"build_time": BuildTime,
+	})
+}
+
+// writeError writes a JSON error response with the given status code and message.
+func writeError(w http.ResponseWriter, code int, msg string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 func (a *API) handleConfig(w http.ResponseWriter, r *http.Request) {
@@ -2861,7 +2894,7 @@ func explainPercentile(sorted []float64, p int) float64 {
 //	POST /api/incidents/{id}/resolve     — resolve an incident
 func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 	if a.incidentService == nil {
-		http.Error(w, "incident service not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "incident service not available")
 		return
 	}
 
@@ -2877,16 +2910,16 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 			format = "json"
 		}
 		if a.reportGenerator == nil {
-			http.Error(w, "report generator not available", http.StatusServiceUnavailable)
+			writeError(w, http.StatusServiceUnavailable, "report generator not available")
 			return
 		}
 		content, contentType, err := a.reportGenerator.Generate(r.Context(), id, format)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				http.Error(w, err.Error(), http.StatusNotFound)
+				writeError(w, http.StatusNotFound, err.Error())
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", contentType)
@@ -2912,7 +2945,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		}
 		results, err := a.incidentService.Store().List(r.Context(), filter)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, results)
@@ -2924,10 +2957,10 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		inc, err := a.incidentService.Store().Get(r.Context(), path)
 		if err != nil {
 			if errors.Is(err, incident.ErrNotFound) {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, inc)
@@ -2944,16 +2977,16 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		inc, err := a.incidentService.Store().Get(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, incident.ErrNotFound) {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		inc.Status = "acknowledged"
 		inc.Owner = body.Owner
 		if err := a.incidentService.Store().Update(r.Context(), inc); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.auditLog(r.Context(), "incident.acknowledged", "incident:"+id, map[string]interface{}{"owner": body.Owner})
@@ -2967,17 +3000,17 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		inc, err := a.incidentService.Store().Get(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, incident.ErrNotFound) {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		now := time.Now()
 		inc.Status = "resolved"
 		inc.ResolvedAt = &now
 		if err := a.incidentService.Store().Update(r.Context(), inc); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.auditLog(r.Context(), "incident.resolved", "incident:"+id, nil)
@@ -2985,7 +3018,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Error(w, "not found", http.StatusNotFound)
+	writeError(w, http.StatusNotFound, "not found")
 }
 
 // handleWebhooks handles webhook CRUD endpoints:
@@ -2996,7 +3029,7 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 //	POST   /api/webhooks/{id}/test    — send a test payload
 func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 	if a.webhookDispatcher == nil {
-		http.Error(w, "webhook dispatcher not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "webhook dispatcher not available")
 		return
 	}
 
@@ -3009,7 +3042,7 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet && path == "" {
 		list, err := store.List(r.Context())
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		if list == nil {
@@ -3023,12 +3056,12 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodPost && path == "" {
 		var cfg webhook.Config
 		if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
 		cfg.ID = "" // always generate a new ID
 		if err := store.Save(r.Context(), &cfg); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.auditLog(r.Context(), "webhook.created", "webhook:"+cfg.ID, map[string]interface{}{"url": cfg.URL})
@@ -3040,10 +3073,10 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodDelete && path != "" && !strings.Contains(path, "/") {
 		if err := store.Delete(r.Context(), path); err != nil {
 			if errors.Is(err, webhook.ErrNotFound) {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.auditLog(r.Context(), "webhook.deleted", "webhook:"+path, nil)
@@ -3057,10 +3090,10 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 		cfg, err := store.Get(r.Context(), id)
 		if err != nil {
 			if errors.Is(err, webhook.ErrNotFound) {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		_ = cfg // fire a test payload via the dispatcher
@@ -3076,19 +3109,19 @@ func (a *API) handleWebhooks(w http.ResponseWriter, r *http.Request) {
 			LastSeen:         time.Now(),
 		}
 		if err := a.webhookDispatcher.FireToConfig(r.Context(), *cfg, "incident.created", testInc); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "sent"})
 		return
 	}
 
-	http.Error(w, "not found", http.StatusNotFound)
+	writeError(w, http.StatusNotFound, "not found")
 }
 
 func (a *API) handleProfile(w http.ResponseWriter, r *http.Request) {
 	if a.profilingEngine == nil {
-		http.Error(w, "profiling not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "profiling not available")
 		return
 	}
 	// Parse service from path: /api/profile/{service}
@@ -3113,7 +3146,7 @@ func (a *API) handleProfile(w http.ResponseWriter, r *http.Request) {
 
 	p, err := a.profilingEngine.Capture(service, profileType, duration)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 

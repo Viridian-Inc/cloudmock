@@ -1,8 +1,10 @@
 package ratelimit
 
 import (
+	"net"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -57,12 +59,29 @@ func (l *Limiter) Allow(key string) bool {
 	return true
 }
 
+// clientIP extracts the client IP address from the request, respecting
+// X-Forwarded-For and X-Real-IP headers set by reverse proxies.
+func clientIP(r *http.Request) string {
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		parts := strings.SplitN(xff, ",", 2)
+		return strings.TrimSpace(parts[0])
+	}
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
+}
+
 // Middleware returns an http.Handler that enforces the rate limit using the
-// request's RemoteAddr as the bucket key. Requests that exceed the limit
+// client's IP address as the bucket key. Requests that exceed the limit
 // receive a 429 Too Many Requests response with a Retry-After: 1 header.
 func (l *Limiter) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		key := r.RemoteAddr // IP-based
+		key := clientIP(r)
 		if !l.Allow(key) {
 			w.Header().Set("Retry-After", strconv.Itoa(1))
 			http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)

@@ -317,6 +317,36 @@ func (c *Config) ApplyEnv() {
 	if v := os.Getenv("CLOUDMOCK_LOG_LEVEL"); v != "" {
 		c.Logging.Level = v
 	}
+	if v := os.Getenv("CLOUDMOCK_GATEWAY_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			c.Gateway.Port = p
+		}
+	}
+	if v := os.Getenv("CLOUDMOCK_ADMIN_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			c.Admin.Port = p
+		}
+	}
+	if v := os.Getenv("CLOUDMOCK_DASHBOARD_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			c.Dashboard.Port = p
+		}
+	}
+	if v := os.Getenv("CLOUDMOCK_DATAPLANE_MODE"); v != "" {
+		c.DataPlane.Mode = v
+	}
+	if v := os.Getenv("CLOUDMOCK_DUCKDB_PATH"); v != "" {
+		c.DataPlane.DuckDB.Path = v
+	}
+	if v := os.Getenv("CLOUDMOCK_POSTGRESQL_URL"); v != "" {
+		c.DataPlane.PostgreSQL.URL = v
+	}
+	if v := os.Getenv("CLOUDMOCK_PROMETHEUS_URL"); v != "" {
+		c.DataPlane.Prometheus.URL = v
+	}
+	if v := os.Getenv("CLOUDMOCK_OTEL_ENDPOINT"); v != "" {
+		c.DataPlane.OTel.CollectorEndpoint = v
+	}
 	if v := os.Getenv("CLOUDMOCK_SERVICES"); v != "" {
 		// Comma-separated list of services to enable
 		if c.Services == nil {

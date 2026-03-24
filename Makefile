@@ -24,7 +24,7 @@ build: build-gateway build-cli build-tools
 build-gateway:
 	@echo "Building gateway..."
 	@mkdir -p bin
-	@go build -o bin/gateway ./cmd/gateway
+	@go build -ldflags="-s -w -X github.com/neureaux/cloudmock/pkg/admin.Version=1.0.0 -X github.com/neureaux/cloudmock/pkg/admin.BuildTime=$(shell date -u +%Y-%m-%dT%H:%M:%SZ)" -o bin/gateway ./cmd/gateway
 
 build-cli:
 	@echo "Building CLI..."

@@ -85,6 +85,41 @@ func TestMiddleware_Returns429(t *testing.T) {
 	}
 }
 
+// TestClientIP_XForwardedFor verifies that X-Forwarded-For takes precedence.
+func TestClientIP_XForwardedFor(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Forwarded-For", "203.0.113.50, 70.41.3.18, 150.172.238.178")
+
+	got := clientIP(req)
+	if got != "203.0.113.50" {
+		t.Fatalf("want %q, got %q", "203.0.113.50", got)
+	}
+}
+
+// TestClientIP_XRealIP verifies that X-Real-IP is used when X-Forwarded-For is absent.
+func TestClientIP_XRealIP(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "10.0.0.1:1234"
+	req.Header.Set("X-Real-IP", "198.51.100.10")
+
+	got := clientIP(req)
+	if got != "198.51.100.10" {
+		t.Fatalf("want %q, got %q", "198.51.100.10", got)
+	}
+}
+
+// TestClientIP_RemoteAddr verifies that RemoteAddr is used as fallback, with port stripped.
+func TestClientIP_RemoteAddr(t *testing.T) {
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	req.RemoteAddr = "192.168.1.1:9999"
+
+	got := clientIP(req)
+	if got != "192.168.1.1" {
+		t.Fatalf("want %q, got %q", "192.168.1.1", got)
+	}
+}
+
 // TestMiddleware_DifferentIPs verifies that different remote addresses maintain
 // independent token buckets.
 func TestMiddleware_DifferentIPs(t *testing.T) {

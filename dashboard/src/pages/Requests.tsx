@@ -227,7 +227,7 @@ export function RequestsPage({ sse, showToast }: RequestsPageProps) {
               <button class="btn btn-sm btn-ghost" onClick={() => replayRequest(drawer.id)}>
                 <PlayIcon /> Replay
               </button>
-              <a class="btn btn-sm btn-secondary" href={`#/requests/${drawer.id}`} style="text-decoration:none;color:white">
+              <a class="btn btn-sm btn-secondary" href={`#/requests/${drawer.id}`} style="text-decoration:none">
                 Full Page
               </a>
             </>

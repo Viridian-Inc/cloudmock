@@ -386,7 +386,7 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
                   <line x1={x} y1={rulerHeight - 4} x2={x} y2={rulerHeight}
                     stroke="var(--text-tertiary)" stroke-width="1" />
                   <text x={x} y={rulerHeight - 8} text-anchor="middle"
-                    fill="var(--text-tertiary)" font-size="10" font-family="monospace">
+                    fill="var(--text-tertiary)" font-size="10" font-family="var(--font-mono)">
                     {fmtDuration(t)}
                   </text>
                   {/* Gridline */}
@@ -439,7 +439,7 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
                     {span.service || '(root)'}
                   </text>
                   <text x="18" y={rowHeight / 2 + 4} fill="var(--text-tertiary)"
-                    font-size="11" font-family="monospace" dx={`${(span.service || '(root)').length * 7.2 + 6}px`}>
+                    font-size="11" font-family="var(--font-mono)" dx={`${(span.service || '(root)').length * 7.2 + 6}px`}>
                     {span.action}
                   </text>
                 </g>
@@ -453,7 +453,7 @@ function WaterfallView({ timeline, traceDetail, traceSummary, hoveredSpan, setHo
 
                 {/* Duration label */}
                 <text x={labelWidth + barAreaWidth + 8} y={y + rowHeight / 2 + 4}
-                  fill="var(--text-tertiary)" font-size="11" font-family="monospace">
+                  fill="var(--text-tertiary)" font-size="11" font-family="var(--font-mono)">
                   {fmtDuration(span.duration_ms)}
                 </text>
               </g>

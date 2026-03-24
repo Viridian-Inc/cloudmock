@@ -324,9 +324,9 @@ function OverviewContent({ p50, p95, p99, inbound, outbound, requests }: {
       <div style={S.card}>
         <div style={S.cardLabel}>Latency Percentiles</div>
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
-          <LatencyBar label="P50" ms={p50} max={p99 || p50 || 1} color="#3B82F6" />
-          <LatencyBar label="P95" ms={p95} max={p99 || p95 || 1} color="#F59E0B" />
-          <LatencyBar label="P99" ms={p99} max={p99 || 1} color="#EF4444" />
+          <LatencyBar label="P50" ms={p50} max={p99 || p50 || 1} color="var(--brand-blue)" />
+          <LatencyBar label="P95" ms={p95} max={p99 || p95 || 1} color="var(--warning)" />
+          <LatencyBar label="P99" ms={p99} max={p99 || 1} color="var(--error)" />
         </div>
       </div>
 
@@ -756,10 +756,10 @@ function BlastRadiusContent({ data, nodeMap, onSelectNode }: {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {upstream.length > 0 && (
-        <ImpactGroup label="Upstream (affected by)" nodes={upstream} nodeMap={nodeMap} onSelect={onSelectNode} color="#F59E0B" />
+        <ImpactGroup label="Upstream (affected by)" nodes={upstream} nodeMap={nodeMap} onSelect={onSelectNode} color="var(--warning)" />
       )}
       {downstream.length > 0 && (
-        <ImpactGroup label="Downstream (will affect)" nodes={downstream} nodeMap={nodeMap} onSelect={onSelectNode} color="#EF4444" />
+        <ImpactGroup label="Downstream (will affect)" nodes={downstream} nodeMap={nodeMap} onSelect={onSelectNode} color="var(--error)" />
       )}
     </div>
   );

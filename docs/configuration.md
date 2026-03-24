@@ -81,16 +81,25 @@ logging:
 
 All environment variables override the corresponding value in `cloudmock.yml`.
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `CLOUDMOCK_REGION` | `us-east-1` | AWS region to emulate |
-| `CLOUDMOCK_IAM_MODE` | `enforce` | IAM mode: `enforce`, `authenticate`, or `none` |
-| `CLOUDMOCK_PERSIST` | `false` | Enable persistence (`true`/`false`) |
-| `CLOUDMOCK_PERSIST_PATH` | — | Directory for state snapshots |
-| `CLOUDMOCK_LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
-| `CLOUDMOCK_SERVICES` | — | Comma-separated list of services to enable (overrides profile) |
-| `CLOUDMOCK_PROFILE` | — | Service profile (set by `cloudmock start --profile`) |
-| `CLOUDMOCK_ADMIN_ADDR` | `http://localhost:4599` | Address the CLI uses to reach the admin API |
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `CLOUDMOCK_GATEWAY_PORT` | Gateway HTTP port | `4566` |
+| `CLOUDMOCK_ADMIN_PORT` | Admin API port | `4599` |
+| `CLOUDMOCK_DASHBOARD_PORT` | Dashboard port | `4500` |
+| `CLOUDMOCK_DATAPLANE_MODE` | Storage mode (`local`/`production`) | `local` |
+| `CLOUDMOCK_DUCKDB_PATH` | DuckDB file path | `cloudmock.duckdb` |
+| `CLOUDMOCK_POSTGRESQL_URL` | PostgreSQL connection URL | — |
+| `CLOUDMOCK_PROMETHEUS_URL` | Prometheus URL | — |
+| `CLOUDMOCK_OTEL_ENDPOINT` | OTel Collector endpoint | — |
+| `CLOUDMOCK_LOG_FORMAT` | Log format (`text`/`json`) | `text` |
+| `CLOUDMOCK_LOG_LEVEL` | Log level: `debug`, `info`, `warn`, `error` | `info` |
+| `CLOUDMOCK_REGION` | AWS region to emulate | `us-east-1` |
+| `CLOUDMOCK_IAM_MODE` | IAM mode (`enforce`/`authenticate`/`none`) | `none` |
+| `CLOUDMOCK_PERSIST` | Enable persistence (`true`/`false`) | `false` |
+| `CLOUDMOCK_PERSIST_PATH` | Directory for state snapshots | — |
+| `CLOUDMOCK_SERVICES` | Comma-separated list of services to enable (overrides profile) | — |
+| `CLOUDMOCK_PROFILE` | Service profile (set by `cloudmock start --profile`) | — |
+| `CLOUDMOCK_ADMIN_ADDR` | Address the CLI uses to reach the admin API | `http://localhost:4599` |
 
 ### Example
 
@@ -232,3 +241,54 @@ Text format is easier to read in a terminal:
 ```
 2026-03-21 12:00:00 INFO  s3 PutObject 200 1ms
 ```
+
+---
+
+## DataPlane Options
+
+CloudMock supports two data plane modes, controlled by the `CLOUDMOCK_DATAPLANE_MODE` environment variable or the `dataplane.mode` config key.
+
+### Local Mode (default)
+
+```yaml
+dataplane:
+  mode: local
+```
+
+In local mode, all data is stored in-memory with optional persistence snapshots on shutdown. This is the simplest option and requires no external dependencies.
+
+- **Requests**: In-memory ring buffer (last 10,000 entries)
+- **Traces**: In-memory trace store
+- **SLO/Metrics**: Computed on-the-fly from in-memory request log
+- **Preferences**: In-memory map (lost on restart unless persistence is enabled)
+- **Incidents/Regressions**: In-memory stores
+
+### Production Mode
+
+```yaml
+dataplane:
+  mode: production
+  duckdb_path: cloudmock.duckdb
+  postgresql_url: postgres://user:pass@localhost:5432/cloudmock
+  prometheus_url: http://localhost:9090
+  otel_endpoint: localhost:4317
+```
+
+Production mode uses external storage backends for durability, scalability, and integration with existing observability stacks.
+
+| Backend | Stores | Purpose |
+|---------|--------|---------|
+| **DuckDB** | Requests, traces, SLO windows, regressions, incidents | Embedded columnar database for fast analytical queries. File-based, no server required. |
+| **PostgreSQL** | Users, webhooks, saved views, deploy events, preferences, audit log | Relational store for configuration and operational data. |
+| **Prometheus** | Metrics time series | Metrics storage and querying via PromQL. Used by the metrics timeline API. |
+| **OTel Collector** | Trace/metric/log export | Receives telemetry via OTLP gRPC and forwards to configured backends. |
+
+You can enable production mode with only a subset of backends. For example, to use DuckDB for request storage without PostgreSQL:
+
+```bash
+CLOUDMOCK_DATAPLANE_MODE=production \
+CLOUDMOCK_DUCKDB_PATH=./data/cloudmock.duckdb \
+./bin/cloudmock start
+```
+
+When a backend is not configured, CloudMock falls back to in-memory storage for that category.

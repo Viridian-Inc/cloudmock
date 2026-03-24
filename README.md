@@ -243,6 +243,43 @@ Tier 2 services support create, describe/get, list, and delete operations with i
 
 ---
 
+## Known Limitations
+
+- **Single region** — all resources exist in one region (configurable, default us-east-1)
+- **Single account** — one AWS account ID, no cross-account access
+- **In-memory by default** — Tier 2 stub services lose data on restart (Tier 1 services support persistent mode)
+- **No eventual consistency** — all operations are strongly consistent
+- **No throttling simulation** — AWS service quotas and rate limits are not enforced
+- **Partial service coverage** — Tier 1 services implement core operations but not all AWS API actions (see service-specific docs)
+- **No VPC networking** — EC2 instances and Lambda functions don't have actual network connectivity
+- **Step Functions** — state machine definitions stored but not executed
+- **RDS** — instance metadata managed but no actual database engine
+
+---
+
+## Troubleshooting
+
+### Port already in use
+CloudMock uses ports 4566 (gateway), 4500 (dashboard), and 4599 (admin API). Override via environment variables:
+```bash
+CLOUDMOCK_GATEWAY_PORT=5566 CLOUDMOCK_ADMIN_PORT=5599 go run cmd/gateway/main.go
+```
+
+### AWS CLI authentication errors
+Set dummy credentials:
+```bash
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+```
+
+### Service returns "Unknown action"
+Check that the service is registered. List available services: `curl http://localhost:4599/api/services`
+
+### Dashboard not loading
+Ensure the dashboard is built: `cd dashboard && npm install && npm run build`
+
+---
+
 ## Dashboard
 
 The web dashboard is available at `http://localhost:4500` when `dashboard.enabled: true`. It shows:

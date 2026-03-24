@@ -1617,11 +1617,11 @@ func parseDuration(s string, fallback time.Duration) time.Duration {
 // GET /api/cost/routes?limit=20
 func (a *API) handleCostRoutes(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.costEngine == nil {
-		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "cost engine not available")
 		return
 	}
 	limit := 20
@@ -1630,7 +1630,7 @@ func (a *API) handleCostRoutes(w http.ResponseWriter, r *http.Request) {
 	}
 	results, err := a.costEngine.ByRoute(r.Context(), limit)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, results)
@@ -1640,11 +1640,11 @@ func (a *API) handleCostRoutes(w http.ResponseWriter, r *http.Request) {
 // GET /api/cost/tenants?limit=20
 func (a *API) handleCostTenants(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.costEngine == nil {
-		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "cost engine not available")
 		return
 	}
 	limit := 20
@@ -1653,7 +1653,7 @@ func (a *API) handleCostTenants(w http.ResponseWriter, r *http.Request) {
 	}
 	results, err := a.costEngine.ByTenant(r.Context(), limit)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, results)
@@ -1663,18 +1663,18 @@ func (a *API) handleCostTenants(w http.ResponseWriter, r *http.Request) {
 // GET /api/cost/trend?window=24h&bucket=1h
 func (a *API) handleCostTrend(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.costEngine == nil {
-		http.Error(w, "cost engine not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "cost engine not available")
 		return
 	}
 	window := parseDuration(r.URL.Query().Get("window"), 24*time.Hour)
 	bucket := parseDuration(r.URL.Query().Get("bucket"), time.Hour)
 	results, err := a.costEngine.Trend(r.Context(), window, bucket)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	writeJSON(w, http.StatusOK, results)
@@ -2098,7 +2098,7 @@ func (a *API) auditLog(ctx context.Context, action, resource string, details map
 // handleAudit serves GET /api/audit — returns recent audit log entries.
 func (a *API) handleAudit(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.auditLogger == nil {
@@ -2122,7 +2122,7 @@ func (a *API) handleAudit(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := a.auditLogger.Query(r.Context(), filter)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if entries == nil {
@@ -2133,17 +2133,17 @@ func (a *API) handleAudit(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.traceComparer == nil {
-		http.Error(w, "trace comparison not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "trace comparison not available")
 		return
 	}
 
 	traceA := r.URL.Query().Get("a")
 	if traceA == "" {
-		http.Error(w, "missing required parameter: a", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "missing required parameter: a")
 		return
 	}
 
@@ -2151,7 +2151,7 @@ func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	traceB := r.URL.Query().Get("b")
 
 	if !baseline && traceB == "" {
-		http.Error(w, "must provide parameter b or baseline=true", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "must provide parameter b or baseline=true")
 		return
 	}
 
@@ -2166,11 +2166,11 @@ func (a *API) handleTraceCompare(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if errors.Is(err, dataplane.ErrNotFound) {
-		http.Error(w, "trace not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "trace not found")
 		return
 	}
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
@@ -2198,15 +2198,15 @@ func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/dismiss"):
 		id := strings.TrimSuffix(path, "/dismiss")
 		if id == "" {
-			http.Error(w, "missing regression id", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "missing regression id")
 			return
 		}
 		if err := a.regressionEngine.Store().UpdateStatus(r.Context(), id, "dismissed"); err != nil {
 			if err == regression.ErrNotFound {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		a.auditLog(r.Context(), "regression.dismissed", "regression:"+id, nil)
@@ -2217,10 +2217,10 @@ func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
 		reg, err := a.regressionEngine.Store().Get(r.Context(), path)
 		if err != nil {
 			if err == regression.ErrNotFound {
-				http.Error(w, "not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "not found")
 				return
 			}
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, reg)
@@ -2240,7 +2240,7 @@ func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
 		}
 		results, err := a.regressionEngine.Store().List(r.Context(), filter)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		if results == nil {
@@ -2249,7 +2249,7 @@ func (a *API) handleRegressions(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, results)
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -3244,11 +3244,11 @@ func (a *API) SetAuthSecret(secret []byte) {
 // handleAuthLogin handles POST /api/auth/login.
 func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.userStore == nil {
-		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "auth not enabled")
 		return
 	}
 
@@ -3257,24 +3257,24 @@ func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		Password string `json:"password"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	user, err := a.userStore.GetByEmail(r.Context(), req.Email)
 	if err != nil {
-		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	if err := bcryptCompare(user.PasswordHash, req.Password); err != nil {
-		http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 
 	token, err := auth.GenerateToken(user, a.authSecret, 24*time.Hour)
 	if err != nil {
-		http.Error(w, `{"error":"failed to generate token"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "failed to generate token")
 		return
 	}
 
@@ -3287,11 +3287,11 @@ func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 // handleAuthRegister handles POST /api/auth/register.
 func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.userStore == nil {
-		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "auth not enabled")
 		return
 	}
 
@@ -3302,12 +3302,12 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 		Role     string `json:"role"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	if req.Email == "" || req.Password == "" || req.Name == "" {
-		http.Error(w, `{"error":"email, password, and name are required"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "email, password, and name are required")
 		return
 	}
 
@@ -3316,7 +3316,7 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 		role = auth.RoleViewer
 	}
 	if !auth.ValidRoles[role] {
-		http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid role")
 		return
 	}
 
@@ -3324,14 +3324,14 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 	if a.cfg.Auth.Enabled {
 		caller := auth.UserFromContext(r.Context())
 		if caller == nil || caller.Role != auth.RoleAdmin {
-			http.Error(w, `{"error":"admin role required to register users"}`, http.StatusForbidden)
+			writeError(w, http.StatusForbidden, "admin role required to register users")
 			return
 		}
 	}
 
 	hash, err := bcryptHash(req.Password)
 	if err != nil {
-		http.Error(w, `{"error":"failed to hash password"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "failed to hash password")
 		return
 	}
 
@@ -3342,7 +3342,7 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 		PasswordHash: hash,
 	}
 	if err := a.userStore.Create(r.Context(), user); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusConflict)
+		writeError(w, http.StatusConflict, err.Error())
 		return
 	}
 
@@ -3357,13 +3357,13 @@ func (a *API) handleAuthRegister(w http.ResponseWriter, r *http.Request) {
 // handleAuthMe handles GET /api/auth/me.
 func (a *API) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
 	user := auth.UserFromContext(r.Context())
 	if user == nil {
-		http.Error(w, `{"error":"authentication required"}`, http.StatusUnauthorized)
+		writeError(w, http.StatusUnauthorized, "authentication required")
 		return
 	}
 
@@ -3373,25 +3373,25 @@ func (a *API) handleAuthMe(w http.ResponseWriter, r *http.Request) {
 // handleUsers handles GET /api/users (admin only).
 func (a *API) handleUsers(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.userStore == nil {
-		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "auth not enabled")
 		return
 	}
 
 	if a.cfg.Auth.Enabled {
 		caller := auth.UserFromContext(r.Context())
 		if caller == nil || caller.Role != auth.RoleAdmin {
-			http.Error(w, `{"error":"admin role required"}`, http.StatusForbidden)
+			writeError(w, http.StatusForbidden, "admin role required")
 			return
 		}
 	}
 
 	users, err := a.userStore.List(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"failed to list users"}`, http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "failed to list users")
 		return
 	}
 
@@ -3401,25 +3401,25 @@ func (a *API) handleUsers(w http.ResponseWriter, r *http.Request) {
 // handleUserByID handles PUT /api/users/{id} (admin only, update role).
 func (a *API) handleUserByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPut {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 	if a.userStore == nil {
-		http.Error(w, `{"error":"auth not enabled"}`, http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "auth not enabled")
 		return
 	}
 
 	if a.cfg.Auth.Enabled {
 		caller := auth.UserFromContext(r.Context())
 		if caller == nil || caller.Role != auth.RoleAdmin {
-			http.Error(w, `{"error":"admin role required"}`, http.StatusForbidden)
+			writeError(w, http.StatusForbidden, "admin role required")
 			return
 		}
 	}
 
 	id := strings.TrimPrefix(r.URL.Path, "/api/users/")
 	if id == "" {
-		http.Error(w, `{"error":"user ID required"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "user ID required")
 		return
 	}
 
@@ -3427,16 +3427,16 @@ func (a *API) handleUserByID(w http.ResponseWriter, r *http.Request) {
 		Role string `json:"role"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 	if !auth.ValidRoles[req.Role] {
-		http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid role")
 		return
 	}
 
 	if err := a.userStore.UpdateRole(r.Context(), id, req.Role); err != nil {
-		http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusNotFound)
+		writeError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
@@ -3471,7 +3471,7 @@ func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		namespace := r.URL.Query().Get("namespace")
 		if namespace == "" {
-			http.Error(w, `{"error":"namespace is required"}`, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "namespace is required")
 			return
 		}
 		key := r.URL.Query().Get("key")
@@ -3481,10 +3481,10 @@ func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
 			val, err := a.prefsGet(r.Context(), namespace, key)
 			if err != nil {
 				if errors.Is(err, dataplane.ErrNotFound) {
-					http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+					writeError(w, http.StatusNotFound, "not found")
 					return
 				}
-				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			w.Header().Set("Content-Type", "application/json")
@@ -3495,7 +3495,7 @@ func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
 		// List all preferences in namespace.
 		result, err := a.prefsListByNamespace(r.Context(), namespace)
 		if err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -3508,15 +3508,15 @@ func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
 			Value     json.RawMessage `json:"value"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON")
 			return
 		}
 		if body.Namespace == "" || body.Key == "" {
-			http.Error(w, `{"error":"namespace and key are required"}`, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "namespace and key are required")
 			return
 		}
 		if err := a.prefsSet(r.Context(), body.Namespace, body.Key, body.Value); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
@@ -3525,17 +3525,17 @@ func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
 		namespace := r.URL.Query().Get("namespace")
 		key := r.URL.Query().Get("key")
 		if namespace == "" || key == "" {
-			http.Error(w, `{"error":"namespace and key are required"}`, http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "namespace and key are required")
 			return
 		}
 		if err := a.prefsDelete(r.Context(), namespace, key); err != nil {
-			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
-		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 

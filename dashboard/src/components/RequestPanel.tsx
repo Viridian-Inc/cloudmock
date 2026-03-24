@@ -110,7 +110,7 @@ export function RequestPanel({ sse, onSelectRequest, selectedRequestId }: Reques
             onClick={() => setShowFilters(!showFilters)}
             style={{
               ...S.iconBtn,
-              color: showFilters || hasActiveFilters ? 'var(--brand-blue, #097FF5)' : 'var(--n400)',
+              color: showFilters || hasActiveFilters ? 'var(--brand-blue, #097FF5)' : 'var(--text-tertiary)',
             }}
             title="Filters"
           >
@@ -163,12 +163,12 @@ export function RequestPanel({ sse, onSelectRequest, selectedRequestId }: Reques
       {/* Live indicator */}
       <div style={S.liveBar}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ ...S.liveDot, background: paused ? 'var(--n300)' : '#10B981' }} />
-          <span style={{ fontSize: 11, fontWeight: 600, color: paused ? 'var(--n400)' : '#10B981' }}>
+          <span style={{ ...S.liveDot, background: paused ? 'var(--border-default)' : '#10B981' }} />
+          <span style={{ fontSize: 11, fontWeight: 600, color: paused ? 'var(--text-tertiary)' : '#10B981' }}>
             {paused ? 'PAUSED' : 'LIVE'}
           </span>
           {paused && bufferRef.current.length > 0 && (
-            <span style={{ fontSize: 10, color: 'var(--n400)' }}>({bufferRef.current.length} buffered)</span>
+            <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>({bufferRef.current.length} buffered)</span>
           )}
         </div>
         <button onClick={paused ? handleResume : () => setPaused(true)} style={S.pauseBtn}>
@@ -179,7 +179,7 @@ export function RequestPanel({ sse, onSelectRequest, selectedRequestId }: Reques
       {/* Request list */}
       <div ref={listRef} style={S.list}>
         {filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--n400)', fontSize: 12 }}>
+          <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--text-tertiary)', fontSize: 12 }}>
             {hasActiveFilters ? 'No matching requests' : 'No requests yet'}
           </div>
         ) : (
@@ -207,27 +207,27 @@ function RequestRow({ req, selected, onClick }: { req: any; selected: boolean; o
       onClick={onClick}
       style={{
         ...S.row,
-        background: selected ? 'var(--brand-blue-50, #EFF6FF)' : isError ? '#FEF2F230' : 'transparent',
+        background: selected ? 'var(--bg-active)' : isError ? '#FEF2F230' : 'transparent',
         borderLeft: selected ? '3px solid var(--brand-blue, #097FF5)' : '3px solid transparent',
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
         <span style={{ ...S.methodBadge, background: `${methodColor}18`, color: methodColor }}>{req.method}</span>
         <span style={S.pathText}>{req.path || req.action}</span>
-        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--n400)' }}>
+        <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
           {fmtTime(req.timestamp)}
         </span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <span style={S.serviceChip}>{req.service}</span>
         {req.action && req.action !== req.path && (
-          <span style={{ fontSize: 10, color: 'var(--n400)' }}>{req.action}</span>
+          <span style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{req.action}</span>
         )}
         <span style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
           <StatusBadge code={status} />
           <span style={{
             fontFamily: 'var(--font-mono)', fontSize: 10,
-            color: isError ? '#EF4444' : 'var(--n400)',
+            color: isError ? '#EF4444' : 'var(--text-tertiary)',
           }}>{fmtDuration(req.latency_ms)}</span>
         </span>
       </div>
@@ -251,37 +251,37 @@ function Select({ label, value, onChange, options }: {
 
 const S = {
   panel: {
-    width: 300, flexShrink: 0, borderRight: '1px solid var(--n200, #E2E8F0)',
-    display: 'flex', flexDirection: 'column' as const, background: 'white',
+    width: 300, flexShrink: 0, borderRight: '1px solid var(--border-default)',
+    display: 'flex', flexDirection: 'column' as const, background: 'var(--bg-secondary)',
     height: '100%', overflow: 'hidden',
   },
   header: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     padding: '12px 14px 8px', flexShrink: 0,
   },
-  title: { fontSize: 14, fontWeight: 700, color: 'var(--n800, #1E293B)' },
+  title: { fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' },
   count: {
-    fontSize: 11, fontWeight: 600, color: 'var(--n400)',
-    background: 'var(--n100)', borderRadius: 10, padding: '1px 7px',
+    fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)',
+    background: 'var(--bg-secondary)', borderRadius: 10, padding: '1px 7px',
   },
   searchWrap: { padding: '0 14px 8px', flexShrink: 0 },
   searchInput: {
-    width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--n200)',
-    borderRadius: 6, outline: 'none', background: 'var(--n50, #F8FAFC)',
+    width: '100%', padding: '6px 10px', fontSize: 12, border: '1px solid var(--border-default)',
+    borderRadius: 6, outline: 'none', background: 'var(--bg-primary)',
     boxSizing: 'border-box' as const,
   },
   filterSection: {
-    padding: '0 14px 8px', borderBottom: '1px solid var(--n100)',
+    padding: '0 14px 8px', borderBottom: '1px solid var(--bg-secondary)',
     flexShrink: 0, display: 'flex', flexDirection: 'column' as const, gap: 4,
   },
   filterRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  filterLabel: { fontSize: 11, fontWeight: 500, color: 'var(--n400)', width: 50, flexShrink: 0 },
+  filterLabel: { fontSize: 11, fontWeight: 500, color: 'var(--text-tertiary)', width: 50, flexShrink: 0 },
   filterSelect: {
-    flex: 1, padding: '3px 6px', fontSize: 11, border: '1px solid var(--n200)',
-    borderRadius: 4, background: 'white', outline: 'none',
+    flex: 1, padding: '3px 6px', fontSize: 11, border: '1px solid var(--border-default)',
+    borderRadius: 4, background: 'var(--bg-tertiary)', outline: 'none',
   },
   filterInput: {
-    flex: 1, padding: '3px 6px', fontSize: 11, border: '1px solid var(--n200)',
+    flex: 1, padding: '3px 6px', fontSize: 11, border: '1px solid var(--border-default)',
     borderRadius: 4, outline: 'none', fontFamily: 'var(--font-mono)',
   },
   clearBtn: {
@@ -290,7 +290,7 @@ const S = {
   },
   liveBar: {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '6px 14px', borderBottom: '1px solid var(--n100)', flexShrink: 0,
+    padding: '6px 14px', borderBottom: '1px solid var(--bg-secondary)', flexShrink: 0,
   },
   liveDot: {
     width: 7, height: 7, borderRadius: '50%', flexShrink: 0,
@@ -298,14 +298,14 @@ const S = {
   },
   pauseBtn: {
     width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'none', border: '1px solid var(--n200)', borderRadius: 4,
-    cursor: 'pointer', fontSize: 10, color: 'var(--n500)',
+    background: 'none', border: '1px solid var(--border-default)', borderRadius: 4,
+    cursor: 'pointer', fontSize: 10, color: 'var(--text-secondary)',
   },
   list: {
     flex: 1, overflowY: 'auto' as const, overflowX: 'hidden' as const,
   },
   row: {
-    padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--n100, #F1F5F9)',
+    padding: '8px 14px', cursor: 'pointer', borderBottom: '1px solid var(--bg-secondary)',
     transition: 'background 0.1s', fontSize: 12,
   },
   methodBadge: {
@@ -313,11 +313,11 @@ const S = {
     fontFamily: 'var(--font-mono)', letterSpacing: 0.3,
   },
   pathText: {
-    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--n700)',
+    fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-primary)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' as const, flex: 1,
   },
   serviceChip: {
-    fontSize: 10, fontWeight: 500, color: 'var(--n500)', background: 'var(--n100)',
+    fontSize: 10, fontWeight: 500, color: 'var(--text-secondary)', background: 'var(--bg-secondary)',
     padding: '1px 5px', borderRadius: 3,
   },
   iconBtn: {

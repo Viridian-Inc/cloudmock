@@ -1038,7 +1038,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         dominant-baseline="central"
                         font-size="9"
                         font-family="var(--font-sans)"
-                        fill="white"
+                        fill="#0c1322"
                       >
                         {edge.label || edge.type}{callCount > 0 ? ` \u00B7 ${callCount} calls \u00B7 avg ${latencyStr}` : ''} ({edge.discovered})
                       </text>
@@ -1206,7 +1206,7 @@ export function TopologyPage({ sse }: TopologyPageProps) {
                         font-size="9.5"
                         font-weight="600"
                         font-family="var(--font-sans)"
-                        fill="white"
+                        fill="#0c1322"
                       >
                         {n.label}
                       </text>

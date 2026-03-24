@@ -171,7 +171,7 @@ export function ItemBrowser({
         left += colWidths[columns[i]] || 150;
       }
     }
-    return `position:sticky;left:${left}px;z-index:1;background:var(--sticky-col-bg, white)`;
+    return `position:sticky;left:${left}px;z-index:1;background:var(--sticky-col-bg, var(--bg-secondary))`;
   }
 
   return (
@@ -278,7 +278,7 @@ export function ItemBrowser({
                     key={idx}
                     class={`ddb-item-row ${selected.has(idx) ? 'selected' : ''} ${expandedRow === idx ? 'expanded' : ''}`}
                   >
-                    <td style="width:40px;text-align:center;position:sticky;left:0;z-index:1;background:var(--sticky-col-bg, white)" onClick={(e) => e.stopPropagation()}>
+                    <td style="width:40px;text-align:center;position:sticky;left:0;z-index:1;background:var(--sticky-col-bg, var(--bg-secondary))" onClick={(e) => e.stopPropagation()}>
                       <input type="checkbox" checked={selected.has(idx)} onChange={() => toggleSelect(idx)} />
                     </td>
                     {columns.map((c, ci) => {

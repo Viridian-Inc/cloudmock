@@ -152,7 +152,7 @@ export function NodeDetailDrawer({ node, edges, nodes, onClose, onSelectNode }: 
             <span style={S.metaDot} />
             <span style={S.metaChip}>{node.type}</span>
             <span style={S.metaDot} />
-            <span style={{ ...S.metaChip, color: 'var(--n400)' }}>{node.group}</span>
+            <span style={{ ...S.metaChip, color: 'var(--text-tertiary)' }}>{node.group}</span>
           </div>
         </div>
       </div>
@@ -165,7 +165,7 @@ export function NodeDetailDrawer({ node, edges, nodes, onClose, onSelectNode }: 
             onClick={() => setTab(t.key)}
             style={{
               ...S.tabBtn,
-              color: tab === t.key ? 'var(--brand-blue, #097FF5)' : 'var(--n500, #64748B)',
+              color: tab === t.key ? 'var(--brand-blue, #097FF5)' : 'var(--text-secondary)',
               fontWeight: tab === t.key ? 600 : 400,
             }}
           >
@@ -173,8 +173,8 @@ export function NodeDetailDrawer({ node, edges, nodes, onClose, onSelectNode }: 
             {t.count !== undefined && (
               <span style={{
                 ...S.tabCount,
-                background: tab === t.key ? 'var(--brand-blue, #097FF5)' : 'var(--n200, #E2E8F0)',
-                color: tab === t.key ? 'white' : 'var(--n500, #64748B)',
+                background: tab === t.key ? 'var(--brand-blue, #097FF5)' : 'var(--border-default)',
+                color: tab === t.key ? 'var(--text-accent)' : 'var(--text-tertiary)',
               }}>{t.count}</span>
             )}
             {tab === t.key && <div style={S.tabIndicator} />}
@@ -214,7 +214,7 @@ function LoadingSkeleton() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {[1, 2, 3].map(i => (
         <div key={i} style={{
-          height: 64, borderRadius: 10, background: 'var(--n100, #F1F5F9)',
+          height: 64, borderRadius: 10, background: 'var(--bg-secondary)',
           animation: 'pulse 1.5s ease-in-out infinite',
         }} />
       ))}
@@ -252,13 +252,13 @@ function OverviewTab({ reqCount, errorRate, avgLatency, p95, p99, inbound, outbo
         <div style={S.cardLabel}>Topology</div>
         <div style={{ display: 'flex', gap: 16, marginTop: 8 }}>
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--n800, #1E293B)' }}>{inbound}</div>
-            <div style={{ fontSize: 11, color: 'var(--n400)', marginTop: 2 }}>Inbound</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{inbound}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Inbound</div>
           </div>
-          <div style={{ width: 1, background: 'var(--n200, #E2E8F0)' }} />
+          <div style={{ width: 1, background: 'var(--border-default)' }} />
           <div style={{ flex: 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--n800, #1E293B)' }}>{outbound}</div>
-            <div style={{ fontSize: 11, color: 'var(--n400)', marginTop: 2 }}>Outbound</div>
+            <div style={{ fontSize: 24, fontWeight: 700, color: 'var(--text-primary)' }}>{outbound}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Outbound</div>
           </div>
         </div>
       </div>
@@ -275,17 +275,17 @@ function OverviewTab({ reqCount, errorRate, avgLatency, p95, p99, inbound, outbo
 }
 
 function StatCard({ label, value, icon, accent }: { label: string; value: string | number; icon: string; accent?: string }) {
-  const iconBg = accent ? `${accent}15` : 'var(--brand-blue-50, #E6F2FF)';
+  const iconBg = accent ? `${accent}15` : 'var(--bg-active)';
   const iconFg = accent || 'var(--brand-blue, #097FF5)';
   const icons: Record<string, string> = { reqs: '\u21C5', err: '\u26A0', lat: '\u23F1' };
 
   return (
     <div style={S.statCard}>
       <div style={{ ...S.statIcon, background: iconBg, color: iconFg }}>{icons[icon] || '\u2022'}</div>
-      <div style={{ fontSize: 22, fontWeight: 700, color: accent || 'var(--n800, #1E293B)', lineHeight: 1, marginTop: 8 }}>
+      <div style={{ fontSize: 22, fontWeight: 700, color: accent || 'var(--text-primary)', lineHeight: 1, marginTop: 8 }}>
         {value}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--n400, #94A3B8)', marginTop: 4, fontWeight: 500 }}>{label}</div>
+      <div style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4, fontWeight: 500 }}>{label}</div>
     </div>
   );
 }
@@ -295,10 +295,10 @@ function LatencyBar({ label, ms, max, color }: { label: string; ms: number; max:
   return (
     <div style={{ flex: 1 }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--n600)' }}>{label}</span>
-        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>{fmtDuration(ms)}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>{label}</span>
+        <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>{fmtDuration(ms)}</span>
       </div>
-      <div style={{ height: 6, background: 'var(--n100, #F1F5F9)', borderRadius: 3 }}>
+      <div style={{ height: 6, background: 'var(--bg-secondary)', borderRadius: 3 }}>
         <div style={{ height: '100%', width: `${pct}%`, background: color, borderRadius: 3, transition: 'width 0.3s ease' }} />
       </div>
     </div>
@@ -324,7 +324,7 @@ function MiniTimeline({ requests }: { requests: any[] }) {
         <div key={i} style={{
           flex: 1,
           height: `${Math.max((count / max) * 100, 4)}%`,
-          background: count > 0 ? 'var(--brand-blue, #097FF5)' : 'var(--n100, #F1F5F9)',
+          background: count > 0 ? 'var(--brand-blue, #097FF5)' : 'var(--bg-secondary)',
           borderRadius: 2,
           opacity: count > 0 ? 0.7 : 0.4,
           transition: 'height 0.2s ease',
@@ -363,8 +363,8 @@ function RequestsTab({ requests }: { requests: any[] }) {
         return (
           <div key={r.id} style={{
             borderRadius: 8,
-            border: `1px solid ${isExpanded ? 'var(--brand-blue, #097FF5)20' : 'var(--n200, #E2E8F0)'}`,
-            background: isExpanded ? 'var(--brand-blue-50, #F0F7FF)' : 'white',
+            border: `1px solid ${isExpanded ? 'var(--brand-blue, #097FF5)20' : 'var(--border-default)'}`,
+            background: isExpanded ? 'var(--bg-active)' : 'var(--bg-secondary)',
             overflow: 'hidden',
             transition: 'all 0.15s ease',
           }}>
@@ -379,10 +379,10 @@ function RequestsTab({ requests }: { requests: any[] }) {
                 ...S.expandChevron,
                 transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
               }}>{'\u203A'}</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--n400)', minWidth: 62 }}>{fmtTime(r.timestamp)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)', minWidth: 62 }}>{fmtTime(r.timestamp)}</span>
               <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.action}</span>
               <StatusBadge code={r.status} />
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isError ? '#EF4444' : 'var(--n400)', minWidth: 44, textAlign: 'right' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: isError ? '#EF4444' : 'var(--text-tertiary)', minWidth: 44, textAlign: 'right' }}>
                 {fmtDuration(r.latency_ms)}
               </span>
             </div>
@@ -406,12 +406,12 @@ function RequestInlineDetail({ req }: { req: any }) {
   }
 
   return (
-    <div style={{ borderTop: '1px solid var(--n100, #F1F5F9)' }}>
-      <div style={{ display: 'flex', gap: 0, background: 'var(--n50, #F8FAFC)', borderBottom: '1px solid var(--n100)' }}>
+    <div style={{ borderTop: '1px solid var(--bg-secondary)' }}>
+      <div style={{ display: 'flex', gap: 0, background: 'var(--bg-primary)', borderBottom: '1px solid var(--bg-secondary)' }}>
         {(['info', 'request', 'response', 'explain'] as const).map(t => (
           <button key={t} onClick={() => { setSubTab(t); if (t === 'explain') loadExplain(); }} style={{
             ...S.subTab,
-            color: subTab === t ? (t === 'explain' ? '#8B5CF6' : 'var(--brand-blue, #097FF5)') : 'var(--n500)',
+            color: subTab === t ? (t === 'explain' ? '#8B5CF6' : 'var(--brand-blue, #097FF5)') : 'var(--text-secondary)',
             fontWeight: subTab === t ? 600 : 400,
             borderBottom: subTab === t ? `2px solid ${t === 'explain' ? '#8B5CF6' : 'var(--brand-blue, #097FF5)'}` : '2px solid transparent',
           }}>{t === 'explain' ? '\u2728 Explain' : t.charAt(0).toUpperCase() + t.slice(1)}</button>
@@ -433,12 +433,12 @@ function RequestInlineDetail({ req }: { req: any }) {
         )}
         {subTab === 'request' && (
           <div style={{ maxHeight: 220, overflow: 'auto', borderRadius: 6 }}>
-            {req.request_body ? <JsonView data={tryParse(req.request_body)} /> : <span style={{ color: 'var(--n400)', fontSize: 12 }}>No request body</span>}
+            {req.request_body ? <JsonView data={tryParse(req.request_body)} /> : <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>No request body</span>}
           </div>
         )}
         {subTab === 'response' && (
           <div style={{ maxHeight: 220, overflow: 'auto', borderRadius: 6 }}>
-            {req.response_body ? <JsonView data={tryParse(req.response_body)} /> : <span style={{ color: 'var(--n400)', fontSize: 12 }}>No response body</span>}
+            {req.response_body ? <JsonView data={tryParse(req.response_body)} /> : <span style={{ color: 'var(--text-tertiary)', fontSize: 12 }}>No response body</span>}
           </div>
         )}
         {subTab === 'explain' && <ExplainPanel data={explainData} loading={explainLoading} />}
@@ -449,10 +449,10 @@ function RequestInlineDetail({ req }: { req: any }) {
 
 function ExplainPanel({ data, loading }: { data: any; loading: boolean }) {
   if (loading) {
-    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}><div style={S.spinner} /> Analyzing request...</div>;
+    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-tertiary)' }}><div style={S.spinner} /> Analyzing request...</div>;
   }
   if (!data) {
-    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--n400)' }}>No analysis available</div>;
+    return <div style={{ textAlign: 'center', padding: 20, color: 'var(--text-tertiary)' }}>No analysis available</div>;
   }
 
   return (
@@ -476,9 +476,9 @@ function NarrativeRenderer({ text }: { text: string }) {
 
     // Headers
     if (line.startsWith('### ')) {
-      elements.push(<h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--n800)', margin: '14px 0 6px', borderBottom: '1px solid var(--n100)', paddingBottom: 4 }}>{line.slice(4)}</h4>);
+      elements.push(<h4 key={i} style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', margin: '14px 0 6px', borderBottom: '1px solid var(--bg-secondary)', paddingBottom: 4 }}>{line.slice(4)}</h4>);
     } else if (line.startsWith('## ')) {
-      elements.push(<h3 key={i} style={{ fontSize: 15, fontWeight: 700, color: 'var(--n800)', margin: '0 0 10px' }}>{line.slice(3)}</h3>);
+      elements.push(<h3 key={i} style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: '0 0 10px' }}>{line.slice(3)}</h3>);
     }
     // Table
     else if (line.startsWith('|') && line.includes('|')) {
@@ -493,8 +493,8 @@ function NarrativeRenderer({ text }: { text: string }) {
         const rows = tableLines.slice(1).map(r => r.split('|').filter(Boolean).map(c => c.trim()));
         elements.push(
           <table key={i} style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse', marginBottom: 10 }}>
-            <thead><tr>{headers.map((h, j) => <th key={j} style={{ textAlign: 'left', padding: '4px 8px', background: 'var(--n50)', borderBottom: '1px solid var(--n200)', fontWeight: 600, color: 'var(--n600)' }}>{renderInline(h)}</th>)}</tr></thead>
-            <tbody>{rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ padding: '3px 8px', borderBottom: '1px solid var(--n100)', fontFamily: cell.startsWith('`') ? 'var(--font-mono)' : 'inherit' }}>{renderInline(cell)}</td>)}</tr>)}</tbody>
+            <thead><tr>{headers.map((h, j) => <th key={j} style={{ textAlign: 'left', padding: '4px 8px', background: 'var(--bg-primary)', borderBottom: '1px solid var(--border-default)', fontWeight: 600, color: 'var(--text-secondary)' }}>{renderInline(h)}</th>)}</tr></thead>
+            <tbody>{rows.map((row, ri) => <tr key={ri}>{row.map((cell, ci) => <td key={ci} style={{ padding: '3px 8px', borderBottom: '1px solid var(--bg-secondary)', fontFamily: cell.startsWith('`') ? 'var(--font-mono)' : 'inherit' }}>{renderInline(cell)}</td>)}</tr>)}</tbody>
           </table>
         );
       }
@@ -508,7 +508,7 @@ function NarrativeRenderer({ text }: { text: string }) {
         i++;
       }
       elements.push(
-        <pre key={i} style={{ background: 'var(--n50)', border: '1px solid var(--n200)', borderRadius: 6, padding: 10, fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'auto', marginBottom: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
+        <pre key={i} style={{ background: 'var(--bg-tertiary)', border: '1px solid var(--border-subtle)', borderRadius: 6, padding: 10, fontSize: 11, fontFamily: 'var(--font-mono)', overflow: 'auto', marginBottom: 10, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>
           {codeLines.join('\n')}
         </pre>
       );
@@ -538,7 +538,7 @@ function renderInline(text: string): any {
       return <strong key={i} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>;
     }
     if (part.startsWith('`') && part.endsWith('`')) {
-      return <code key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9em', background: 'var(--n100)', padding: '1px 4px', borderRadius: 3 }}>{part.slice(1, -1)}</code>;
+      return <code key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: '0.9em', background: 'var(--bg-secondary)', padding: '1px 4px', borderRadius: 3 }}>{part.slice(1, -1)}</code>;
     }
     return part;
   });
@@ -572,8 +572,8 @@ function TracesTab({ traces }: { traces: any[] }) {
         return (
           <div key={t.trace_id} style={{
             borderRadius: 8,
-            border: `1px solid ${isExpanded ? 'var(--brand-blue, #097FF5)20' : 'var(--n200, #E2E8F0)'}`,
-            background: isExpanded ? 'var(--brand-blue-50, #F0F7FF)' : 'white',
+            border: `1px solid ${isExpanded ? 'var(--brand-blue, #097FF5)20' : 'var(--border-default)'}`,
+            background: isExpanded ? 'var(--bg-active)' : 'var(--bg-secondary)',
             overflow: 'hidden',
             transition: 'all 0.15s ease',
           }}>
@@ -588,8 +588,8 @@ function TracesTab({ traces }: { traces: any[] }) {
               <span style={{ fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {t.root_action || t.root_service}
               </span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--n400)' }}>{t.span_count} spans</span>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--n500)' }}>{fmtDuration(t.duration_ms)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-tertiary)' }}>{t.span_count} spans</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--text-secondary)' }}>{fmtDuration(t.duration_ms)}</span>
               {t.has_error ? (
                 <span style={{ padding: '1px 8px', borderRadius: 10, background: '#FEE2E2', color: '#DC2626', fontSize: 10, fontWeight: 600 }}>Error</span>
               ) : (
@@ -607,7 +607,7 @@ function TracesTab({ traces }: { traces: any[] }) {
 function WaterfallTimeline({ spans, totalMs }: { spans: any[]; totalMs: number }) {
   if (spans.length === 0) {
     return (
-      <div style={{ padding: 16, borderTop: '1px solid var(--n100)', textAlign: 'center' }}>
+      <div style={{ padding: 16, borderTop: '1px solid var(--bg-secondary)', textAlign: 'center' }}>
         <div style={{ ...S.spinner }} />
       </div>
     );
@@ -616,10 +616,10 @@ function WaterfallTimeline({ spans, totalMs }: { spans: any[]; totalMs: number }
   const maxMs = totalMs || Math.max(...spans.map(s => (s.start_offset_ms || 0) + (s.duration_ms || 0)), 1);
 
   return (
-    <div style={{ borderTop: '1px solid var(--n100)', padding: '12px 12px 8px' }}>
+    <div style={{ borderTop: '1px solid var(--bg-secondary)', padding: '12px 12px 8px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--n600)' }}>Waterfall</span>
-        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--n400)' }}>{spans.length} spans / {fmtDuration(totalMs)}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-secondary)' }}>Waterfall</span>
+        <span style={{ fontSize: 10, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)' }}>{spans.length} spans / {fmtDuration(totalMs)}</span>
       </div>
       {spans.map((s: any, i: number) => {
         const left = ((s.start_offset_ms || 0) / maxMs) * 100;
@@ -632,12 +632,12 @@ function WaterfallTimeline({ spans, totalMs }: { spans: any[]; totalMs: number }
             <div style={{
               width: 130, flexShrink: 0, paddingLeft: indent,
               overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              color: 'var(--n600)',
+              color: 'var(--text-secondary)',
             }}>
               <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: color, marginRight: 5, verticalAlign: 'middle' }} />
               {s.action || s.service}
             </div>
-            <div style={{ flex: 1, height: 16, background: 'var(--n100, #F1F5F9)', borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
+            <div style={{ flex: 1, height: 16, background: 'var(--bg-secondary)', borderRadius: 3, position: 'relative', overflow: 'hidden' }}>
               <div style={{
                 position: 'absolute', left: `${left}%`, width: `${width}%`,
                 height: '100%', background: color, borderRadius: 3,
@@ -653,7 +653,7 @@ function WaterfallTimeline({ spans, totalMs }: { spans: any[]; totalMs: number }
               </div>
             </div>
             {width <= 8 && (
-              <div style={{ width: 44, textAlign: 'right', flexShrink: 0, fontFamily: 'var(--font-mono)', color: 'var(--n400)', fontSize: 10 }}>
+              <div style={{ width: 44, textAlign: 'right', flexShrink: 0, fontFamily: 'var(--font-mono)', color: 'var(--text-tertiary)', fontSize: 10 }}>
                 {fmtDuration(s.duration_ms)}
               </div>
             )}
@@ -693,9 +693,9 @@ function ConnectionGroup({ label, icon, edges, direction, nodeMap, onSelect }: {
 }) {
   return (
     <div>
-      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--n600)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
         <span>{icon}</span> {label}
-        <span style={{ fontWeight: 400, color: 'var(--n400)' }}>({edges.length})</span>
+        <span style={{ fontWeight: 400, color: 'var(--text-tertiary)' }}>({edges.length})</span>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {edges.map((edge, i) => {
@@ -710,30 +710,30 @@ function ConnectionGroup({ label, icon, edges, direction, nodeMap, onSelect }: {
               onClick={() => peer && onSelect(peer)}
               style={{
                 display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px',
-                borderRadius: 8, border: '1px solid var(--n200, #E2E8F0)',
+                borderRadius: 8, border: '1px solid var(--border-default)',
                 cursor: peer ? 'pointer' : 'default',
                 transition: 'all 0.1s ease',
-                background: 'white',
+                background: 'var(--bg-secondary)',
               }}
               onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.borderColor = edgeColor + '60'; (e.currentTarget as HTMLElement).style.background = edgeColor + '08'; }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ''; (e.currentTarget as HTMLElement).style.background = 'white'; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.borderColor = ''; (e.currentTarget as HTMLElement).style.background = 'var(--bg-secondary)'; }}
             >
               <div style={{ ...S.typeIconSm, background: peerType.bg, color: peerType.fg }}>{peerType.icon}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {peer?.label || peerId}
                 </div>
-                <div style={{ fontSize: 10, color: 'var(--n400)', display: 'flex', gap: 8, marginTop: 2 }}>
+                <div style={{ fontSize: 10, color: 'var(--text-tertiary)', display: 'flex', gap: 8, marginTop: 2 }}>
                   <span style={{ color: edgeColor, fontWeight: 600 }}>{edge.type}</span>
                   {edge.discovered && <span>{edge.discovered}</span>}
                 </div>
               </div>
               <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--n500)' }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' }}>
                   {edge.avg_latency_ms ? fmtDuration(edge.avg_latency_ms) : '\u2014'}
                 </div>
                 {(edge.call_count || 0) > 0 && (
-                  <div style={{ fontSize: 10, color: 'var(--n400)' }}>{edge.call_count} calls</div>
+                  <div style={{ fontSize: 10, color: 'var(--text-tertiary)' }}>{edge.call_count} calls</div>
                 )}
               </div>
             </div>
@@ -752,7 +752,7 @@ function ResourceTab({ resources, nodeType }: { resources: any; nodeType: string
   }
 
   return (
-    <div style={{ overflow: 'auto', maxHeight: 500, borderRadius: 8, border: '1px solid var(--n200)', background: 'var(--n50, #F8FAFC)' }}>
+    <div style={{ overflow: 'auto', maxHeight: 500, borderRadius: 8, border: '1px solid var(--border-default)', background: 'var(--bg-primary)' }}>
       <div style={{ padding: 12 }}>
         <JsonView data={resources} />
       </div>
@@ -766,7 +766,7 @@ function EmptyState({ icon, message }: { icon: string; message: string }) {
   return (
     <div style={{ textAlign: 'center', padding: '40px 20px' }}>
       <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.3 }}>{icon}</div>
-      <div style={{ fontSize: 13, color: 'var(--n400, #94A3B8)' }}>{message}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>{message}</div>
     </div>
   );
 }
@@ -774,8 +774,8 @@ function EmptyState({ icon, message }: { icon: string; message: string }) {
 function InfoRow({ label, value }: { label: string; value: any }) {
   return (
     <>
-      <div style={{ color: 'var(--n400)', fontSize: 12, padding: '2px 0' }}>{label}</div>
-      <div style={{ color: 'var(--n700, #334155)', fontSize: 12, padding: '2px 0' }}>{value}</div>
+      <div style={{ color: 'var(--text-tertiary)', fontSize: 12, padding: '2px 0' }}>{label}</div>
+      <div style={{ color: 'var(--text-primary)', fontSize: 12, padding: '2px 0' }}>{value}</div>
     </>
   );
 }
@@ -796,7 +796,7 @@ const S = {
   nodeHeader: {
     display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
     padding: '12px 14px', borderRadius: 10,
-    background: 'var(--n50, #F8FAFC)', border: '1px solid var(--n200, #E2E8F0)',
+    background: 'var(--bg-primary)', border: '1px solid var(--border-default)',
   } as const,
   typeIcon: {
     width: 36, height: 36, borderRadius: 8, display: 'flex',
@@ -810,16 +810,16 @@ const S = {
     fontSize: 9, fontWeight: 700, fontFamily: 'var(--font-mono)',
     flexShrink: 0, textTransform: 'uppercase' as const, letterSpacing: 0.3,
   } as const,
-  nodeTitle: { fontSize: 15, fontWeight: 700, color: 'var(--n800, #1E293B)', lineHeight: 1.2 } as const,
+  nodeTitle: { fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.2 } as const,
   nodeMeta: {
-    display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 12, color: 'var(--n500, #64748B)',
+    display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 12, color: 'var(--text-secondary)',
   } as const,
   metaChip: { fontSize: 11, fontWeight: 500 } as const,
   metaDot: {
-    width: 3, height: 3, borderRadius: '50%', background: 'var(--n300, #CBD5E1)', flexShrink: 0,
+    width: 3, height: 3, borderRadius: '50%', background: 'var(--border-default)', flexShrink: 0,
   } as const,
   tabBar: {
-    display: 'flex', gap: 0, borderBottom: '1px solid var(--n200, #E2E8F0)',
+    display: 'flex', gap: 0, borderBottom: '1px solid var(--border-default)',
     marginBottom: 16, marginLeft: -20, marginRight: -20, paddingLeft: 20, paddingRight: 20,
     overflowX: 'auto' as const,
   } as const,
@@ -839,20 +839,20 @@ const S = {
   } as const,
   tabContent: { minHeight: 200 } as const,
   card: {
-    padding: 14, borderRadius: 10, border: '1px solid var(--n200, #E2E8F0)',
-    background: 'white',
+    padding: 14, borderRadius: 10, border: '1px solid var(--border-default)',
+    background: 'var(--bg-secondary)',
   } as const,
-  cardLabel: { fontSize: 11, fontWeight: 600, color: 'var(--n400, #94A3B8)', textTransform: 'uppercase' as const, letterSpacing: 0.5 } as const,
+  cardLabel: { fontSize: 11, fontWeight: 600, color: 'var(--text-tertiary)', textTransform: 'uppercase' as const, letterSpacing: 0.5 } as const,
   statCard: {
-    padding: 14, borderRadius: 10, border: '1px solid var(--n200, #E2E8F0)',
-    background: 'white', textAlign: 'center' as const,
+    padding: 14, borderRadius: 10, border: '1px solid var(--border-default)',
+    background: 'var(--bg-secondary)', textAlign: 'center' as const,
   } as const,
   statIcon: {
     width: 28, height: 28, borderRadius: 8, display: 'inline-flex',
     alignItems: 'center', justifyContent: 'center', fontSize: 14,
   } as const,
   expandChevron: {
-    display: 'inline-block', fontSize: 16, fontWeight: 700, color: 'var(--n400)',
+    display: 'inline-block', fontSize: 16, fontWeight: 700, color: 'var(--text-tertiary)',
     transition: 'transform 0.15s ease', lineHeight: 1, width: 12, textAlign: 'center' as const,
   } as const,
   subTab: {
@@ -860,7 +860,7 @@ const S = {
     cursor: 'pointer' as const, whiteSpace: 'nowrap' as const,
   } as const,
   spinner: {
-    width: 20, height: 20, border: '2px solid var(--n200)', borderTopColor: 'var(--brand-blue, #097FF5)',
+    width: 20, height: 20, border: '2px solid var(--border-default)', borderTopColor: 'var(--brand-blue, #097FF5)',
     borderRadius: '50%', animation: 'spin 0.6s linear infinite', display: 'inline-block',
   } as const,
 };

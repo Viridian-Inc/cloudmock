@@ -285,7 +285,7 @@ export function ChaosPage({ showToast }: { showToast: (msg: string) => void }) {
                   >
                     <span style={{
                       position: 'absolute', top: '2px', width: '18px', height: '18px', borderRadius: '50%',
-                      background: 'white', transition: 'left 0.2s',
+                      background: 'var(--text-primary)', transition: 'left 0.2s',
                       left: r.enabled ? '20px' : '2px',
                     }} />
                   </button>

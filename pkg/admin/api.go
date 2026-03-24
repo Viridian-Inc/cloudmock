@@ -258,7 +258,7 @@ func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleServices(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -294,7 +294,7 @@ func (a *API) handleServiceByName(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -314,7 +314,7 @@ func (a *API) handleServiceByName(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleServiceReset(w http.ResponseWriter, r *http.Request, name string) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -333,7 +333,7 @@ func (a *API) handleServiceReset(w http.ResponseWriter, r *http.Request, name st
 
 func (a *API) handleResetAll(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -351,7 +351,7 @@ func (a *API) handleResetAll(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleHealth(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -407,7 +407,7 @@ func writeError(w http.ResponseWriter, code int, msg string) {
 
 func (a *API) handleConfig(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -416,7 +416,7 @@ func (a *API) handleConfig(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -435,20 +435,20 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			views, err := a.dp.Config.ListViews(r.Context())
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			writeJSON(w, http.StatusOK, views)
 		case http.MethodPost:
 			var v dataplane.SavedView
 			if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
-				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 				return
 			}
 			v.ID = fmt.Sprintf("view-%d", time.Now().UnixNano())
 			v.CreatedAt = time.Now().UTC()
 			if err := a.dp.Config.SaveView(r.Context(), v); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]any{"name": v.Name})
@@ -456,17 +456,17 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		case http.MethodDelete:
 			id := r.URL.Query().Get("id")
 			if id == "" {
-				http.Error(w, "missing id query parameter", http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "missing id query parameter")
 				return
 			}
 			if err := a.dp.Config.DeleteView(r.Context(), id); err != nil {
-				http.Error(w, "view not found", http.StatusNotFound)
+				writeError(w, http.StatusNotFound, "view not found")
 				return
 			}
 			a.auditLog(r.Context(), "view.deleted", "view:"+id, nil)
 			w.WriteHeader(http.StatusNoContent)
 		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 		return
 	}
@@ -482,7 +482,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var v SavedView
 		if err := json.NewDecoder(r.Body).Decode(&v); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
 		v.ID = fmt.Sprintf("view-%d", time.Now().UnixNano())
@@ -491,7 +491,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		a.viewsMu.Lock()
 		if len(a.views) >= 50 {
 			a.viewsMu.Unlock()
-			http.Error(w, "maximum of 50 saved views reached", http.StatusConflict)
+			writeError(w, http.StatusConflict, "maximum of 50 saved views reached")
 			return
 		}
 		a.views = append(a.views, v)
@@ -502,7 +502,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 	case http.MethodDelete:
 		id := r.URL.Query().Get("id")
 		if id == "" {
-			http.Error(w, "missing id query parameter", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "missing id query parameter")
 			return
 		}
 		a.viewsMu.Lock()
@@ -516,20 +516,20 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 		}
 		a.viewsMu.Unlock()
 		if !found {
-			http.Error(w, "view not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "view not found")
 			return
 		}
 		a.auditLog(r.Context(), "view.deleted", "view:"+id, nil)
 		w.WriteHeader(http.StatusNoContent)
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
 func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -596,7 +596,7 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 		}
 		entries, err := a.dp.Requests.Query(r.Context(), dpFilter)
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, entries)
@@ -630,7 +630,7 @@ func (a *API) handleRequests(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
 
@@ -659,7 +659,7 @@ func (a *API) handleStream(w http.ResponseWriter, r *http.Request) {
 // handleLambdaLogs returns recent Lambda execution logs.
 func (a *API) handleLambdaLogs(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -684,7 +684,7 @@ func (a *API) handleLambdaLogs(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleLambdaLogStream(w http.ResponseWriter, r *http.Request) {
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		http.Error(w, "streaming unsupported", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "streaming unsupported")
 		return
 	}
 
@@ -740,7 +740,7 @@ func (a *API) handleRequestByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -841,7 +841,7 @@ type IAMEvalResponse struct {
 
 func (a *API) handleIAMEvaluate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -855,7 +855,7 @@ func (a *API) handleIAMEvaluate(w http.ResponseWriter, r *http.Request) {
 
 	var req IAMEvalRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
@@ -892,7 +892,7 @@ type SESEmailSummary struct {
 
 func (a *API) handleSESEmails(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -919,7 +919,7 @@ func (a *API) handleSESEmails(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleSESEmailByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -947,7 +947,7 @@ func (a *API) handleSESEmailByID(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleTopology(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -961,12 +961,12 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, "failed to read body", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "failed to read body")
 			return
 		}
 		var cfg IaCTopologyConfig
 		if err := json.Unmarshal(body, &cfg); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
 		a.iacTopologyMu.Lock()
@@ -987,7 +987,7 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusOK, cfg)
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -1068,7 +1068,7 @@ var restServices = map[string]bool{
 // by making an internal call to the service's HandleRequest method.
 func (a *API) handleResources(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1194,7 +1194,7 @@ func (a *API) SetTraceStore(ts *gateway.TraceStore) {
 // handleTraces returns recent traces.
 func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1222,7 +1222,7 @@ func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
 			Limit:    limit,
 		})
 		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			writeError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
 		writeJSON(w, http.StatusOK, summaries)
@@ -1241,7 +1241,7 @@ func (a *API) handleTraces(w http.ResponseWriter, r *http.Request) {
 // handleTraceByID returns a single trace or its timeline.
 func (a *API) handleTraceByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1314,7 +1314,7 @@ func AdminAuthMiddleware(next http.Handler, apiKey string) http.Handler {
 			key = r.URL.Query().Get("key")
 		}
 		if key != apiKey {
-			http.Error(w, `{"error":"unauthorized","message":"Invalid or missing X-Admin-Key header"}`, http.StatusUnauthorized)
+			writeError(w, http.StatusUnauthorized, "Invalid or missing X-Admin-Key header")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -1333,7 +1333,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			status, err := a.dp.SLO.Status(r.Context())
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			rules, _ := a.dp.SLO.Rules(r.Context())
@@ -1346,22 +1346,22 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 		case http.MethodPut:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "bad request", http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "bad request")
 				return
 			}
 			var rules []config.SLORule
 			if err := json.Unmarshal(body, &rules); err != nil {
-				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 				return
 			}
 			if err := a.dp.SLO.SetRules(r.Context(), rules); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]any{"rule_count": len(rules)})
 			writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "rules": len(rules)})
 		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 		return
 	}
@@ -1378,19 +1378,19 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad request")
 			return
 		}
 		var rules []config.SLORule
 		if err := json.Unmarshal(body, &rules); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
 		a.sloEngine.SetRules(rules)
 		a.auditLog(r.Context(), "slo.rules.updated", "slo:config", map[string]any{"rule_count": len(rules)})
 		writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "rules": len(rules)})
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -1400,7 +1400,7 @@ func (a *API) handleSLO(w http.ResponseWriter, r *http.Request) {
 func (a *API) handleBlastRadius(w http.ResponseWriter, r *http.Request) {
 	nodeID := r.URL.Query().Get("node")
 	if nodeID == "" {
-		http.Error(w, "node parameter required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "node parameter required")
 		return
 	}
 
@@ -1451,7 +1451,7 @@ func bfsNodes(startID string, adj map[string][]string) []string {
 // GET /api/tenants?id=CALLER_ID — detail for a specific tenant
 func (a *API) handleTenants(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1536,7 +1536,7 @@ func (a *API) handleTenants(w http.ResponseWriter, r *http.Request) {
 // Prices based on us-east-1 on-demand pricing (approximate).
 func (a *API) handleCost(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1685,7 +1685,7 @@ func (a *API) handleCostTrend(w http.ResponseWriter, r *http.Request) {
 // Splits recent requests into two halves and compares metrics.
 func (a *API) handleCompare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1795,19 +1795,19 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 		case http.MethodGet:
 			deploys, err := a.dp.Config.ListDeploys(r.Context(), dataplane.DeployFilter{Limit: 100})
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			writeJSON(w, http.StatusOK, deploys)
 		case http.MethodPost:
 			body, err := io.ReadAll(r.Body)
 			if err != nil {
-				http.Error(w, "bad request", http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "bad request")
 				return
 			}
 			var deploy dataplane.DeployEvent
 			if err := json.Unmarshal(body, &deploy); err != nil {
-				http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+				writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 				return
 			}
 			if deploy.DeployedAt.IsZero() {
@@ -1817,7 +1817,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 				deploy.ID = fmt.Sprintf("deploy-%d", time.Now().UnixNano())
 			}
 			if err := a.dp.Config.AddDeploy(r.Context(), deploy); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, err.Error())
 				return
 			}
 			if a.regressionEngine != nil {
@@ -1826,7 +1826,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 			a.auditLog(r.Context(), "deploy.created", "deploy:"+deploy.ID, map[string]any{"service": deploy.Service})
 			writeJSON(w, http.StatusCreated, deploy)
 		default:
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		}
 		return
 	}
@@ -1842,12 +1842,12 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			http.Error(w, "bad request", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "bad request")
 			return
 		}
 		var deploy DeployEvent
 		if err := json.Unmarshal(body, &deploy); err != nil {
-			http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
 			return
 		}
 		if deploy.Timestamp == "" {
@@ -1883,7 +1883,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusCreated, deploy)
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -1933,7 +1933,7 @@ func (a *API) handleTenantExport(w http.ResponseWriter, r *http.Request) {
 // POST /api/shadow {"target": "http://localhost:3203", "service": "bff", "limit": 10}
 func (a *API) handleShadowTest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -1944,11 +1944,11 @@ func (a *API) handleShadowTest(w http.ResponseWriter, r *http.Request) {
 		Limit   int    `json:"limit"`
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
 	if req.Target == "" {
-		http.Error(w, "target URL required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "target URL required")
 		return
 	}
 	if req.Limit <= 0 {
@@ -2274,7 +2274,7 @@ func (a *API) handleChaos(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var rule gateway.ChaosRule
 		if err := json.NewDecoder(r.Body).Decode(&rule); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 		created := a.chaosEngine.AddRule(rule)
@@ -2286,7 +2286,7 @@ func (a *API) handleChaos(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "all_disabled"})
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
@@ -2315,7 +2315,7 @@ func (a *API) handleChaosRule(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPut:
 		var update gateway.ChaosRule
 		if err := json.NewDecoder(r.Body).Decode(&update); err != nil {
-			http.Error(w, "invalid request body", http.StatusBadRequest)
+			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 		updated, ok := a.chaosEngine.UpdateRule(id, update)
@@ -2333,14 +2333,14 @@ func (a *API) handleChaosRule(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 
 	default:
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	data, err := json.Marshal(v)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -2378,20 +2378,20 @@ type ExplainAnalysis struct {
 // GET /api/explain/{requestId}
 func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
 	reqID := strings.TrimPrefix(r.URL.Path, "/api/explain/")
 	if reqID == "" {
-		http.Error(w, "request ID required", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "request ID required")
 		return
 	}
 
 	// 1. Get the request
 	entry := a.log.GetByID(reqID)
 	if entry == nil {
-		http.Error(w, "request not found", http.StatusNotFound)
+		writeError(w, http.StatusNotFound, "request not found")
 		return
 	}
 
@@ -3161,7 +3161,7 @@ func (a *API) handleProfile(w http.ResponseWriter, r *http.Request) {
 	// flamegraph format
 	folded, err := a.profilingEngine.FoldedStacks(p.ID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -3170,7 +3170,7 @@ func (a *API) handleProfile(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	if a.profilingEngine == nil {
-		http.Error(w, "profiling not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "profiling not available")
 		return
 	}
 
@@ -3191,7 +3191,7 @@ func (a *API) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	if format == "pprof" {
 		filePath, err := a.profilingEngine.FilePath(path)
 		if err != nil {
-			http.Error(w, "not found", http.StatusNotFound)
+			writeError(w, http.StatusNotFound, "not found")
 			return
 		}
 		w.Header().Set("Content-Type", "application/octet-stream")
@@ -3200,7 +3200,7 @@ func (a *API) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	}
 	folded, err := a.profilingEngine.FoldedStacks(path)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain")
@@ -3209,21 +3209,21 @@ func (a *API) handleProfiles(w http.ResponseWriter, r *http.Request) {
 
 func (a *API) handleSourcemaps(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost || a.symbolizer == nil {
-		http.Error(w, "not available", http.StatusServiceUnavailable)
+		writeError(w, http.StatusServiceUnavailable, "not available")
 		return
 	}
 	filePath := r.URL.Query().Get("file")
 	if filePath == "" {
-		http.Error(w, "missing file parameter", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "missing file parameter")
 		return
 	}
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	if err := a.symbolizer.LoadMap(filePath, body); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 	a.auditLog(r.Context(), "sourcemap.uploaded", "sourcemap:"+filePath, nil)

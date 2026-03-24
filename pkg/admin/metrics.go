@@ -45,7 +45,7 @@ type BucketMetric struct {
 // from the last 15 minutes of request log entries.
 func (a *API) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
@@ -119,7 +119,7 @@ func (a *API) handleMetrics(w http.ResponseWriter, r *http.Request) {
 // Returns time-bucketed metrics for charting.
 func (a *API) handleMetricsTimeline(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 

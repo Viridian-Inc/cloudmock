@@ -2,7 +2,7 @@ package gateway
 
 import (
 	"encoding/binary"
-	"log"
+	"log/slog"
 	"net"
 	"strings"
 )
@@ -21,16 +21,16 @@ func StartDNSServer(port int, domain string) {
 	addr := &net.UDPAddr{Port: port, IP: net.ParseIP("127.0.0.1")}
 	conn, err := net.ListenUDP("udp", addr)
 	if err != nil {
-		log.Printf("dns: failed to listen on UDP :%d: %v", port, err)
+		slog.Error("dns: failed to listen", "port", port, "error", err)
 		return
 	}
-	log.Printf("dns: listening on UDP :%d (resolving *.%s → 127.0.0.1)", port, domain)
+	slog.Info("dns: listening", "port", port, "domain", domain)
 
 	buf := make([]byte, 512)
 	for {
 		n, src, err := conn.ReadFromUDP(buf)
 		if err != nil {
-			log.Printf("dns: read error: %v", err)
+			slog.Warn("dns: read error", "error", err)
 			continue
 		}
 		pkt := make([]byte, n)
@@ -76,7 +76,7 @@ func handleDNSQuery(conn *net.UDPConn, src *net.UDPAddr, pkt []byte, domain stri
 	}
 
 	if _, err := conn.WriteToUDP(resp, src); err != nil {
-		log.Printf("dns: write error: %v", err)
+		slog.Warn("dns: write error", "error", err)
 	}
 }
 

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -36,7 +36,7 @@ func (d *Dispatcher) Store() Store { return d.store }
 func (d *Dispatcher) Fire(ctx context.Context, event string, payload any) error {
 	configs, err := d.store.ListByEvent(ctx, event)
 	if err != nil {
-		log.Printf("webhook: list by event %q: %v", event, err)
+		slog.Warn("webhook: failed to list by event", "event", event, "error", err)
 		return nil // best-effort
 	}
 
@@ -45,7 +45,7 @@ func (d *Dispatcher) Fire(ctx context.Context, event string, payload any) error 
 			continue
 		}
 		if err := d.send(ctx, cfg, event, payload); err != nil {
-			log.Printf("webhook: send to %s (id=%s): %v", cfg.URL, cfg.ID, err)
+			slog.Warn("webhook: delivery failed", "url", cfg.URL, "id", cfg.ID, "error", err)
 		}
 	}
 	return nil

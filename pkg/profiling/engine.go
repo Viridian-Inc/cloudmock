@@ -2,6 +2,7 @@ package profiling
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime/pprof"
@@ -94,7 +95,10 @@ func (e *Engine) Capture(service, profileType string, duration time.Duration) (*
 	if len(e.profiles) > e.maxProfiles {
 		evicted := e.profiles[0]
 		e.profiles = e.profiles[1:]
-		os.Remove(evicted.FilePath)
+		slog.Warn("evicting oldest profile", "id", evicted.ID, "count", len(e.profiles), "max", e.maxProfiles)
+		if err := os.Remove(evicted.FilePath); err != nil {
+			slog.Warn("failed to remove profile", "path", evicted.FilePath, "error", err)
+		}
 	}
 	e.mu.Unlock()
 

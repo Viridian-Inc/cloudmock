@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -79,6 +80,16 @@ import (
 )
 
 func main() {
+	// Initialize structured logging. JSON in production, text for local dev.
+	logFormat := os.Getenv("CLOUDMOCK_LOG_FORMAT")
+	var logHandler slog.Handler
+	if logFormat == "json" {
+		logHandler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	} else {
+		logHandler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
+	}
+	slog.SetDefault(slog.New(logHandler))
+
 	rootCtx, rootCancel := context.WithCancel(context.Background())
 	defer rootCancel()
 
@@ -536,9 +547,9 @@ func main() {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 	go func() {
-		log.Printf("cloudmock admin API starting on %s", adminAddr)
+		slog.Info("cloudmock admin API starting", "addr", adminAddr)
 		if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Printf("admin API exited: %v", err)
+			slog.Error("admin API exited", "error", err)
 		}
 	}()
 
@@ -556,9 +567,9 @@ func main() {
 			ReadHeaderTimeout: 10 * time.Second,
 		}
 		go func() {
-			log.Printf("cloudmock dashboard starting on %s", dashAddr)
+			slog.Info("cloudmock dashboard starting", "addr", dashAddr)
 			if err := dashServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("dashboard exited: %v", err)
+				slog.Error("dashboard exited", "error", err)
 			}
 		}()
 	}
@@ -578,7 +589,7 @@ func main() {
 		routes := gateway.BuildRoutes(autotendDomain, cloudmockDomain)
 		certs, certsErr := gateway.EnsureCerts(autotendDomain, cloudmockDomain)
 		if certsErr != nil {
-			log.Printf("proxy: TLS certs unavailable (%v) — starting HTTP only", certsErr)
+			slog.Warn("proxy: TLS certs unavailable, starting HTTP only", "error", certsErr)
 			certs = nil
 		}
 		gateway.StartProxyWithOpts(routes, certs, gateway.ProxyOpts{
@@ -601,8 +612,9 @@ func main() {
 		IdleTimeout:       120 * time.Second,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
-	log.Printf("cloudmock gateway starting on %s (region=%s, account=%s, iam_mode=%s, services=%d)",
-		addr, cfg.Region, cfg.AccountID, cfg.IAM.Mode, len(registry.List()))
+	slog.Info("cloudmock gateway starting",
+		"addr", addr, "region", cfg.Region, "account", cfg.AccountID,
+		"iam_mode", cfg.IAM.Mode, "services", len(registry.List()))
 
 	go func() {
 		if err := gwServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -614,7 +626,7 @@ func main() {
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-sigCh
-	log.Printf("received %v, shutting down...", sig)
+	slog.Info("shutdown signal received", "signal", sig)
 
 	// Cancel the root context so background goroutines (e.g. SLO callbacks) stop.
 	rootCancel()
@@ -623,14 +635,14 @@ func main() {
 	defer cancel()
 
 	if err := gwServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("gateway shutdown error: %v", err)
+		slog.Error("gateway shutdown error", "error", err)
 	}
 	if err := adminServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("admin shutdown error: %v", err)
+		slog.Error("admin shutdown error", "error", err)
 	}
 	if dashServer != nil {
 		if err := dashServer.Shutdown(shutdownCtx); err != nil {
-			log.Printf("dashboard shutdown error: %v", err)
+			slog.Error("dashboard shutdown error", "error", err)
 		}
 	}
 
@@ -640,7 +652,7 @@ func main() {
 	}
 	if otelShutdown != nil {
 		if err := otelShutdown(shutdownCtx); err != nil {
-			log.Printf("otel shutdown error: %v", err)
+			slog.Error("otel shutdown error", "error", err)
 		}
 	}
 	if duckClient != nil {
@@ -650,5 +662,5 @@ func main() {
 		pgPool.Close()
 	}
 
-	log.Printf("shutdown complete")
+	slog.Info("shutdown complete")
 }

@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -406,17 +406,17 @@ func StartProxyWithOpts(routes []ProxyRoute, tlsCert *CertPair, opts ProxyOpts) 
 		addr := ":80"
 		ln, err := net.Listen("tcp", addr)
 		if err != nil {
-			log.Printf("proxy: port 80 unavailable (%v), falling back to :8080", err)
+			slog.Warn("proxy: port 80 unavailable, falling back to :8080", "error", err)
 			addr = ":8080"
 			ln, err = net.Listen("tcp", addr)
 			if err != nil {
-				log.Printf("proxy: failed to listen on %s: %v", addr, err)
+				slog.Error("proxy: failed to listen", "addr", addr, "error", err)
 				return
 			}
 		}
-		log.Printf("proxy HTTP%s: routing via .localhost and custom domains", addr)
+		slog.Info("proxy HTTP listening", "addr", addr)
 		if err := http.Serve(ln, proxy); err != nil {
-			log.Printf("proxy HTTP exited: %v", err)
+			slog.Error("proxy HTTP exited", "error", err)
 		}
 	}()
 
@@ -427,18 +427,18 @@ func StartProxyWithOpts(routes []ProxyRoute, tlsCert *CertPair, opts ProxyOpts) 
 			addr := ":443"
 			ln, err := net.Listen("tcp", addr)
 			if err != nil {
-				log.Printf("proxy: port 443 unavailable (%v), falling back to :8443", err)
+				slog.Warn("proxy: port 443 unavailable, falling back to :8443", "error", err)
 				addr = ":8443"
 				ln, err = net.Listen("tcp", addr)
 				if err != nil {
-					log.Printf("proxy: failed to listen on %s: %v", addr, err)
+					slog.Error("proxy: failed to listen", "addr", addr, "error", err)
 					return
 				}
 			}
 			tlsLn := tls.NewListener(ln, tlsConfig)
-			log.Printf("proxy HTTPS%s: same routes with TLS", addr)
+			slog.Info("proxy HTTPS listening", "addr", addr)
 			if err := http.Serve(tlsLn, proxy); err != nil {
-				log.Printf("proxy HTTPS exited: %v", err)
+				slog.Error("proxy HTTPS exited", "error", err)
 			}
 		}()
 	}

@@ -8,7 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"log"
+	"log/slog"
 	"math/big"
 	"net"
 	"os"
@@ -93,13 +93,13 @@ func EnsureCerts(domains ...string) (*CertPair, error) {
 					trustCA(caCertPath)
 					return &CertPair{Cert: cert, CACert: caCertPath}, nil
 				}
-				log.Printf("certs: SAN mismatch (have %v, need %v), regenerating", leaf.DNSNames, needed)
+				slog.Info("certs: SAN mismatch, regenerating", "have", leaf.DNSNames, "need", needed)
 			}
 		}
 	}
 
 	// Generate new certs
-	log.Printf("certs: generating self-signed CA and certificate for domains %v", domains)
+	slog.Info("certs: generating self-signed CA and certificate", "domains", domains)
 
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("cannot create cert directory: %w", err)
@@ -191,11 +191,11 @@ func EnsureCerts(domains ...string) (*CertPair, error) {
 // Falls back to sudo if direct access is denied.
 func trustCA(caCertPath string) {
 	if isCATrusted(caCertPath) {
-		log.Printf("certs: CA already trusted")
+		slog.Info("certs: CA already trusted")
 		return
 	}
 
-	log.Printf("certs: trusting CA certificate...")
+	slog.Info("certs: trusting CA certificate")
 
 	switch runtime.GOOS {
 	case "darwin":
@@ -240,11 +240,11 @@ func trustCADarwin(caCertPath string) {
 	err := exec.Command("security", "add-trusted-cert", "-r", "trustRoot",
 		"-k", loginKeychainPath(), caCertPath).Run()
 	if err == nil {
-		log.Printf("certs: CA trusted in login keychain")
+		slog.Info("certs: CA trusted in login keychain")
 		return
 	}
 
-	log.Printf("certs: login keychain failed (%v), trying system keychain with sudo...", err)
+	slog.Warn("certs: login keychain failed, trying system keychain with sudo", "error", err)
 	cmd := exec.Command("sudo", "-p", "cloudmock needs sudo to trust the CA certificate: ",
 		"security", "add-trusted-cert", "-d", "-r", "trustRoot",
 		"-k", "/Library/Keychains/System.keychain", caCertPath)
@@ -252,11 +252,11 @@ func trustCADarwin(caCertPath string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Printf("certs: failed to trust CA (%v)", err)
+		slog.Warn("certs: failed to trust CA", "error", err)
 		printTrustInstructions(caCertPath)
 		return
 	}
-	log.Printf("certs: CA trusted in system keychain")
+	slog.Info("certs: CA trusted in system keychain")
 }
 
 func trustCALinux(caCertPath string) {
@@ -265,14 +265,14 @@ func trustCALinux(caCertPath string) {
 	// Try direct copy first
 	if err := exec.Command("cp", caCertPath, dest).Run(); err != nil {
 		// Re-exec with sudo
-		log.Printf("certs: requesting sudo to trust CA certificate...")
+		slog.Info("certs: requesting sudo to trust CA certificate")
 		cmd := exec.Command("sudo", "-p", "cloudmock needs sudo to trust the CA certificate: ",
 			"cp", caCertPath, dest)
 		cmd.Stdin = os.Stdin
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil {
-			log.Printf("certs: failed to copy CA cert (%v)", err)
+			slog.Warn("certs: failed to copy CA cert", "error", err)
 			printTrustInstructions(caCertPath)
 			return
 		}
@@ -282,9 +282,9 @@ func trustCALinux(caCertPath string) {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
-		log.Printf("certs: update-ca-certificates failed (%v)", err)
+		slog.Warn("certs: update-ca-certificates failed", "error", err)
 	} else {
-		log.Printf("certs: CA trusted in system store")
+		slog.Info("certs: CA trusted in system store")
 	}
 }
 

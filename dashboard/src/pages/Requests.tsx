@@ -5,6 +5,7 @@ import { StatusBadge, statusClass } from '../components/StatusBadge';
 import { JsonView } from '../components/JsonView';
 import { Drawer } from '../components/Drawer';
 import { ExpandIcon, RefreshIcon, PlayIcon, CopyIcon } from '../components/Icons';
+import { SavedViewsPicker } from '../components/SavedViewsPicker';
 import { fmtTime, fmtDuration, copyToClipboard } from '../utils';
 
 interface RequestsPageProps {
@@ -141,6 +142,15 @@ export function RequestsPage({ sse, showToast }: RequestsPageProps) {
           <RefreshIcon /> Refresh
         </button>
       </div>
+
+      <SavedViewsPicker
+        currentFilters={{ service: svcFilter, status: statusFilter, text: textFilter }}
+        onLoadView={(filters) => {
+          if (filters.service !== undefined) setSvcFilter(filters.service || '');
+          if (filters.status !== undefined) setStatusFilter(filters.status || '');
+          if (filters.text !== undefined) setTextFilter(filters.text || '');
+        }}
+      />
 
       <div class="filters-bar">
         <select class="select" id="service-filter" value={svcFilter} onChange={(e) => setSvcFilter((e.target as HTMLSelectElement).value)}>

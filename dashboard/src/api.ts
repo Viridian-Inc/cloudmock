@@ -130,6 +130,14 @@ export async function compareBaseline(a: string) {
   return api<any>(`/api/traces/compare?a=${a}&baseline=true`);
 }
 
+// --- Metrics Timeline ---
+
+export async function fetchMetricsTimeline(service?: string, minutes = 15, bucket = '1m') {
+  const query = new URLSearchParams({ minutes: String(minutes), bucket });
+  if (service) query.set('service', service);
+  return api<any[]>(`/api/metrics/timeline?${query}`);
+}
+
 // --- Cost ---
 
 export async function fetchCostRoutes(limit = 20) {

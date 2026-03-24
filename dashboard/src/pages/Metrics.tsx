@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { api, fetchCostRoutes, fetchCostTenants, fetchCostTrend } from '../api';
+import { api, fetchMetricsTimeline, fetchCostRoutes, fetchCostTenants, fetchCostTrend } from '../api';
 
 interface ServiceMetric {
   service: string;
@@ -68,7 +68,7 @@ export function MetricsPage() {
 
   const fetchData = useCallback(() => {
     api('/api/metrics').then(setMetrics).catch(() => {});
-    api('/api/metrics/timeline?minutes=15&bucket=1m').then(setTimeline).catch(() => {});
+    fetchMetricsTimeline(undefined, 15, '1m').then(setTimeline).catch(() => {});
   }, []);
 
   const fetchCostData = useCallback(() => {

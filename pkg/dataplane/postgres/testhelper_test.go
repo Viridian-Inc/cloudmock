@@ -68,3 +68,15 @@ func setupPostgres(t *testing.T, ctx context.Context) *pgxpool.Pool {
 
 	return pool
 }
+
+// applySchema reads and executes a SQL file against the given pool.
+func applySchema(t *testing.T, ctx context.Context, pool *pgxpool.Pool, path string) {
+	t.Helper()
+	sql, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("failed to read schema file %s: %v", path, err)
+	}
+	if _, err := pool.Exec(ctx, string(sql)); err != nil {
+		t.Fatalf("failed to apply schema %s: %v", path, err)
+	}
+}

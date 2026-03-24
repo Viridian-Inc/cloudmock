@@ -99,6 +99,8 @@ type API struct {
 	reportGenerator   *report.Generator
 	mux              *http.ServeMux
 	dp               *dataplane.DataPlane
+	prefsMu          sync.RWMutex
+	prefs            map[string]map[string]json.RawMessage
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -153,6 +155,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/auth/me", a.handleAuthMe)
 	a.mux.HandleFunc("/api/users", a.handleUsers)
 	a.mux.HandleFunc("/api/users/", a.handleUserByID)
+	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 
 	return a
 }
@@ -222,6 +225,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/auth/me", a.handleAuthMe)
 	a.mux.HandleFunc("/api/users", a.handleUsers)
 	a.mux.HandleFunc("/api/users/", a.handleUserByID)
+	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 
 	return a
 }
@@ -3422,4 +3426,156 @@ func bcryptHash(password string) (string, error) {
 // bcryptCompare compares a bcrypt hash with a plaintext password.
 func bcryptCompare(hash, password string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+}
+
+// handlePreferences handles CRUD operations for user preferences.
+//   - GET /api/preferences?namespace=X          → ListByNamespace
+//   - GET /api/preferences?namespace=X&key=Y    → Get single
+//   - PUT /api/preferences                      → Set (body: {namespace, key, value})
+//   - DELETE /api/preferences?namespace=X&key=Y → Delete
+func (a *API) handlePreferences(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		namespace := r.URL.Query().Get("namespace")
+		if namespace == "" {
+			http.Error(w, `{"error":"namespace is required"}`, http.StatusBadRequest)
+			return
+		}
+		key := r.URL.Query().Get("key")
+
+		if key != "" {
+			// Get single preference.
+			val, err := a.prefsGet(r.Context(), namespace, key)
+			if err != nil {
+				if errors.Is(err, dataplane.ErrNotFound) {
+					http.Error(w, `{"error":"not found"}`, http.StatusNotFound)
+					return
+				}
+				http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+				return
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(val)
+			return
+		}
+
+		// List all preferences in namespace.
+		result, err := a.prefsListByNamespace(r.Context(), namespace)
+		if err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
+
+	case http.MethodPut:
+		var body struct {
+			Namespace string          `json:"namespace"`
+			Key       string          `json:"key"`
+			Value     json.RawMessage `json:"value"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, `{"error":"invalid JSON"}`, http.StatusBadRequest)
+			return
+		}
+		if body.Namespace == "" || body.Key == "" {
+			http.Error(w, `{"error":"namespace and key are required"}`, http.StatusBadRequest)
+			return
+		}
+		if err := a.prefsSet(r.Context(), body.Namespace, body.Key, body.Value); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	case http.MethodDelete:
+		namespace := r.URL.Query().Get("namespace")
+		key := r.URL.Query().Get("key")
+		if namespace == "" || key == "" {
+			http.Error(w, `{"error":"namespace and key are required"}`, http.StatusBadRequest)
+			return
+		}
+		if err := a.prefsDelete(r.Context(), namespace, key); err != nil {
+			http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, `{"error":"method not allowed"}`, http.StatusMethodNotAllowed)
+	}
+}
+
+// prefsGet returns a single preference, using the DataPlane store if
+// available or the legacy in-memory fallback.
+func (a *API) prefsGet(ctx context.Context, namespace, key string) (json.RawMessage, error) {
+	if a.dp != nil && a.dp.Preferences != nil {
+		return a.dp.Preferences.Get(ctx, namespace, key)
+	}
+	a.prefsMu.RLock()
+	defer a.prefsMu.RUnlock()
+	if a.prefs == nil {
+		return nil, dataplane.ErrNotFound
+	}
+	ns, ok := a.prefs[namespace]
+	if !ok {
+		return nil, dataplane.ErrNotFound
+	}
+	v, ok := ns[key]
+	if !ok {
+		return nil, dataplane.ErrNotFound
+	}
+	return v, nil
+}
+
+// prefsSet upserts a preference.
+func (a *API) prefsSet(ctx context.Context, namespace, key string, value json.RawMessage) error {
+	if a.dp != nil && a.dp.Preferences != nil {
+		return a.dp.Preferences.Set(ctx, namespace, key, value)
+	}
+	a.prefsMu.Lock()
+	defer a.prefsMu.Unlock()
+	if a.prefs == nil {
+		a.prefs = make(map[string]map[string]json.RawMessage)
+	}
+	ns, ok := a.prefs[namespace]
+	if !ok {
+		ns = make(map[string]json.RawMessage)
+		a.prefs[namespace] = ns
+	}
+	ns[key] = value
+	return nil
+}
+
+// prefsDelete removes a preference.
+func (a *API) prefsDelete(ctx context.Context, namespace, key string) error {
+	if a.dp != nil && a.dp.Preferences != nil {
+		return a.dp.Preferences.Delete(ctx, namespace, key)
+	}
+	a.prefsMu.Lock()
+	defer a.prefsMu.Unlock()
+	if a.prefs != nil {
+		if ns, ok := a.prefs[namespace]; ok {
+			delete(ns, key)
+		}
+	}
+	return nil
+}
+
+// prefsListByNamespace returns all preferences for a namespace.
+func (a *API) prefsListByNamespace(ctx context.Context, namespace string) (map[string]json.RawMessage, error) {
+	if a.dp != nil && a.dp.Preferences != nil {
+		return a.dp.Preferences.ListByNamespace(ctx, namespace)
+	}
+	a.prefsMu.RLock()
+	defer a.prefsMu.RUnlock()
+	result := make(map[string]json.RawMessage)
+	if a.prefs != nil {
+		if ns, ok := a.prefs[namespace]; ok {
+			for k, v := range ns {
+				result[k] = v
+			}
+		}
+	}
+	return result, nil
 }

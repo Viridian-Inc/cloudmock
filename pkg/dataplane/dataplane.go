@@ -13,6 +13,7 @@ type DataPlane struct {
 	MetricW  MetricWriter
 	SLO      SLOStore
 	Config   ConfigStore
-	Topology TopologyStore
-	Mode     string
+	Topology    TopologyStore
+	Preferences PreferenceStore
+	Mode        string
 }

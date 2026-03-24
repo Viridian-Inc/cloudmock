@@ -210,4 +210,32 @@ export async function updateUserRole(id: string, role: string) {
   });
 }
 
+// --- Preferences ---
+
+export async function getPreferences(namespace: string): Promise<Record<string, any>> {
+  const res = await fetch(ADMIN_BASE + `/api/preferences?namespace=${encodeURIComponent(namespace)}`);
+  if (!res.ok) return {};
+  return res.json();
+}
+
+export async function getPreference(namespace: string, key: string): Promise<any> {
+  const res = await fetch(ADMIN_BASE + `/api/preferences?namespace=${encodeURIComponent(namespace)}&key=${encodeURIComponent(key)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export async function setPreference(namespace: string, key: string, value: any): Promise<void> {
+  await fetch(ADMIN_BASE + '/api/preferences', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ namespace, key, value }),
+  });
+}
+
+export async function deletePreference(namespace: string, key: string): Promise<void> {
+  await fetch(ADMIN_BASE + `/api/preferences?namespace=${encodeURIComponent(namespace)}&key=${encodeURIComponent(key)}`, {
+    method: 'DELETE',
+  });
+}
+
 export { ADMIN_BASE, GW_BASE };

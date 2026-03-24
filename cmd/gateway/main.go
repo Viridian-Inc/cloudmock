@@ -289,9 +289,10 @@ func main() {
 			Metrics:  memory.NewMetricStore(requestStats, requestLog),
 			MetricW:  memory.NewMetricStore(requestStats, requestLog),
 			SLO:      memory.NewSLOStore(sloEngine),
-			Config:   memory.NewConfigStore(cfg),
-			Topology: memory.NewTopologyStore(),
-			Mode:     "local",
+			Config:      memory.NewConfigStore(cfg),
+			Topology:    memory.NewTopologyStore(),
+			Preferences: memory.NewPreferenceStore(),
+			Mode:        "local",
 		}
 	case "production":
 		var err error
@@ -336,9 +337,10 @@ func main() {
 			Metrics:  promImpl.NewMetricReader(promClient),
 			MetricW:  promImpl.NewMetricWriter(),
 			SLO:      pgImpl.NewSLOStore(pgPool),
-			Config:   pgImpl.NewConfigStore(pgPool),
-			Topology: pgImpl.NewTopologyStore(pgPool),
-			Mode:     "production",
+			Config:      pgImpl.NewConfigStore(pgPool),
+			Topology:    pgImpl.NewTopologyStore(pgPool),
+			Preferences: pgImpl.NewPreferenceStore(pgPool),
+			Mode:        "production",
 		}
 	default:
 		log.Fatalf("unknown dataplane mode: %q", mode)

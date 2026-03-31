@@ -599,7 +599,173 @@ func TestCW_DescribeAlarmsForMetric(t *testing.T) {
 	}
 }
 
-// ---- Test 8: PutMetricData — missing namespace returns error ----
+// ---- Test 8: SetAlarmState on non-existent alarm returns ResourceNotFound ----
+
+func TestCW_SetAlarmState_ResourceNotFound(t *testing.T) {
+	handler := newCWGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cwReq(t, "SetAlarmState", url.Values{
+		"AlarmName":   {"no-such-alarm"},
+		"StateValue":  {"OK"},
+		"StateReason": {"test"},
+	}))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("SetAlarmState nonexistent: expected 404, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Test 9: TagResource on non-existent alarm returns ResourceNotFound ----
+
+func TestCW_TagResource_ResourceNotFound(t *testing.T) {
+	handler := newCWGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cwReq(t, "TagResource", url.Values{
+		"ResourceARN":         {"arn:aws:cloudwatch:us-east-1:000000000000:alarm:nonexistent"},
+		"Tags.member.1.Key":   {"k"},
+		"Tags.member.1.Value": {"v"},
+	}))
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("TagResource nonexistent: expected 404, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Test 10: PutMetricAlarm overwrites existing alarm ----
+
+func TestCW_PutMetricAlarm_Overwrite(t *testing.T) {
+	handler := newCWGateway(t)
+
+	// Create alarm
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, cwReq(t, "PutMetricAlarm", url.Values{
+		"AlarmName":          {"overwrite-alarm"},
+		"Namespace":          {"AWS/EC2"},
+		"MetricName":         {"CPUUtilization"},
+		"ComparisonOperator": {"GreaterThanThreshold"},
+		"Threshold":          {"80"},
+		"EvaluationPeriods":  {"2"},
+		"Period":             {"300"},
+		"Statistic":          {"Average"},
+	}))
+	if w1.Code != http.StatusOK {
+		t.Fatalf("PutMetricAlarm first: expected 200, got %d", w1.Code)
+	}
+
+	// Overwrite with different threshold
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, cwReq(t, "PutMetricAlarm", url.Values{
+		"AlarmName":          {"overwrite-alarm"},
+		"Namespace":          {"AWS/EC2"},
+		"MetricName":         {"CPUUtilization"},
+		"ComparisonOperator": {"GreaterThanThreshold"},
+		"Threshold":          {"95"},
+		"EvaluationPeriods":  {"1"},
+		"Period":             {"60"},
+		"Statistic":          {"Maximum"},
+	}))
+	if w2.Code != http.StatusOK {
+		t.Fatalf("PutMetricAlarm overwrite: expected 200, got %d", w2.Code)
+	}
+
+	// Verify updated via DescribeAlarms
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, cwReq(t, "DescribeAlarms", url.Values{
+		"AlarmNames.member.1": {"overwrite-alarm"},
+	}))
+	body := wd.Body.String()
+	if !strings.Contains(body, "95") {
+		t.Errorf("PutMetricAlarm overwrite: expected threshold=95 in response\nbody: %s", body)
+	}
+	if !strings.Contains(body, "Maximum") {
+		t.Errorf("PutMetricAlarm overwrite: expected Statistic=Maximum\nbody: %s", body)
+	}
+}
+
+// ---- Test 11: DeleteAlarms on multiple alarms ----
+
+func TestCW_DeleteAlarms_Multiple(t *testing.T) {
+	handler := newCWGateway(t)
+
+	// Create three alarms
+	for _, name := range []string{"del-a", "del-b", "del-c"} {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, cwReq(t, "PutMetricAlarm", url.Values{
+			"AlarmName":          {name},
+			"Namespace":          {"Test/NS"},
+			"MetricName":         {"M"},
+			"ComparisonOperator": {"GreaterThanThreshold"},
+			"Threshold":          {"10"},
+			"EvaluationPeriods":  {"1"},
+			"Period":             {"60"},
+			"Statistic":          {"Sum"},
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("PutMetricAlarm %s: %d", name, w.Code)
+		}
+	}
+
+	// Delete two at once
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, cwReq(t, "DeleteAlarms", url.Values{
+		"AlarmNames.member.1": {"del-a"},
+		"AlarmNames.member.2": {"del-b"},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteAlarms: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+
+	// Verify only del-c remains
+	wl := httptest.NewRecorder()
+	handler.ServeHTTP(wl, cwReq(t, "DescribeAlarms", nil))
+	body := wl.Body.String()
+	if strings.Contains(body, "del-a") {
+		t.Errorf("DeleteAlarms: del-a should be gone\nbody: %s", body)
+	}
+	if strings.Contains(body, "del-b") {
+		t.Errorf("DeleteAlarms: del-b should be gone\nbody: %s", body)
+	}
+	if !strings.Contains(body, "del-c") {
+		t.Errorf("DeleteAlarms: del-c should remain\nbody: %s", body)
+	}
+}
+
+// ---- Test 12: PutMetricData with dimensions ----
+
+func TestCW_PutMetricData_WithDimensions(t *testing.T) {
+	handler := newCWGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cwReq(t, "PutMetricData", url.Values{
+		"Namespace":                                    {"Custom/DimTest"},
+		"MetricData.member.1.MetricName":               {"Latency"},
+		"MetricData.member.1.Value":                    {"150"},
+		"MetricData.member.1.Unit":                     {"Milliseconds"},
+		"MetricData.member.1.Dimensions.member.1.Name": {"Service"},
+		"MetricData.member.1.Dimensions.member.1.Value": {"ApiGateway"},
+		"MetricData.member.1.Dimensions.member.2.Name": {"Region"},
+		"MetricData.member.1.Dimensions.member.2.Value": {"us-east-1"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("PutMetricData with dims: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// ListMetrics and verify dimensions present
+	wl := httptest.NewRecorder()
+	handler.ServeHTTP(wl, cwReq(t, "ListMetrics", url.Values{"Namespace": {"Custom/DimTest"}}))
+	if wl.Code != http.StatusOK {
+		t.Fatalf("ListMetrics: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
+	}
+	body := wl.Body.String()
+	if !strings.Contains(body, "Service") {
+		t.Errorf("ListMetrics with dims: expected dimension Service\nbody: %s", body)
+	}
+	if !strings.Contains(body, "ApiGateway") {
+		t.Errorf("ListMetrics with dims: expected dimension value ApiGateway\nbody: %s", body)
+	}
+}
+
+// ---- Test 13: PutMetricData — missing namespace returns InvalidParameterValue ----
 
 func TestCW_PutMetricData_MissingNamespace(t *testing.T) {
 	handler := newCWGateway(t)

@@ -463,7 +463,181 @@ func TestSSM_DescribeParameters(t *testing.T) {
 	}
 }
 
-// ---- Test 8: DeleteParameters batch ----
+// ---- Test 8: StringList type ----
+
+func TestSSM_StringListType(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	// PutParameter with StringList type
+	wp := httptest.NewRecorder()
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
+		"Name":  "/app/config/allowed-regions",
+		"Value": "us-east-1,us-west-2,eu-west-1",
+		"Type":  "StringList",
+	}))
+	if wp.Code != http.StatusOK {
+		t.Fatalf("PutParameter StringList: expected 200, got %d\nbody: %s", wp.Code, wp.Body.String())
+	}
+
+	mp := decodeJSON(t, wp.Body.String())
+	if mp["Version"].(float64) != 1 {
+		t.Errorf("PutParameter StringList: expected Version=1, got %v", mp["Version"])
+	}
+
+	// GetParameter
+	wg := httptest.NewRecorder()
+	handler.ServeHTTP(wg, ssmReq(t, "GetParameter", map[string]any{
+		"Name": "/app/config/allowed-regions",
+	}))
+	if wg.Code != http.StatusOK {
+		t.Fatalf("GetParameter StringList: expected 200, got %d\nbody: %s", wg.Code, wg.Body.String())
+	}
+
+	mg := decodeJSON(t, wg.Body.String())
+	param := mg["Parameter"].(map[string]any)
+	if param["Type"].(string) != "StringList" {
+		t.Errorf("GetParameter StringList: expected Type=StringList, got %q", param["Type"])
+	}
+	if param["Value"].(string) != "us-east-1,us-west-2,eu-west-1" {
+		t.Errorf("GetParameter StringList: expected Value=%q, got %q",
+			"us-east-1,us-west-2,eu-west-1", param["Value"])
+	}
+}
+
+// ---- Test 9: GetParameter ParameterNotFound error code ----
+
+func TestSSM_GetParameter_ParameterNotFound(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ssmReq(t, "GetParameter", map[string]any{
+		"Name": "/nonexistent/param",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetParameter nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ParameterNotFound" {
+		t.Errorf("GetParameter nonexistent: expected __type=ParameterNotFound, got %q", errType)
+	}
+}
+
+// ---- Test 10: DeleteParameter ParameterNotFound error code ----
+
+func TestSSM_DeleteParameter_ParameterNotFound(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ssmReq(t, "DeleteParameter", map[string]any{
+		"Name": "/nonexistent/param",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteParameter nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ParameterNotFound" {
+		t.Errorf("DeleteParameter nonexistent: expected __type=ParameterNotFound, got %q", errType)
+	}
+}
+
+// ---- Test 11: PutParameter ParameterAlreadyExists error code ----
+
+func TestSSM_PutParameter_ParameterAlreadyExists(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	// Create first
+	wp := httptest.NewRecorder()
+	handler.ServeHTTP(wp, ssmReq(t, "PutParameter", map[string]any{
+		"Name":  "/exists/param",
+		"Value": "v1",
+		"Type":  "String",
+	}))
+	if wp.Code != http.StatusOK {
+		t.Fatalf("PutParameter first: %d %s", wp.Code, wp.Body.String())
+	}
+
+	// Try again without overwrite
+	wp2 := httptest.NewRecorder()
+	handler.ServeHTTP(wp2, ssmReq(t, "PutParameter", map[string]any{
+		"Name":      "/exists/param",
+		"Value":     "v2",
+		"Type":      "String",
+		"Overwrite": false,
+	}))
+	if wp2.Code != http.StatusBadRequest {
+		t.Fatalf("PutParameter duplicate: expected 400, got %d\nbody: %s", wp2.Code, wp2.Body.String())
+	}
+	errBody := decodeJSON(t, wp2.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ParameterAlreadyExists" {
+		t.Errorf("PutParameter duplicate: expected __type=ParameterAlreadyExists, got %q", errType)
+	}
+}
+
+// ---- Test 12: GetParametersByPath empty result ----
+
+func TestSSM_GetParametersByPath_Empty(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ssmReq(t, "GetParametersByPath", map[string]any{
+		"Path":      "/empty/path",
+		"Recursive": true,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetParametersByPath empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	params, _ := m["Parameters"].([]any)
+	if len(params) != 0 {
+		t.Errorf("GetParametersByPath empty: expected 0 params, got %d", len(params))
+	}
+}
+
+// ---- Test 13: DescribeParameters returns all parameters ----
+
+func TestSSM_DescribeParameters_Multiple(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	// Create several parameters
+	names := []string{"/desc/param-a", "/desc/param-b", "/desc/param-c"}
+	for _, name := range names {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]any{
+			"Name":  name,
+			"Value": "value",
+			"Type":  "String",
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("PutParameter %s: %d %s", name, w.Code, w.Body.String())
+		}
+	}
+
+	// DescribeParameters
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ssmReq(t, "DescribeParameters", nil))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeParameters: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+
+	md := decodeJSON(t, wd.Body.String())
+	paramList, _ := md["Parameters"].([]any)
+	if len(paramList) < 3 {
+		t.Errorf("DescribeParameters: expected at least 3 parameters, got %d", len(paramList))
+	}
+
+	// Verify no values are exposed
+	for _, item := range paramList {
+		p := item.(map[string]any)
+		if _, hasValue := p["Value"]; hasValue {
+			t.Errorf("DescribeParameters: should not expose Value for %s", p["Name"])
+		}
+	}
+}
+
+// ---- Test 14: DeleteParameters batch ----
 
 func TestSSM_DeleteParameters(t *testing.T) {
 	handler := newSSMGateway(t)

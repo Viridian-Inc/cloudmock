@@ -195,6 +195,45 @@ type CostConfig struct {
 	Pricing PricingConfig `yaml:"pricing" json:"pricing"`
 }
 
+// SaaSConfig holds hosted SaaS configuration.
+type SaaSConfig struct {
+	Enabled      bool               `yaml:"enabled"`
+	Clerk        ClerkConfig        `yaml:"clerk"`
+	Stripe       StripeConfig       `yaml:"stripe"`
+	Provisioning ProvisioningConfig `yaml:"provisioning"`
+	Cloudflare   CloudflareConfig   `yaml:"cloudflare"`
+}
+
+// ClerkConfig holds Clerk authentication configuration.
+type ClerkConfig struct {
+	SecretKey     string `yaml:"secret_key"`
+	WebhookSecret string `yaml:"webhook_secret"`
+}
+
+// StripeConfig holds Stripe billing configuration.
+type StripeConfig struct {
+	SecretKey     string `yaml:"secret_key"`
+	WebhookSecret string `yaml:"webhook_secret"`
+	ProPriceID    string `yaml:"pro_price_id"`
+	TeamPriceID   string `yaml:"team_price_id"`
+}
+
+// ProvisioningConfig holds Fly Machines provisioning configuration.
+type ProvisioningConfig struct {
+	FlyAPIToken        string `yaml:"fly_api_token"`
+	FlyOrg             string `yaml:"fly_org"`
+	FlyRegion          string `yaml:"fly_region"`
+	Image              string `yaml:"image"`
+	IdleTimeoutMinutes int    `yaml:"idle_timeout_minutes"`
+	DataRetentionDays  int    `yaml:"data_retention_days"`
+}
+
+// CloudflareConfig holds Cloudflare DNS configuration.
+type CloudflareConfig struct {
+	APIToken string `yaml:"api_token"`
+	ZoneID   string `yaml:"zone_id"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -214,6 +253,7 @@ type Config struct {
 	Cost        CostConfig               `yaml:"cost" json:"cost"`
 	Incidents   IncidentConfig           `yaml:"incidents" json:"incidents"`
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
+	SaaS        SaaSConfig               `yaml:"saas"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
 
@@ -346,6 +386,44 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLOUDMOCK_OTEL_ENDPOINT"); v != "" {
 		c.DataPlane.OTel.CollectorEndpoint = v
+	}
+	if v := os.Getenv("CLOUDMOCK_SAAS_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			c.SaaS.Enabled = b
+		}
+	}
+	if v := os.Getenv("CLERK_SECRET_KEY"); v != "" {
+		c.SaaS.Clerk.SecretKey = v
+	}
+	if v := os.Getenv("CLERK_WEBHOOK_SECRET"); v != "" {
+		c.SaaS.Clerk.WebhookSecret = v
+	}
+	if v := os.Getenv("STRIPE_SECRET_KEY"); v != "" {
+		c.SaaS.Stripe.SecretKey = v
+	}
+	if v := os.Getenv("STRIPE_WEBHOOK_SECRET"); v != "" {
+		c.SaaS.Stripe.WebhookSecret = v
+	}
+	if v := os.Getenv("STRIPE_PRO_PRICE_ID"); v != "" {
+		c.SaaS.Stripe.ProPriceID = v
+	}
+	if v := os.Getenv("STRIPE_TEAM_PRICE_ID"); v != "" {
+		c.SaaS.Stripe.TeamPriceID = v
+	}
+	if v := os.Getenv("FLY_API_TOKEN"); v != "" {
+		c.SaaS.Provisioning.FlyAPIToken = v
+	}
+	if v := os.Getenv("FLY_ORG"); v != "" {
+		c.SaaS.Provisioning.FlyOrg = v
+	}
+	if v := os.Getenv("FLY_REGION"); v != "" {
+		c.SaaS.Provisioning.FlyRegion = v
+	}
+	if v := os.Getenv("CLOUDFLARE_API_TOKEN"); v != "" {
+		c.SaaS.Cloudflare.APIToken = v
+	}
+	if v := os.Getenv("CLOUDFLARE_ZONE_ID"); v != "" {
+		c.SaaS.Cloudflare.ZoneID = v
 	}
 	if v := os.Getenv("CLOUDMOCK_SERVICES"); v != "" {
 		// Comma-separated list of services to enable

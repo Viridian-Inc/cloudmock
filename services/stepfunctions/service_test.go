@@ -564,7 +564,159 @@ func TestSFN_TaggingRoundTrip(t *testing.T) {
 	}
 }
 
-// ---- Error cases ----
+// ---- Error: StateMachineDoesNotExist for DescribeStateMachine ----
+
+func TestSFN_DescribeStateMachine_StateMachineDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "DescribeStateMachine", map[string]string{
+		"stateMachineArn": "arn:aws:states:us-east-1:000000000000:stateMachine:nonexistent",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("DescribeStateMachine nonexistent: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "StateMachineDoesNotExist" {
+		t.Errorf("DescribeStateMachine nonexistent: expected __type=StateMachineDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Error: StateMachineDoesNotExist for DeleteStateMachine ----
+
+func TestSFN_DeleteStateMachine_StateMachineDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "DeleteStateMachine", map[string]string{
+		"stateMachineArn": "arn:aws:states:us-east-1:000000000000:stateMachine:nonexistent",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("DeleteStateMachine nonexistent: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "StateMachineDoesNotExist" {
+		t.Errorf("DeleteStateMachine nonexistent: expected __type=StateMachineDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Error: StateMachineDoesNotExist for StartExecution ----
+
+func TestSFN_StartExecution_StateMachineDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "StartExecution", map[string]string{
+		"stateMachineArn": "arn:aws:states:us-east-1:000000000000:stateMachine:nonexistent",
+		"name":            "exec-1",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("StartExecution nonexistent SM: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "StateMachineDoesNotExist" {
+		t.Errorf("StartExecution nonexistent SM: expected __type=StateMachineDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Error: ExecutionDoesNotExist for DescribeExecution ----
+
+func TestSFN_DescribeExecution_ExecutionDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "DescribeExecution", map[string]string{
+		"executionArn": "arn:aws:states:us-east-1:000000000000:execution:sm:nonexistent",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("DescribeExecution nonexistent: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ExecutionDoesNotExist" {
+		t.Errorf("DescribeExecution nonexistent: expected __type=ExecutionDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Error: ExecutionDoesNotExist for StopExecution ----
+
+func TestSFN_StopExecution_ExecutionDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "StopExecution", map[string]string{
+		"executionArn": "arn:aws:states:us-east-1:000000000000:execution:sm:nonexistent",
+		"cause":        "test",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("StopExecution nonexistent: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ExecutionDoesNotExist" {
+		t.Errorf("StopExecution nonexistent: expected __type=ExecutionDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Error: ExecutionDoesNotExist for GetExecutionHistory ----
+
+func TestSFN_GetExecutionHistory_ExecutionDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "GetExecutionHistory", map[string]string{
+		"executionArn": "arn:aws:states:us-east-1:000000000000:execution:sm:nonexistent",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("GetExecutionHistory nonexistent: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ExecutionDoesNotExist" {
+		t.Errorf("GetExecutionHistory nonexistent: expected __type=ExecutionDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Positive: StateMachineDoesNotExist for ListExecutions ----
+
+func TestSFN_ListExecutions_StateMachineDoesNotExist(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "ListExecutions", map[string]string{
+		"stateMachineArn": "arn:aws:states:us-east-1:000000000000:stateMachine:nonexistent",
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("ListExecutions nonexistent SM: expected error, got 200")
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "StateMachineDoesNotExist" {
+		t.Errorf("ListExecutions nonexistent SM: expected __type=StateMachineDoesNotExist, got %q", errType)
+	}
+}
+
+// ---- Positive: ListStateMachines empty ----
+
+func TestSFN_ListStateMachines_Empty(t *testing.T) {
+	handler := newSFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, sfnReq(t, "ListStateMachines", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListStateMachines empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	machines, _ := m["stateMachines"].([]any)
+	if len(machines) != 0 {
+		t.Errorf("ListStateMachines empty: expected 0, got %d", len(machines))
+	}
+}
+
+// ---- Error cases (existing) ----
 
 func TestSFN_CreateStateMachine_AlreadyExists(t *testing.T) {
 	handler := newSFNGateway(t)

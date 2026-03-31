@@ -597,6 +597,205 @@ func TestKinesis_CreateStream_Duplicate(t *testing.T) {
 	}
 }
 
+// ---- Error: ResourceNotFoundException for PutRecord to nonexistent stream ----
+
+func TestKinesis_PutRecord_ResourceNotFoundException(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("data"))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "PutRecord", map[string]string{
+		"StreamName":   "nonexistent-stream",
+		"Data":         payload,
+		"PartitionKey": "pk-1",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutRecord nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutRecord nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: PutRecords to nonexistent stream returns failed records ----
+
+func TestKinesis_PutRecords_NonexistentStream(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	records := []map[string]string{
+		{"Data": base64.StdEncoding.EncodeToString([]byte("data")), "PartitionKey": "pk-1"},
+	}
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "PutRecords", map[string]any{
+		"StreamName": "nonexistent-stream",
+		"Records":    records,
+	}))
+	// PutRecords returns 200 even on failures; individual records have error codes
+	if w.Code != http.StatusOK {
+		t.Fatalf("PutRecords nonexistent: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	failedCount, _ := m["FailedRecordCount"].(float64)
+	if failedCount != 1 {
+		t.Errorf("PutRecords nonexistent: expected FailedRecordCount=1, got %v", failedCount)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DescribeStream on nonexistent stream ----
+
+func TestKinesis_DescribeStream_ResourceNotFoundException(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "DescribeStream", map[string]string{
+		"StreamName": "nonexistent-stream",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeStream nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DescribeStream nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for GetShardIterator on nonexistent stream ----
+
+func TestKinesis_GetShardIterator_ResourceNotFoundException(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "GetShardIterator", map[string]string{
+		"StreamName":        "nonexistent-stream",
+		"ShardId":           "shardId-000000000000",
+		"ShardIteratorType": "TRIM_HORIZON",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetShardIterator nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("GetShardIterator nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DeleteStream on nonexistent stream ----
+
+func TestKinesis_DeleteStream_ResourceNotFoundException(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "DeleteStream", map[string]string{
+		"StreamName": "nonexistent-stream",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteStream nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DeleteStream nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Positive: IncreaseStreamRetentionPeriod + DecreaseStreamRetentionPeriod ----
+
+func TestKinesis_RetentionPeriod(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	// Create stream
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
+		"StreamName": "retention-stream",
+		"ShardCount": 1,
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateStream: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// IncreaseStreamRetentionPeriod to 48 hours
+	wi := httptest.NewRecorder()
+	handler.ServeHTTP(wi, kinesisReq(t, "IncreaseStreamRetentionPeriod", map[string]any{
+		"StreamName":           "retention-stream",
+		"RetentionPeriodHours": 48,
+	}))
+	if wi.Code != http.StatusOK {
+		t.Fatalf("IncreaseStreamRetentionPeriod: expected 200, got %d\nbody: %s", wi.Code, wi.Body.String())
+	}
+
+	// DecreaseStreamRetentionPeriod to 24 hours
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, kinesisReq(t, "DecreaseStreamRetentionPeriod", map[string]any{
+		"StreamName":           "retention-stream",
+		"RetentionPeriodHours": 24,
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DecreaseStreamRetentionPeriod: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+}
+
+// ---- Error: InvalidArgumentException for bad retention period ----
+
+func TestKinesis_RetentionPeriod_InvalidArgument(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	// Create stream
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kinesisReq(t, "CreateStream", map[string]any{
+		"StreamName": "bad-retention-stream",
+		"ShardCount": 1,
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateStream: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Try to decrease below 24 hours
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "DecreaseStreamRetentionPeriod", map[string]any{
+		"StreamName":           "bad-retention-stream",
+		"RetentionPeriodHours": 12,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DecreaseStreamRetentionPeriod invalid: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "InvalidArgumentException" {
+		t.Errorf("DecreaseStreamRetentionPeriod invalid: expected __type=InvalidArgumentException, got %q", errType)
+	}
+
+	// Try to increase to same as current (24 = 24)
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, kinesisReq(t, "IncreaseStreamRetentionPeriod", map[string]any{
+		"StreamName":           "bad-retention-stream",
+		"RetentionPeriodHours": 24,
+	}))
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("IncreaseStreamRetentionPeriod same: expected 400, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+}
+
+// ---- Positive: ListStreams empty ----
+
+func TestKinesis_ListStreams_Empty(t *testing.T) {
+	handler := newKinesisGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kinesisReq(t, "ListStreams", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListStreams empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	streamNames, _ := m["StreamNames"].([]any)
+	if len(streamNames) != 0 {
+		t.Errorf("ListStreams empty: expected 0 streams, got %d", len(streamNames))
+	}
+}
+
 // ---- Additional: Unknown action ----
 
 func TestKinesis_UnknownAction(t *testing.T) {

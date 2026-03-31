@@ -1003,6 +1003,15 @@ func main() {
 		}
 	}()
 
+	// Startup banner — printed after all servers are launched.
+	fmt.Printf("\nCloudMock v1.0.0\n")
+	fmt.Printf("  Gateway:    http://localhost:%d\n", cfg.Gateway.Port)
+	fmt.Printf("  Devtools:   http://localhost:%d  <-- open in browser\n", cfg.Dashboard.Port)
+	fmt.Printf("  Admin API:  http://localhost:%d\n", cfg.Admin.Port)
+	fmt.Printf("  Services:   %d active (%s profile)\n", len(registry.List()), cfg.Profile)
+	fmt.Println()
+	fmt.Printf("Ready. Point your AWS SDK at http://localhost:%d\n\n", cfg.Gateway.Port)
+
 	// Wait for termination signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)

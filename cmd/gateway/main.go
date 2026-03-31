@@ -203,8 +203,8 @@ func main() {
 
 	// Determine which Tier 1 services to eagerly initialize based on profile.
 	// "minimal"  — only the 8 core services used by almost every app.
-	// "standard" — all Tier 1 services.
-	// "full"     — all Tier 1 services (Tier 2 stubs are lazy regardless).
+	// "standard" — all 97 Tier 1 services loaded eagerly.
+	// "full"     — all 97 Tier 1 services loaded eagerly.
 	profile := cfg.Profile
 
 	// minimalSet is the set of Tier 1 service names always loaded eagerly.
@@ -700,6 +700,8 @@ func main() {
 
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
+	// Also set the direct request log/stats for topology edge enrichment
+	adminAPI.SetRequestLog(requestLog, requestStats)
 	// Audit logger
 	var auditLog audit.Logger
 	switch mode {

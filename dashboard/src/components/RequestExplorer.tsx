@@ -37,17 +37,16 @@ export function RequestExplorer({
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    api('/api/requests?limit=100&level=app').then(setRequests).catch(() => {});
+    api('/api/requests?limit=100&level=all').then(setRequests).catch(() => {});
     api('/api/services').then((s: any[]) => setServices(s.map((x: any) => x.name).sort())).catch(() => {});
     getViews().then(setViews).catch(() => {});
   }, []);
 
-  // SSE live tail - filter infra events
+  // SSE live tail
   useEffect(() => {
     if (sse.events.length === 0) return;
     const latest = sse.events[0];
     if (latest?.type === 'request' && latest.data) {
-      if (latest.data.level === 'infra') return;
       if (paused) {
         bufferRef.current = [latest.data, ...bufferRef.current].slice(0, 200);
       } else {
@@ -98,6 +97,7 @@ export function RequestExplorer({
 
   const filtered = useMemo(() => {
     return requests.filter((r: any) => {
+      if (!filters.showInfra && r.level === 'infra') return false;
       if (filters.service && r.service !== filters.service) return false;
       if (filters.method && r.method !== filters.method) return false;
       if (filters.path && !(r.path || '').startsWith(filters.path)) return false;
@@ -210,6 +210,12 @@ export function RequestExplorer({
               {showAdvanced ? 'Hide advanced' : 'Advanced'}
             </button>
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', padding: '4px 0' }}>
+            <label style={{ ...S.filterLabel, display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', width: 'auto' }}>
+              <input type="checkbox" checked={filters.showInfra !== false} onChange={(e) => setFilter('showInfra', (e.target as HTMLInputElement).checked)} />
+              Show infrastructure traffic
+            </label>
+          </div>
 
           {/* Advanced filters */}
           {showAdvanced && (
@@ -312,6 +318,7 @@ export function RequestExplorer({
 function RequestRow({ req, selected, onClick }: { req: any; selected: boolean; onClick: () => void }) {
   const status = req.status || req.status_code;
   const isError = status >= 400;
+  const isInfra = req.level === 'infra';
   const methodColor = METHOD_COLORS[req.method] || '#6B7280';
 
   return (
@@ -321,10 +328,12 @@ function RequestRow({ req, selected, onClick }: { req: any; selected: boolean; o
         ...S.row,
         background: selected ? 'var(--bg-active)' : isError ? 'var(--error-50)' : 'transparent',
         borderLeft: selected ? '3px solid var(--brand-teal)' : '3px solid transparent',
+        opacity: isInfra ? 0.6 : 1,
       }}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2 }}>
         <span style={{ ...S.methodBadge, background: `${methodColor}18`, color: methodColor }}>{req.method}</span>
+        {isInfra && <span style={S.infraBadge}>infra</span>}
         <span style={S.pathText}>{req.path || req.action}</span>
         <span style={{ marginLeft: 'auto', fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--text-tertiary)' }}>
           {fmtTime(req.timestamp)}
@@ -468,5 +477,10 @@ const S = {
     fontSize: 8, fontWeight: 700, color: 'var(--bg-primary)', background: 'var(--brand-teal)',
     width: 14, height: 14, borderRadius: '50%', display: 'flex',
     alignItems: 'center', justifyContent: 'center',
+  },
+  infraBadge: {
+    fontSize: 8, fontWeight: 600, color: 'var(--text-tertiary)', background: 'var(--bg-tertiary)',
+    padding: '1px 4px', borderRadius: 3, border: '1px solid var(--border-subtle)',
+    letterSpacing: 0.3, textTransform: 'uppercase' as const, flexShrink: 0,
   },
 };

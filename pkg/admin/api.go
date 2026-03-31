@@ -110,6 +110,15 @@ type API struct {
 	prefs            map[string]map[string]json.RawMessage
 }
 
+// SetRequestLog sets the direct in-memory request log and stats on the API.
+// This is needed for topology edge enrichment even when DataPlane is used,
+// because the DataPlane stores requests but the topology enrichment reads
+// from the direct RequestLog.
+func (a *API) SetRequestLog(log *gateway.RequestLog, stats *gateway.RequestStats) {
+	a.log = log
+	a.stats = stats
+}
+
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
 func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog, stats *gateway.RequestStats) *API {
 	a := &API{

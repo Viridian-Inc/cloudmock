@@ -305,7 +305,6 @@ export function ConsolePage({ sse, showToast }: ConsolePageProps) {
     if (!sse?.events?.length) return;
     const latest = sse.events[0];
     if (!latest?.data?.service) return;
-    if (latest.data.level === 'infra') return;
 
     const svcName = latest.data.service;
     setPulsingNodes(prev => {

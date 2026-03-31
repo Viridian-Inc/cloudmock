@@ -17,19 +17,20 @@ export interface RequestFilters {
   max_latency_ms?: number;
   from?: string;
   to?: string;
+  showInfra?: boolean;
 }
 
 export function useFilters(initial: Partial<RequestFilters> = {}) {
-  const [filters, setFilters] = useState<RequestFilters>({ level: 'app', limit: 100, ...initial });
+  const [filters, setFilters] = useState<RequestFilters>({ level: 'all', limit: 100, showInfra: true, ...initial });
 
   const setFilter = useCallback(<K extends keyof RequestFilters>(key: K, value: RequestFilters[K]) => {
     setFilters(prev => ({ ...prev, [key]: value }));
   }, []);
 
-  const clearFilters = useCallback(() => setFilters({ level: 'app', limit: 100 }), []);
+  const clearFilters = useCallback(() => setFilters({ level: 'all', limit: 100, showInfra: true }), []);
 
   const hasActiveFilters = Object.entries(filters).some(([k, v]) =>
-    v !== undefined && v !== '' && k !== 'level' && k !== 'limit'
+    v !== undefined && v !== '' && k !== 'level' && k !== 'limit' && k !== 'showInfra'
   );
 
   return { filters, setFilter, clearFilters, hasActiveFilters };

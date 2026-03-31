@@ -1,10 +1,11 @@
-# Stage 1: Build dashboard
+# Stage 1: Build devtools UI from neureaux-devtools
 FROM node:20-alpine AS dashboard
-WORKDIR /dashboard
-COPY dashboard/package*.json ./
-RUN npm ci
-COPY dashboard/ ./
-RUN npm run build
+RUN corepack enable && corepack prepare pnpm@latest --activate
+WORKDIR /devtools
+COPY neureaux-devtools/package.json neureaux-devtools/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+COPY neureaux-devtools/ ./
+RUN pnpm build
 
 # Stage 2: Build Go binary
 FROM golang:1.26-alpine AS builder
@@ -12,7 +13,7 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-COPY --from=dashboard /dashboard/dist/ ./pkg/dashboard/dist/
+COPY --from=dashboard /devtools/dist/ ./pkg/dashboard/dist/
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /cloudmock ./cmd/gateway
 
 # Stage 3: Final image

@@ -84,9 +84,10 @@ release: build-dashboard
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/cloudmock-darwin-arm64 ./cmd/gateway
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-windows-amd64.exe ./cmd/gateway
 
-build-dashboard:
-	cd dashboard && npm run build
-	cp -r dashboard/dist/ pkg/dashboard/dist/
+build-dashboard: ## Build devtools UI from neureaux-devtools
+	cd ../neureaux-devtools && pnpm install && pnpm build
+	rm -rf pkg/dashboard/dist
+	cp -r ../neureaux-devtools/dist pkg/dashboard/dist
 
 docker-up:
 	@echo "Starting Docker containers..."

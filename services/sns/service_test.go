@@ -10,6 +10,7 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	snssvc "github.com/neureaux/cloudmock/services/sns"
 )
@@ -417,5 +418,569 @@ func TestSNS_TagResource(t *testing.T) {
 	}))
 	if wu.Code != http.StatusOK {
 		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", wu.Code, wu.Body.String())
+	}
+}
+
+// newSNSGatewayWithIAM builds a gateway with IAM enforce mode for AccessDenied tests.
+func newSNSGatewayWithIAM(t *testing.T) (*gateway.Gateway, *iampkg.Store, *iampkg.Engine) {
+	t.Helper()
+
+	cfg := config.Default()
+	cfg.IAM.Mode = "enforce"
+
+	store := iampkg.NewStore(cfg.AccountID)
+	if err := store.InitRoot("ROOTKEY", "ROOTSECRET"); err != nil {
+		t.Fatalf("InitRoot: %v", err)
+	}
+
+	engine := iampkg.NewEngine()
+
+	reg := routing.NewRegistry()
+	reg.Register(snssvc.New(cfg.AccountID, cfg.Region))
+
+	gw := gateway.NewWithIAM(cfg, reg, store, engine)
+	return gw, store, engine
+}
+
+// snsReqWithKey builds a form-encoded POST request with a specific access key ID.
+func snsReqWithKey(t *testing.T, action string, extra url.Values, accessKeyID string) *http.Request {
+	t.Helper()
+
+	form := url.Values{}
+	form.Set("Action", action)
+	form.Set("Version", "2010-03-31")
+	for k, vs := range extra {
+		for _, v := range vs {
+			form.Add(k, v)
+		}
+	}
+
+	body := strings.NewReader(form.Encode())
+	req := httptest.NewRequest(http.MethodPost, "/", body)
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("Authorization",
+		"AWS4-HMAC-SHA256 Credential="+accessKeyID+"/20240101/us-east-1/sns/aws4_request, SignedHeaders=host, Signature=abc123")
+	return req
+}
+
+// ---- Test 9: Subscribe with filter policy (attribute-based) ----
+
+func TestSNS_SubscribeWithFilterPolicy(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "filter-topic")
+
+	// Subscribe with a filter policy passed as an Attribute.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "Subscribe", url.Values{
+		"TopicArn": {topicArn},
+		"Protocol": {"sqs"},
+		"Endpoint": {"arn:aws:sqs:us-east-1:000000000000:filtered-queue"},
+		"Attributes.entry.1.key":   {"FilterPolicy"},
+		"Attributes.entry.1.value": {`{"event":["order_created"]}`},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("Subscribe with filter policy: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Result struct {
+			SubscriptionArn string `xml:"SubscriptionArn"`
+		} `xml:"SubscribeResult"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Subscribe with filter policy: unmarshal: %v", err)
+	}
+	if resp.Result.SubscriptionArn == "" {
+		t.Error("Subscribe with filter policy: SubscriptionArn is empty")
+	}
+
+	// Subscribe to non-existent topic with filter — should fail.
+	wf := httptest.NewRecorder()
+	handler.ServeHTTP(wf, snsReq(t, "Subscribe", url.Values{
+		"TopicArn": {"arn:aws:sns:us-east-1:000000000000:no-such-topic"},
+		"Protocol": {"sqs"},
+		"Endpoint": {"arn:aws:sqs:us-east-1:000000000000:some-queue"},
+		"Attributes.entry.1.key":   {"FilterPolicy"},
+		"Attributes.entry.1.value": {`{"event":["x"]}`},
+	}))
+	if wf.Code == http.StatusOK {
+		t.Error("Subscribe with filter to non-existent topic: expected error, got 200")
+	}
+}
+
+// ---- Test 10: Publish with MessageAttributes ----
+
+func TestSNS_PublishWithMessageAttributes(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "msgattr-topic")
+
+	// Publish with MessageAttributes.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "Publish", url.Values{
+		"TopicArn":                                        {topicArn},
+		"Message":                                         {"order event"},
+		"MessageAttributes.entry.1.Name":                  {"event_type"},
+		"MessageAttributes.entry.1.Value.DataType":        {"String"},
+		"MessageAttributes.entry.1.Value.StringValue":     {"order_created"},
+		"MessageAttributes.entry.2.Name":                  {"priority"},
+		"MessageAttributes.entry.2.Value.DataType":        {"String"},
+		"MessageAttributes.entry.2.Value.StringValue":     {"high"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("Publish with MessageAttributes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Result struct {
+			MessageId string `xml:"MessageId"`
+		} `xml:"PublishResult"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Publish with MessageAttributes: unmarshal: %v", err)
+	}
+	if resp.Result.MessageId == "" {
+		t.Error("Publish with MessageAttributes: MessageId is empty")
+	}
+
+	// Publish with TargetArn instead of TopicArn — should also work.
+	wt := httptest.NewRecorder()
+	handler.ServeHTTP(wt, snsReq(t, "Publish", url.Values{
+		"TargetArn": {topicArn},
+		"Message":   {"via TargetArn"},
+	}))
+	if wt.Code != http.StatusOK {
+		t.Fatalf("Publish via TargetArn: expected 200, got %d\nbody: %s", wt.Code, wt.Body.String())
+	}
+
+	// Publish with empty message — should fail.
+	we := httptest.NewRecorder()
+	handler.ServeHTTP(we, snsReq(t, "Publish", url.Values{
+		"TopicArn": {topicArn},
+	}))
+	if we.Code == http.StatusOK {
+		t.Error("Publish with empty message: expected error, got 200")
+	}
+}
+
+// ---- Test 11: ListSubscriptionsByTopic with multiple subscriptions ----
+
+func TestSNS_ListSubscriptionsByTopicMultiple(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "multi-sub-topic")
+
+	// Create a second topic to verify filtering works.
+	otherArn := mustCreateTopic(t, handler, "other-topic")
+	mustSubscribe(t, handler, otherArn, "email", "other@example.com")
+
+	// Subscribe 3 endpoints to the main topic.
+	sub1 := mustSubscribe(t, handler, topicArn, "sqs", "arn:aws:sqs:us-east-1:000000000000:queue-1")
+	sub2 := mustSubscribe(t, handler, topicArn, "https", "https://example.com/hook")
+	sub3 := mustSubscribe(t, handler, topicArn, "email", "user@example.com")
+
+	// ListSubscriptionsByTopic.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "ListSubscriptionsByTopic", url.Values{"TopicArn": {topicArn}}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListSubscriptionsByTopic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+
+	// Verify all 3 subscriptions appear.
+	for _, arn := range []string{sub1, sub2, sub3} {
+		if !strings.Contains(body, arn) {
+			t.Errorf("ListSubscriptionsByTopic: expected %s in response\nbody: %s", arn, body)
+		}
+	}
+
+	// Verify subscription protocols are present.
+	for _, proto := range []string{"sqs", "https", "email"} {
+		if !strings.Contains(body, proto) {
+			t.Errorf("ListSubscriptionsByTopic: expected protocol %s in response\nbody: %s", proto, body)
+		}
+	}
+
+	// Verify the "other-topic" subscription does NOT appear.
+	if strings.Contains(body, "other@example.com") {
+		t.Errorf("ListSubscriptionsByTopic: should not contain subscription from other topic\nbody: %s", body)
+	}
+
+	// ListSubscriptionsByTopic for non-existent topic — should fail.
+	wf := httptest.NewRecorder()
+	handler.ServeHTTP(wf, snsReq(t, "ListSubscriptionsByTopic", url.Values{
+		"TopicArn": {"arn:aws:sns:us-east-1:000000000000:no-such-topic"},
+	}))
+	if wf.Code == http.StatusOK {
+		t.Error("ListSubscriptionsByTopic for non-existent topic: expected error, got 200")
+	}
+}
+
+// ---- Test 12: ConfirmSubscription (unimplemented — returns InvalidAction) ----
+
+func TestSNS_ConfirmSubscription(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "confirm-topic")
+
+	// ConfirmSubscription is not implemented — should return 400 InvalidAction.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "ConfirmSubscription", url.Values{
+		"TopicArn": {topicArn},
+		"Token":    {"fake-confirmation-token"},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("ConfirmSubscription: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "InvalidAction") {
+		t.Errorf("ConfirmSubscription: expected InvalidAction in response\nbody: %s", body)
+	}
+}
+
+// ---- Test 13: SetSubscriptionAttributes / GetSubscriptionAttributes (unimplemented) ----
+
+func TestSNS_SubscriptionAttributes(t *testing.T) {
+	handler := newSNSGateway(t)
+
+	// SetSubscriptionAttributes is not implemented — should return 400 InvalidAction.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "SetSubscriptionAttributes", url.Values{
+		"SubscriptionArn": {"arn:aws:sns:us-east-1:000000000000:topic:sub-id"},
+		"AttributeName":   {"FilterPolicy"},
+		"AttributeValue":  {`{"event":["x"]}`},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("SetSubscriptionAttributes: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "InvalidAction") {
+		t.Errorf("SetSubscriptionAttributes: expected InvalidAction\nbody: %s", w.Body.String())
+	}
+
+	// GetSubscriptionAttributes is not implemented — should return 400 InvalidAction.
+	wg := httptest.NewRecorder()
+	handler.ServeHTTP(wg, snsReq(t, "GetSubscriptionAttributes", url.Values{
+		"SubscriptionArn": {"arn:aws:sns:us-east-1:000000000000:topic:sub-id"},
+	}))
+	if wg.Code != http.StatusBadRequest {
+		t.Fatalf("GetSubscriptionAttributes: expected 400, got %d\nbody: %s", wg.Code, wg.Body.String())
+	}
+	if !strings.Contains(wg.Body.String(), "InvalidAction") {
+		t.Errorf("GetSubscriptionAttributes: expected InvalidAction\nbody: %s", wg.Body.String())
+	}
+}
+
+// ---- Test 14: Error — TopicNotFound for multiple operations ----
+
+func TestSNS_TopicNotFound(t *testing.T) {
+	handler := newSNSGateway(t)
+	fakeArn := "arn:aws:sns:us-east-1:000000000000:nonexistent-topic"
+
+	tests := []struct {
+		action string
+		params url.Values
+	}{
+		{"GetTopicAttributes", url.Values{"TopicArn": {fakeArn}}},
+		{"SetTopicAttributes", url.Values{
+			"TopicArn":       {fakeArn},
+			"AttributeName":  {"DisplayName"},
+			"AttributeValue": {"x"},
+		}},
+		{"Subscribe", url.Values{
+			"TopicArn": {fakeArn},
+			"Protocol": {"sqs"},
+			"Endpoint": {"arn:aws:sqs:us-east-1:000000000000:q"},
+		}},
+		{"Publish", url.Values{
+			"TopicArn": {fakeArn},
+			"Message":  {"hello"},
+		}},
+		{"ListSubscriptionsByTopic", url.Values{"TopicArn": {fakeArn}}},
+		{"DeleteTopic", url.Values{"TopicArn": {fakeArn}}},
+		{"TagResource", url.Values{
+			"ResourceArn":         {fakeArn},
+			"Tags.member.1.Key":   {"k"},
+			"Tags.member.1.Value": {"v"},
+		}},
+		{"UntagResource", url.Values{
+			"ResourceArn":      {fakeArn},
+			"TagKeys.member.1": {"k"},
+		}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.action, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, snsReq(t, tc.action, tc.params))
+			if w.Code == http.StatusOK {
+				t.Errorf("%s on non-existent topic: expected error, got 200\nbody: %s", tc.action, w.Body.String())
+			}
+			body := w.Body.String()
+			if !strings.Contains(body, "NotFound") && !strings.Contains(body, "not exist") {
+				t.Errorf("%s: expected NotFound error\nbody: %s", tc.action, body)
+			}
+		})
+	}
+}
+
+// ---- Test 15: Error — SubscriptionNotFound ----
+
+func TestSNS_SubscriptionNotFound(t *testing.T) {
+	handler := newSNSGateway(t)
+
+	// Unsubscribe with a non-existent subscription ARN.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "Unsubscribe", url.Values{
+		"SubscriptionArn": {"arn:aws:sns:us-east-1:000000000000:topic:nonexistent-sub-id"},
+	}))
+	if w.Code == http.StatusOK {
+		t.Error("Unsubscribe non-existent: expected error, got 200")
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NotFound") && !strings.Contains(body, "not exist") {
+		t.Errorf("Unsubscribe non-existent: expected NotFound in response\nbody: %s", body)
+	}
+}
+
+// ---- Test 16: Error — InvalidParameter (missing required fields) ----
+
+func TestSNS_InvalidParameter(t *testing.T) {
+	handler := newSNSGateway(t)
+
+	tests := []struct {
+		name   string
+		action string
+		params url.Values
+	}{
+		{"CreateTopic_MissingName", "CreateTopic", url.Values{}},
+		{"DeleteTopic_MissingArn", "DeleteTopic", url.Values{}},
+		{"GetTopicAttributes_MissingArn", "GetTopicAttributes", url.Values{}},
+		{"SetTopicAttributes_MissingArn", "SetTopicAttributes", url.Values{
+			"AttributeName": {"DisplayName"},
+		}},
+		{"SetTopicAttributes_MissingAttrName", "SetTopicAttributes", url.Values{
+			"TopicArn": {"arn:aws:sns:us-east-1:000000000000:some-topic"},
+		}},
+		{"Subscribe_MissingTopicArn", "Subscribe", url.Values{
+			"Protocol": {"sqs"},
+		}},
+		{"Subscribe_MissingProtocol", "Subscribe", url.Values{
+			"TopicArn": {"arn:aws:sns:us-east-1:000000000000:some-topic"},
+		}},
+		{"Unsubscribe_MissingArn", "Unsubscribe", url.Values{}},
+		{"Publish_MissingTopicAndTarget", "Publish", url.Values{
+			"Message": {"hello"},
+		}},
+		{"Publish_MissingMessage", "Publish", url.Values{
+			"TopicArn": {"arn:aws:sns:us-east-1:000000000000:some-topic"},
+		}},
+		{"TagResource_MissingArn", "TagResource", url.Values{}},
+		{"UntagResource_MissingArn", "UntagResource", url.Values{}},
+		{"ListSubscriptionsByTopic_MissingArn", "ListSubscriptionsByTopic", url.Values{}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			handler.ServeHTTP(w, snsReq(t, tc.action, tc.params))
+			if w.Code == http.StatusOK {
+				t.Errorf("%s: expected error for missing parameter, got 200\nbody: %s", tc.name, w.Body.String())
+			}
+			if w.Code != http.StatusBadRequest {
+				t.Errorf("%s: expected 400, got %d\nbody: %s", tc.name, w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
+// ---- Test 17: Error — AuthorizationError (IAM enforcement) ----
+
+func TestSNS_AccessDenied_WithIAMEnforcement(t *testing.T) {
+	gw, store, _ := newSNSGatewayWithIAM(t)
+
+	// Create a user with no policies — should be denied.
+	if _, err := store.CreateUser("noperm-sns"); err != nil {
+		t.Fatalf("CreateUser: %v", err)
+	}
+	key, err := store.CreateAccessKey("noperm-sns")
+	if err != nil {
+		t.Fatalf("CreateAccessKey: %v", err)
+	}
+
+	// CreateTopic with unprivileged user — should get 403.
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, snsReqWithKey(t, "CreateTopic", url.Values{"Name": {"denied-topic"}}, key.AccessKeyID))
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 AccessDenied, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+	if !strings.Contains(body, "AccessDenied") {
+		t.Errorf("error response should contain 'AccessDenied'\nbody: %s", body)
+	}
+}
+
+// ---- Test 18: Error — AuthorizationError (invalid credentials) ----
+
+func TestSNS_AccessDenied_InvalidCredential(t *testing.T) {
+	gw, _, _ := newSNSGatewayWithIAM(t)
+
+	// Use a completely unknown access key.
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, snsReqWithKey(t, "ListTopics", nil, "AKIAFAKEUNKNOWNKEY"))
+
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("expected 403, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Test 19: Subscribe multiple protocols and verify ListSubscriptions ----
+
+func TestSNS_SubscribeMultipleProtocols(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "proto-topic")
+
+	protocols := []struct {
+		proto    string
+		endpoint string
+	}{
+		{"sqs", "arn:aws:sqs:us-east-1:000000000000:queue-proto"},
+		{"https", "https://hooks.example.com/sns"},
+		{"email", "user@example.com"},
+		{"lambda", "arn:aws:lambda:us-east-1:000000000000:function:my-func"},
+	}
+
+	subArns := make([]string, 0, len(protocols))
+	for _, p := range protocols {
+		arn := mustSubscribe(t, handler, topicArn, p.proto, p.endpoint)
+		subArns = append(subArns, arn)
+	}
+
+	// All subscriptions should appear in ListSubscriptions.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "ListSubscriptions", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListSubscriptions: expected 200, got %d", w.Code)
+	}
+	body := w.Body.String()
+	for _, arn := range subArns {
+		if !strings.Contains(body, arn) {
+			t.Errorf("ListSubscriptions: missing subscription %s\nbody: %s", arn, body)
+		}
+	}
+
+	// Verify each protocol name is in the response.
+	for _, p := range protocols {
+		if !strings.Contains(body, p.proto) {
+			t.Errorf("ListSubscriptions: missing protocol %s\nbody: %s", p.proto, body)
+		}
+	}
+}
+
+// ---- Test 20: Publish to topic with TargetArn (alternate field) ----
+
+func TestSNS_PublishWithTargetArn(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "target-arn-topic")
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "Publish", url.Values{
+		"TargetArn": {topicArn},
+		"Message":   {"via TargetArn field"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("Publish via TargetArn: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Result struct {
+			MessageId string `xml:"MessageId"`
+		} `xml:"PublishResult"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Publish via TargetArn: unmarshal: %v", err)
+	}
+	if resp.Result.MessageId == "" {
+		t.Error("Publish via TargetArn: MessageId is empty")
+	}
+
+	// Neither TopicArn nor TargetArn — should fail.
+	wf := httptest.NewRecorder()
+	handler.ServeHTTP(wf, snsReq(t, "Publish", url.Values{
+		"Message": {"no topic or target"},
+	}))
+	if wf.Code == http.StatusOK {
+		t.Error("Publish without TopicArn or TargetArn: expected error, got 200")
+	}
+}
+
+// ---- Test 21: DeleteTopic cascades subscription removal ----
+
+func TestSNS_DeleteTopicCascadesSubscriptions(t *testing.T) {
+	handler := newSNSGateway(t)
+	topicArn := mustCreateTopic(t, handler, "cascade-topic")
+
+	// Add multiple subscriptions.
+	mustSubscribe(t, handler, topicArn, "sqs", "arn:aws:sqs:us-east-1:000000000000:q1")
+	mustSubscribe(t, handler, topicArn, "sqs", "arn:aws:sqs:us-east-1:000000000000:q2")
+	mustSubscribe(t, handler, topicArn, "email", "cascade@example.com")
+
+	// Verify subscriptions exist.
+	wl := httptest.NewRecorder()
+	handler.ServeHTTP(wl, snsReq(t, "ListSubscriptions", nil))
+	if !strings.Contains(wl.Body.String(), "cascade-topic") {
+		t.Fatal("subscriptions should exist before delete")
+	}
+
+	// Delete topic.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, snsReq(t, "DeleteTopic", url.Values{"TopicArn": {topicArn}}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteTopic: expected 200, got %d", wd.Code)
+	}
+
+	// All subscriptions should be gone.
+	wl2 := httptest.NewRecorder()
+	handler.ServeHTTP(wl2, snsReq(t, "ListSubscriptions", nil))
+	if strings.Contains(wl2.Body.String(), "cascade-topic") {
+		t.Error("ListSubscriptions: subscriptions should be removed after topic deletion")
+	}
+}
+
+// ---- Test 22: CreateTopic with attributes and tags ----
+
+func TestSNS_CreateTopicWithAttributesAndTags(t *testing.T) {
+	handler := newSNSGateway(t)
+
+	// Create topic with attributes and tags.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, snsReq(t, "CreateTopic", url.Values{
+		"Name":                         {"full-topic"},
+		"Attributes.entry.1.key":       {"DisplayName"},
+		"Attributes.entry.1.value":     {"Full Display"},
+		"Tags.member.1.Key":            {"env"},
+		"Tags.member.1.Value":          {"production"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateTopic with attrs/tags: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	var resp struct {
+		Result struct {
+			TopicArn string `xml:"TopicArn"`
+		} `xml:"CreateTopicResult"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("CreateTopic: unmarshal: %v", err)
+	}
+	topicArn := resp.Result.TopicArn
+
+	// Verify attribute persisted.
+	wg := httptest.NewRecorder()
+	handler.ServeHTTP(wg, snsReq(t, "GetTopicAttributes", url.Values{"TopicArn": {topicArn}}))
+	if wg.Code != http.StatusOK {
+		t.Fatalf("GetTopicAttributes: expected 200, got %d", wg.Code)
+	}
+	if !strings.Contains(wg.Body.String(), "Full Display") {
+		t.Errorf("GetTopicAttributes: expected DisplayName 'Full Display'\nbody: %s", wg.Body.String())
 	}
 }

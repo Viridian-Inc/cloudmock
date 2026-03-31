@@ -1,0 +1,32 @@
+app = "cloudmock-saas"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  CLOUDMOCK_SAAS_ENABLED = "true"
+  CLOUDMOCK_AUTH_ENABLED = "true"
+  CLOUDMOCK_PROFILE = "full"
+
+[http_service]
+  internal_port = 4500
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[services]]
+  internal_port = 4566
+  protocol = "tcp"
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 100
+
+[checks]
+  [checks.health]
+    type = "http"
+    port = 4500
+    path = "/api/health"
+    interval = "10s"
+    timeout = "5s"

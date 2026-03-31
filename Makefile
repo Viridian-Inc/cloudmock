@@ -1,4 +1,4 @@
-.PHONY: build build-gateway build-cli build-tools build-plugins build-plugin-example build-dashboard test lint clean proto docker docker-push docker-up docker-down release help
+.PHONY: build build-gateway build-cli build-tools build-plugins build-plugin-example build-dashboard test test-all lint clean proto docker docker-push docker-up docker-down release help
 
 VERSION ?= 1.0.0
 
@@ -119,3 +119,8 @@ test-unit: ## Run unit tests only (no Docker)
 .PHONY: test-race
 test-race: ## Run tests with race detector
 	go test -race -count=1 -short ./...
+
+.PHONY: test-all
+test-all: ## Run all tests: unit + dataplane + integration
+	go test -v -cover -count=1 ./...
+	go test -v -cover -count=1 ./pkg/dataplane/...

@@ -485,3 +485,153 @@ func TestCreateFunction_ValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateFunction_ResourceConflictException(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	nodeCode := createZipFile(t, "index.js",
+		`exports.handler = async (event) => ({ statusCode: 200 });`)
+	b64Code := base64.StdEncoding.EncodeToString(nodeCode)
+
+	createBody := `{
+		"FunctionName": "conflict-func",
+		"Runtime": "nodejs20.x",
+		"Role": "arn:aws:iam::000000000000:role/lambda-role",
+		"Handler": "index.handler",
+		"Code": {"ZipFile": "` + b64Code + `"}
+	}`
+
+	// First create.
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost, "/2015-03-31/functions", createBody))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	// Duplicate create — should return 409 with ResourceConflictException.
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost, "/2015-03-31/functions", createBody))
+	assert.Equal(t, http.StatusConflict, w.Code)
+
+	var errResp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
+	errType, _ := errResp["__type"].(string)
+	if errType == "" {
+		errType, _ = errResp["Type"].(string)
+	}
+	assert.Contains(t, w.Body.String(), "already exists",
+		"conflict error should mention 'already exists'")
+}
+
+func TestGetFunction_ResourceNotFoundException(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet, "/2015-03-31/functions/nonexistent-func", ""))
+	assert.Equal(t, http.StatusNotFound, w.Code)
+
+	var errResp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
+	assert.Contains(t, w.Body.String(), "not found",
+		"not found error should mention 'not found'")
+}
+
+func TestUpdateFunctionCode_NotFound(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	nodeCode := createZipFile(t, "index.js",
+		`exports.handler = async (event) => ({ statusCode: 200 });`)
+	b64Code := base64.StdEncoding.EncodeToString(nodeCode)
+
+	updateBody := `{"ZipFile": "` + b64Code + `"}`
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPut,
+		"/2015-03-31/functions/nonexistent-func/code", updateBody))
+	assert.Equal(t, http.StatusNotFound, w.Code,
+		"UpdateFunctionCode for missing function should return 404")
+}
+
+func TestUpdateFunctionConfiguration_NotFound(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPut,
+		"/2015-03-31/functions/nonexistent-func/configuration",
+		`{"Timeout": 30}`))
+	assert.Equal(t, http.StatusNotFound, w.Code,
+		"UpdateFunctionConfiguration for missing function should return 404")
+}
+
+func TestEventSourceMapping_CreateListDelete(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	nodeCode := createZipFile(t, "index.js",
+		`exports.handler = async (event) => ({ statusCode: 200 });`)
+	b64Code := base64.StdEncoding.EncodeToString(nodeCode)
+
+	// Create a function first.
+	createBody := `{
+		"FunctionName": "esm-func",
+		"Runtime": "nodejs20.x",
+		"Role": "arn:aws:iam::000000000000:role/lambda-role",
+		"Handler": "index.handler",
+		"Code": {"ZipFile": "` + b64Code + `"}
+	}`
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost, "/2015-03-31/functions", createBody))
+	require.Equal(t, http.StatusCreated, w.Code)
+
+	// CreateEventSourceMapping.
+	esmBody := `{
+		"EventSourceArn": "arn:aws:sqs:us-east-1:000000000000:my-queue",
+		"FunctionName": "esm-func",
+		"BatchSize": 10,
+		"Enabled": true
+	}`
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodPost, "/2015-03-31/event-source-mappings", esmBody))
+	assert.Equal(t, http.StatusCreated, w.Code, "CreateEventSourceMapping should return 201")
+
+	var esmResp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &esmResp))
+	uuid, _ := esmResp["UUID"].(string)
+	assert.NotEmpty(t, uuid, "EventSourceMapping should have UUID")
+	funcArn, _ := esmResp["FunctionArn"].(string)
+	assert.Contains(t, funcArn, "esm-func", "FunctionArn should contain function name")
+
+	// ListEventSourceMappings.
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet, "/2015-03-31/event-source-mappings", ""))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var listResp map[string]any
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &listResp))
+	esms := listResp["EventSourceMappings"].([]any)
+	assert.GreaterOrEqual(t, len(esms), 1)
+
+	// GetEventSourceMapping.
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet,
+		"/2015-03-31/event-source-mappings/"+uuid, ""))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// DeleteEventSourceMapping.
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodDelete,
+		"/2015-03-31/event-source-mappings/"+uuid, ""))
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Delete again — should 404.
+	w = httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodDelete,
+		"/2015-03-31/event-source-mappings/"+uuid, ""))
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestGetFunctionConfiguration_NotFound(t *testing.T) {
+	gw := newLambdaGateway(t)
+
+	w := httptest.NewRecorder()
+	gw.ServeHTTP(w, lambdaReq(t, http.MethodGet,
+		"/2015-03-31/functions/nonexistent-func/configuration", ""))
+	assert.Equal(t, http.StatusNotFound, w.Code,
+		"GetFunctionConfiguration for missing function should return 404")
+}

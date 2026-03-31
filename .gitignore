@@ -1,5 +1,6 @@
-# Go binaries
+# Go binaries (but keep shell scripts like cmk)
 bin/
+!bin/cmk
 *.exe
 *.exe~
 *.dll

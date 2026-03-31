@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# cmk - CloudMock CLI wrapper
+# Like LocalStack's awslocal, wraps the AWS CLI with --endpoint-url
+# pointed at CloudMock.
+#
+# Usage:
+#   cmk s3 ls
+#   cmk dynamodb list-tables
+#   cmk sts get-caller-identity
+#
+# Override the endpoint:
+#   CLOUDMOCK_ENDPOINT=http://localhost:5000 cmk s3 ls
+
+CLOUDMOCK_ENDPOINT="${CLOUDMOCK_ENDPOINT:-http://localhost:4566}"
+
+exec aws --endpoint-url="$CLOUDMOCK_ENDPOINT" "$@"

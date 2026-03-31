@@ -503,6 +503,152 @@ func TestSM_TagAndUntagResource(t *testing.T) {
 	}
 }
 
+// ---- Error: ResourceNotFoundException for GetSecretValue on nonexistent secret ----
+
+func TestSM_GetSecretValue_ResourceNotFoundException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "GetSecretValue", map[string]string{
+		"SecretId": "nonexistent-secret",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetSecretValue nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("GetSecretValue nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for PutSecretValue on nonexistent secret ----
+
+func TestSM_PutSecretValue_ResourceNotFoundException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "PutSecretValue", map[string]string{
+		"SecretId":     "nonexistent-secret",
+		"SecretString": "value",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutSecretValue nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutSecretValue nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for UpdateSecret on nonexistent secret ----
+
+func TestSM_UpdateSecret_ResourceNotFoundException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "UpdateSecret", map[string]string{
+		"SecretId":     "nonexistent-secret",
+		"SecretString": "value",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("UpdateSecret nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("UpdateSecret nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DeleteSecret on nonexistent secret ----
+
+func TestSM_DeleteSecret_ResourceNotFoundException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "DeleteSecret", map[string]any{
+		"SecretId":                   "nonexistent-secret",
+		"ForceDeleteWithoutRecovery": true,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteSecret nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DeleteSecret nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceExistsException for CreateSecret duplicate ----
+
+func TestSM_CreateSecret_ResourceExistsException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	// Create first
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, smReq(t, "CreateSecret", map[string]any{
+		"Name":         "duplicate-secret",
+		"SecretString": "value",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateSecret first: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Try again
+	wc2 := httptest.NewRecorder()
+	handler.ServeHTTP(wc2, smReq(t, "CreateSecret", map[string]any{
+		"Name":         "duplicate-secret",
+		"SecretString": "value2",
+	}))
+	if wc2.Code != http.StatusBadRequest {
+		t.Fatalf("CreateSecret duplicate: expected 400, got %d\nbody: %s", wc2.Code, wc2.Body.String())
+	}
+	errBody := decodeJSON(t, wc2.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceExistsException" {
+		t.Errorf("CreateSecret duplicate: expected __type=ResourceExistsException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DescribeSecret on nonexistent secret ----
+
+func TestSM_DescribeSecret_ResourceNotFoundException(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "DescribeSecret", map[string]string{
+		"SecretId": "nonexistent-secret",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeSecret nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DescribeSecret nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Positive: ListSecrets empty ----
+
+func TestSM_ListSecrets_Empty(t *testing.T) {
+	handler := newSMGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, smReq(t, "ListSecrets", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListSecrets empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	secretList, _ := m["SecretList"].([]any)
+	if len(secretList) != 0 {
+		t.Errorf("ListSecrets empty: expected 0 secrets, got %d", len(secretList))
+	}
+}
+
 // ---- Additional: UnknownAction ----
 
 func TestSM_UnknownAction(t *testing.T) {

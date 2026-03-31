@@ -710,7 +710,200 @@ func TestECS_TagOperations(t *testing.T) {
 	}
 }
 
-// ---- Test 8: Unknown action ----
+// ---- Test 8: ClusterNotFoundException — CreateService on nonexistent cluster ----
+
+func TestECS_CreateService_ClusterNotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "CreateService", map[string]any{
+		"cluster":        "nonexistent-cluster",
+		"serviceName":    "my-svc",
+		"taskDefinition": "some-task:1",
+		"desiredCount":   1,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateService cluster not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ClusterNotFoundException") {
+		t.Errorf("CreateService cluster not found: expected ClusterNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test 9: ClusterNotFoundException — DeleteCluster ----
+
+func TestECS_DeleteCluster_NotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "DeleteCluster", map[string]any{
+		"cluster": "nonexistent-cluster",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteCluster not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ClusterNotFoundException") {
+		t.Errorf("DeleteCluster not found: expected ClusterNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test 10: ServiceNotFoundException — DescribeServices ----
+
+func TestECS_DescribeServices_NotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	// Create cluster first.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
+		"clusterName": "svcnf-cluster",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateCluster: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Describe non-existent service.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "DescribeServices", map[string]any{
+		"cluster":  "svcnf-cluster",
+		"services": []string{"nonexistent-svc"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeServices not found: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	failures, ok := m["failures"].([]any)
+	if !ok || len(failures) == 0 {
+		t.Fatalf("DescribeServices not found: expected failures\nbody: %s", w.Body.String())
+	}
+	failure := failures[0].(map[string]any)
+	if failure["reason"].(string) != "MISSING" {
+		t.Errorf("DescribeServices: expected reason=MISSING, got %q", failure["reason"])
+	}
+}
+
+// ---- Test 11: ServiceNotFoundException — DeleteService ----
+
+func TestECS_DeleteService_NotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	// Create cluster.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
+		"clusterName": "delsvcnf-cluster",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateCluster: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Delete non-existent service.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "DeleteService", map[string]any{
+		"cluster": "delsvcnf-cluster",
+		"service": "nonexistent-svc",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteService not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ServiceNotFoundException") {
+		t.Errorf("DeleteService not found: expected ServiceNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test 12: UpdateService — ServiceNotFoundException ----
+
+func TestECS_UpdateService_NotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	// Create cluster.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ecsReq(t, "CreateCluster", map[string]any{
+		"clusterName": "updsvcnf-cluster",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateCluster: %d %s", wc.Code, wc.Body.String())
+	}
+
+	desiredCount := 3
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "UpdateService", map[string]any{
+		"cluster":      "updsvcnf-cluster",
+		"service":      "nonexistent-svc",
+		"desiredCount": desiredCount,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("UpdateService not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ServiceNotFoundException") {
+		t.Errorf("UpdateService not found: expected ServiceNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test 13: RunTask — ClusterNotFoundException ----
+
+func TestECS_RunTask_ClusterNotFound(t *testing.T) {
+	handler := newECSGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecsReq(t, "RunTask", map[string]any{
+		"cluster":        "nonexistent-cluster",
+		"taskDefinition": "some-task:1",
+		"count":          1,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("RunTask cluster not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ClusterNotFoundException") {
+		t.Errorf("RunTask cluster not found: expected ClusterNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test 14: DeregisterTaskDefinition ----
+
+func TestECS_DeregisterTaskDefinition(t *testing.T) {
+	handler := newECSGateway(t)
+
+	// Register a task definition.
+	wr := httptest.NewRecorder()
+	handler.ServeHTTP(wr, ecsReq(t, "RegisterTaskDefinition", map[string]any{
+		"family": "dereg-task",
+		"containerDefinitions": []map[string]any{
+			{"name": "app", "image": "myapp:latest", "cpu": 256, "memory": 512, "essential": true},
+		},
+	}))
+	if wr.Code != http.StatusOK {
+		t.Fatalf("setup RegisterTaskDefinition: %d %s", wr.Code, wr.Body.String())
+	}
+
+	// Deregister it.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, ecsReq(t, "DeregisterTaskDefinition", map[string]any{
+		"taskDefinition": "dereg-task:1",
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeregisterTaskDefinition: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	md := decodeJSON(t, wd.Body.String())
+	td := md["taskDefinition"].(map[string]any)
+	if td["status"].(string) != "INACTIVE" {
+		t.Errorf("DeregisterTaskDefinition: expected status=INACTIVE, got %q", td["status"])
+	}
+
+	// Deregister nonexistent.
+	wnf := httptest.NewRecorder()
+	handler.ServeHTTP(wnf, ecsReq(t, "DeregisterTaskDefinition", map[string]any{
+		"taskDefinition": "nonexistent-task:999",
+	}))
+	if wnf.Code != http.StatusBadRequest {
+		t.Fatalf("DeregisterTaskDefinition not found: expected 400, got %d\nbody: %s", wnf.Code, wnf.Body.String())
+	}
+}
+
+// ---- Test 15: Unknown action ----
 
 func TestECS_UnknownAction(t *testing.T) {
 	handler := newECSGateway(t)

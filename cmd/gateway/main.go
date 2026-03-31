@@ -922,10 +922,22 @@ func main() {
 		}
 	}()
 
-	// Dashboard
+	// Source server: accepts TCP connections from @cloudmock/node SDK
+	// SDK-captured HTTP requests (e.g. BFF inbound traffic) are injected into RequestLog
+	sourceServer := admin.NewSourceServer(requestLog, requestStats, adminAPI.Broadcaster())
+	adminAPI.SetSourceServer(sourceServer)
+	sourceAddr := ":4580"
+	go func() {
+		if err := sourceServer.ListenAndServe(sourceAddr); err != nil {
+			slog.Error("source server exited", "error", err)
+		}
+	}()
+
+	// Dashboard — serves SPA + admin API on a single origin (no CORS needed)
 	var dashServer *http.Server
 	if cfg.Dashboard.Enabled {
 		dashboardHandler := dashboard.New(cfg.Admin.Port)
+		dashboardHandler.SetAdminHandler(adminAPI)
 		dashAddr := fmt.Sprintf(":%d", cfg.Dashboard.Port)
 		dashServer = &http.Server{
 			Addr:              dashAddr,

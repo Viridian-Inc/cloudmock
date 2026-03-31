@@ -14,9 +14,13 @@ import (
 var distFS embed.FS
 
 // Handler serves the cloudmock web dashboard as a Vite-built SPA.
+// When an admin API handler is attached via SetAdminHandler, requests to
+// /api/* are delegated to it, making the dashboard port a single-origin
+// server for both the UI and the admin API (eliminates CORS).
 type Handler struct {
-	fileServer http.Handler
-	adminPort  int
+	fileServer   http.Handler
+	adminPort    int
+	adminHandler http.Handler
 }
 
 // New creates a dashboard Handler. The adminPort parameter is kept for API
@@ -30,10 +34,23 @@ func New(adminPort int) *Handler {
 	}
 }
 
+// SetAdminHandler attaches an admin API handler so that /api/* requests
+// are served on the same port as the SPA (single-origin, no CORS needed).
+func (h *Handler) SetAdminHandler(handler http.Handler) {
+	h.adminHandler = handler
+}
+
 // ServeHTTP implements http.Handler. It serves static assets from the embedded
 // dist directory. For any path that does not match a static file, it serves
-// index.html (SPA fallback for client-side routing).
+// index.html (SPA fallback for client-side routing). Requests to /api/* are
+// forwarded to the admin API handler when one is attached.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Delegate /api/* to the admin API handler if attached.
+	if h.adminHandler != nil && strings.HasPrefix(r.URL.Path, "/api/") {
+		h.adminHandler.ServeHTTP(w, r)
+		return
+	}
+
 	// Try to open the requested file in the embedded FS.
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "" {

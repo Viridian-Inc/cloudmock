@@ -4,7 +4,7 @@ All 98 services supported by cloudmock, grouped by tier.
 
 ---
 
-## Tier 1 — Full Emulation (24 services)
+## Tier 1 — Full Emulation (25 services)
 
 | Service | AWS Service Name | Protocol | Actions |
 |---------|-----------------|----------|---------|
@@ -31,11 +31,12 @@ All 98 services supported by cloudmock, grouped by tier.
 | Data Firehose | `firehose` | JSON | CreateDeliveryStream, DeleteDeliveryStream, DescribeDeliveryStream, ListDeliveryStreams, PutRecord, PutRecordBatch, UpdateDestination, TagDeliveryStream, UntagDeliveryStream, ListTagsForDeliveryStream |
 | CloudFormation | `cloudformation` | Query | CreateStack, DeleteStack, DescribeStacks, ListStacks, DescribeStackResources, DescribeStackEvents, GetTemplate, ValidateTemplate, ListExports, CreateChangeSet, DescribeChangeSet, ExecuteChangeSet, DeleteChangeSet |
 | IAM | `iam` | Embedded | CreateUser, GetUser, CreateAccessKey, AttachUserPolicy, GetUserPolicies (via seed file / admin API) |
+| AppSync | `appsync` | REST-JSON | CreateGraphqlApi, GetGraphqlApi, ListGraphqlApis, UpdateGraphqlApi, DeleteGraphqlApi, CreateDataSource, GetDataSource, ListDataSources, UpdateDataSource, DeleteDataSource, CreateResolver, GetResolver, ListResolvers, UpdateResolver, DeleteResolver, CreateFunction, GetFunction, ListFunctions, UpdateFunction, DeleteFunction, CreateApiKey, ListApiKeys, UpdateApiKey, DeleteApiKey, TagResource, UntagResource, ListTagsForResource |
 | Lambda | `lambda` | REST-JSON | CreateFunction, DeleteFunction, GetFunction, ListFunctions, UpdateFunctionCode, UpdateFunctionConfiguration, InvokeFunction (stub), AddPermission, RemovePermission, CreateEventSourceMapping, ListEventSourceMappings, TagResource, UntagResource |
 
 ---
 
-## Tier 2 — CRUD Stubs (74 services)
+## Tier 2 — CRUD Stubs (73 services)
 
 Tier 2 services support basic CRUD: create, describe/get, list, delete. Some include update. All resources are stored in memory; no business logic is executed.
 
@@ -100,7 +101,6 @@ Tier 2 services support basic CRUD: create, describe/get, list, delete. Some inc
 
 | # | Service | AWS Service Name | Actions |
 |---|---------|-----------------|---------|
-| 16 | AppSync | `appsync` | CreateGraphqlApi, ListGraphqlApis, GetGraphqlApi, DeleteGraphqlApi |
 | 19 | Batch | `batch` | CreateJobQueue, ListJobQueues, GetJobQueue, DeleteJobQueue |
 | 20 | Bedrock | `bedrock` | CreateModelCustomizationJob, ListModelCustomizationJobs, GetModelCustomizationJob, DeleteModelCustomizationJob |
 | 25 | CodeArtifact | `codeartifact` | CreateRepository, ListRepositories, GetRepository, DeleteRepository |
@@ -139,6 +139,6 @@ Tier 2 services support basic CRUD: create, describe/get, list, delete. Some inc
 
 | Tier | Count | Description |
 |------|-------|-------------|
-| Tier 1 | 24 | Full emulation with business logic |
-| Tier 2 | 74 | CRUD stubs with in-memory resource storage |
+| Tier 1 | 25 | Full emulation with business logic |
+| Tier 2 | 73 | CRUD stubs with in-memory resource storage |
 | **Total** | **98** | |

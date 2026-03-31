@@ -596,6 +596,151 @@ func TestECR_DescribeImageScanFindings(t *testing.T) {
 	}
 }
 
+// ---- Test: RepositoryNotFoundException — DescribeRepositories by name ----
+
+func TestECR_DescribeRepositories_NotFound(t *testing.T) {
+	handler := newECRGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecrReq(t, "DescribeRepositories", map[string]any{
+		"repositoryNames": []string{"nonexistent-repo"},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeRepositories not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "RepositoryNotFoundException") {
+		t.Errorf("DescribeRepositories not found: expected RepositoryNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test: RepositoryNotFoundException — ListImages on missing repo ----
+
+func TestECR_ListImages_RepositoryNotFound(t *testing.T) {
+	handler := newECRGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecrReq(t, "ListImages", map[string]any{
+		"repositoryName": "no-such-repo",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("ListImages repo not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "RepositoryNotFoundException") {
+		t.Errorf("ListImages repo not found: expected RepositoryNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test: PutImage — RepositoryNotFoundException ----
+
+func TestECR_PutImage_RepositoryNotFound(t *testing.T) {
+	handler := newECRGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecrReq(t, "PutImage", map[string]any{
+		"repositoryName": "no-such-repo",
+		"imageManifest":  `{"schemaVersion":2}`,
+		"imageTag":       "latest",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutImage repo not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "RepositoryNotFoundException") {
+		t.Errorf("PutImage repo not found: expected RepositoryNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test: ImageTagAlreadyExistsException — immutable tag ----
+
+func TestECR_PutImage_ImageTagAlreadyExists_Immutable(t *testing.T) {
+	handler := newECRGateway(t)
+
+	// Create repo with IMMUTABLE tag mutability.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, ecrReq(t, "CreateRepository", map[string]any{
+		"repositoryName":     "immutable-repo",
+		"imageTagMutability": "IMMUTABLE",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateRepository: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Push first image with tag.
+	wp1 := httptest.NewRecorder()
+	handler.ServeHTTP(wp1, ecrReq(t, "PutImage", map[string]any{
+		"repositoryName": "immutable-repo",
+		"imageManifest":  `{"schemaVersion":2,"unique":"first"}`,
+		"imageTag":       "v1",
+	}))
+	if wp1.Code != http.StatusOK {
+		t.Fatalf("first PutImage: %d %s", wp1.Code, wp1.Body.String())
+	}
+
+	// Push different image with same tag — should fail for IMMUTABLE.
+	wp2 := httptest.NewRecorder()
+	handler.ServeHTTP(wp2, ecrReq(t, "PutImage", map[string]any{
+		"repositoryName": "immutable-repo",
+		"imageManifest":  `{"schemaVersion":2,"unique":"second"}`,
+		"imageTag":       "v1",
+	}))
+	if wp2.Code != http.StatusConflict {
+		t.Fatalf("duplicate tag immutable: expected 409, got %d\nbody: %s", wp2.Code, wp2.Body.String())
+	}
+	body := wp2.Body.String()
+	if !strings.Contains(body, "ImageTagAlreadyExistsException") {
+		t.Errorf("duplicate tag immutable: expected ImageTagAlreadyExistsException\nbody: %s", body)
+	}
+}
+
+// ---- Test: DeleteRepository — RepositoryNotFoundException ----
+
+func TestECR_DeleteRepository_NotFound(t *testing.T) {
+	handler := newECRGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecrReq(t, "DeleteRepository", map[string]any{
+		"repositoryName": "no-such-repo",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteRepository not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "RepositoryNotFoundException") {
+		t.Errorf("DeleteRepository not found: expected RepositoryNotFoundException\nbody: %s", body)
+	}
+}
+
+// ---- Test: GetAuthorizationToken — response structure ----
+
+func TestECR_GetAuthorizationToken_Structure(t *testing.T) {
+	handler := newECRGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ecrReq(t, "GetAuthorizationToken", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GetAuthorizationToken: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	m := decodeJSON(t, w.Body.String())
+	authData, ok := m["authorizationData"].([]any)
+	if !ok || len(authData) == 0 {
+		t.Fatalf("GetAuthorizationToken: missing authorizationData")
+	}
+
+	entry := authData[0].(map[string]any)
+	token, _ := entry["authorizationToken"].(string)
+	if token == "" {
+		t.Error("GetAuthorizationToken: empty token")
+	}
+
+	// Token should be base64-encoded.
+	if !strings.Contains(token, "=") && len(token) < 10 {
+		t.Errorf("GetAuthorizationToken: token does not look base64-encoded: %q", token)
+	}
+}
+
 // ---- Unknown action ----
 
 func TestECR_UnknownAction(t *testing.T) {

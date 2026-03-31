@@ -659,7 +659,165 @@ func TestRDS_Tags(t *testing.T) {
 	}
 }
 
-// ---- Test 8: Unknown action ----
+// ---- Test 8: DBInstanceAlreadyExists — duplicate CreateDBInstance ----
+
+func TestRDS_CreateDBInstance_AlreadyExists(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	mustCreateInstance(t, handler, "dup-db", "db.t3.micro", "mysql")
+
+	// Attempt to create same identifier again.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, rdsReq(t, "CreateDBInstance", url.Values{
+		"DBInstanceIdentifier": {"dup-db"},
+		"DBInstanceClass":      {"db.t3.micro"},
+		"Engine":               {"mysql"},
+		"MasterUsername":       {"admin"},
+		"MasterUserPassword":   {"password123"},
+		"AllocatedStorage":     {"20"},
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("CreateDBInstance duplicate: expected error, got 200")
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "DBInstanceAlreadyExists") {
+		t.Errorf("CreateDBInstance duplicate: expected DBInstanceAlreadyExists in body\nbody: %s", body)
+	}
+}
+
+// ---- Test 9: DBInstanceNotFound — DeleteDBInstance ----
+
+func TestRDS_DeleteDBInstance_NotFound(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, rdsReq(t, "DeleteDBInstance", url.Values{
+		"DBInstanceIdentifier": {"no-such-instance"},
+		"SkipFinalSnapshot":    {"true"},
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("DeleteDBInstance non-existent: expected error, got 200")
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "DBInstanceNotFound") {
+		t.Errorf("DeleteDBInstance not found: expected DBInstanceNotFound in body\nbody: %s", body)
+	}
+}
+
+// ---- Test 10: DBClusterAlreadyExists — duplicate CreateDBCluster ----
+
+func TestRDS_CreateDBCluster_AlreadyExists(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	mustCreateCluster(t, handler, "dup-cluster", "aurora-mysql")
+
+	// Attempt to create same identifier again.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, rdsReq(t, "CreateDBCluster", url.Values{
+		"DBClusterIdentifier": {"dup-cluster"},
+		"Engine":              {"aurora-mysql"},
+		"MasterUsername":      {"admin"},
+		"MasterUserPassword":  {"password123"},
+	}))
+	if w.Code == http.StatusOK {
+		t.Fatal("CreateDBCluster duplicate: expected error, got 200")
+	}
+}
+
+// ---- Test 11: DeleteDBSnapshot + DescribeDBSnapshots for specific snapshot ----
+
+func TestRDS_DeleteDBSnapshot(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	mustCreateInstance(t, handler, "snap-del-db", "db.t3.micro", "mysql")
+
+	// Create snapshot.
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, rdsReq(t, "CreateDBSnapshot", url.Values{
+		"DBSnapshotIdentifier": {"del-snapshot"},
+		"DBInstanceIdentifier": {"snap-del-db"},
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("CreateDBSnapshot: %d %s", ws.Code, ws.Body.String())
+	}
+
+	// Delete snapshot.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, rdsReq(t, "DeleteDBSnapshot", url.Values{
+		"DBSnapshotIdentifier": {"del-snapshot"},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteDBSnapshot: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), "del-snapshot") {
+		t.Errorf("DeleteDBSnapshot: expected identifier in response\nbody: %s", wd.Body.String())
+	}
+
+	// Describe deleted snapshot — should return empty or not found.
+	wds := httptest.NewRecorder()
+	handler.ServeHTTP(wds, rdsReq(t, "DescribeDBSnapshots", url.Values{
+		"DBSnapshotIdentifier": {"del-snapshot"},
+	}))
+	// The service may return 200 with empty list or 404; either is acceptable.
+	if wds.Code == http.StatusOK && strings.Contains(wds.Body.String(), "del-snapshot") {
+		t.Errorf("DescribeDBSnapshots: deleted snapshot should not appear\nbody: %s", wds.Body.String())
+	}
+
+	// Delete again — should fail.
+	wd2 := httptest.NewRecorder()
+	handler.ServeHTTP(wd2, rdsReq(t, "DeleteDBSnapshot", url.Values{
+		"DBSnapshotIdentifier": {"del-snapshot"},
+	}))
+	if wd2.Code == http.StatusOK {
+		t.Error("DeleteDBSnapshot second time: expected error, got 200")
+	}
+}
+
+// ---- Test 12: DeleteDBSubnetGroup ----
+
+func TestRDS_DeleteDBSubnetGroup(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	// Create a subnet group.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, rdsReq(t, "CreateDBSubnetGroup", url.Values{
+		"DBSubnetGroupName":        {"del-subnet-group"},
+		"DBSubnetGroupDescription": {"To be deleted"},
+		"SubnetIds.member.1":       {"subnet-11111111"},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateDBSubnetGroup: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// Delete it.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, rdsReq(t, "DeleteDBSubnetGroup", url.Values{
+		"DBSubnetGroupName": {"del-subnet-group"},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteDBSubnetGroup: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+
+	// Verify gone.
+	wcheck := httptest.NewRecorder()
+	handler.ServeHTTP(wcheck, rdsReq(t, "DescribeDBSubnetGroups", url.Values{
+		"DBSubnetGroupName": {"del-subnet-group"},
+	}))
+	if wcheck.Code == http.StatusOK && strings.Contains(wcheck.Body.String(), "del-subnet-group") {
+		t.Error("DeleteDBSubnetGroup: subnet group should be deleted")
+	}
+
+	// Delete non-existent.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, rdsReq(t, "DeleteDBSubnetGroup", url.Values{
+		"DBSubnetGroupName": {"no-such-group"},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Error("DeleteDBSubnetGroup non-existent: expected error, got 200")
+	}
+}
+
+// ---- Test 13: Unknown action ----
 
 func TestRDS_UnknownAction(t *testing.T) {
 	handler := newRDSGateway(t)

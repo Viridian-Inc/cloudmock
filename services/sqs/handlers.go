@@ -523,6 +523,15 @@ func handleSendMessageBatch(ctx *service.RequestContext, store *QueueStore) (*se
 	// Entries are passed as SendMessageBatchRequestEntry.N.{Id,MessageBody,...}
 	entries := parseBatchSendEntries(form)
 
+	if len(entries) == 0 {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.EmptyBatchRequest",
+			"The batch request doesn't contain any entries.", http.StatusBadRequest))
+	}
+	if len(entries) > 10 {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.TooManyEntriesInBatchRequest",
+			"Maximum number of entries per request are 10.", http.StatusBadRequest))
+	}
+
 	successful := make([]xmlSendMessageBatchResultEntry, 0)
 	failed := make([]xmlBatchResultErrorEntry, 0)
 
@@ -586,6 +595,16 @@ func handleDeleteMessageBatch(ctx *service.RequestContext, store *QueueStore) (*
 	}
 
 	entries := parseBatchDeleteEntries(form)
+
+	if len(entries) == 0 {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.EmptyBatchRequest",
+			"The batch request doesn't contain any entries.", http.StatusBadRequest))
+	}
+	if len(entries) > 10 {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.TooManyEntriesInBatchRequest",
+			"Maximum number of entries per request are 10.", http.StatusBadRequest))
+	}
+
 	successful := make([]xmlDeleteMessageBatchResultEntry, 0)
 	failed := make([]xmlBatchResultErrorEntry, 0)
 

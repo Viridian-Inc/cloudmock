@@ -538,6 +538,15 @@ func jsonSendMessageBatch(ctx *service.RequestContext, store *QueueStore) (*serv
 		return jsonErr(err.(*service.AWSError))
 	}
 
+	if len(input.Entries) == 0 {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.EmptyBatchRequest",
+			"The batch request doesn't contain any entries.", http.StatusBadRequest))
+	}
+	if len(input.Entries) > 10 {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.TooManyEntriesInBatchRequest",
+			"Maximum number of entries per request are 10.", http.StatusBadRequest))
+	}
+
 	successful := make([]jsonSendMessageBatchResultEntry, 0)
 	failed := make([]jsonBatchResultErrorEntry, 0)
 
@@ -595,6 +604,15 @@ func jsonDeleteMessageBatch(ctx *service.RequestContext, store *QueueStore) (*se
 	q, err := resolveQueueFromURL(input.QueueUrl, store)
 	if err != nil {
 		return jsonErr(err.(*service.AWSError))
+	}
+
+	if len(input.Entries) == 0 {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.EmptyBatchRequest",
+			"The batch request doesn't contain any entries.", http.StatusBadRequest))
+	}
+	if len(input.Entries) > 10 {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.TooManyEntriesInBatchRequest",
+			"Maximum number of entries per request are 10.", http.StatusBadRequest))
 	}
 
 	successful := make([]jsonDeleteMessageBatchResultEntry, 0)

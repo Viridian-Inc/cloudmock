@@ -489,6 +489,141 @@ func TestIAM_UpdateUser(t *testing.T) {
 	)
 }
 
+// ---- Test: EntityAlreadyExists — CreateRole duplicate ----
+
+func TestIAM_CreateRole_AlreadyExists(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	extra := url.Values{}
+	extra.Set("RoleName", "DupRole")
+	extra.Set("AssumeRolePolicyDocument", `{}`)
+	w := doIAM(t, handler, "CreateRole", extra)
+	requireOK(t, w, "first CreateRole")
+
+	// Duplicate.
+	w = doIAM(t, handler, "CreateRole", extra)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("CreateRole duplicate: expected 409, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "EntityAlreadyExists") {
+		t.Errorf("CreateRole duplicate: expected EntityAlreadyExists\nbody: %s", body)
+	}
+}
+
+// ---- Test: NoSuchEntity — GetUser not found (explicit error code) ----
+
+func TestIAM_GetUser_NoSuchEntity(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	extra := url.Values{}
+	extra.Set("UserName", "ghost-user")
+	w := doIAM(t, handler, "GetUser", extra)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("GetUser not found: expected 404, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NoSuchEntity") {
+		t.Errorf("GetUser not found: expected NoSuchEntity\nbody: %s", body)
+	}
+}
+
+// ---- Test: NoSuchEntity — GetRole not found ----
+
+func TestIAM_GetRole_NoSuchEntity(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	extra := url.Values{}
+	extra.Set("RoleName", "GhostRole")
+	w := doIAM(t, handler, "GetRole", extra)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("GetRole not found: expected 404, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NoSuchEntity") {
+		t.Errorf("GetRole not found: expected NoSuchEntity\nbody: %s", body)
+	}
+}
+
+// ---- Test: GetPolicy + NoSuchEntity ----
+
+func TestIAM_GetPolicy(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	// Create a policy.
+	extra := url.Values{}
+	extra.Set("PolicyName", "GetTestPolicy")
+	extra.Set("PolicyDocument", `{"Version":"2012-10-17","Statement":[]}`)
+	w := doIAM(t, handler, "CreatePolicy", extra)
+	requireOK(t, w, "CreatePolicy")
+
+	// GetPolicy.
+	extra = url.Values{}
+	extra.Set("PolicyArn", "arn:aws:iam::000000000000:policy/GetTestPolicy")
+	w = doIAM(t, handler, "GetPolicy", extra)
+	body := requireOK(t, w, "GetPolicy")
+	requireContains(t, body, "GetPolicy",
+		"GetPolicyResponse",
+		"<PolicyName>GetTestPolicy</PolicyName>",
+	)
+
+	// GetPolicy — not found.
+	extra = url.Values{}
+	extra.Set("PolicyArn", "arn:aws:iam::000000000000:policy/NonExistentPolicy")
+	w = doIAM(t, handler, "GetPolicy", extra)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("GetPolicy not found: expected 404, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Test: DetachRolePolicy + NoSuchEntity ----
+
+func TestIAM_DetachRolePolicy_NotAttached(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	// Create role and policy.
+	extra := url.Values{}
+	extra.Set("RoleName", "DetachRole")
+	extra.Set("AssumeRolePolicyDocument", `{}`)
+	doIAM(t, handler, "CreateRole", extra)
+
+	extra = url.Values{}
+	extra.Set("PolicyName", "DetachPol")
+	extra.Set("PolicyDocument", `{}`)
+	doIAM(t, handler, "CreatePolicy", extra)
+
+	// Detach without attaching first — should fail.
+	extra = url.Values{}
+	extra.Set("RoleName", "DetachRole")
+	extra.Set("PolicyArn", "arn:aws:iam::000000000000:policy/DetachPol")
+	w := doIAM(t, handler, "DetachRolePolicy", extra)
+	if w.Code == http.StatusOK {
+		t.Fatal("DetachRolePolicy not attached: expected error, got 200")
+	}
+}
+
+// ---- Test: CreatePolicy — EntityAlreadyExists ----
+
+func TestIAM_CreatePolicy_AlreadyExists(t *testing.T) {
+	handler := newIAMGateway(t)
+
+	extra := url.Values{}
+	extra.Set("PolicyName", "DupPolicy")
+	extra.Set("PolicyDocument", `{}`)
+	w := doIAM(t, handler, "CreatePolicy", extra)
+	requireOK(t, w, "first CreatePolicy")
+
+	// Duplicate.
+	w = doIAM(t, handler, "CreatePolicy", extra)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("CreatePolicy duplicate: expected 409, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "EntityAlreadyExists") {
+		t.Errorf("CreatePolicy duplicate: expected EntityAlreadyExists\nbody: %s", body)
+	}
+}
+
 // ---- Test: AttachRolePolicy + ListAttachedRolePolicies ----
 
 func TestIAM_AttachRolePolicy_ListAttached(t *testing.T) {

@@ -505,6 +505,217 @@ func TestKMS_EncryptByAlias(t *testing.T) {
 	}
 }
 
+// ---- Encrypt with disabled key — DisabledException ----
+
+func TestKMS_Encrypt_DisabledKey(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create and disable a key.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, kmsReq(t, "DisableKey", map[string]string{"KeyId": keyID}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("setup DisableKey: %d %s", wd.Code, wd.Body.String())
+	}
+
+	// Encrypt with disabled key should fail.
+	plaintextB64 := base64.StdEncoding.EncodeToString([]byte("test"))
+	we := httptest.NewRecorder()
+	handler.ServeHTTP(we, kmsReq(t, "Encrypt", map[string]string{
+		"KeyId":     keyID,
+		"Plaintext": plaintextB64,
+	}))
+	if we.Code != http.StatusBadRequest {
+		t.Fatalf("Encrypt disabled key: expected 400, got %d\nbody: %s", we.Code, we.Body.String())
+	}
+	body := we.Body.String()
+	if !strings.Contains(body, "Disabled") && !strings.Contains(body, "disabled") {
+		t.Errorf("Encrypt disabled key: expected DisabledException in body\nbody: %s", body)
+	}
+}
+
+// ---- NotFoundException — DescribeKey nonexistent (explicit code check) ----
+
+func TestKMS_DescribeKey_NotFoundException(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kmsReq(t, "DescribeKey", map[string]string{
+		"KeyId": "00000000-0000-0000-0000-000000000000",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeKey not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NotFoundException") {
+		t.Errorf("DescribeKey not found: expected NotFoundException in body\nbody: %s", body)
+	}
+}
+
+// ---- NotFoundException — Encrypt with nonexistent key ----
+
+func TestKMS_Encrypt_KeyNotFound(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	plaintextB64 := base64.StdEncoding.EncodeToString([]byte("hello"))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kmsReq(t, "Encrypt", map[string]string{
+		"KeyId":     "00000000-0000-0000-0000-000000000000",
+		"Plaintext": plaintextB64,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Encrypt key not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NotFoundException") {
+		t.Errorf("Encrypt key not found: expected NotFoundException in body\nbody: %s", body)
+	}
+}
+
+// ---- CreateAlias — duplicate (AlreadyExistsException) ----
+
+func TestKMS_CreateAlias_AlreadyExists(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create key + alias.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	wa := httptest.NewRecorder()
+	handler.ServeHTTP(wa, kmsReq(t, "CreateAlias", map[string]string{
+		"AliasName":   "alias/dup-test",
+		"TargetKeyId": keyID,
+	}))
+	if wa.Code != http.StatusOK {
+		t.Fatalf("setup CreateAlias: %d %s", wa.Code, wa.Body.String())
+	}
+
+	// Create same alias again — should fail.
+	wa2 := httptest.NewRecorder()
+	handler.ServeHTTP(wa2, kmsReq(t, "CreateAlias", map[string]string{
+		"AliasName":   "alias/dup-test",
+		"TargetKeyId": keyID,
+	}))
+	if wa2.Code != http.StatusConflict {
+		t.Fatalf("CreateAlias duplicate: expected 409, got %d\nbody: %s", wa2.Code, wa2.Body.String())
+	}
+	body := wa2.Body.String()
+	if !strings.Contains(body, "AlreadyExistsException") {
+		t.Errorf("CreateAlias duplicate: expected AlreadyExistsException\nbody: %s", body)
+	}
+}
+
+// ---- ScheduleKeyDeletion — encrypt after deletion scheduled ----
+
+func TestKMS_Encrypt_AfterScheduledDeletion(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create a key.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	// Schedule deletion.
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, kmsReq(t, "ScheduleKeyDeletion", map[string]any{
+		"KeyId":               keyID,
+		"PendingWindowInDays": 7,
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("setup ScheduleKeyDeletion: %d %s", ws.Code, ws.Body.String())
+	}
+
+	// Encrypt should fail (key is PendingDeletion).
+	plaintextB64 := base64.StdEncoding.EncodeToString([]byte("test"))
+	we := httptest.NewRecorder()
+	handler.ServeHTTP(we, kmsReq(t, "Encrypt", map[string]string{
+		"KeyId":     keyID,
+		"Plaintext": plaintextB64,
+	}))
+	if we.Code != http.StatusBadRequest {
+		t.Fatalf("Encrypt after scheduled deletion: expected 400, got %d\nbody: %s", we.Code, we.Body.String())
+	}
+
+	// EnableKey on PendingDeletion key should also fail.
+	wek := httptest.NewRecorder()
+	handler.ServeHTTP(wek, kmsReq(t, "EnableKey", map[string]string{"KeyId": keyID}))
+	if wek.Code != http.StatusBadRequest {
+		t.Fatalf("EnableKey pending deletion: expected 400, got %d\nbody: %s", wek.Code, wek.Body.String())
+	}
+}
+
+// ---- Decrypt roundtrip by alias ----
+
+func TestKMS_DecryptByAlias_RoundTrip(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create key + alias.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("setup CreateKey: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	wa := httptest.NewRecorder()
+	handler.ServeHTTP(wa, kmsReq(t, "CreateAlias", map[string]string{
+		"AliasName":   "alias/decrypt-rt",
+		"TargetKeyId": keyID,
+	}))
+	if wa.Code != http.StatusOK {
+		t.Fatalf("setup CreateAlias: %d %s", wa.Code, wa.Body.String())
+	}
+
+	// Encrypt using alias.
+	originalText := "alias roundtrip test"
+	plaintextB64 := base64.StdEncoding.EncodeToString([]byte(originalText))
+	we := httptest.NewRecorder()
+	handler.ServeHTTP(we, kmsReq(t, "Encrypt", map[string]string{
+		"KeyId":     "alias/decrypt-rt",
+		"Plaintext": plaintextB64,
+	}))
+	if we.Code != http.StatusOK {
+		t.Fatalf("Encrypt via alias: %d %s", we.Code, we.Body.String())
+	}
+	me := decodeJSON(t, we.Body.String())
+	ciphertextB64 := me["CiphertextBlob"].(string)
+
+	// Decrypt — KMS should find the key from the ciphertext.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, kmsReq(t, "Decrypt", map[string]string{
+		"CiphertextBlob": ciphertextB64,
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("Decrypt alias roundtrip: %d %s", wd.Code, wd.Body.String())
+	}
+	md := decodeJSON(t, wd.Body.String())
+	decryptedB64 := md["Plaintext"].(string)
+	decrypted, err := base64.StdEncoding.DecodeString(decryptedB64)
+	if err != nil {
+		t.Fatalf("Decrypt base64 decode: %v", err)
+	}
+	if string(decrypted) != originalText {
+		t.Errorf("Decrypt: expected %q, got %q", originalText, string(decrypted))
+	}
+}
+
 // ---- UnknownAction ----
 
 func TestKMS_UnknownAction(t *testing.T) {

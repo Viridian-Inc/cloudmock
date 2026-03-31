@@ -28,6 +28,9 @@ import (
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/neureaux/cloudmock/pkg/saas/clerk"
+	saasstripe "github.com/neureaux/cloudmock/pkg/saas/stripe"
+	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	"github.com/neureaux/cloudmock/pkg/webhook"
@@ -108,6 +111,10 @@ type API struct {
 	dp               *dataplane.DataPlane
 	prefsMu          sync.RWMutex
 	prefs            map[string]map[string]json.RawMessage
+	sourceServer     *SourceServer
+	tenantStore      tenant.Store
+	clerkWebhook     *clerk.WebhookHandler
+	stripeWebhook    *saasstripe.WebhookHandler
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -117,6 +124,11 @@ type API struct {
 func (a *API) SetRequestLog(log *gateway.RequestLog, stats *gateway.RequestStats) {
 	a.log = log
 	a.stats = stats
+}
+
+// SetSourceServer wires the source server for HTTP event ingestion.
+func (a *API) SetSourceServer(ss *SourceServer) {
+	a.sourceServer = ss
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -175,6 +187,15 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
 	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
+	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
+	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
+
+	// SaaS hosted-tier endpoints
+	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)
+	a.mux.HandleFunc("/api/usage", a.handleUsage)
+	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
+	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
+	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
 
 	return a
 }
@@ -248,6 +269,15 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
 	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
+	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
+	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
+
+	// SaaS hosted-tier endpoints
+	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)
+	a.mux.HandleFunc("/api/usage", a.handleUsage)
+	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
+	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
+	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
 
 	return a
 }
@@ -2444,14 +2474,28 @@ type ExplainAnalysis struct {
 }
 
 // handleExplainRequest returns AI-ready context for a specific request.
-// GET /api/explain/{requestId}
+// GET  /api/explain/{requestId}
+// POST /api/explain/  with JSON body {"request_id": "..."}
 func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
+	var reqID string
+
+	switch r.Method {
+	case http.MethodGet:
+		reqID = strings.TrimPrefix(r.URL.Path, "/api/explain/")
+	case http.MethodPost:
+		var body struct {
+			RequestID string `json:"request_id"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid JSON body")
+			return
+		}
+		reqID = body.RequestID
+	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
 
-	reqID := strings.TrimPrefix(r.URL.Path, "/api/explain/")
 	if reqID == "" {
 		writeError(w, http.StatusBadRequest, "request ID required")
 		return
@@ -3310,6 +3354,21 @@ func (a *API) SetAuthSecret(secret []byte) {
 	a.authSecret = secret
 }
 
+// SetTenantStore sets the SaaS tenant store for hosted-tier endpoints.
+func (a *API) SetTenantStore(s tenant.Store) {
+	a.tenantStore = s
+}
+
+// SetClerkWebhook sets the Clerk webhook handler for /api/webhooks/clerk.
+func (a *API) SetClerkWebhook(h *clerk.WebhookHandler) {
+	a.clerkWebhook = h
+}
+
+// SetStripeWebhook sets the Stripe webhook handler for /api/webhooks/stripe.
+func (a *API) SetStripeWebhook(h *saasstripe.WebhookHandler) {
+	a.stripeWebhook = h
+}
+
 // handleAuthLogin handles POST /api/auth/login.
 func (a *API) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
@@ -3680,4 +3739,279 @@ func (a *API) prefsListByNamespace(ctx context.Context, namespace string) (map[s
 		}
 	}
 	return result, nil
+}
+
+// handleSourceEvents accepts SDK events via HTTP POST.
+// POST /api/source/events — single event or JSON array of events.
+func (a *API) handleSourceEvents(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	var raw json.RawMessage
+	if err := json.NewDecoder(r.Body).Decode(&raw); err != nil {
+		http.Error(w, "invalid JSON: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var events []sdkEvent
+	if err := json.Unmarshal(raw, &events); err != nil {
+		var single sdkEvent
+		if err2 := json.Unmarshal(raw, &single); err2 != nil {
+			http.Error(w, "invalid event format", http.StatusBadRequest)
+			return
+		}
+		events = []sdkEvent{single}
+	}
+
+	if a.sourceServer != nil {
+		for _, evt := range events {
+			_ = a.sourceServer.IngestSDKEvent(evt)
+		}
+	} else {
+		for _, evt := range events {
+			if evt.Type != "http:inbound" && evt.Type != "http:response" {
+				continue
+			}
+			entry, err := convertSDKEvent(evt)
+			if err != nil {
+				continue
+			}
+			if a.log != nil {
+				a.log.Add(entry)
+			}
+			if a.stats != nil {
+				a.stats.Increment(entry.Service)
+			}
+			if a.broadcaster != nil {
+				a.broadcaster.Broadcast("request", entry)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{"accepted": len(events)})
+}
+
+// handleSourceStatus returns connected source info.
+// GET /api/source/status
+func (a *API) handleSourceStatus(w http.ResponseWriter, r *http.Request) {
+	result := map[string]any{
+		"tcp_sources":  []connectedSource{},
+		"http_sources": []string{},
+		"total_events": int64(0),
+	}
+	if a.sourceServer != nil {
+		result["tcp_sources"] = a.sourceServer.ConnectedSources()
+		result["http_sources"] = a.sourceServer.HTTPSources()
+		result["total_events"] = a.sourceServer.EventCount()
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+// --- SaaS hosted-tier handlers ---
+
+// handleTenantsSaaS handles GET/POST /api/saas/tenants for the hosted SaaS tier.
+// GET  — list all tenants (admin only).
+// POST — create a new tenant.
+func (a *API) handleTenantsSaaS(w http.ResponseWriter, r *http.Request) {
+	if a.tenantStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "SaaS mode is not enabled")
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		tenants, err := a.tenantStore.List(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "failed to list tenants")
+			return
+		}
+		type tenantResponse struct {
+			ID                   string `json:"id"`
+			ClerkOrgID           string `json:"clerk_org_id"`
+			Name                 string `json:"name"`
+			Slug                 string `json:"slug"`
+			Tier                 string `json:"tier"`
+			Status               string `json:"status"`
+			RequestCount         int64  `json:"request_count"`
+			RequestLimit         int64  `json:"request_limit"`
+			StripeCustomerID     string `json:"stripe_customer_id,omitempty"`
+			StripeSubscriptionID string `json:"stripe_subscription_id,omitempty"`
+			FlyAppName           string `json:"fly_app_name,omitempty"`
+			CreatedAt            string `json:"created_at"`
+		}
+		result := make([]tenantResponse, 0, len(tenants))
+		for _, t := range tenants {
+			result = append(result, tenantResponse{
+				ID:                   t.ID,
+				ClerkOrgID:           t.ClerkOrgID,
+				Name:                 t.Name,
+				Slug:                 t.Slug,
+				Tier:                 t.Tier,
+				Status:               t.Status,
+				RequestCount:         t.RequestCount,
+				RequestLimit:         t.RequestLimit,
+				StripeCustomerID:     t.StripeCustomerID,
+				StripeSubscriptionID: t.StripeSubscriptionID,
+				FlyAppName:           t.FlyAppName,
+				CreatedAt:            t.CreatedAt.Format(time.RFC3339),
+			})
+		}
+		writeJSON(w, http.StatusOK, result)
+
+	case http.MethodPost:
+		var req struct {
+			Name       string `json:"name"`
+			Slug       string `json:"slug"`
+			ClerkOrgID string `json:"clerk_org_id"`
+			Tier       string `json:"tier"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&req); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid request body")
+			return
+		}
+		if req.Name == "" || req.Slug == "" {
+			writeError(w, http.StatusBadRequest, "name and slug are required")
+			return
+		}
+		tier := req.Tier
+		if tier == "" {
+			tier = "free"
+		}
+		// Default request limits by tier.
+		var requestLimit int64
+		switch tier {
+		case "pro":
+			requestLimit = 100_000
+		case "team":
+			requestLimit = 1_000_000
+		default:
+			requestLimit = 1_000
+		}
+
+		t := &tenant.Tenant{
+			ClerkOrgID:   req.ClerkOrgID,
+			Name:         req.Name,
+			Slug:         req.Slug,
+			Tier:         tier,
+			Status:       "active",
+			RequestLimit: requestLimit,
+		}
+		if err := a.tenantStore.Create(r.Context(), t); err != nil {
+			writeError(w, http.StatusConflict, "failed to create tenant: "+err.Error())
+			return
+		}
+		writeJSON(w, http.StatusCreated, map[string]any{
+			"id":     t.ID,
+			"name":   t.Name,
+			"slug":   t.Slug,
+			"tier":   t.Tier,
+			"status": t.Status,
+		})
+
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+	}
+}
+
+// handleUsage returns current usage for the authenticated user's tenant.
+// GET /api/usage
+func (a *API) handleUsage(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if a.tenantStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "SaaS mode is not enabled")
+		return
+	}
+
+	// Try to get the tenant ID from the query param or X-Tenant-ID header.
+	tenantID := r.URL.Query().Get("tenant_id")
+	if tenantID == "" {
+		tenantID = r.Header.Get("X-Tenant-ID")
+	}
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id query parameter or X-Tenant-ID header is required")
+		return
+	}
+
+	t, err := a.tenantStore.Get(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "tenant not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tenant_id":     t.ID,
+		"request_count": t.RequestCount,
+		"request_limit": t.RequestLimit,
+		"tier":          t.Tier,
+		"usage_percent": usagePercent(t.RequestCount, t.RequestLimit),
+	})
+}
+
+// usagePercent returns the usage percentage (0-100), or 0 if limit is 0.
+func usagePercent(count, limit int64) float64 {
+	if limit <= 0 {
+		return 0
+	}
+	return float64(count) / float64(limit) * 100
+}
+
+// handleSubscription returns subscription status for a tenant.
+// GET /api/subscription
+func (a *API) handleSubscription(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if a.tenantStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "SaaS mode is not enabled")
+		return
+	}
+
+	tenantID := r.URL.Query().Get("tenant_id")
+	if tenantID == "" {
+		tenantID = r.Header.Get("X-Tenant-ID")
+	}
+	if tenantID == "" {
+		writeError(w, http.StatusBadRequest, "tenant_id query parameter or X-Tenant-ID header is required")
+		return
+	}
+
+	t, err := a.tenantStore.Get(r.Context(), tenantID)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "tenant not found")
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"tenant_id":              t.ID,
+		"tier":                   t.Tier,
+		"status":                 t.Status,
+		"stripe_subscription_id": t.StripeSubscriptionID,
+		"stripe_customer_id":     t.StripeCustomerID,
+	})
+}
+
+// handleClerkWebhook delegates POST /api/webhooks/clerk to the Clerk webhook handler.
+func (a *API) handleClerkWebhook(w http.ResponseWriter, r *http.Request) {
+	if a.clerkWebhook == nil {
+		writeError(w, http.StatusServiceUnavailable, "Clerk webhooks not configured")
+		return
+	}
+	a.clerkWebhook.HandleWebhook(w, r)
+}
+
+// handleStripeWebhook delegates POST /api/webhooks/stripe to the Stripe webhook handler.
+func (a *API) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
+	if a.stripeWebhook == nil {
+		writeError(w, http.StatusServiceUnavailable, "Stripe webhooks not configured")
+		return
+	}
+	a.stripeWebhook.HandleWebhook(w, r)
 }

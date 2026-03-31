@@ -208,6 +208,7 @@ type SaaSConfig struct {
 type ClerkConfig struct {
 	SecretKey     string `yaml:"secret_key"`
 	WebhookSecret string `yaml:"webhook_secret"`
+	Domain        string `yaml:"domain"` // Clerk frontend API domain (e.g. "abc.clerk.accounts.dev")
 }
 
 // StripeConfig holds Stripe billing configuration.
@@ -397,6 +398,9 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLERK_WEBHOOK_SECRET"); v != "" {
 		c.SaaS.Clerk.WebhookSecret = v
+	}
+	if v := os.Getenv("CLERK_DOMAIN"); v != "" {
+		c.SaaS.Clerk.Domain = v
 	}
 	if v := os.Getenv("STRIPE_SECRET_KEY"); v != "" {
 		c.SaaS.Stripe.SecretKey = v

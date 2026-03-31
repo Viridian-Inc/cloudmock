@@ -7,7 +7,13 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+// ServiceLocator resolves other services for cross-service integration.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
 
 // Pipe represents an EventBridge Pipe.
 type Pipe struct {
@@ -26,6 +32,9 @@ type Pipe struct {
 	LastModifiedTime time.Time
 	Lifecycle        *lifecycle.Machine
 	Tags             map[string]string
+	// Behavioral fields
+	EventsForwarded int
+	cancelPolling   func()
 }
 
 // Store manages all Pipes state in memory.
@@ -35,6 +44,7 @@ type Store struct {
 	accountID       string
 	region          string
 	lifecycleConfig *lifecycle.Config
+	locator         ServiceLocator
 }
 
 // NewStore returns a new Store for the given account and region.

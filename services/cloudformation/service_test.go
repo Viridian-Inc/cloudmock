@@ -440,7 +440,153 @@ func TestCFN_ListExports(t *testing.T) {
 	}
 }
 
-// ---- Test 9: DescribeStackEvents ----
+// ---- Test 9: CreateStack AlreadyExistsException ----
+
+func TestCFN_CreateStack_AlreadyExists(t *testing.T) {
+	handler := newCFNGateway(t)
+	mustCreateStack(t, handler, "exists-stack")
+
+	// Try to create again
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "CreateStack", url.Values{
+		"StackName":    {"exists-stack"},
+		"TemplateBody": {sampleTemplate},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateStack duplicate: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "AlreadyExistsException") {
+		t.Errorf("CreateStack duplicate: expected AlreadyExistsException\nbody: %s", body)
+	}
+}
+
+// ---- Test 10: DescribeStacks nonexistent shows no stacks or error ----
+
+func TestCFN_DescribeStacks_NonExistent(t *testing.T) {
+	handler := newCFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "DescribeStacks", url.Values{
+		"StackName": {"nonexistent-stack"},
+	}))
+	// CloudFormation returns 400 for nonexistent stacks
+	if w.Code != http.StatusBadRequest && w.Code != http.StatusOK {
+		t.Fatalf("DescribeStacks nonexistent: unexpected status %d\nbody: %s", w.Code, w.Body.String())
+	}
+	// If 200, there should be no stack members in the response
+	if w.Code == http.StatusOK {
+		body := w.Body.String()
+		if strings.Contains(body, "nonexistent-stack") {
+			t.Errorf("DescribeStacks nonexistent: should not find nonexistent-stack\nbody: %s", body)
+		}
+	}
+}
+
+// ---- Test 11: DescribeStackResources for stack with template resources ----
+
+func TestCFN_DescribeStackResources_Detailed(t *testing.T) {
+	handler := newCFNGateway(t)
+	mustCreateStack(t, handler, "detailed-resource-stack")
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"detailed-resource-stack"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+	// Verify resource status
+	if !strings.Contains(body, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", body)
+	}
+
+	// Parse and count resources (template has MyBucket + MyQueue)
+	var resp struct {
+		Result struct {
+			Resources []struct {
+				LogicalResourceId string `xml:"LogicalResourceId"`
+				ResourceType      string `xml:"ResourceType"`
+				ResourceStatus    string `xml:"ResourceStatus"`
+			} `xml:"StackResources>member"`
+		} `xml:"DescribeStackResourcesResult"`
+	}
+	if err := xml.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Result.Resources) != 2 {
+		t.Errorf("DescribeStackResources: expected 2 resources, got %d", len(resp.Result.Resources))
+	}
+}
+
+// ---- Test 12: DescribeStackEvents returns creation events ----
+
+func TestCFN_DescribeStackEvents_Detailed(t *testing.T) {
+	handler := newCFNGateway(t)
+	mustCreateStack(t, handler, "events-detail-stack")
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "DescribeStackEvents", url.Values{
+		"StackName": {"events-detail-stack"},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeStackEvents: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+	// Verify the stack event contains resource types
+	if !strings.Contains(body, "AWS::CloudFormation::Stack") {
+		t.Errorf("DescribeStackEvents: expected AWS::CloudFormation::Stack\nbody: %s", body)
+	}
+	// Should have events for the resources too
+	if !strings.Contains(body, "AWS::S3::Bucket") && !strings.Contains(body, "AWS::SQS::Queue") {
+		t.Errorf("DescribeStackEvents: expected resource events\nbody: %s", body)
+	}
+}
+
+// ---- Test 13: ValidateTemplate with parameters ----
+
+func TestCFN_ValidateTemplate_Parameters(t *testing.T) {
+	handler := newCFNGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "ValidateTemplate", url.Values{
+		"TemplateBody": {sampleTemplate},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ValidateTemplate: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	body := w.Body.String()
+	// Should include EnvName parameter
+	if !strings.Contains(body, "EnvName") {
+		t.Errorf("ValidateTemplate: expected EnvName parameter\nbody: %s", body)
+	}
+	// Should include description
+	if !strings.Contains(body, "Test stack for cloudmock") {
+		t.Errorf("ValidateTemplate: expected description\nbody: %s", body)
+	}
+}
+
+// ---- Test 14: DeleteStack idempotent (delete nonexistent stack) ----
+
+func TestCFN_DeleteStack_NonExistent(t *testing.T) {
+	handler := newCFNGateway(t)
+
+	// Deleting nonexistent stack should still return 200 (CloudFormation behavior)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnReq(t, "DeleteStack", url.Values{
+		"StackName": {"nonexistent-stack"},
+	}))
+	// CloudFormation returns 200 for deleting nonexistent stacks
+	if w.Code != http.StatusOK {
+		t.Fatalf("DeleteStack nonexistent: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Original Test 9: DescribeStackEvents ----
 
 func TestCFN_DescribeStackEvents(t *testing.T) {
 	handler := newCFNGateway(t)

@@ -1,0 +1,36 @@
+---
+title: CloudMock
+description: Local AWS emulation for developers. Run 98 AWS services on your laptop with a single binary.
+template: splash
+hero:
+  tagline: A standalone, open-source local AWS emulator. Run a single binary and point your SDKs at localhost — no internet required.
+  actions:
+    - text: Get Started
+      link: /getting-started/installation/
+      icon: right-arrow
+      variant: primary
+    - text: View on GitHub
+      link: https://github.com/neureaux/cloudmock
+      icon: external
+---
+
+import { Card, CardGrid } from "@astrojs/starlight/components";
+
+<CardGrid>
+  <Card title="24 fully emulated services" icon="rocket">
+    S3, DynamoDB, SQS, SNS, Lambda, Cognito, and 18 more with complete API
+    coverage. 74 additional services with CRUD stubs.
+  </Card>
+  <Card title="Zero dependencies" icon="seti:config">
+    Pure Go binary. No database, no Docker requirement, no JVM. Starts in under
+    a second.
+  </Card>
+  <Card title="Real IAM enforcement" icon="approve-check-circle">
+    Full policy evaluation, credential verification, or no-auth mode. Test your
+    IAM policies locally before deploying.
+  </Card>
+  <Card title="Built-in dashboard" icon="laptop">
+    Web UI at localhost:4500 for inspecting services, resources, and request
+    logs. No extra tooling needed.
+  </Card>
+</CardGrid>

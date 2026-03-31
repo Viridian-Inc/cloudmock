@@ -613,6 +613,340 @@ func TestCognito_AdminDeleteUser(t *testing.T) {
 	}
 }
 
+// ---- Test: DescribeUserPool — ResourceNotFoundException ----
+
+func TestCognito_DescribeUserPool_NotFound(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cognitoReq(t, "DescribeUserPool", map[string]any{
+		"UserPoolId": "us-east-1_NONEXISTENT",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeUserPool not found: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "ResourceNotFoundException") {
+		t.Errorf("DescribeUserPool not found: expected ResourceNotFoundException in body\nbody: %s", body)
+	}
+}
+
+// ---- Test: ListUserPools — empty and populated ----
+
+func TestCognito_ListUserPools_Empty(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cognitoReq(t, "ListUserPools", map[string]any{
+		"MaxResults": 10,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListUserPools empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	pools, _ := m["UserPools"].([]any)
+	if len(pools) != 0 {
+		t.Errorf("ListUserPools empty: expected 0 pools, got %d", len(pools))
+	}
+}
+
+// ---- Test: SignUp — UsernameExistsException ----
+
+func TestCognito_SignUp_UsernameExistsException(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	// Create pool + client.
+	wcp := httptest.NewRecorder()
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
+		"PoolName": "dup-signup-pool",
+	}))
+	if wcp.Code != http.StatusOK {
+		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
+	}
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
+
+	wcc := httptest.NewRecorder()
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
+		"UserPoolId": poolID,
+		"ClientName": "dup-client",
+	}))
+	if wcc.Code != http.StatusOK {
+		t.Fatalf("setup CreateUserPoolClient: %d %s", wcc.Code, wcc.Body.String())
+	}
+	clientID := decodeJSON(t, wcc.Body.String())["UserPoolClient"].(map[string]any)["ClientId"].(string)
+
+	// First sign-up.
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, cognitoReq(t, "SignUp", map[string]any{
+		"ClientId": clientID,
+		"Username": "duplicate@example.com",
+		"Password": "Pass123!",
+	}))
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first SignUp: %d %s", w1.Code, w1.Body.String())
+	}
+
+	// Second sign-up — same username.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, cognitoReq(t, "SignUp", map[string]any{
+		"ClientId": clientID,
+		"Username": "duplicate@example.com",
+		"Password": "Pass456!",
+	}))
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("duplicate SignUp: expected 400, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+	body := w2.Body.String()
+	if !strings.Contains(body, "UsernameExistsException") {
+		t.Errorf("duplicate SignUp: expected UsernameExistsException in body\nbody: %s", body)
+	}
+}
+
+// ---- Test: AdminCreateUser — UsernameExistsException ----
+
+func TestCognito_AdminCreateUser_UsernameExistsException(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	// Create pool.
+	wcp := httptest.NewRecorder()
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
+		"PoolName": "dup-admin-pool",
+	}))
+	if wcp.Code != http.StatusOK {
+		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
+	}
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
+
+	// First admin create.
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, cognitoReq(t, "AdminCreateUser", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "admin-dup@example.com",
+	}))
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first AdminCreateUser: %d %s", w1.Code, w1.Body.String())
+	}
+
+	// Second admin create — same username.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, cognitoReq(t, "AdminCreateUser", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "admin-dup@example.com",
+	}))
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("duplicate AdminCreateUser: expected 400, got %d\nbody: %s", w2.Code, w2.Body.String())
+	}
+	body := w2.Body.String()
+	if !strings.Contains(body, "UsernameExistsException") {
+		t.Errorf("duplicate AdminCreateUser: expected UsernameExistsException in body\nbody: %s", body)
+	}
+}
+
+// ---- Test: InitiateAuth — NotAuthorizedException (explicit error code check) ----
+
+func TestCognito_InitiateAuth_NotAuthorizedException(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	// Setup: pool, client, user.
+	wcp := httptest.NewRecorder()
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
+		"PoolName": "notauth-pool",
+	}))
+	if wcp.Code != http.StatusOK {
+		t.Fatalf("setup: %d %s", wcp.Code, wcp.Body.String())
+	}
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
+
+	wcc := httptest.NewRecorder()
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
+		"UserPoolId": poolID,
+		"ClientName": "notauth-client",
+	}))
+	if wcc.Code != http.StatusOK {
+		t.Fatalf("setup: %d %s", wcc.Code, wcc.Body.String())
+	}
+	clientID := decodeJSON(t, wcc.Body.String())["UserPoolClient"].(map[string]any)["ClientId"].(string)
+
+	wsu := httptest.NewRecorder()
+	handler.ServeHTTP(wsu, cognitoReq(t, "SignUp", map[string]any{
+		"ClientId": clientID,
+		"Username": "authuser@example.com",
+		"Password": "CorrectPass123!",
+	}))
+	if wsu.Code != http.StatusOK {
+		t.Fatalf("setup SignUp: %d %s", wsu.Code, wsu.Body.String())
+	}
+
+	// Confirm the user.
+	wconf := httptest.NewRecorder()
+	handler.ServeHTTP(wconf, cognitoReq(t, "AdminConfirmSignUp", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "authuser@example.com",
+	}))
+	if wconf.Code != http.StatusOK {
+		t.Fatalf("setup AdminConfirmSignUp: %d %s", wconf.Code, wconf.Body.String())
+	}
+
+	// Wrong password should return NotAuthorizedException.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cognitoReq(t, "InitiateAuth", map[string]any{
+		"AuthFlow": "USER_PASSWORD_AUTH",
+		"ClientId": clientID,
+		"AuthParameters": map[string]string{
+			"USERNAME": "authuser@example.com",
+			"PASSWORD": "WrongPass!",
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("InitiateAuth wrong password: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "NotAuthorizedException") {
+		t.Errorf("InitiateAuth wrong password: expected NotAuthorizedException in body\nbody: %s", body)
+	}
+}
+
+// ---- Test: ListUserPoolClients ----
+
+func TestCognito_ListUserPoolClients(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	// Create pool.
+	wcp := httptest.NewRecorder()
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
+		"PoolName": "list-clients-pool",
+	}))
+	if wcp.Code != http.StatusOK {
+		t.Fatalf("setup CreateUserPool: %d %s", wcp.Code, wcp.Body.String())
+	}
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
+
+	// Create two clients.
+	for _, name := range []string{"client-a", "client-b"} {
+		wcc := httptest.NewRecorder()
+		handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
+			"UserPoolId": poolID,
+			"ClientName": name,
+		}))
+		if wcc.Code != http.StatusOK {
+			t.Fatalf("setup CreateUserPoolClient %s: %d %s", name, wcc.Code, wcc.Body.String())
+		}
+	}
+
+	// ListUserPoolClients.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cognitoReq(t, "ListUserPoolClients", map[string]any{
+		"UserPoolId": poolID,
+		"MaxResults": 10,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListUserPoolClients: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	clients, ok := m["UserPoolClients"].([]any)
+	if !ok || len(clients) < 2 {
+		t.Fatalf("ListUserPoolClients: expected 2+ clients, got %v\nbody: %s", clients, w.Body.String())
+	}
+
+	// ListUserPoolClients on non-existent pool.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, cognitoReq(t, "ListUserPoolClients", map[string]any{
+		"UserPoolId": "us-east-1_NONEXISTENT",
+		"MaxResults": 10,
+	}))
+	if wne.Code != http.StatusBadRequest {
+		t.Fatalf("ListUserPoolClients nonexistent pool: expected 400, got %d\nbody: %s", wne.Code, wne.Body.String())
+	}
+}
+
+// ---- Test: AdminSetUserPassword ----
+
+func TestCognito_AdminSetUserPassword(t *testing.T) {
+	handler := newCognitoGateway(t)
+
+	// Setup pool + user.
+	wcp := httptest.NewRecorder()
+	handler.ServeHTTP(wcp, cognitoReq(t, "CreateUserPool", map[string]any{
+		"PoolName": "set-pw-pool",
+	}))
+	if wcp.Code != http.StatusOK {
+		t.Fatalf("setup: %d %s", wcp.Code, wcp.Body.String())
+	}
+	poolID := decodeJSON(t, wcp.Body.String())["UserPool"].(map[string]any)["Id"].(string)
+
+	wcc := httptest.NewRecorder()
+	handler.ServeHTTP(wcc, cognitoReq(t, "CreateUserPoolClient", map[string]any{
+		"UserPoolId": poolID,
+		"ClientName": "pw-client",
+	}))
+	if wcc.Code != http.StatusOK {
+		t.Fatalf("setup: %d %s", wcc.Code, wcc.Body.String())
+	}
+	clientID := decodeJSON(t, wcc.Body.String())["UserPoolClient"].(map[string]any)["ClientId"].(string)
+
+	wcu := httptest.NewRecorder()
+	handler.ServeHTTP(wcu, cognitoReq(t, "AdminCreateUser", map[string]any{
+		"UserPoolId":        poolID,
+		"Username":          "pw-user@example.com",
+		"TemporaryPassword": "TempPass123!",
+	}))
+	if wcu.Code != http.StatusOK {
+		t.Fatalf("setup: %d %s", wcu.Code, wcu.Body.String())
+	}
+
+	// Set permanent password.
+	wsp := httptest.NewRecorder()
+	handler.ServeHTTP(wsp, cognitoReq(t, "AdminSetUserPassword", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "pw-user@example.com",
+		"Password":   "NewPerm123!",
+		"Permanent":  true,
+	}))
+	if wsp.Code != http.StatusOK {
+		t.Fatalf("AdminSetUserPassword: expected 200, got %d\nbody: %s", wsp.Code, wsp.Body.String())
+	}
+
+	// Verify user status is CONFIRMED after permanent password.
+	wgu := httptest.NewRecorder()
+	handler.ServeHTTP(wgu, cognitoReq(t, "AdminGetUser", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "pw-user@example.com",
+	}))
+	if wgu.Code != http.StatusOK {
+		t.Fatalf("AdminGetUser: %d %s", wgu.Code, wgu.Body.String())
+	}
+	mgu := decodeJSON(t, wgu.Body.String())
+	if mgu["UserStatus"].(string) != "CONFIRMED" {
+		t.Errorf("AdminSetUserPassword permanent: expected UserStatus=CONFIRMED, got %q", mgu["UserStatus"])
+	}
+
+	// Now auth should work with the new password.
+	wia := httptest.NewRecorder()
+	handler.ServeHTTP(wia, cognitoReq(t, "InitiateAuth", map[string]any{
+		"AuthFlow": "USER_PASSWORD_AUTH",
+		"ClientId": clientID,
+		"AuthParameters": map[string]string{
+			"USERNAME": "pw-user@example.com",
+			"PASSWORD": "NewPerm123!",
+		},
+	}))
+	if wia.Code != http.StatusOK {
+		t.Fatalf("InitiateAuth after password set: expected 200, got %d\nbody: %s", wia.Code, wia.Body.String())
+	}
+
+	// AdminSetUserPassword on non-existent user.
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, cognitoReq(t, "AdminSetUserPassword", map[string]any{
+		"UserPoolId": poolID,
+		"Username":   "nonexistent@example.com",
+		"Password":   "Pass123!",
+		"Permanent":  true,
+	}))
+	if wne.Code != http.StatusBadRequest {
+		t.Fatalf("AdminSetUserPassword nonexistent: expected 400, got %d\nbody: %s", wne.Code, wne.Body.String())
+	}
+}
+
 // ---- Unknown action ----
 
 func TestCognito_UnknownAction(t *testing.T) {

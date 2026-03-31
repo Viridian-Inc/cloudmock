@@ -1321,3 +1321,192 @@ func TestDDB_TransactGetItems(t *testing.T) {
 		t.Errorf("TransactGetItems: expected second item name=Bob, got %v", name1)
 	}
 }
+
+// ---- Verification: ResourceNotFoundException — PutItem on nonexistent table ----
+
+func TestDDB_PutItem_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "PutItem", map[string]any{
+		"TableName": "NonExistentTable",
+		"Item": map[string]any{
+			"pk": map[string]any{"S": "test"},
+			"sk": map[string]any{"S": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutItem nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutItem nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — GetItem on nonexistent table ----
+
+func TestDDB_GetItem_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "GetItem", map[string]any{
+		"TableName": "NonExistentTable",
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "test"},
+			"sk": map[string]any{"S": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetItem nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("GetItem nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — Query on nonexistent table ----
+
+func TestDDB_Query_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "Query", map[string]any{
+		"TableName":              "NonExistentTable",
+		"KeyConditionExpression": "pk = :pk",
+		"ExpressionAttributeValues": map[string]any{
+			":pk": map[string]any{"S": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Query nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("Query nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — Scan on nonexistent table ----
+
+func TestDDB_Scan_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "Scan", map[string]any{
+		"TableName": "NonExistentTable",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("Scan nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("Scan nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — DeleteItem on nonexistent table ----
+
+func TestDDB_DeleteItem_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "DeleteItem", map[string]any{
+		"TableName": "NonExistentTable",
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "test"},
+			"sk": map[string]any{"S": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteItem nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DeleteItem nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — UpdateItem on nonexistent table ----
+
+func TestDDB_UpdateItem_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "UpdateItem", map[string]any{
+		"TableName": "NonExistentTable",
+		"Key": map[string]any{
+			"pk": map[string]any{"S": "test"},
+			"sk": map[string]any{"S": "test"},
+		},
+		"UpdateExpression": "SET #n = :v",
+		"ExpressionAttributeNames": map[string]string{
+			"#n": "name",
+		},
+		"ExpressionAttributeValues": map[string]any{
+			":v": map[string]any{"S": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("UpdateItem nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("UpdateItem nonexistent table: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Verification: ValidationException — CreateTable missing key schema ----
+
+func TestDDB_CreateTable_ValidationException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	// Missing KeySchema entirely.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
+		"TableName": "bad-table",
+		"AttributeDefinitions": []map[string]string{
+			{"AttributeName": "pk", "AttributeType": "S"},
+		},
+		"BillingMode": "PAY_PER_REQUEST",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateTable missing KeySchema: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	errType, _ := m["__type"].(string)
+	if errType != "ValidationException" {
+		t.Errorf("CreateTable validation: expected ValidationException, got %q", errType)
+	}
+}
+
+// ---- Verification: ResourceNotFoundException — TransactWriteItems on nonexistent table ----
+
+func TestDDB_TransactWriteItems_ResourceNotFoundException(t *testing.T) {
+	handler := newDDBGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "TransactWriteItems", map[string]any{
+		"TransactItems": []map[string]any{
+			{
+				"Put": map[string]any{
+					"TableName": "NonExistentTxTable",
+					"Item": map[string]any{
+						"pk": map[string]any{"S": "test"},
+						"sk": map[string]any{"S": "test"},
+					},
+				},
+			},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("TransactWriteItems nonexistent table: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}

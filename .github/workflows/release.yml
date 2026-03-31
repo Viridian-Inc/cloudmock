@@ -15,10 +15,20 @@ jobs:
         run: cd dashboard && npm ci && npm run build && cp -r dist/ ../pkg/dashboard/dist/
       - name: Build binaries
         run: make release
+      - name: Package release archives
+        run: |
+          cd dist
+          for bin in cloudmock-linux-amd64 cloudmock-linux-arm64 cloudmock-darwin-amd64 cloudmock-darwin-arm64; do
+            tar czf "${bin}.tar.gz" "${bin}" -C .. bin/cmk --transform='s|bin/||'
+          done
+          zip cloudmock-windows-amd64.zip cloudmock-windows-amd64.exe ../bin/cmk
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/*
+          files: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/cloudmock-*
           generate_release_notes: true
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
@@ -27,3 +37,9 @@ jobs:
           tags: |
             ghcr.io/neureaux/cloudmock:${{ github.ref_name }}
             ghcr.io/neureaux/cloudmock:latest
+      - name: Publish npm package
+        run: |
+          cd npm/cloudmock
+          npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

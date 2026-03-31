@@ -1,0 +1,335 @@
+---
+const title = "Pricing -- CloudMock";
+const description = "Free for local development. Hosted endpoints for teams.";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @import "../styles/homepage.css";
+      @import "../styles/pricing.css";
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="nav">
+      <div class="nav-inner">
+        <a href="/" class="nav-logo">CloudMock</a>
+        <ul class="nav-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/neureaux/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Pricing Hero -->
+    <section class="pricing-hero">
+      <div class="container">
+        <h1>Pricing</h1>
+        <p>
+          Free for local development. Hosted endpoints for teams that need
+          shared environments.
+        </p>
+      </div>
+    </section>
+
+    <!-- Tier Cards -->
+    <section style="padding-top: 0;">
+      <div class="container">
+        <div class="pricing-grid">
+          <!-- Free -->
+          <div class="tier-card">
+            <h2 class="tier-name">Free</h2>
+            <p class="tier-desc">
+              Local development. No limits, no account required.
+            </p>
+            <div class="tier-price">
+              <span class="amount">$0</span>
+            </div>
+            <ul class="tier-features">
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Local CLI</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>25 AWS services</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Unlimited local requests</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Built-in devtools</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>1 seat</span>
+              </li>
+              <li>
+                <span class="dash">--</span>
+                <span>No hosted endpoint</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Community support</span>
+              </li>
+            </ul>
+            <div class="tier-cta">
+              <a
+                href="/docs/getting-started/installation/"
+                class="btn-primary">Get Started</a
+              >
+            </div>
+          </div>
+
+          <!-- Pro -->
+          <div class="tier-card featured">
+            <span class="tier-badge">Most Popular</span>
+            <h2 class="tier-name">Pro</h2>
+            <p class="tier-desc">
+              Hosted endpoint for CI/CD and staging environments.
+            </p>
+            <div class="tier-price">
+              <span class="amount">$29</span>
+              <span class="period">/mo</span>
+            </div>
+            <ul class="tier-features">
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Local CLI</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>25 AWS services</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>1M requests/mo (hosted)</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Built-in devtools</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>1 seat</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span
+                  ><span class="label">Hosted:</span> {"{org}"}.cloudmock.io</span
+                >
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Email support</span>
+              </li>
+            </ul>
+            <div class="tier-cta">
+              <button class="btn-disabled" disabled>Coming Soon</button>
+            </div>
+          </div>
+
+          <!-- Team -->
+          <div class="tier-card">
+            <h2 class="tier-name">Team</h2>
+            <p class="tier-desc">
+              Shared hosted environment for your entire team.
+            </p>
+            <div class="tier-price">
+              <span class="amount">$99</span>
+              <span class="period">/mo</span>
+            </div>
+            <ul class="tier-features">
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Local CLI</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>25 AWS services</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>10M requests/mo (hosted)</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Built-in devtools</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>10 seats</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span
+                  ><span class="label">Hosted:</span> {"{org}"}.cloudmock.io</span
+                >
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Priority support</span>
+              </li>
+            </ul>
+            <div class="tier-cta">
+              <button class="btn-disabled" disabled>Coming Soon</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Comparison Table -->
+    <section class="comparison-section">
+      <div class="container">
+        <div class="section-header-center">
+          <h2 class="section-title">Compare plans</h2>
+        </div>
+        <div class="comparison-table-wrap">
+          <table class="comparison-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>Free</th>
+                <th class="highlight-col">Pro</th>
+                <th>Team</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Price</td>
+                <td>$0</td>
+                <td class="highlight-col">$29/mo</td>
+                <td>$99/mo</td>
+              </tr>
+              <tr>
+                <td>Local CLI</td>
+                <td>Yes</td>
+                <td class="highlight-col">Yes</td>
+                <td>Yes</td>
+              </tr>
+              <tr>
+                <td>Hosted endpoint</td>
+                <td>No</td>
+                <td class="highlight-col">{"{org}"}.cloudmock.io</td>
+                <td>{"{org}"}.cloudmock.io</td>
+              </tr>
+              <tr>
+                <td>Services</td>
+                <td>25</td>
+                <td class="highlight-col">25</td>
+                <td>25</td>
+              </tr>
+              <tr>
+                <td>Requests/mo</td>
+                <td>Unlimited (local)</td>
+                <td class="highlight-col">1M</td>
+                <td>10M</td>
+              </tr>
+              <tr>
+                <td>Seats</td>
+                <td>1</td>
+                <td class="highlight-col">1</td>
+                <td>10</td>
+              </tr>
+              <tr>
+                <td>Devtools</td>
+                <td>Yes</td>
+                <td class="highlight-col">Yes</td>
+                <td>Yes</td>
+              </tr>
+              <tr>
+                <td>Support</td>
+                <td>Community</td>
+                <td class="highlight-col">Email</td>
+                <td>Priority</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- FAQ -->
+    <section class="faq-section">
+      <div class="container">
+        <div class="section-header-center">
+          <h2 class="section-title">Questions</h2>
+        </div>
+        <div class="faq-grid">
+          <div class="faq-item">
+            <h3>Is the local CLI really free?</h3>
+            <p>
+              Yes. CloudMock is Apache-2.0 licensed. The local CLI is free with
+              no usage limits. No account required.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>What are hosted endpoints?</h3>
+            <p>
+              Pro and Team plans include a hosted CloudMock instance at
+              {"{org}"}.cloudmock.io for CI/CD pipelines, staging environments,
+              and shared development.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>When will Pro and Team be available?</h3>
+            <p>
+              Hosted plans are in development. Sign up for the waitlist on
+              GitHub to be notified when they launch.
+            </p>
+          </div>
+          <div class="faq-item">
+            <h3>Can I self-host?</h3>
+            <p>
+              Yes. The binary runs anywhere -- your laptop, a VM, a container.
+              The hosted plans add managed infrastructure and support.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span class="footer-copy">CloudMock</span>
+        <ul class="footer-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/neureaux/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

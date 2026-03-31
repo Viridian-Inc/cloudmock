@@ -161,7 +161,7 @@ Android blocks cleartext HTTP by default. Add to `android/app/src/main/AndroidMa
     ... >
 ```
 
-Or use a more targeted network security config as described in the [Kotlin guide](/language-guides/kotlin/#network-security-config).
+Or use a more targeted network security config as described in the [Kotlin guide](/docs/language-guides/kotlin/#network-security-config).
 
 ### App Transport Security (iOS)
 

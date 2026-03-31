@@ -1,0 +1,267 @@
+/* ===== Pricing Page ===== */
+.pricing-hero {
+  padding: 10rem 0 3rem;
+  text-align: center;
+}
+
+.pricing-hero h1 {
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.pricing-hero p {
+  margin-top: 1rem;
+  color: var(--text-secondary);
+  font-size: 1.125rem;
+  max-width: 520px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* ===== Tier Cards ===== */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  padding: 2rem 0 5rem;
+}
+
+.tier-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 2.5rem 2rem;
+  display: flex;
+  flex-direction: column;
+  transition: border-color 0.2s ease;
+}
+
+.tier-card:hover {
+  border-color: var(--border-light);
+}
+
+.tier-card.featured {
+  border-color: var(--accent);
+  position: relative;
+}
+
+.tier-badge {
+  position: absolute;
+  top: -0.75rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--accent);
+  color: var(--bg-primary);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.875rem;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+
+.tier-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.25rem;
+}
+
+.tier-desc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-bottom: 1.5rem;
+  line-height: 1.5;
+}
+
+.tier-price {
+  display: flex;
+  align-items: baseline;
+  gap: 0.25rem;
+  margin-bottom: 2rem;
+}
+
+.tier-price .amount {
+  font-size: 2.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary);
+}
+
+.tier-price .period {
+  font-size: 0.9375rem;
+  color: var(--text-muted);
+}
+
+/* ===== Feature List ===== */
+.tier-features {
+  list-style: none;
+  flex: 1;
+  margin-bottom: 2rem;
+}
+
+.tier-features li {
+  padding: 0.5rem 0;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.625rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.tier-features li:last-child {
+  border-bottom: none;
+}
+
+.tier-features .check {
+  color: var(--accent);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+  font-weight: 700;
+}
+
+.tier-features .dash {
+  color: var(--text-muted);
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.tier-features .label {
+  color: var(--text-muted);
+  margin-right: 0.25rem;
+}
+
+/* ===== CTA Buttons ===== */
+.tier-cta {
+  margin-top: auto;
+}
+
+.tier-cta .btn-primary,
+.tier-cta .btn-secondary {
+  width: 100%;
+  justify-content: center;
+  text-align: center;
+}
+
+.btn-disabled {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.75rem 1.75rem;
+  background: var(--bg-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.9375rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+/* ===== Comparison Table ===== */
+.comparison-section {
+  padding: 0 0 5rem;
+  border-top: 1px solid var(--border);
+  padding-top: 5rem;
+}
+
+.comparison-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+}
+
+.comparison-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.comparison-table th {
+  text-align: left;
+  padding: 1rem 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.comparison-table th:first-child {
+  border-top-left-radius: var(--radius-lg);
+}
+
+.comparison-table th:last-child {
+  border-top-right-radius: var(--radius-lg);
+}
+
+.comparison-table td {
+  padding: 0.875rem 1.25rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border);
+}
+
+.comparison-table tr:last-child td {
+  border-bottom: none;
+}
+
+.comparison-table td:first-child {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.comparison-table .highlight-col {
+  background: rgba(74, 229, 248, 0.03);
+}
+
+/* ===== FAQ ===== */
+.faq-section {
+  border-top: 1px solid var(--border);
+  padding: 5rem 0;
+}
+
+.faq-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 2rem;
+}
+
+.faq-item h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.faq-item p {
+  color: var(--text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 768px) {
+  .pricing-grid {
+    grid-template-columns: 1fr;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+
+  .faq-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-table {
+    font-size: 0.8125rem;
+  }
+
+  .comparison-table th,
+  .comparison-table td {
+    padding: 0.75rem 1rem;
+  }
+}

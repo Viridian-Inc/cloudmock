@@ -1,0 +1,234 @@
+---
+const title = "CloudMock -- AWS, locally.";
+const description = "Local AWS emulation for developers. 25 services, one binary, built-in devtools. No Docker, no cloud account.";
+
+const services = [
+  "API Gateway",
+  "AppSync",
+  "CloudFormation",
+  "CloudWatch",
+  "CloudWatch Logs",
+  "Cognito",
+  "DynamoDB",
+  "ECR",
+  "ECS",
+  "EventBridge",
+  "Firehose",
+  "IAM",
+  "Kinesis",
+  "KMS",
+  "Lambda",
+  "RDS",
+  "Route 53",
+  "S3",
+  "Secrets Manager",
+  "SES",
+  "SNS",
+  "SQS",
+  "SSM",
+  "Step Functions",
+  "STS",
+];
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cloudmock.io" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @import "../styles/homepage.css";
+    </style>
+  </head>
+  <body>
+    <!-- Navigation -->
+    <nav class="nav">
+      <div class="nav-inner">
+        <a href="/" class="nav-logo">CloudMock</a>
+        <ul class="nav-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/neureaux/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="hero-headline">AWS, locally.</h1>
+        <p class="hero-sub">25 services. One binary. Built-in devtools.</p>
+        <div class="hero-install">
+          <span class="prompt">$</span>
+          <span>npx cloudmock</span>
+        </div>
+        <div class="hero-cta">
+          <a href="/docs/getting-started/installation/" class="btn-primary"
+            >Get Started</a
+          >
+          <a
+            href="https://github.com/neureaux/cloudmock"
+            class="btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer">View on GitHub</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">How it works</p>
+          <h2 class="section-title">Three steps. No configuration.</h2>
+        </div>
+        <div class="steps-grid">
+          <div class="step">
+            <div class="step-number">1</div>
+            <h3>Install</h3>
+            <p>One command. No dependencies, no Docker, no cloud account.</p>
+            <code>npx cloudmock</code>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <h3>Point your SDK</h3>
+            <p>Override the endpoint in your AWS SDK config.</p>
+            <code
+              >const client = new S3Client(&#123;<br />&nbsp;&nbsp;endpoint:
+              "http://localhost:4566",<br />&#125;);</code
+            >
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <h3>Open Devtools</h3>
+            <p>
+              Inspect services, trace requests, and test failure scenarios in the
+              browser.
+            </p>
+            <code>http://localhost:4500</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Grid -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">Features</p>
+          <h2 class="section-title">Everything you need to develop locally</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3>25 AWS Services</h3>
+            <p>
+              S3, DynamoDB, SQS, Lambda, and 21 more. Full API emulation, not
+              stubs. Test your integrations without an AWS account.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Built-in Devtools</h3>
+            <p>
+              Topology map, request tracing, metrics dashboard, and chaos
+              engineering. All accessible at localhost:4500.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>6 Language SDKs</h3>
+            <p>
+              Node, Go, Python, Swift, Kotlin, and Dart. Use your existing AWS
+              SDK -- just change the endpoint.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Zero Config</h3>
+            <p>
+              Works out of the box. No Docker required. No cloud account. No
+              YAML files. Start building in seconds.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Service List -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">Services</p>
+          <h2 class="section-title">25 fully emulated AWS services</h2>
+          <p class="section-desc">
+            Complete API coverage for the services you use most. Each service
+            runs in-process with persistent state.
+          </p>
+        </div>
+        <div class="service-grid">
+          {services.map((name) => <div class="service-item">{name}</div>)}
+        </div>
+      </div>
+    </section>
+
+    <!-- Open Source -->
+    <section class="oss-section">
+      <div class="container">
+        <p class="section-label">Open Source</p>
+        <h2 class="section-title">
+          Apache-2.0. Free forever for local development.
+        </h2>
+        <p class="section-desc">
+          CloudMock is open source. Run it locally without limits, inspect the
+          code, and contribute.
+        </p>
+        <div class="oss-links">
+          <a
+            href="https://github.com/neureaux/cloudmock"
+            class="btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer">View on GitHub</a
+          >
+          <a href="/docs/getting-started/installation/" class="btn-primary"
+            >Get Started</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span class="footer-copy">CloudMock</span>
+        <ul class="footer-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/neureaux/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </footer>
+  </body>
+</html>

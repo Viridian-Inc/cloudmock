@@ -100,7 +100,7 @@ The gateway listens on three ports:
 
 ## Configuration
 
-CloudMock reads configuration from `cloudmock.yml` in the working directory. The defaults work for most use cases. See the [Configuration Reference](/reference/configuration/) for all options.
+CloudMock reads configuration from `cloudmock.yml` in the working directory. The defaults work for most use cases. See the [Configuration Reference](/docs/reference/configuration/) for all options.
 
 Common overrides via environment variables:
 
@@ -117,4 +117,4 @@ CLOUDMOCK_IAM_MODE=none cloudmock start
 
 ## Next step
 
-You have CloudMock running. Now [make your first request](/getting-started/first-request/).
+You have CloudMock running. Now [make your first request](/docs/getting-started/first-request/).

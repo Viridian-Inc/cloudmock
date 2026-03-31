@@ -99,6 +99,6 @@ Where SAM Local is stronger:
 If you are currently using LocalStack, migrating to CloudMock is straightforward because both tools serve the AWS API on a configurable port:
 
 1. Change the endpoint URL from LocalStack's port (default 4566) to CloudMock's port (also 4566 by default, so this may be a no-op).
-2. Verify that the services your application uses are in CloudMock's [compatibility matrix](/services/).
+2. Verify that the services your application uses are in CloudMock's [compatibility matrix](/docs/services/).
 3. Replace any LocalStack-specific admin API calls with the equivalent CloudMock admin API calls.
 4. Update CI/CD scripts to install and start CloudMock instead of LocalStack.

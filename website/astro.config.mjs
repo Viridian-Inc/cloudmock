@@ -14,30 +14,40 @@ export default defineConfig({
           href: "https://github.com/neureaux/cloudmock",
         },
       ],
+      customCss: [],
+      head: [
+        {
+          tag: "meta",
+          attrs: {
+            name: "og:image",
+            content: "/og-image.png",
+          },
+        },
+      ],
       sidebar: [
         {
           label: "Getting Started",
           items: [
-            { slug: "getting-started/installation" },
-            { slug: "getting-started/first-request" },
-            { slug: "getting-started/with-your-stack" },
+            { slug: "docs/getting-started/installation" },
+            { slug: "docs/getting-started/first-request" },
+            { slug: "docs/getting-started/with-your-stack" },
           ],
         },
         {
           label: "Services",
-          autogenerate: { directory: "services" },
+          autogenerate: { directory: "docs/services" },
         },
         {
           label: "Devtools",
-          autogenerate: { directory: "devtools" },
+          autogenerate: { directory: "docs/devtools" },
         },
         {
           label: "Language Guides",
-          autogenerate: { directory: "language-guides" },
+          autogenerate: { directory: "docs/language-guides" },
         },
         {
           label: "Reference",
-          autogenerate: { directory: "reference" },
+          autogenerate: { directory: "docs/reference" },
         },
       ],
     }),

@@ -7,7 +7,7 @@ This tutorial takes 30 seconds. You will create an S3 bucket, upload a file, and
 
 ## Prerequisites
 
-CloudMock must be running on `localhost:4566`. If it is not, see [Installation](/getting-started/installation/).
+CloudMock must be running on `localhost:4566`. If it is not, see [Installation](/docs/getting-started/installation/).
 
 ## Set credentials
 
@@ -139,4 +139,4 @@ No AWS account. No internet. No cost.
 
 ## Next step
 
-You have made your first request. Now [configure your SDK](/getting-started/with-your-stack/) to use CloudMock in your application code.
+You have made your first request. Now [configure your SDK](/docs/getting-started/with-your-stack/) to use CloudMock in your application code.

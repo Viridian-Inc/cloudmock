@@ -411,6 +411,198 @@ func TestFirehose_UnknownAction(t *testing.T) {
 	}
 }
 
+// ---- Error: ResourceNotFoundException for PutRecord to nonexistent stream ----
+
+func TestFirehose_PutRecord_ResourceNotFoundException(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	payload := base64.StdEncoding.EncodeToString([]byte("data"))
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "PutRecord", map[string]any{
+		"DeliveryStreamName": "nonexistent-stream",
+		"Record": map[string]string{
+			"Data": payload,
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutRecord nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutRecord nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for PutRecordBatch to nonexistent stream ----
+
+func TestFirehose_PutRecordBatch_ResourceNotFoundException(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	records := []map[string]string{
+		{"Data": base64.StdEncoding.EncodeToString([]byte("data"))},
+	}
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "PutRecordBatch", map[string]any{
+		"DeliveryStreamName": "nonexistent-stream",
+		"Records":            records,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutRecordBatch nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutRecordBatch nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DescribeDeliveryStream on nonexistent stream ----
+
+func TestFirehose_DescribeDeliveryStream_ResourceNotFoundException(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "DescribeDeliveryStream", map[string]string{
+		"DeliveryStreamName": "nonexistent-stream",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DescribeDeliveryStream nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DescribeDeliveryStream nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: ResourceNotFoundException for DeleteDeliveryStream on nonexistent stream ----
+
+func TestFirehose_DeleteDeliveryStream_ResourceNotFoundException(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "DeleteDeliveryStream", map[string]string{
+		"DeliveryStreamName": "nonexistent-stream",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteDeliveryStream nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DeleteDeliveryStream nonexistent: expected __type=ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Error: InvalidArgumentException for UpdateDestination with bad destination ID ----
+
+func TestFirehose_UpdateDestination_InvalidArgumentException(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	// Create a stream first
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
+		"DeliveryStreamName": "update-dest-stream",
+		"S3DestinationConfiguration": map[string]any{
+			"BucketARN": "arn:aws:s3:::update-bucket",
+			"RoleARN":   "arn:aws:iam::123456789012:role/r",
+		},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateDeliveryStream: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// UpdateDestination with an invalid destination ID
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "UpdateDestination", map[string]any{
+		"DeliveryStreamName":        "update-dest-stream",
+		"CurrentDeliveryStreamVersionId": "1",
+		"DestinationId":             "invalid-dest-id",
+		"S3DestinationUpdate": map[string]any{
+			"BucketARN": "arn:aws:s3:::new-bucket",
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("UpdateDestination bad dest: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "InvalidArgumentException" {
+		t.Errorf("UpdateDestination bad dest: expected __type=InvalidArgumentException, got %q", errType)
+	}
+}
+
+// ---- Positive: UpdateDestination succeeds with valid destination ----
+
+func TestFirehose_UpdateDestination_Success(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	// Create a stream
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
+		"DeliveryStreamName": "update-ok-stream",
+		"S3DestinationConfiguration": map[string]any{
+			"BucketARN": "arn:aws:s3:::original-bucket",
+			"RoleARN":   "arn:aws:iam::123456789012:role/r",
+			"Prefix":    "original/",
+		},
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateDeliveryStream: %d %s", wc.Code, wc.Body.String())
+	}
+
+	// UpdateDestination with the correct destination ID
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "UpdateDestination", map[string]any{
+		"DeliveryStreamName":        "update-ok-stream",
+		"CurrentDeliveryStreamVersionId": "1",
+		"DestinationId":             "destinationId-000000000001",
+		"S3DestinationUpdate": map[string]any{
+			"BucketARN": "arn:aws:s3:::updated-bucket",
+			"Prefix":    "updated/",
+		},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("UpdateDestination: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify via DescribeDeliveryStream
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, firehoseReq(t, "DescribeDeliveryStream", map[string]string{
+		"DeliveryStreamName": "update-ok-stream",
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DescribeDeliveryStream after update: %d %s", wd.Code, wd.Body.String())
+	}
+
+	mDesc := decodeJSON(t, wd.Body.String())
+	desc := mDesc["DeliveryStreamDescription"].(map[string]any)
+	dests := desc["Destinations"].([]any)
+	d := dests[0].(map[string]any)
+	s3Desc := d["S3DestinationDescription"].(map[string]any)
+	if s3Desc["BucketARN"] != "arn:aws:s3:::updated-bucket" {
+		t.Errorf("UpdateDestination: expected BucketARN=updated-bucket, got %q", s3Desc["BucketARN"])
+	}
+}
+
+// ---- Positive: ListDeliveryStreams empty result ----
+
+func TestFirehose_ListDeliveryStreams_Empty(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, firehoseReq(t, "ListDeliveryStreams", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ListDeliveryStreams empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	streamNames, _ := m["DeliveryStreamNames"].([]any)
+	if len(streamNames) != 0 {
+		t.Errorf("ListDeliveryStreams empty: expected 0 streams, got %d", len(streamNames))
+	}
+}
+
 // contains is a helper to check if s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||

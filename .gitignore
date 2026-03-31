@@ -1,6 +1,7 @@
-# Go binaries (but keep shell scripts like cmk)
+# Go binaries (but keep shell scripts like cmk and npm package bin)
 bin/
 !bin/cmk
+!npm/cloudmock/bin/
 *.exe
 *.exe~
 *.dll

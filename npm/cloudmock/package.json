@@ -1,0 +1,26 @@
+{
+  "name": "cloudmock",
+  "version": "1.0.0",
+  "description": "Local AWS emulation. 25 services. One command.",
+  "bin": {
+    "cloudmock": "bin/cloudmock.mjs"
+  },
+  "files": [
+    "bin/"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neureaux/cloudmock"
+  },
+  "keywords": [
+    "aws",
+    "mock",
+    "local",
+    "development",
+    "testing",
+    "s3",
+    "dynamodb",
+    "lambda"
+  ]
+}

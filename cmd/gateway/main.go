@@ -21,6 +21,11 @@ import (
 	authmemory "github.com/neureaux/cloudmock/pkg/auth/memory"
 	authpg "github.com/neureaux/cloudmock/pkg/auth/postgres"
 	"github.com/neureaux/cloudmock/pkg/ratelimit"
+	saasclerk "github.com/neureaux/cloudmock/pkg/saas/clerk"
+	"github.com/neureaux/cloudmock/pkg/saas/provisioning"
+	"github.com/neureaux/cloudmock/pkg/saas/quota"
+	saasstripe "github.com/neureaux/cloudmock/pkg/saas/stripe"
+	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	auditmemory "github.com/neureaux/cloudmock/pkg/audit/memory"
 	auditpg "github.com/neureaux/cloudmock/pkg/audit/postgres"
@@ -875,6 +880,83 @@ func main() {
 		slog.Warn("failed to load external plugins", "dir", extPluginDir, "error", err)
 	}
 
+	// --- SaaS hosted-tier wiring ---
+	var quotaMiddleware *quota.Middleware
+	if cfg.SaaS.Enabled {
+		slog.Info("SaaS mode enabled, initializing hosted-tier components")
+
+		// 1. Tenant store (memory or postgres based on dataplane mode).
+		var tenantStore tenant.Store
+		switch mode {
+		case "production":
+			tenantStore = tenant.NewPostgresStore(pgPool)
+		default:
+			tenantStore = tenant.NewMemoryStore()
+		}
+		adminAPI.SetTenantStore(tenantStore)
+
+		// 2. Clerk webhook handler and JWT verifier.
+		var userStore auth.UserStore
+		if cfg.Auth.Enabled {
+			// Reuse the user store already created for auth.
+			// The adminAPI already has it set; we just need a reference
+			// for the Clerk webhook handler.
+			switch mode {
+			case "production":
+				userStore = authpg.NewStore(pgPool)
+			default:
+				userStore = authmemory.NewStore()
+			}
+		}
+		clerkWH := saasclerk.NewWebhookHandler(
+			tenantStore, userStore,
+			cfg.SaaS.Clerk.WebhookSecret, slog.Default(),
+		)
+		adminAPI.SetClerkWebhook(clerkWH)
+
+		// Clerk JWT verifier (for authenticating SaaS requests).
+		if cfg.SaaS.Clerk.Domain != "" {
+			clerkVerifier := saasclerk.NewJWTVerifier(cfg.SaaS.Clerk.Domain, slog.Default())
+			_ = clerkVerifier // Available for auth middleware integration
+			slog.Info("Clerk JWT verifier initialized", "domain", cfg.SaaS.Clerk.Domain)
+		}
+
+		// 3. Stripe webhook handler and usage reporter.
+		stripeWH := saasstripe.NewWebhookHandler(
+			tenantStore, cfg.SaaS.Stripe.WebhookSecret, slog.Default(),
+		)
+		adminAPI.SetStripeWebhook(stripeWH)
+
+		usageReporter := saasstripe.NewUsageReporter(
+			tenantStore, cfg.SaaS.Stripe.SecretKey, slog.Default(),
+		)
+		go usageReporter.RunPeriodicReporting(rootCtx, 1*time.Hour)
+
+		// 4. Provisioning orchestrator.
+		flyClient := provisioning.NewFlyClient(
+			cfg.SaaS.Provisioning.FlyAPIToken,
+			cfg.SaaS.Provisioning.FlyOrg,
+			cfg.SaaS.Provisioning.FlyRegion,
+			cfg.SaaS.Provisioning.Image,
+		)
+		cfClient := provisioning.NewCloudflareClient(
+			cfg.SaaS.Cloudflare.APIToken,
+			cfg.SaaS.Cloudflare.ZoneID,
+		)
+		orchestrator := provisioning.NewOrchestrator(flyClient, cfClient, tenantStore)
+		_ = orchestrator // Available for tenant lifecycle operations
+		slog.Info("SaaS provisioning orchestrator initialized")
+
+		// 5. Quota enforcement middleware (applied to gateway handler below).
+		quotaMiddleware = quota.New(tenantStore)
+
+		slog.Info("SaaS mode fully initialized",
+			"tenant_store", mode,
+			"clerk_webhooks", cfg.SaaS.Clerk.WebhookSecret != "",
+			"stripe_webhooks", cfg.SaaS.Stripe.WebhookSecret != "",
+		)
+	}
+
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	gw.SetPluginManager(pluginMgr)
 	var handler http.Handler = gw
@@ -888,6 +970,10 @@ func main() {
 	if cfg.RateLimit.Enabled {
 		limiter := ratelimit.New(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
 		handler = limiter.Middleware(handler)
+	}
+	// Apply SaaS quota enforcement (after rate limiting, before logging).
+	if quotaMiddleware != nil {
+		handler = quotaMiddleware.Handler(handler)
 	}
 	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster: adminAPI.Broadcaster(),

@@ -710,7 +710,152 @@ func TestLogs_TagOperations(t *testing.T) {
 	}
 }
 
-// ---- Test 8: Unknown action returns 400 ----
+// ---- Test 8: CreateLogStream duplicate returns ResourceAlreadyExistsException ----
+
+func TestLogs_CreateLogStream_AlreadyExists(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	// Setup group
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
+		"logGroupName": "/dup-stream/group",
+	}))
+
+	// Create stream
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, logsReq(t, "CreateLogStream", map[string]string{
+		"logGroupName":  "/dup-stream/group",
+		"logStreamName": "my-stream",
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("CreateLogStream first: %d %s", ws.Code, ws.Body.String())
+	}
+
+	// Duplicate
+	ws2 := httptest.NewRecorder()
+	handler.ServeHTTP(ws2, logsReq(t, "CreateLogStream", map[string]string{
+		"logGroupName":  "/dup-stream/group",
+		"logStreamName": "my-stream",
+	}))
+	if ws2.Code != http.StatusBadRequest {
+		t.Fatalf("CreateLogStream duplicate: expected 400, got %d\nbody: %s", ws2.Code, ws2.Body.String())
+	}
+	errBody := decodeJSON(t, ws2.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceAlreadyExistsException" {
+		t.Errorf("CreateLogStream duplicate: expected ResourceAlreadyExistsException, got %q", errType)
+	}
+}
+
+// ---- Test 9: PutLogEvents ResourceNotFoundException on nonexistent stream ----
+
+func TestLogs_PutLogEvents_ResourceNotFoundException(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	// Create group only, no stream
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
+		"logGroupName": "/put-events-err/group",
+	}))
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, logsReq(t, "PutLogEvents", map[string]any{
+		"logGroupName":  "/put-events-err/group",
+		"logStreamName": "nonexistent-stream",
+		"logEvents": []map[string]any{
+			{"timestamp": nowMs(), "message": "test"},
+		},
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("PutLogEvents nonexistent stream: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("PutLogEvents nonexistent stream: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Test 10: GetLogEvents ResourceNotFoundException on nonexistent stream ----
+
+func TestLogs_GetLogEvents_ResourceNotFoundException(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	// Create group only, no stream
+	handler.ServeHTTP(httptest.NewRecorder(), logsReq(t, "CreateLogGroup", map[string]any{
+		"logGroupName": "/get-events-err/group",
+	}))
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, logsReq(t, "GetLogEvents", map[string]any{
+		"logGroupName":  "/get-events-err/group",
+		"logStreamName": "nonexistent-stream",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetLogEvents nonexistent stream: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("GetLogEvents nonexistent stream: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Test 11: FilterLogEvents on nonexistent group returns ResourceNotFoundException ----
+
+func TestLogs_FilterLogEvents_ResourceNotFoundException(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, logsReq(t, "FilterLogEvents", map[string]any{
+		"logGroupName":  "/nonexistent/group",
+		"filterPattern": "ERROR",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("FilterLogEvents nonexistent group: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("FilterLogEvents nonexistent group: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Test 12: DeleteLogGroup ResourceNotFoundException ----
+
+func TestLogs_DeleteLogGroup_ResourceNotFoundException(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, logsReq(t, "DeleteLogGroup", map[string]any{
+		"logGroupName": "/nonexistent/group",
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("DeleteLogGroup nonexistent: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	errBody := decodeJSON(t, w.Body.String())
+	errType, _ := errBody["__type"].(string)
+	if errType != "ResourceNotFoundException" {
+		t.Errorf("DeleteLogGroup nonexistent: expected ResourceNotFoundException, got %q", errType)
+	}
+}
+
+// ---- Test 13: DescribeLogGroups empty ----
+
+func TestLogs_DescribeLogGroups_Empty(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, logsReq(t, "DescribeLogGroups", nil))
+	if w.Code != http.StatusOK {
+		t.Fatalf("DescribeLogGroups empty: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	groups, _ := m["logGroups"].([]any)
+	if len(groups) != 0 {
+		t.Errorf("DescribeLogGroups empty: expected 0, got %d", len(groups))
+	}
+}
+
+// ---- Test 14: Unknown action returns 400 ----
 
 func TestLogs_UnknownAction(t *testing.T) {
 	handler := newLogsGateway(t)

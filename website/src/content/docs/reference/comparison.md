@@ -1,0 +1,104 @@
+---
+title: Comparison
+description: CloudMock vs LocalStack vs Moto vs SAM Local -- an honest comparison
+---
+
+This page compares CloudMock with other popular AWS emulation and mocking tools. The goal is to help you choose the right tool for your use case. All data reflects the state of each project as of early 2026.
+
+## Feature matrix
+
+| Feature | CloudMock | LocalStack | Moto | SAM Local |
+|---------|-----------|------------|------|-----------|
+| **Service count** | 98 (25 full, 73 CRUD stubs) | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
+| **Protocol fidelity** | High -- implements actual AWS wire protocols (Query, JSON, REST-JSON, REST-XML) | High -- aims for API compatibility | Medium -- Python mocks, some protocol gaps | Medium -- focused on SAM/CloudFormation |
+| **Implementation language** | Go | Python | Python | Python / Go (Lambda runtime) |
+| **Startup time** | < 1 second | 5-15 seconds | N/A (library) | 3-10 seconds |
+| **Memory usage (idle)** | ~30 MB | ~200-500 MB | N/A (in-process) | ~100-200 MB |
+| **Memory usage (load)** | ~50-150 MB | ~500 MB - 2 GB | Depends on test suite | ~200-500 MB |
+| **Single binary** | Yes | No (Python + Docker) | No (Python library) | No (Python + Docker) |
+| **Docker required** | No (optional) | Yes (for many services) | No | Yes (for Lambda) |
+| **Devtools UI** | Yes -- 12-view desktop app (topology, traces, metrics, chaos, etc.) | Yes -- web dashboard (Pro) | No | No |
+| **Distributed tracing** | Built-in (waterfall + flamegraph) | Pro tier only | No | Limited (X-Ray local) |
+| **Chaos engineering** | Built-in (latency, errors, throttling) | No | No | No |
+| **IAM emulation** | Full policy evaluation with enforce/authenticate/none modes | Pro tier only | Partial | No |
+| **Pricing** | Free and open source | Free tier + Pro ($35/mo) + Team + Enterprise | Free and open source | Free and open source |
+| **CI/CD integration** | `npx cloudmock`, `go install`, Docker | Docker | pip install | SAM CLI |
+| **Language SDKs** | Node.js, Go, Python (with trace propagation) | None (use AWS SDKs directly) | Python only (decorator-based) | None (use AWS SDKs directly) |
+| **Persistence** | Snapshot, DuckDB, PostgreSQL | Pro tier (persistence) | In-memory only | In-memory only |
+| **Multi-account** | Single account (configurable ID) | Pro tier | In-process mocking | Single account |
+
+## Detailed comparison
+
+### CloudMock vs LocalStack
+
+**LocalStack** is the most established AWS emulator. It has broad service coverage and a large community.
+
+Where CloudMock is stronger:
+- **Startup speed**: CloudMock starts in under 1 second (single Go binary). LocalStack takes 5-15 seconds to initialize its Python/Docker stack.
+- **Resource usage**: CloudMock idles at ~30 MB of memory. LocalStack typically uses 200-500 MB, and more under load.
+- **Devtools**: CloudMock includes a 12-view desktop observability console with topology maps, distributed tracing, chaos engineering, and incident tracking. LocalStack's dashboard is available only in the Pro tier.
+- **IAM enforcement**: CloudMock includes full IAM policy evaluation in the free tier. LocalStack restricts IAM to Pro.
+- **No Docker dependency**: CloudMock runs as a single binary. LocalStack requires Docker for many services.
+- **Chaos engineering**: Built into CloudMock. Not available in LocalStack.
+- **Cost**: CloudMock is fully open source with no paid tiers. LocalStack's free tier has limitations; full features require Pro ($35/month per developer).
+
+Where LocalStack is stronger:
+- **Service count**: LocalStack supports more services at deeper implementation levels, especially for complex services like CloudFormation, ECS, and EKS.
+- **Community and ecosystem**: LocalStack has a larger user base, more Stack Overflow answers, and more third-party integrations.
+- **CloudFormation**: LocalStack has more complete CloudFormation support, including more resource types and intrinsic functions.
+- **Maturity**: LocalStack has been in development since 2017 and has addressed more edge cases.
+
+### CloudMock vs Moto
+
+**Moto** is a Python library that mocks AWS services at the SDK level using decorators or a standalone server mode.
+
+Where CloudMock is stronger:
+- **Language independence**: CloudMock is an HTTP server that works with any AWS SDK (Node.js, Go, Python, Java, Kotlin, Swift, Dart). Moto is primarily a Python library.
+- **Devtools**: CloudMock includes observability tools. Moto has no UI.
+- **Protocol fidelity**: CloudMock implements actual AWS HTTP protocols. Moto intercepts at the Python SDK level, which can miss protocol-level bugs.
+- **Integration testing**: CloudMock runs as a real HTTP server, testing the full SDK-to-server path. Moto intercepts requests before they leave the process.
+
+Where Moto is stronger:
+- **Service breadth**: Moto supports 150+ services with deep mock coverage.
+- **Test isolation**: As a Python library with decorators, Moto provides excellent per-test isolation without starting/stopping servers.
+- **No server process**: Moto runs in-process, so there is no server to manage.
+- **Python ecosystem**: Moto integrates natively with pytest, unittest, and other Python test frameworks.
+
+### CloudMock vs SAM Local
+
+**SAM Local** (`sam local`) is AWS's official tool for running Lambda functions and API Gateway locally.
+
+Where CloudMock is stronger:
+- **Service coverage**: CloudMock emulates 98 services. SAM Local supports Lambda, API Gateway, DynamoDB (via DynamoDB Local), and S3.
+- **Devtools**: CloudMock includes topology maps, tracing, metrics, and chaos engineering. SAM Local has no equivalent.
+- **Startup speed**: CloudMock starts in under 1 second. SAM Local takes 3-10 seconds, longer when building containers.
+- **Protocol coverage**: CloudMock covers all 4 AWS wire protocols. SAM Local focuses on Lambda invocation and API Gateway routing.
+
+Where SAM Local is stronger:
+- **Lambda execution**: SAM Local actually runs Lambda functions in Docker containers with the correct runtime. CloudMock stubs Lambda invocations.
+- **CloudFormation integration**: SAM Local reads SAM templates directly and provisions resources. CloudMock requires separate configuration.
+- **Official AWS support**: SAM Local is maintained by AWS and tracks service changes closely.
+- **Step Functions Local**: SAM integrates with Step Functions Local for workflow testing.
+
+## When to use each tool
+
+| Use case | Recommended tool |
+|----------|-----------------|
+| Fast feedback loop during development | CloudMock |
+| CI/CD integration tests (all languages) | CloudMock |
+| Python unit tests with fine-grained mocking | Moto |
+| Testing Lambda function execution | SAM Local |
+| Deep CloudFormation testing | LocalStack Pro |
+| Observability and chaos engineering during dev | CloudMock |
+| Team environment with shared state | CloudMock (production mode) or LocalStack Pro |
+| Budget-conscious teams | CloudMock or Moto (both fully free) |
+| Maximum service coverage regardless of cost | LocalStack Enterprise |
+
+## Migration from LocalStack
+
+If you are currently using LocalStack, migrating to CloudMock is straightforward because both tools serve the AWS API on a configurable port:
+
+1. Change the endpoint URL from LocalStack's port (default 4566) to CloudMock's port (also 4566 by default, so this may be a no-op).
+2. Verify that the services your application uses are in CloudMock's [compatibility matrix](/services/).
+3. Replace any LocalStack-specific admin API calls with the equivalent CloudMock admin API calls.
+4. Update CI/CD scripts to install and start CloudMock instead of LocalStack.

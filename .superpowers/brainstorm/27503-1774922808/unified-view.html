@@ -1,0 +1,210 @@
+<h2>Unified Workspace</h2>
+<p class="subtitle">One cohesive view across all app types — not separate tabs per platform</p>
+
+<div class="section">
+  <h3>The Problem with Separate Panels</h3>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="color: #ef4444;">❌ Siloed — What we had before</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 12px;">
+        <div style="display: flex; gap: 4px; margin-bottom: 12px;">
+          <span style="background: rgba(99,102,241,0.2); padding: 4px 12px; border-radius: 4px;">☁️ Cloud</span>
+          <span style="background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 4px;">📱 Devices</span>
+          <span style="background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 4px;">🌐 Web</span>
+          <span style="background: rgba(255,255,255,0.05); padding: 4px 12px; border-radius: 4px;">📋 Logs</span>
+        </div>
+        <div style="opacity: 0.5; font-style: italic; text-align: center; padding: 30px;">
+          Cloud services in one tab...<br>
+          Devices in another tab...<br>
+          Logs somewhere else...<br><br>
+          Still switching between tools. Just different tabs instead of different apps.
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="color: #22c55e;">✓ Unified — What we're building</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 12px;">
+        <div style="margin-bottom: 12px; font-weight: bold;">Everything in context together:</div>
+        <div style="opacity: 0.7; line-height: 1.8;">
+          Your Flutter app's HTTP request → hits cloudmock S3 → you see the request on the client side AND the server side in the same view.<br><br>
+          Your React Native app crashes → you see the error log, the network call that triggered it, and the Lambda function it was calling — all without switching panels.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>The Unified Model</h3>
+  <div class="mockup">
+    <div class="mockup-header">Workspace — Everything Connected</div>
+    <div class="mockup-body" style="padding: 0; height: 420px; display: flex; font-size: 11px;">
+
+      <!-- Icon rail -->
+      <div style="width: 48px; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 6px; border-right: 1px solid rgba(255,255,255,0.1);">
+        <div style="width: 32px; height: 32px; background: rgba(99,102,241,0.3); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; border-left: 2px solid #6366f1;" title="Workspace">🏠</div>
+        <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px;" title="Topology">🗺️</div>
+        <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px;" title="Profiler">🔥</div>
+        <div style="flex:1"></div>
+        <div style="width: 32px; height: 32px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 10px;" title="Settings">⚙️</div>
+      </div>
+
+      <!-- Main workspace -->
+      <div style="flex: 1; display: flex; flex-direction: column;">
+
+        <!-- Top: Apps + Services bar -->
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <span style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-right: 4px;">Connected:</span>
+          <div style="display: flex; gap: 6px;">
+            <span style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); padding: 3px 8px; border-radius: 4px; font-size: 11px;">🐦 Flutter App <span style="color: #22c55e;">●</span></span>
+            <span style="background: rgba(96,165,250,0.15); border: 1px solid rgba(96,165,250,0.3); padding: 3px 8px; border-radius: 4px; font-size: 11px;">⚛️ RN App <span style="color: #22c55e;">●</span></span>
+            <span style="background: rgba(251,146,60,0.15); border: 1px solid rgba(251,146,60,0.3); padding: 3px 8px; border-radius: 4px; font-size: 11px;">🌐 Web App <span style="color: #22c55e;">●</span></span>
+            <span style="background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); padding: 3px 8px; border-radius: 4px; font-size: 11px;">☁️ cloudmock <span style="color: #22c55e;">●</span></span>
+          </div>
+          <div style="flex:1"></div>
+          <span style="opacity: 0.3; font-size: 11px;">+ Add source</span>
+        </div>
+
+        <!-- Content: split panels -->
+        <div style="flex: 1; display: flex;">
+
+          <!-- Left: Unified timeline -->
+          <div style="flex: 1.2; border-right: 2px solid rgba(255,255,255,0.08); display: flex; flex-direction: column;">
+            <div style="padding: 8px 12px; font-size: 10px; text-transform: uppercase; opacity: 0.4; border-bottom: 1px solid rgba(255,255,255,0.06); display: flex; align-items: center; gap: 8px;">
+              Activity Stream
+              <span style="margin-left: auto; display: flex; gap: 4px;">
+                <span style="background: rgba(255,255,255,0.08); padding: 1px 6px; border-radius: 3px; cursor: pointer;">All</span>
+                <span style="background: rgba(255,255,255,0.04); padding: 1px 6px; border-radius: 3px; cursor: pointer; opacity: 0.5;">Errors</span>
+                <span style="background: rgba(255,255,255,0.04); padding: 1px 6px; border-radius: 3px; cursor: pointer; opacity: 0.5;">Network</span>
+              </span>
+            </div>
+            <div style="flex: 1; padding: 6px 10px; font-family: monospace; line-height: 2; overflow: hidden;">
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:01</span>
+                <span style="background: rgba(56,189,248,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">🐦 Flutter</span>
+                <span style="color: #22c55e;">→</span>
+                <span>PUT s3://uploads/photo.jpg</span>
+                <span style="opacity: 0.3;">340ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:01</span>
+                <span style="background: rgba(139,92,246,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">☁️ S3</span>
+                <span style="color: #22c55e;">200</span>
+                <span>PutObject uploads/photo.jpg</span>
+                <span style="opacity: 0.3;">12ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:02</span>
+                <span style="background: rgba(96,165,250,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">⚛️ RN</span>
+                <span style="color: #22c55e;">→</span>
+                <span>POST /api/users/login</span>
+                <span style="opacity: 0.3;">180ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:02</span>
+                <span style="background: rgba(139,92,246,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">☁️ Cognito</span>
+                <span style="color: #22c55e;">200</span>
+                <span>InitiateAuth</span>
+                <span style="opacity: 0.3;">8ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:03</span>
+                <span style="background: rgba(251,146,60,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">🌐 Web</span>
+                <span style="color: #ef4444;">✕</span>
+                <span style="color: #ef4444;">TypeError: Cannot read property 'id'</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:03</span>
+                <span style="background: rgba(251,146,60,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">🌐 Web</span>
+                <span style="color: #f59e0b;">→</span>
+                <span>GET /api/dashboard</span>
+                <span style="opacity: 0.3;">45ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:03</span>
+                <span style="background: rgba(139,92,246,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">☁️ DDB</span>
+                <span style="color: #22c55e;">200</span>
+                <span>Query users/dashboard</span>
+                <span style="opacity: 0.3;">3ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:04</span>
+                <span style="background: rgba(56,189,248,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">🐦 Flutter</span>
+                <span style="color: #22c55e;">→</span>
+                <span>GET /api/sessions</span>
+                <span style="opacity: 0.3;">92ms</span>
+              </div>
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <span style="opacity: 0.3; font-size: 10px;">12:04:04</span>
+                <span style="background: rgba(139,92,246,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">☁️ Lambda</span>
+                <span style="color: #f59e0b;">403</span>
+                <span>Invoke get-sessions — AccessDenied</span>
+                <span style="opacity: 0.3;">2ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Detail / Inspector -->
+          <div style="flex: 0.8; display: flex; flex-direction: column;">
+            <div style="padding: 8px 12px; font-size: 10px; text-transform: uppercase; opacity: 0.4; border-bottom: 1px solid rgba(255,255,255,0.06);">
+              Inspector
+            </div>
+            <div style="padding: 12px; flex: 1;">
+              <div style="font-size: 13px; font-weight: bold; margin-bottom: 4px;">PUT s3://uploads/photo.jpg</div>
+              <div style="font-size: 11px; opacity: 0.5; margin-bottom: 12px;">
+                <span style="background: rgba(56,189,248,0.15); padding: 1px 5px; border-radius: 3px;">🐦 Flutter</span> →
+                <span style="background: rgba(139,92,246,0.15); padding: 1px 5px; border-radius: 3px;">☁️ S3</span>
+              </div>
+
+              <div style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-bottom: 6px;">Client Side</div>
+              <div style="background: rgba(255,255,255,0.03); border-radius: 4px; padding: 8px; margin-bottom: 12px; font-size: 11px; line-height: 1.6;">
+                <div><span style="opacity:0.4;">Method:</span> PUT</div>
+                <div><span style="opacity:0.4;">URL:</span> http://localhost:4566/uploads/photo.jpg</div>
+                <div><span style="opacity:0.4;">Size:</span> 2.4 MB</div>
+                <div><span style="opacity:0.4;">Duration:</span> 340ms</div>
+                <div><span style="opacity:0.4;">Source:</span> upload_service.dart:42</div>
+              </div>
+
+              <div style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-bottom: 6px;">Server Side (cloudmock)</div>
+              <div style="background: rgba(255,255,255,0.03); border-radius: 4px; padding: 8px; font-size: 11px; line-height: 1.6;">
+                <div><span style="opacity:0.4;">Action:</span> PutObject</div>
+                <div><span style="opacity:0.4;">Bucket:</span> uploads</div>
+                <div><span style="opacity:0.4;">Key:</span> photo.jpg</div>
+                <div><span style="opacity:0.4;">Status:</span> <span style="color:#22c55e;">200 OK</span></div>
+                <div><span style="opacity:0.4;">Latency:</span> 12ms</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status bar -->
+        <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 3px 12px; font-size: 10px; gap: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+          <div><span style="color: #22c55e;">●</span> Local — localhost:4566</div>
+          <div style="opacity: 0.4;">us-east-1</div>
+          <div style="opacity: 0.4;">3 apps connected</div>
+          <div style="flex: 1;"></div>
+          <div style="opacity: 0.4;">152 events/s</div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Concept: Sources, Not Silos</h3>
+  <div style="display: grid; gap: 10px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; font-size: 13px;">
+      <strong>Everything is a "source"</strong> — your Flutter app, React Native app, web app, Node server, and cloudmock are all sources that feed into one unified activity stream. No separation by platform.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; font-size: 13px;">
+      <strong>Automatic correlation</strong> — when your Flutter app makes an HTTP request that hits cloudmock S3, the devtools automatically links the client-side request to the server-side action. You see both sides of the call in the inspector.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; font-size: 13px;">
+      <strong>Filter, don't tab-switch</strong> — want to see only Flutter errors? Filter the stream. Want only network requests? Filter. Want only cloudmock Lambda invocations? Filter. The data is always in context, you just narrow your view.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; font-size: 13px;">
+      <strong>Icon rail is for views, not platforms</strong> — 🏠 Workspace (the unified stream), 🗺️ Topology (service graph), 🔥 Profiler (flame graphs), ⚙️ Settings. Each view shows data from ALL sources.
+    </div>
+  </div>
+</div>

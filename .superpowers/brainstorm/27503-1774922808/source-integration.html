@@ -1,0 +1,85 @@
+<h2>Source Integration</h2>
+<p class="subtitle">How do Flutter, React Native, Web, and Node apps connect to the devtools?</p>
+
+<div class="section">
+  <h3>SDK Approach</h3>
+  <div class="mockup">
+    <div class="mockup-header">How Sources Connect</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace;">
+      <div style="text-align: center;">
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;">
+          <div style="border: 1px solid rgba(56,189,248,0.4); border-radius: 8px; padding: 12px; min-width: 140px;">
+            <div style="font-weight: bold; font-size: 13px;">Flutter App</div>
+            <div style="font-size: 11px; opacity: 0.5; margin-top: 4px;">cloudmock_sdk (Dart)</div>
+            <div style="font-size: 10px; opacity: 0.3; margin-top: 2px;">import 'package:cloudmock/cloudmock.dart'</div>
+          </div>
+          <div style="border: 1px solid rgba(96,165,250,0.4); border-radius: 8px; padding: 12px; min-width: 140px;">
+            <div style="font-weight: bold; font-size: 13px;">React Native App</div>
+            <div style="font-size: 11px; opacity: 0.5; margin-top: 4px;">@cloudmock/react-native</div>
+            <div style="font-size: 10px; opacity: 0.3; margin-top: 2px;">import { CloudMock } from '@cloudmock/rn'</div>
+          </div>
+          <div style="border: 1px solid rgba(251,146,60,0.4); border-radius: 8px; padding: 12px; min-width: 140px;">
+            <div style="font-weight: bold; font-size: 13px;">Web / Node</div>
+            <div style="font-size: 11px; opacity: 0.5; margin-top: 4px;">@cloudmock/web</div>
+            <div style="font-size: 10px; opacity: 0.3; margin-top: 2px;">import { CloudMock } from '@cloudmock/web'</div>
+          </div>
+        </div>
+
+        <div style="font-size: 13px; opacity: 0.4; margin: 8px 0;">▼ WebSocket to devtools ▼</div>
+
+        <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 14px; max-width: 350px; margin: 12px auto 0;">
+          <div style="font-weight: bold; font-size: 14px;">Devtools App</div>
+          <div style="font-size: 11px; opacity: 0.5; margin-top: 4px;">WebSocket server on localhost:4580</div>
+          <div style="font-size: 11px; opacity: 0.5;">Sources auto-discover via mDNS/Bonjour</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>What the SDKs Capture</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 6px;">Network Requests</div>
+      <div style="opacity: 0.7;">HTTP interceptor captures all outgoing requests — URL, method, headers, body, timing, status. Automatically correlates with cloudmock's server-side log via request ID header injection.</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 6px;">Console Logs</div>
+      <div style="opacity: 0.7;">Intercepts print/console.log/debugPrint with level, timestamp, and source location (file:line). Platform-native: Dart zones for Flutter, LogBox for RN, console API for web.</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 6px;">Errors & Crashes</div>
+      <div style="opacity: 0.7;">Uncaught exceptions with stack traces. Flutter: FlutterError.onError + PlatformDispatcher. RN: ErrorUtils. Web: window.onerror + unhandledrejection.</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 6px;">Performance</div>
+      <div style="opacity: 0.7;">App launch time, frame rate (Flutter/RN), memory usage, navigation timing. Feeds into Metrics and SLO views.</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Zero-Config Integration</h3>
+  <div style="display: grid; gap: 10px; font-size: 13px;">
+    <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 12px;">
+      <strong>Dev-only, tree-shaken in production.</strong> SDKs wrap in <code>kDebugMode</code> / <code>__DEV__</code> / <code>process.env.NODE_ENV</code> checks. Zero overhead in release builds — no need to remove imports.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <strong>Auto-discovery.</strong> SDKs find the devtools app via mDNS/Bonjour on the local network. No hardcoded ports or config. Works with simulators, emulators, and physical devices on the same WiFi.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <strong>Graceful when devtools isn't running.</strong> If the devtools app isn't open, the SDK silently no-ops. No crashes, no warnings, no performance impact.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <strong>cloudmock correlation is automatic.</strong> The SDK injects an <code>X-CloudMock-Source</code> header on HTTP requests. Cloudmock reads it and tags the server-side log entry. The devtools links both sides by request ID.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Alternative: No-SDK Mode</h3>
+  <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px; font-size: 13px;">
+    <strong>For apps that can't add an SDK</strong>, the devtools can also act as a proxy. Point your app's API base URL at the devtools (e.g., <code>localhost:4580</code>) instead of cloudmock directly. The devtools forwards to cloudmock and captures the traffic — like Charles Proxy but built into the tool. Less data (no console logs or crashes), but zero app changes needed.
+  </div>
+</div>

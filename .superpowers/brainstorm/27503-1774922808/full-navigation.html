@@ -1,0 +1,191 @@
+<h2>Full Navigation</h2>
+<p class="subtitle">All 28 existing dashboard pages + new device capabilities in one app</p>
+
+<div class="section">
+  <h3>Icon Rail — All Views</h3>
+  <div class="mockup">
+    <div class="mockup-header">Complete App Layout</div>
+    <div class="mockup-body" style="padding: 0; height: 500px; display: flex; font-size: 11px;">
+
+      <!-- Icon rail -->
+      <div style="width: 56px; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; padding-top: 10px; gap: 2px; border-right: 1px solid rgba(255,255,255,0.1);">
+
+        <!-- Active: Activity -->
+        <div style="width: 42px; padding: 6px 0; text-align: center; background: rgba(99,102,241,0.2); border-radius: 6px; border-left: 2px solid #6366f1; margin-bottom: 2px; cursor: pointer;">
+          <div style="font-size: 16px;">⚡</div>
+          <div style="font-size: 9px; opacity: 0.8;">Activity</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🗺️</div>
+          <div style="font-size: 9px; opacity: 0.4;">Topology</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">☁️</div>
+          <div style="font-size: 9px; opacity: 0.4;">Services</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🔍</div>
+          <div style="font-size: 9px; opacity: 0.4;">Traces</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">📊</div>
+          <div style="font-size: 9px; opacity: 0.4;">Metrics</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🎯</div>
+          <div style="font-size: 9px; opacity: 0.4;">SLOs</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🚨</div>
+          <div style="font-size: 9px; opacity: 0.4;">Incidents</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🔥</div>
+          <div style="font-size: 9px; opacity: 0.4;">Profiler</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🧪</div>
+          <div style="font-size: 9px; opacity: 0.4;">Chaos</div>
+        </div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer;">
+          <div style="font-size: 16px;">🤖</div>
+          <div style="font-size: 9px; opacity: 0.4;">AI Debug</div>
+        </div>
+
+        <div style="flex: 1;"></div>
+
+        <div style="width: 42px; padding: 6px 0; text-align: center; border-radius: 6px; cursor: pointer; margin-bottom: 8px;">
+          <div style="font-size: 16px;">⚙️</div>
+          <div style="font-size: 9px; opacity: 0.4;">Settings</div>
+        </div>
+      </div>
+
+      <!-- Main content: Activity view -->
+      <div style="flex: 1; display: flex; flex-direction: column;">
+
+        <!-- Connected sources bar -->
+        <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: rgba(0,0,0,0.2); border-bottom: 1px solid rgba(255,255,255,0.08);">
+          <span style="font-size: 10px; text-transform: uppercase; opacity: 0.4;">Sources:</span>
+          <span style="background: rgba(56,189,248,0.15); border: 1px solid rgba(56,189,248,0.3); padding: 2px 8px; border-radius: 4px; font-size: 10px;">🐦 Flutter <span style="color: #22c55e;">●</span></span>
+          <span style="background: rgba(96,165,250,0.15); border: 1px solid rgba(96,165,250,0.3); padding: 2px 8px; border-radius: 4px; font-size: 10px;">⚛️ RN <span style="color: #22c55e;">●</span></span>
+          <span style="background: rgba(251,146,60,0.15); border: 1px solid rgba(251,146,60,0.3); padding: 2px 8px; border-radius: 4px; font-size: 10px;">🌐 Web <span style="color: #22c55e;">●</span></span>
+          <span style="background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); padding: 2px 8px; border-radius: 4px; font-size: 10px;">☁️ cloudmock <span style="color: #22c55e;">●</span></span>
+          <div style="flex:1"></div>
+          <span style="opacity: 0.3; font-size: 10px;">+ Add</span>
+        </div>
+
+        <!-- Activity stream -->
+        <div style="flex: 1; padding: 8px 12px; font-family: monospace; line-height: 2.1; overflow: hidden; font-size: 11px;">
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="opacity: 0.3; font-size: 10px;">12:04:01</span>
+            <span style="background: rgba(56,189,248,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">Flutter</span>
+            <span style="color: #22c55e;">→</span>
+            <span>PUT s3://uploads/photo.jpg</span>
+            <span style="opacity: 0.3;">340ms</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="opacity: 0.3; font-size: 10px;">12:04:01</span>
+            <span style="background: rgba(139,92,246,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">S3</span>
+            <span style="color: #22c55e;">200</span>
+            <span>PutObject uploads/photo.jpg</span>
+            <span style="opacity: 0.3;">12ms</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="opacity: 0.3; font-size: 10px;">12:04:02</span>
+            <span style="background: rgba(96,165,250,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">RN</span>
+            <span style="color: #ef4444;">✕</span>
+            <span style="color: #ef4444;">TypeError: Cannot read 'id'</span>
+          </div>
+          <div style="display: flex; gap: 8px; align-items: center;">
+            <span style="opacity: 0.3; font-size: 10px;">12:04:03</span>
+            <span style="background: rgba(251,146,60,0.15); padding: 0 5px; border-radius: 3px; font-size: 10px;">Web</span>
+            <span style="color: #22c55e;">→</span>
+            <span>GET /api/dashboard</span>
+            <span style="opacity: 0.3;">45ms</span>
+          </div>
+        </div>
+
+        <!-- Status bar -->
+        <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 3px 12px; font-size: 10px; gap: 12px; border-top: 1px solid rgba(255,255,255,0.08);">
+          <div><span style="color: #22c55e;">●</span> Local — localhost:4566</div>
+          <div style="opacity: 0.4;">us-east-1</div>
+          <div style="flex: 1;"></div>
+          <div style="opacity: 0.4;">4 sources · 152 events/s</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>View Inventory — What Each Icon Does</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+
+    <div style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">⚡ Activity</div>
+      <div style="opacity: 0.7;">Unified stream from all sources. Logs, network requests, errors, cloudmock API calls — interleaved chronologically. Filter by source, level, type. Click any event → inspector panel.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🗺️ Topology</div>
+      <div style="opacity: 0.7;">Service graph from existing console. Nodes = your apps + cloudmock services. Edges = traffic between them (auto-discovered from request correlation). Health-colored, traffic-sized. <em>Shows cross-platform data flow.</em></div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">☁️ Services</div>
+      <div style="opacity: 0.7;">Resource browser for cloud services — S3 buckets, DDB tables, Lambda functions, SQS queues, Cognito pools, etc. Same as existing dashboard's resource pages but rebuilt for desktop. Also shows K8s + ArgoCD resources.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🔍 Traces</div>
+      <div style="opacity: 0.7;">Distributed trace waterfall from existing console. Now includes spans from client apps too — see the full journey from button tap → HTTP request → Lambda → DynamoDB → response.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">📊 Metrics</div>
+      <div style="opacity: 0.7;">Request volume, latency percentiles, error rates, SLO burn rates — from existing console. Now includes client-side metrics (app launch time, frame rate, crash rate) per source.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🎯 SLOs</div>
+      <div style="opacity: 0.7;">SLO dashboard from existing console — burn rate, error budgets, compliance. Extended to track client-side SLOs (e.g., "95% of Flutter API calls complete under 500ms").</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🚨 Incidents</div>
+      <div style="opacity: 0.7;">Incident management from existing console — alert grouping, timeline, regression detection. Now surfaces client-side crashes and errors alongside server-side incidents.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🔥 Profiler</div>
+      <div style="opacity: 0.7;">Flame graphs, CPU/heap profiling from existing console. Extended: Flutter DevTools performance overlay, React Native Hermes profiling, Chrome DevTools CPU profiler — all in one flame graph view.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🧪 Chaos</div>
+      <div style="opacity: 0.7;">Chaos engineering from existing console — inject latency, errors, throttling into cloudmock services. Test how your Flutter/RN/Web apps handle degraded backends.</div>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">🤖 AI Debug</div>
+      <div style="opacity: 0.7;">AI explain from existing console — select any request, trace, or error and get a narrative explanation. Now with full context: "Your Flutter app's S3 upload failed because the IAM policy doesn't allow PutObject on the uploads/ prefix."</div>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Principle</h3>
+  <div style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 16px; font-size: 14px;">
+    <strong>Every view shows data from all sources.</strong> Topology shows your Flutter app talking to S3. Traces show the journey from button tap to DynamoDB. Metrics include client-side latency. There are no "cloud-only" or "device-only" views — the whole point is correlation across the stack.
+  </div>
+</div>

@@ -1,0 +1,124 @@
+<h2>Architecture Approaches</h2>
+<p class="subtitle">How should Tauri, the Preact dashboard, and cloudmock's Go binary fit together?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tauri Shell + Embedded Dashboard (Recommended)</h3>
+      <p>Tauri's Rust backend spawns cloudmock's Go binary as a child process and manages its lifecycle. The existing Preact dashboard is served by cloudmock on port 4500 as it does today, and Tauri's webview loads it directly. Tauri adds native window chrome, system tray, and IPC commands for start/stop/config.</p>
+      <div class="mockup" style="margin-top: 12px; font-size: 13px;">
+        <div class="mockup-header">Architecture</div>
+        <div class="mockup-body" style="font-family: monospace; line-height: 1.6; padding: 16px;">
+          <div style="text-align: center;">
+            <div style="border: 2px solid #6366f1; border-radius: 8px; padding: 12px; display: inline-block; margin-bottom: 8px;">
+              <strong>Tauri App</strong><br>
+              <span style="opacity: 0.7;">Rust backend (process mgmt, IPC)</span><br>
+              <span style="opacity: 0.7;">Webview → localhost:4500</span>
+            </div>
+            <div style="font-size: 20px;">↕</div>
+            <div style="border: 2px solid #22c55e; border-radius: 8px; padding: 12px; display: inline-block;">
+              <strong>cloudmock gateway</strong> (Go binary)<br>
+              <span style="opacity: 0.7;">:4566 AWS API · :4500 Dashboard · :4599 Admin</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Zero changes to existing dashboard code</li>
+          <li>Existing dashboard features work immediately</li>
+          <li>Clean process boundary — Go binary is independent</li>
+          <li>Can still use dashboard in browser if preferred</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Two processes to manage (Tauri + Go)</li>
+          <li>Port conflicts possible if cloudmock already running</li>
+          <li>Adding new native panels means new Tauri webview windows or tabs</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Tauri Shell + Rebuilt Frontend</h3>
+      <p>Tauri spawns cloudmock's Go binary for the backend, but replaces the Preact dashboard with a new frontend built specifically for the desktop app. The new UI talks to cloudmock's admin API (:4599) and adds device debugging panels natively. Uses a modern framework like SolidJS or Svelte for performance.</p>
+      <div class="mockup" style="margin-top: 12px; font-size: 13px;">
+        <div class="mockup-header">Architecture</div>
+        <div class="mockup-body" style="font-family: monospace; line-height: 1.6; padding: 16px;">
+          <div style="text-align: center;">
+            <div style="border: 2px solid #6366f1; border-radius: 8px; padding: 12px; display: inline-block; margin-bottom: 8px;">
+              <strong>Tauri App</strong><br>
+              <span style="opacity: 0.7;">Rust backend + New SPA frontend</span><br>
+              <span style="opacity: 0.7;">Talks to admin API on :4599</span>
+            </div>
+            <div style="font-size: 20px;">↕</div>
+            <div style="border: 2px solid #22c55e; border-radius: 8px; padding: 12px; display: inline-block;">
+              <strong>cloudmock gateway</strong> (Go, headless)<br>
+              <span style="opacity: 0.7;">:4566 AWS API · :4599 Admin API only</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Purpose-built UI for desktop (not a wrapped web page)</li>
+          <li>Can integrate device panels seamlessly from day 1</li>
+          <li>Full control over UX without web-dashboard constraints</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Massive upfront effort — rewrite 28 dashboard pages</li>
+          <li>Two frontends to maintain (web dashboard + desktop)</li>
+          <li>Delays MVP significantly</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Tauri Hybrid — Embed Existing + Extend</h3>
+      <p>Start with Approach A (embed existing dashboard), but build new panels (device debugging, log aggregation) as separate Tauri-native views using the same Preact/Vite stack. The Tauri app becomes a tabbed container: "Cloud" tab loads cloudmock dashboard, "Devices" tab loads new debugging UI, "Logs" tab shows unified log stream.</p>
+      <div class="mockup" style="margin-top: 12px; font-size: 13px;">
+        <div class="mockup-header">Architecture</div>
+        <div class="mockup-body" style="font-family: monospace; line-height: 1.6; padding: 16px;">
+          <div style="text-align: center;">
+            <div style="border: 2px solid #6366f1; border-radius: 8px; padding: 12px; display: inline-block; margin-bottom: 8px;">
+              <strong>Tauri App</strong><br>
+              <span style="opacity: 0.7;">Rust backend (process mgmt, device bridges)</span><br>
+              <span style="opacity: 0.5; font-size: 12px;">Tab: Cloud → cloudmock dashboard (:4500)</span><br>
+              <span style="opacity: 0.5; font-size: 12px;">Tab: Devices → new Preact views (bundled)</span><br>
+              <span style="opacity: 0.5; font-size: 12px;">Tab: Logs → unified log stream (bundled)</span>
+            </div>
+            <div style="font-size: 20px;">↕</div>
+            <div style="display: flex; gap: 12px; justify-content: center;">
+              <div style="border: 2px solid #22c55e; border-radius: 8px; padding: 10px; display: inline-block;">
+                <strong>cloudmock</strong><br>
+                <span style="opacity: 0.7; font-size: 12px;">Go binary</span>
+              </div>
+              <div style="border: 2px solid #f59e0b; border-radius: 8px; padding: 10px; display: inline-block;">
+                <strong>Device bridges</strong><br>
+                <span style="opacity: 0.7; font-size: 12px;">ADB, xcrun, CDP</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons" style="margin-top: 12px;">
+        <div class="pros"><h4>Pros</h4><ul>
+          <li>Fast MVP — existing dashboard works day 1</li>
+          <li>New panels built purpose-fit for desktop</li>
+          <li>Incremental migration path — can replace cloudmock dashboard pages one by one</li>
+          <li>Same tech stack (Preact/Vite) across all views</li>
+        </ul></div>
+        <div class="cons"><h4>Cons</h4><ul>
+          <li>Some UX inconsistency between embedded and new views initially</li>
+          <li>Slightly more complex routing (multi-webview or iframe-based tabs)</li>
+        </ul></div>
+      </div>
+    </div>
+  </div>
+</div>

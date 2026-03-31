@@ -1,0 +1,66 @@
+<h2>Implementation Progress</h2>
+<p class="subtitle">neureaux-devtools — Phase 1 MVP + Phase 2 views</p>
+
+<div class="section">
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+
+    <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 14px;">
+      <div style="font-weight: bold; margin-bottom: 8px; color: #4ade80;">✓ Complete</div>
+      <ul style="margin: 0; padding-left: 16px; line-height: 1.8; font-size: 13px;">
+        <li>Tauri v2 shell (window, dark theme, system tray)</li>
+        <li>Rust backend (process manager, health monitor, API bridge)</li>
+        <li>Icon rail (10 views + settings)</li>
+        <li>Source bar + status bar</li>
+        <li>Connection picker</li>
+        <li>Resizable split panels</li>
+        <li><strong>⚡ Activity view</strong> — live SSE stream, filters, inspector</li>
+        <li><strong>🗺️ Topology view</strong> — force-directed graph, 55 nodes, 7 groups, zoom/pan</li>
+        <li><strong>☁️ Services view</strong> — 98 services, JSON resource browser</li>
+        <li><strong>🔍 Traces view</strong> — trace list, waterfall spans</li>
+        <li><strong>⚙️ Settings view</strong> — connections, config, appearance</li>
+      </ul>
+    </div>
+
+    <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 14px;">
+      <div style="font-weight: bold; margin-bottom: 8px; color: var(--text-secondary);">Remaining Views</div>
+      <ul style="margin: 0; padding-left: 16px; line-height: 1.8; font-size: 13px; opacity: 0.6;">
+        <li>📊 Metrics — needs traffic data</li>
+        <li>🎯 SLOs — burn rate dashboard</li>
+        <li>🚨 Incidents — alert grouping</li>
+        <li>🔥 Profiler — flame graphs</li>
+        <li>🧪 Chaos — fault injection</li>
+        <li>🤖 AI Debug — narrative explanations</li>
+      </ul>
+      <div style="font-weight: bold; margin-top: 16px; margin-bottom: 8px; color: var(--text-secondary);">Phase 2 Infrastructure</div>
+      <ul style="margin: 0; padding-left: 16px; line-height: 1.8; font-size: 13px; opacity: 0.6;">
+        <li>Node SDK (@cloudmock/node)</li>
+        <li>WebSocket source server</li>
+        <li>mDNS auto-discovery</li>
+        <li>Multi-source activity stream</li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+
+<div class="section">
+  <h3>File Count</h3>
+  <div style="display: flex; gap: 16px; flex-wrap: wrap;">
+    <div style="background: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; font-weight: bold; color: var(--text-accent);">5</div>
+      <div style="font-size: 11px; opacity: 0.5;">Working Views</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; font-weight: bold; color: var(--text-accent);">40+</div>
+      <div style="font-size: 11px; opacity: 0.5;">Files Created</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; font-weight: bold; color: var(--text-accent);">0</div>
+      <div style="font-size: 11px; opacity: 0.5;">TypeScript Errors</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); padding: 12px 20px; border-radius: 8px; text-align: center;">
+      <div style="font-size: 24px; font-weight: bold; color: var(--text-accent);">0</div>
+      <div style="font-size: 11px; opacity: 0.5;">Rust Errors</div>
+    </div>
+  </div>
+</div>

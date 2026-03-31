@@ -47,6 +47,7 @@ import (
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
+	"github.com/neureaux/cloudmock/pkg/iac"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/plugin"
@@ -79,7 +80,80 @@ import (
 	iamsvc "github.com/neureaux/cloudmock/services/iam"
 	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
 	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
-	"github.com/neureaux/cloudmock/services/stubs"
+
+	// Promoted Tier 1 services (formerly Tier 2 stubs)
+	accountsvc "github.com/neureaux/cloudmock/services/account"
+	acmsvc "github.com/neureaux/cloudmock/services/acm"
+	acmpcasvc "github.com/neureaux/cloudmock/services/acmpca"
+	airflowsvc "github.com/neureaux/cloudmock/services/airflow"
+	amplifysvc "github.com/neureaux/cloudmock/services/amplify"
+	appconfigsvc "github.com/neureaux/cloudmock/services/appconfig"
+	appautoscalingsvc "github.com/neureaux/cloudmock/services/applicationautoscaling"
+	appsyncsvc "github.com/neureaux/cloudmock/services/appsync"
+	athenasvc "github.com/neureaux/cloudmock/services/athena"
+	autoscalingsvc "github.com/neureaux/cloudmock/services/autoscaling"
+	backupsvc "github.com/neureaux/cloudmock/services/backup"
+	batchsvc "github.com/neureaux/cloudmock/services/batch"
+	bedrocksvc "github.com/neureaux/cloudmock/services/bedrock"
+	cesvc "github.com/neureaux/cloudmock/services/ce"
+	cloudcontrolsvc "github.com/neureaux/cloudmock/services/cloudcontrol"
+	cloudfrontsvc "github.com/neureaux/cloudmock/services/cloudfront"
+	cloudtrailsvc "github.com/neureaux/cloudmock/services/cloudtrail"
+	codeartifactsvc "github.com/neureaux/cloudmock/services/codeartifact"
+	codebuildsvc "github.com/neureaux/cloudmock/services/codebuild"
+	codecommitsvc "github.com/neureaux/cloudmock/services/codecommit"
+	codeconnectionssvc "github.com/neureaux/cloudmock/services/codeconnections"
+	codedeploysvc "github.com/neureaux/cloudmock/services/codedeploy"
+	codepipelinesvc "github.com/neureaux/cloudmock/services/codepipeline"
+	configsvc "github.com/neureaux/cloudmock/services/config"
+	dmssvc "github.com/neureaux/cloudmock/services/dms"
+	docdbsvc "github.com/neureaux/cloudmock/services/docdb"
+	ekssvcsvc "github.com/neureaux/cloudmock/services/eks"
+	elasticachesvc "github.com/neureaux/cloudmock/services/elasticache"
+	ebsvc2 "github.com/neureaux/cloudmock/services/elasticbeanstalk"
+	elbsvc "github.com/neureaux/cloudmock/services/elasticloadbalancing"
+	emrsvc "github.com/neureaux/cloudmock/services/elasticmapreduce"
+	essvc "github.com/neureaux/cloudmock/services/es"
+	fissvc "github.com/neureaux/cloudmock/services/fis"
+	glaciersvc "github.com/neureaux/cloudmock/services/glacier"
+	gluesvc "github.com/neureaux/cloudmock/services/glue"
+	identitystoresvc "github.com/neureaux/cloudmock/services/identitystore"
+	iotsvc "github.com/neureaux/cloudmock/services/iot"
+	iotdatasvc "github.com/neureaux/cloudmock/services/iotdata"
+	iotwirelesssvc "github.com/neureaux/cloudmock/services/iotwireless"
+	kafkasvc "github.com/neureaux/cloudmock/services/kafka"
+	kinesisanalyticssvc "github.com/neureaux/cloudmock/services/kinesisanalytics"
+	lakeformationsvc "github.com/neureaux/cloudmock/services/lakeformation"
+	managedblockchain "github.com/neureaux/cloudmock/services/managedblockchain"
+	mediaconvertsvc "github.com/neureaux/cloudmock/services/mediaconvert"
+	memorydbsvc "github.com/neureaux/cloudmock/services/memorydb"
+	mqsvc "github.com/neureaux/cloudmock/services/mq"
+	neptunesvc "github.com/neureaux/cloudmock/services/neptune"
+	opensearchsvc "github.com/neureaux/cloudmock/services/opensearch"
+	organizationssvc "github.com/neureaux/cloudmock/services/organizations"
+	pinpointsvc "github.com/neureaux/cloudmock/services/pinpoint"
+	pipessvc "github.com/neureaux/cloudmock/services/pipes"
+	ramsvc "github.com/neureaux/cloudmock/services/ram"
+	redshiftsvc "github.com/neureaux/cloudmock/services/redshift"
+	resourcegroupssvc "github.com/neureaux/cloudmock/services/resourcegroups"
+	route53resolversvc "github.com/neureaux/cloudmock/services/route53resolver"
+	s3tablessvc "github.com/neureaux/cloudmock/services/s3tables"
+	sagemakersvc "github.com/neureaux/cloudmock/services/sagemaker"
+	schedulersvc "github.com/neureaux/cloudmock/services/scheduler"
+	serverlessreposvc "github.com/neureaux/cloudmock/services/serverlessrepo"
+	servicediscoverysvc "github.com/neureaux/cloudmock/services/servicediscovery"
+	shieldsvc "github.com/neureaux/cloudmock/services/shield"
+	ssoadminsvc "github.com/neureaux/cloudmock/services/ssoadmin"
+	supportsvc "github.com/neureaux/cloudmock/services/support"
+	swfsvc "github.com/neureaux/cloudmock/services/swf"
+	taggingsvc "github.com/neureaux/cloudmock/services/tagging"
+	textractsvc "github.com/neureaux/cloudmock/services/textract"
+	timestreamwritesvc "github.com/neureaux/cloudmock/services/timestreamwrite"
+	transcribesvc "github.com/neureaux/cloudmock/services/transcribe"
+	transfersvc "github.com/neureaux/cloudmock/services/transfer"
+	verifiedpermissionssvc "github.com/neureaux/cloudmock/services/verifiedpermissions"
+	wafregionalsvc "github.com/neureaux/cloudmock/services/wafregional"
+	wafv2svc "github.com/neureaux/cloudmock/services/wafv2"
 )
 
 func main() {
@@ -98,6 +172,8 @@ func main() {
 
 	configPath := flag.String("config", "", "path to cloudmock YAML config file")
 	pluginDir := flag.String("plugin-dir", "", "directory containing external plugin binaries (default: ~/.cloudmock/plugins/)")
+	iacDir := flag.String("iac", "", "path to Pulumi/Terraform project directory — auto-provisions DynamoDB tables, API routes from IaC source")
+	iacEnv := flag.String("iac-env", "dev", "environment name for IaC resource name resolution (e.g., dev, stage, prod)")
 	flag.Parse()
 
 	var cfg *config.Config
@@ -272,8 +348,256 @@ func main() {
 	// Wire cross-service integrations via event bus
 	integration.WireIntegrations(bus, registry, cfg.AccountID, cfg.Region)
 
-	// Tier 2 stub services — always lazy to avoid initializing ~73 services at startup.
-	stubs.RegisterAllLazy(registry, cfg.AccountID, cfg.Region)
+	// ── Promoted Tier 1 services (formerly Tier 2 stubs) ──────────────────────
+
+	// Services with ServiceLocator (need SetLocator wired after registration)
+	var elbService *elbsvc.ELBService
+	if eagerAll {
+		elbService = elbsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(elbService)
+	} else {
+		registry.RegisterLazy("elasticloadbalancing", func() service.Service {
+			svc := elbsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var autoscalingService *autoscalingsvc.AutoScalingService
+	if eagerAll {
+		autoscalingService = autoscalingsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(autoscalingService)
+	} else {
+		registry.RegisterLazy("autoscaling", func() service.Service {
+			svc := autoscalingsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var cloudfrontService *cloudfrontsvc.CloudFrontService
+	if eagerAll {
+		cloudfrontService = cloudfrontsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(cloudfrontService)
+	} else {
+		registry.RegisterLazy("cloudfront", func() service.Service {
+			svc := cloudfrontsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var elasticacheService *elasticachesvc.ElastiCacheService
+	if eagerAll {
+		elasticacheService = elasticachesvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(elasticacheService)
+	} else {
+		registry.RegisterLazy("elasticache", func() service.Service {
+			svc := elasticachesvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var eksService *ekssvcsvc.EKSService
+	if eagerAll {
+		eksService = ekssvcsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(eksService)
+	} else {
+		registry.RegisterLazy("eks", func() service.Service {
+			svc := ekssvcsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codebuildService *codebuildsvc.CodeBuildService
+	if eagerAll {
+		codebuildService = codebuildsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codebuildService)
+	} else {
+		registry.RegisterLazy("codebuild", func() service.Service {
+			svc := codebuildsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codepipelineService *codepipelinesvc.CodePipelineService
+	if eagerAll {
+		codepipelineService = codepipelinesvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codepipelineService)
+	} else {
+		registry.RegisterLazy("codepipeline", func() service.Service {
+			svc := codepipelinesvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codedeployService *codedeploysvc.CodeDeployService
+	if eagerAll {
+		codedeployService = codedeploysvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codedeployService)
+	} else {
+		registry.RegisterLazy("codedeploy", func() service.Service {
+			svc := codedeploysvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codecommitService *codecommitsvc.CodeCommitService
+	if eagerAll {
+		codecommitService = codecommitsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codecommitService)
+	} else {
+		registry.RegisterLazy("codecommit", func() service.Service {
+			svc := codecommitsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codeconnectionsService *codeconnectionssvc.CodeConnectionsService
+	if eagerAll {
+		codeconnectionsService = codeconnectionssvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codeconnectionsService)
+	} else {
+		registry.RegisterLazy("codeconnections", func() service.Service {
+			svc := codeconnectionssvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	var codeartifactService *codeartifactsvc.CodeArtifactService
+	if eagerAll {
+		codeartifactService = codeartifactsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(codeartifactService)
+	} else {
+		registry.RegisterLazy("codeartifact", func() service.Service {
+			svc := codeartifactsvc.New(cfg.AccountID, cfg.Region)
+			svc.SetLocator(registry)
+			return svc
+		})
+	}
+
+	// Wire locators for promoted services with cross-service integration
+	if elbService != nil {
+		elbService.SetLocator(registry)
+	}
+	if autoscalingService != nil {
+		autoscalingService.SetLocator(registry)
+	}
+	if cloudfrontService != nil {
+		cloudfrontService.SetLocator(registry)
+	}
+	if elasticacheService != nil {
+		elasticacheService.SetLocator(registry)
+	}
+	if eksService != nil {
+		eksService.SetLocator(registry)
+	}
+	if codebuildService != nil {
+		codebuildService.SetLocator(registry)
+	}
+	if codepipelineService != nil {
+		codepipelineService.SetLocator(registry)
+	}
+	if codedeployService != nil {
+		codedeployService.SetLocator(registry)
+	}
+	if codecommitService != nil {
+		codecommitService.SetLocator(registry)
+	}
+	if codeconnectionsService != nil {
+		codeconnectionsService.SetLocator(registry)
+	}
+	if codeartifactService != nil {
+		codeartifactService.SetLocator(registry)
+	}
+
+	// Simple services (no cross-service locator needed) — registerOrDefer pattern
+	_ = registerOrDefer("acm", func() service.Service { return acmsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("acm-pca", func() service.Service { return acmpcasvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cloudtrail", func() service.Service { return cloudtrailsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("config", func() service.Service { return configsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("organizations", func() service.Service { return organizationssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("wafv2", func() service.Service { return wafv2svc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("waf-regional", func() service.Service { return wafregionalsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("shield", func() service.Service { return shieldsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("sso-admin", func() service.Service { return ssoadminsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("verifiedpermissions", func() service.Service { return verifiedpermissionssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ram", func() service.Service { return ramsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("athena", func() service.Service { return athenasvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("glue", func() service.Service { return gluesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("redshift", func() service.Service { return redshiftsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("elasticmapreduce", func() service.Service { return emrsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("kinesisanalytics", func() service.Service { return kinesisanalyticssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("lakeformation", func() service.Service { return lakeformationsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("opensearch", func() service.Service { return opensearchsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("es", func() service.Service { return essvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("timestream-write", func() service.Service { return timestreamwritesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("neptune", func() service.Service { return neptunesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("docdb", func() service.Service { return docdbsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("memorydb", func() service.Service { return memorydbsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("appconfig", func() service.Service { return appconfigsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("application-autoscaling", func() service.Service { return appautoscalingsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("servicediscovery", func() service.Service { return servicediscoverysvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("scheduler", func() service.Service { return schedulersvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("pipes", func() service.Service { return pipessvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("swf", func() service.Service { return swfsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("appsync", func() service.Service { return appsyncsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("amplify", func() service.Service { return amplifysvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("sagemaker", func() service.Service { return sagemakersvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("textract", func() service.Service { return textractsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("transcribe", func() service.Service { return transcribesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("bedrock", func() service.Service { return bedrocksvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("kafka", func() service.Service { return kafkasvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("mq", func() service.Service { return mqsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("airflow", func() service.Service { return airflowsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("iot", func() service.Service { return iotsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("iot-data", func() service.Service { return iotdatasvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("iot-wireless", func() service.Service { return iotwirelesssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("dms", func() service.Service { return dmssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("transfer", func() service.Service { return transfersvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("glacier", func() service.Service { return glaciersvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("s3tables", func() service.Service { return s3tablessvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cloudcontrol", func() service.Service { return cloudcontrolsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ce", func() service.Service { return cesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("tagging", func() service.Service { return taggingsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("support", func() service.Service { return supportsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("backup", func() service.Service { return backupsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("account", func() service.Service { return accountsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("resource-groups", func() service.Service { return resourcegroupssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("fis", func() service.Service { return fissvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("pinpoint", func() service.Service { return pinpointsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("mediaconvert", func() service.Service { return mediaconvertsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("managedblockchain", func() service.Service { return managedblockchain.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("serverlessrepo", func() service.Service { return serverlessreposvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("route53resolver", func() service.Service { return route53resolversvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("identitystore", func() service.Service { return identitystoresvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("elasticbeanstalk", func() service.Service { return ebsvc2.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("batch", func() service.Service { return batchsvc.New(cfg.AccountID, cfg.Region) })
+
+	// Auto-provision resources from IaC source (Pulumi/Terraform).
+	// This reads DynamoDB table definitions, API Gateway routes, etc. from the
+	// IaC project directory and creates them in CloudMock — no seed scripts needed.
+	if *iacDir != "" {
+		iacResult, err := iac.ImportPulumiDir(*iacDir, *iacEnv, slog.Default())
+		if err != nil {
+			slog.Error("failed to import IaC", "dir", *iacDir, "error", err)
+		} else {
+			dynamoSvc, lookupErr := registry.Lookup("dynamodb")
+			if lookupErr != nil {
+				slog.Error("DynamoDB service not found for IaC provisioning", "error", lookupErr)
+			} else {
+				iac.ProvisionDynamoTables(iacResult.Tables, dynamoSvc, slog.Default())
+				slog.Info("auto-provisioned resources from IaC", "dir", *iacDir, "env", *iacEnv, "tables", len(iacResult.Tables))
+			}
+		}
+	}
 
 	// Determine DataPlane mode
 	ctx := context.Background()

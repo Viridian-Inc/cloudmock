@@ -1,0 +1,176 @@
+<h2>Product Phasing</h2>
+<p class="subtitle">From MVP to full platform — what ships when</p>
+
+<div class="section">
+  <div style="display: grid; gap: 16px;">
+
+    <!-- Phase 1 -->
+    <div style="border: 2px solid #22c55e; border-radius: 10px; padding: 18px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: #22c55e; color: #000; font-weight: bold; padding: 3px 10px; border-radius: 4px; font-size: 12px;">Phase 1</span>
+        <span style="font-weight: bold; font-size: 16px;">Desktop App MVP</span>
+        <span style="opacity: 0.4; font-size: 12px; margin-left: auto;">Build first</span>
+      </div>
+      <div style="font-size: 13px; opacity: 0.7; margin-bottom: 14px;">Tauri shell + new Preact frontend + local cloudmock management. The "it works" moment.</div>
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Tauri Shell</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Window with icon rail + resizable panels</li>
+            <li>System tray with start/stop</li>
+            <li>Native menus, keyboard shortcuts</li>
+            <li>Connection picker (local only)</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Rust Backend</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Process manager (spawn/stop Go binary)</li>
+            <li>Health monitoring + auto-restart</li>
+            <li>Config file read/write</li>
+            <li>Admin API proxy (IPC → HTTP)</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Cloud Services Panel</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Service list with health status</li>
+            <li>Per-service resource browser (S3 buckets, DDB tables, etc.)</li>
+            <li>Service detail view with stats</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Request Log Panel</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Live SSE stream of API calls</li>
+            <li>Filter by service, status, action</li>
+            <li>Request detail inspector</li>
+            <li>Timestamp, latency, response body</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 2 -->
+    <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 18px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: #6366f1; color: #fff; font-weight: bold; padding: 3px 10px; border-radius: 4px; font-size: 12px;">Phase 2</span>
+        <span style="font-weight: bold; font-size: 16px;">Observability + Topology</span>
+      </div>
+      <div style="font-size: 13px; opacity: 0.7; margin-bottom: 14px;">Port the existing console's best features into desktop-native panels.</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Topology Canvas</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Service graph with health-colored nodes</li>
+            <li>Traffic-sized edges</li>
+            <li>Click node → detail panel</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Traces + AI Explain</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Distributed trace waterfall</li>
+            <li>Span detail with timing</li>
+            <li>AI-powered request explanation</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">SLOs + Alerts</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>SLO burn rate dashboard</li>
+            <li>Native notifications on violations</li>
+            <li>Incident timeline</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 3 -->
+    <div style="border: 2px solid #f59e0b; border-radius: 10px; padding: 18px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: #f59e0b; color: #000; font-weight: bold; padding: 3px 10px; border-radius: 4px; font-size: 12px;">Phase 3</span>
+        <span style="font-weight: bold; font-size: 16px;">Device Debugging</span>
+      </div>
+      <div style="font-size: 13px; opacity: 0.7; margin-bottom: 14px;">The Flipper replacement — cross-platform device inspection for Flutter, React Native, and Web.</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Device Manager</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Auto-detect iOS sims + Android emulators</li>
+            <li>ADB + xcrun/idb bridges in Rust</li>
+            <li>Device list with status</li>
+            <li>Launch/kill simulators</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Unified Log Viewer</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>iOS os_log + Android logcat + console.log</li>
+            <li>Filter by device, level, tag</li>
+            <li>Interleaved timeline</li>
+            <li>Flutter/Dart log parsing</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Network Inspector</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>HTTP requests from all platforms</li>
+            <li>Correlate with cloudmock request log</li>
+            <li>Request/response body viewer</li>
+            <li>CDP + Flutter DevTools protocol</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 4 -->
+    <div style="border: 2px solid #ec4899; border-radius: 10px; padding: 18px;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: #ec4899; color: #fff; font-weight: bold; padding: 3px 10px; border-radius: 4px; font-size: 12px;">Phase 4</span>
+        <span style="font-weight: bold; font-size: 16px;">cloudmock.io + Hosted Platform</span>
+      </div>
+      <div style="font-size: 13px; opacity: 0.7; margin-bottom: 14px;">The SaaS layer — hosted instances, team management, billing.</div>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px;">
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">cloudmock.io Web</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Marketing landing page</li>
+            <li>Account + team management</li>
+            <li>Instance provisioning</li>
+            <li>API key management</li>
+            <li>Usage dashboards + billing</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Hosted Backend</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Container orchestration (ECS/K8s)</li>
+            <li>Per-tenant isolated instances</li>
+            <li>Persistent state (PostgreSQL/DuckDB)</li>
+            <li>Auth layer + API key validation</li>
+          </ul>
+        </div>
+        <div style="background: rgba(255,255,255,0.05); border-radius: 6px; padding: 10px; flex: 1; min-width: 200px;">
+          <div style="font-weight: bold; margin-bottom: 6px;">Desktop Integration</div>
+          <ul style="margin: 0; padding-left: 16px; line-height: 1.7; opacity: 0.7;">
+            <li>Login with cloudmock.io account</li>
+            <li>Connection picker: hosted instances</li>
+            <li>Team-shared saved views</li>
+            <li>Sync config across machines</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Phase 5 -->
+    <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 18px; opacity: 0.7;">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+        <span style="background: rgba(255,255,255,0.15); font-weight: bold; padding: 3px 10px; border-radius: 4px; font-size: 12px;">Phase 5</span>
+        <span style="font-weight: bold; font-size: 16px;">Developer Portal + Ecosystem</span>
+      </div>
+      <div style="font-size: 13px; opacity: 0.7;">Service catalog, API docs browser, plugin marketplace, community plugins for GCP/Azure emulation, third-party integrations (Datadog, PagerDuty, Slack).</div>
+    </div>
+
+  </div>
+</div>

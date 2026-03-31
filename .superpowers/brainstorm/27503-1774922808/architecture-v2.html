@@ -1,0 +1,109 @@
+<h2>Updated Product Architecture</h2>
+<p class="subtitle">neureaux-devtools: desktop app + cloudmock.io SaaS</p>
+
+<div class="section">
+  <h3>Two Products, Shared Backend</h3>
+  <div class="mockup">
+    <div class="mockup-header">System Architecture</div>
+    <div class="mockup-body" style="font-family: monospace; line-height: 1.8; padding: 20px;">
+      <div style="text-align: center;">
+
+        <!-- Top row: two frontends -->
+        <div style="display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 16px;">
+
+          <!-- Desktop App -->
+          <div style="border: 2px solid #6366f1; border-radius: 12px; padding: 16px; flex: 1; min-width: 260px; max-width: 320px;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">🖥 Desktop App</div>
+            <div style="font-size: 12px; opacity: 0.7; margin-bottom: 10px;">Tauri v2 + Preact</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+              <span style="background: rgba(99,102,241,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Cloud Services</span>
+              <span style="background: rgba(99,102,241,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Device Inspector</span>
+              <span style="background: rgba(99,102,241,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Network Monitor</span>
+              <span style="background: rgba(99,102,241,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Log Viewer</span>
+              <span style="background: rgba(99,102,241,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Topology</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 11px; opacity: 0.5;">Full devtools experience</div>
+            <div style="margin-top: 6px; font-size: 11px; opacity: 0.5;">Connects to local OR hosted cloudmock</div>
+          </div>
+
+          <!-- Web Console -->
+          <div style="border: 2px solid #22c55e; border-radius: 12px; padding: 16px; flex: 1; min-width: 260px; max-width: 320px;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 8px;">🌐 cloudmock.io</div>
+            <div style="font-size: 12px; opacity: 0.7; margin-bottom: 10px;">Web app (Preact or Next.js)</div>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+              <span style="background: rgba(34,197,94,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Landing Page</span>
+              <span style="background: rgba(34,197,94,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Account Mgmt</span>
+              <span style="background: rgba(34,197,94,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Instance Console</span>
+              <span style="background: rgba(34,197,94,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">API Keys</span>
+              <span style="background: rgba(34,197,94,0.2); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Billing</span>
+            </div>
+            <div style="margin-top: 10px; font-size: 11px; opacity: 0.5;">Manage hosted instances</div>
+            <div style="margin-top: 6px; font-size: 11px; opacity: 0.5;">No device debugging</div>
+          </div>
+        </div>
+
+        <div style="font-size: 14px; margin: 8px 0; opacity: 0.6;">── Both talk to the same cloudmock Admin API ──</div>
+
+        <!-- Backend layer -->
+        <div style="display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin-top: 12px;">
+          <div style="border: 2px solid #f59e0b; border-radius: 8px; padding: 12px; min-width: 200px;">
+            <strong>Local Mode</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">cloudmock Go binary</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Spawned by Tauri on your machine</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">localhost:4566 / :4599</span>
+          </div>
+          <div style="font-size: 18px; align-self: center;">or</div>
+          <div style="border: 2px solid #ec4899; border-radius: 8px; padding: 12px; min-width: 200px;">
+            <strong>Hosted Mode</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">cloudmock on cloud infra</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Per-tenant isolated instances</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">https://api.cloudmock.io</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>How It Fits Together</h3>
+  <div style="display: grid; gap: 12px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Shared API surface</strong> — Both local and hosted cloudmock expose the same admin API. The desktop app doesn't care whether it's talking to localhost:4599 or api.cloudmock.io — it just needs an endpoint URL.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Desktop = full experience</strong> — Cloud services + device debugging + network monitoring + log aggregation. Works with local or hosted cloudmock.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Web = management console</strong> — cloudmock.io is the marketing site + web console for provisioning instances, managing API keys, viewing usage/billing. Not a debugging tool.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Auth layer</strong> — Hosted mode requires authentication. The desktop app stores an API key (from cloudmock.io console) to connect to hosted instances. Local mode stays unauthenticated.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Revised MVP Scope</h3>
+  <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 16px;">
+    <p style="margin-top: 0;"><strong>Phase 1 — Desktop app with local cloudmock</strong></p>
+    <ul style="margin: 0; line-height: 1.8;">
+      <li>Tauri shell, system tray, native menus</li>
+      <li>Start/stop/restart local cloudmock gateway</li>
+      <li>Service overview, live request log, config UI</li>
+      <li>Connection settings (endpoint URL — defaults to localhost)</li>
+    </ul>
+    <p style="margin-top: 16px;"><strong>Phase 2 — Hosted backend + cloudmock.io</strong></p>
+    <ul style="margin: 0; line-height: 1.8;">
+      <li>cloudmock.io landing + web console</li>
+      <li>Hosted cloudmock instances (container orchestration)</li>
+      <li>API key auth, desktop app connects to hosted endpoint</li>
+    </ul>
+    <p style="margin-top: 16px;"><strong>Phase 3 — Device debugging</strong></p>
+    <ul style="margin: 0; line-height: 1.8;">
+      <li>ADB/iOS/CDP bridges in Rust</li>
+      <li>Unified log viewer, network inspector, view hierarchy</li>
+    </ul>
+  </div>
+</div>

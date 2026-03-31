@@ -1,0 +1,92 @@
+<h2>Connection Model</h2>
+<p class="subtitle">How does the desktop app connect to cloudmock (local vs hosted)?</p>
+
+<div class="section">
+  <h3>Startup Experience</h3>
+  <div class="mockup">
+    <div class="mockup-header">First Launch — Connection Picker</div>
+    <div class="mockup-body" style="padding: 40px; text-align: center;">
+      <div style="max-width: 400px; margin: 0 auto;">
+        <div style="font-size: 24px; font-weight: bold; margin-bottom: 4px;">cloudmock</div>
+        <div style="font-size: 13px; opacity: 0.5; margin-bottom: 32px;">Connect to a cloudmock instance</div>
+
+        <!-- Local option -->
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 16px; margin-bottom: 12px; text-align: left; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 24px;">💻</div>
+            <div>
+              <div style="font-weight: bold;">Local Instance</div>
+              <div style="font-size: 12px; opacity: 0.5;">Start cloudmock on this machine</div>
+            </div>
+            <div style="margin-left: auto; opacity: 0.3;">→</div>
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="background: rgba(34,197,94,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Free</span>
+            <span style="background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 3px; font-size: 11px;">No account needed</span>
+            <span style="background: rgba(255,255,255,0.08); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Full 98 services</span>
+          </div>
+        </div>
+
+        <!-- Hosted option -->
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 16px; margin-bottom: 12px; text-align: left; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 24px;">☁️</div>
+            <div>
+              <div style="font-weight: bold;">cloudmock.io</div>
+              <div style="font-size: 12px; opacity: 0.5;">Connect to a hosted instance</div>
+            </div>
+            <div style="margin-left: auto; opacity: 0.3;">→</div>
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <span style="background: rgba(99,102,241,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Team sharing</span>
+            <span style="background: rgba(99,102,241,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">Persistent state</span>
+            <span style="background: rgba(99,102,241,0.15); padding: 2px 8px; border-radius: 3px; font-size: 11px;">CI integration</span>
+          </div>
+        </div>
+
+        <!-- Custom endpoint -->
+        <div style="background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.15); border-radius: 10px; padding: 16px; text-align: left; cursor: pointer;">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="font-size: 24px;">🔗</div>
+            <div>
+              <div style="font-weight: bold;">Custom Endpoint</div>
+              <div style="font-size: 12px; opacity: 0.5;">Connect to any cloudmock instance by URL</div>
+            </div>
+            <div style="margin-left: auto; opacity: 0.3;">→</div>
+          </div>
+        </div>
+
+        <div style="margin-top: 24px; font-size: 11px; opacity: 0.3;">v1.0.0</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>After Connection</h3>
+  <div class="mockup">
+    <div class="mockup-header">Status Bar — Bottom of App Window</div>
+    <div class="mockup-body" style="padding: 0;">
+      <div style="display: flex; align-items: center; background: rgba(0,0,0,0.3); padding: 4px 12px; font-size: 11px; gap: 16px;">
+        <div><span style="color: #22c55e;">●</span> Local — localhost:4566</div>
+        <div style="opacity: 0.5;">us-east-1</div>
+        <div style="opacity: 0.5;">profile: minimal</div>
+        <div style="opacity: 0.5;">IAM: enforce</div>
+        <div style="flex: 1;"></div>
+        <div style="opacity: 0.5;">98 services</div>
+        <div style="opacity: 0.4; cursor: pointer;">Switch ↗</div>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 12px; display: grid; gap: 10px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 13px;">
+      <strong>Connection remembered</strong> — last connection auto-restores on next launch. Local mode auto-starts the Go binary if not already running.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 13px;">
+      <strong>Multiple connections saved</strong> — switch between local, hosted, and custom endpoints from the status bar. Like database client connection profiles.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 13px;">
+      <strong>API surface is identical</strong> — the app doesn't know or care whether it's talking to a local Go binary or a hosted container. Same admin API, same experience.
+    </div>
+  </div>
+</div>

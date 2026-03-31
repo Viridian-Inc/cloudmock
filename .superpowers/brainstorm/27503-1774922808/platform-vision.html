@@ -1,0 +1,147 @@
+<h2>Reframed: CloudMock as Developer Platform</h2>
+<p class="subtitle">Drawing parallels from Kong's platform model</p>
+
+<div class="section">
+  <h3>Kong → CloudMock Mapping</h3>
+  <div class="mockup">
+    <div class="mockup-header">Platform Comparison</div>
+    <div class="mockup-body" style="padding: 20px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
+        <thead>
+          <tr style="border-bottom: 2px solid rgba(255,255,255,0.2);">
+            <th style="text-align: left; padding: 10px; width: 30%;">Kong</th>
+            <th style="text-align: left; padding: 10px; width: 30%;">CloudMock Equivalent</th>
+            <th style="text-align: left; padding: 10px; width: 40%;">What It Does</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">Kong Gateway</td>
+            <td style="padding: 10px;"><strong>cloudmock gateway</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Open-source runtime — emulates 98 AWS services + K8s + ArgoCD via plugin system</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">Kong Konnect</td>
+            <td style="padding: 10px;"><strong>cloudmock.io</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Hosted control plane — manage instances, teams, governance, billing</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">Kong Insomnia</td>
+            <td style="padding: 10px;"><strong>neureaux devtools</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Desktop app — debug, inspect, test across iOS/Android/Web + cloud services</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">Developer Portal</td>
+            <td style="padding: 10px;"><strong>cloudmock portal</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Discover available services, get credentials, browse API docs, register apps</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">Service Catalog</td>
+            <td style="padding: 10px;"><strong>service registry</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Inventory of all 98+ emulated services with compatibility status and docs</td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px; opacity: 0.7;">API Analytics</td>
+            <td style="padding: 10px;"><strong>cloudmock console</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Already built — observability, traces, SLOs, request replay, AI explain</td>
+          </tr>
+          <tr>
+            <td style="padding: 10px; opacity: 0.7;">Kong AI Gateway</td>
+            <td style="padding: 10px;"><strong>AI/ML service plugins</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">Bedrock, SageMaker emulation — already stubbed as Tier 2 services</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>The CloudMock Platform Stack</h3>
+  <div class="mockup">
+    <div class="mockup-header">Product Architecture</div>
+    <div class="mockup-body" style="padding: 24px; font-family: monospace;">
+      <div style="text-align: center;">
+
+        <!-- Top: User-facing products -->
+        <div style="margin-bottom: 6px; font-size: 11px; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px;">User-Facing Products</div>
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 20px;">
+          <div style="border: 2px solid #6366f1; border-radius: 10px; padding: 14px 18px; min-width: 180px;">
+            <div style="font-weight: bold;">🖥 Devtools</div>
+            <div style="font-size: 12px; opacity: 0.6; margin-top: 4px;">Tauri desktop app</div>
+            <div style="font-size: 11px; opacity: 0.4; margin-top: 4px;">Debug · Inspect · Test</div>
+            <div style="font-size: 11px; opacity: 0.4;">iOS · Android · Web</div>
+          </div>
+          <div style="border: 2px solid #22c55e; border-radius: 10px; padding: 14px 18px; min-width: 180px;">
+            <div style="font-weight: bold;">🌐 cloudmock.io</div>
+            <div style="font-size: 12px; opacity: 0.6; margin-top: 4px;">Control plane + portal</div>
+            <div style="font-size: 11px; opacity: 0.4; margin-top: 4px;">Manage · Govern · Bill</div>
+            <div style="font-size: 11px; opacity: 0.4;">Teams · API keys · Docs</div>
+          </div>
+          <div style="border: 2px solid #f59e0b; border-radius: 10px; padding: 14px 18px; min-width: 180px;">
+            <div style="font-weight: bold;">⌨️ CLI</div>
+            <div style="font-size: 12px; opacity: 0.6; margin-top: 4px;">cloudmock + wrappers</div>
+            <div style="font-size: 11px; opacity: 0.4; margin-top: 4px;">Start · Stop · Config</div>
+            <div style="font-size: 11px; opacity: 0.4;">aws · cdk · sam · ci</div>
+          </div>
+        </div>
+
+        <div style="font-size: 12px; opacity: 0.4; margin: 4px 0;">▼ All connect via Admin API ▼</div>
+
+        <!-- Middle: Platform layer -->
+        <div style="margin-top: 16px; margin-bottom: 6px; font-size: 11px; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px;">Platform Layer</div>
+        <div style="border: 2px solid #ec4899; border-radius: 10px; padding: 16px; max-width: 580px; margin: 0 auto 20px;">
+          <div style="font-weight: bold; font-size: 16px;">CloudMock Console</div>
+          <div style="font-size: 12px; opacity: 0.6; margin: 6px 0 10px;">Observability · Analytics · Intelligence (already built)</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Traces</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">SLOs</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">AI Explain</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Incidents</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Regressions</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Cost</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Topology</span>
+            <span style="background: rgba(236,72,153,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Profiling</span>
+          </div>
+        </div>
+
+        <!-- Bottom: Runtime -->
+        <div style="margin-bottom: 6px; font-size: 11px; opacity: 0.5; text-transform: uppercase; letter-spacing: 1px;">Runtime</div>
+        <div style="border: 2px solid #8b5cf6; border-radius: 10px; padding: 16px; max-width: 580px; margin: 0 auto;">
+          <div style="font-weight: bold; font-size: 16px;">CloudMock Gateway</div>
+          <div style="font-size: 12px; opacity: 0.6; margin: 6px 0 10px;">Open-source · Plugin-based · 101 services</div>
+          <div style="display: flex; gap: 6px; flex-wrap: wrap; justify-content: center;">
+            <span style="background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">98 AWS Services</span>
+            <span style="background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Kubernetes</span>
+            <span style="background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">ArgoCD</span>
+            <span style="background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">IAM Engine</span>
+            <span style="background: rgba(139,92,246,0.15); padding: 3px 8px; border-radius: 4px; font-size: 11px;">Plugin System</span>
+          </div>
+          <div style="display: flex; gap: 12px; justify-content: center; margin-top: 12px; font-size: 12px; opacity: 0.5;">
+            <span>Runs locally</span>
+            <span>·</span>
+            <span>Runs hosted</span>
+            <span>·</span>
+            <span>Runs in CI</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>What This Means for the Desktop App</h3>
+  <div style="display: grid; gap: 12px;">
+    <div style="background: rgba(99,102,241,0.1); border: 1px solid rgba(99,102,241,0.3); border-radius: 8px; padding: 14px;">
+      <strong>The desktop app is "Insomnia" to cloudmock's "Kong Gateway"</strong> — a rich, native tool for developers to interact with the platform. It's not just a dashboard viewer; it's where developers debug, inspect, and test their apps against cloudmock services.
+    </div>
+    <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 14px;">
+      <strong>cloudmock.io is "Konnect"</strong> — the hosted control plane where platform teams manage instances, set governance rules, onboard developers, and handle billing. It's a web console, not a debugging tool.
+    </div>
+    <div style="background: rgba(245,158,11,0.1); border: 1px solid rgba(245,158,11,0.3); border-radius: 8px; padding: 14px;">
+      <strong>The gateway stays open-source</strong> — just like Kong Gateway. The monetization is in the hosted platform (cloudmock.io) and potentially premium desktop features.
+    </div>
+  </div>
+</div>

@@ -1,0 +1,134 @@
+<h2>Framework-Agnostic Sources</h2>
+<p class="subtitle">Support runtimes, not frameworks — everything else follows</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header" style="color: #ef4444;">❌ Before: Framework-specific</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 13px;">
+        <div style="opacity: 0.5; line-height: 1.8;">
+          @cloudmock/react-native<br>
+          @cloudmock/react<br>
+          cloudmock_flutter (Dart)<br>
+          @cloudmock/web<br>
+          @cloudmock/next<br>
+          @cloudmock/express<br>
+          ...<br><br>
+          Endless framework SDKs to build and maintain. New framework? New SDK.
+        </div>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header" style="color: #22c55e;">✓ After: Runtime-level</div>
+      <div class="mockup-body" style="padding: 16px; font-size: 13px;">
+        <div style="line-height: 1.8;">
+          <strong>3 SDKs total:</strong><br>
+          <span style="color: #22c55e;">●</span> Node/JS/TS — covers React, RN, Next, Express, Bun, Deno<br>
+          <span style="color: #3b82f6;">●</span> Swift — covers iOS, macOS, SwiftUI, UIKit, Vapor<br>
+          <span style="color: #f59e0b;">●</span> Kotlin — covers Android, KMP, Ktor, Spring<br><br>
+          New framework on any of these? Already works.
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Three SDKs Cover Everything</h3>
+  <div class="mockup">
+    <div class="mockup-header">Runtime → Framework Coverage</div>
+    <div class="mockup-body" style="padding: 20px;">
+      <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+        <thead>
+          <tr style="border-bottom: 2px solid rgba(255,255,255,0.2);">
+            <th style="text-align: left; padding: 10px; width: 20%;">SDK</th>
+            <th style="text-align: left; padding: 10px; width: 30%;">What It Hooks</th>
+            <th style="text-align: left; padding: 10px; width: 50%;">Frameworks That Just Work</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px;"><strong style="color: #22c55e;">cloudmock/node</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">
+              <code>http</code>/<code>https</code> module<br>
+              <code>fetch</code> global<br>
+              <code>console.*</code><br>
+              <code>process.on('uncaughtException')</code>
+            </td>
+            <td style="padding: 10px; opacity: 0.7;">
+              React, React Native, Next.js, Express, Fastify, Hono, Remix, Svelte, Vue, Angular, Bun, Deno, Electron, any JS/TS app
+            </td>
+          </tr>
+          <tr style="border-bottom: 1px solid rgba(255,255,255,0.08);">
+            <td style="padding: 10px;"><strong style="color: #3b82f6;">cloudmock/swift</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">
+              <code>URLSession</code><br>
+              <code>os.Logger</code> / <code>NSLog</code><br>
+              <code>NSSetUncaughtExceptionHandler</code><br>
+              <code>MetricKit</code>
+            </td>
+            <td style="padding: 10px; opacity: 0.7;">
+              SwiftUI, UIKit, AppKit, Vapor, Hummingbird, any Swift app (iOS, macOS, tvOS, watchOS, server-side)
+            </td>
+          </tr>
+          <tr>
+            <td style="padding: 10px;"><strong style="color: #f59e0b;">cloudmock/kotlin</strong></td>
+            <td style="padding: 10px; opacity: 0.7;">
+              <code>OkHttp</code> interceptor<br>
+              <code>HttpURLConnection</code><br>
+              <code>Log.*</code> / <code>Timber</code><br>
+              <code>Thread.setDefaultUncaughtExceptionHandler</code>
+            </td>
+            <td style="padding: 10px; opacity: 0.7;">
+              Jetpack Compose, XML Views, Kotlin Multiplatform, Ktor, Spring Boot, any Kotlin/JVM app (Android, server, desktop)
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>What About Flutter (Dart)?</h3>
+  <div style="display: grid; gap: 10px; font-size: 13px;">
+    <div style="background: rgba(56,189,248,0.1); border: 1px solid rgba(56,189,248,0.3); border-radius: 8px; padding: 14px;">
+      <strong>Dart is a 4th runtime — add it if there's demand.</strong> Dart's <code>HttpClient</code>, <code>dart:developer</code>, and zone error handling are distinct from Node/Swift/Kotlin. If you want Flutter support, a Dart SDK is a clean addition to the same pattern. But the architecture doesn't depend on it — it's just another source.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Updated Connected Sources Bar</h3>
+  <div class="mockup">
+    <div class="mockup-header">Sources show runtime, not framework</div>
+    <div class="mockup-body" style="padding: 12px;">
+      <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+        <span style="font-size: 10px; text-transform: uppercase; opacity: 0.4;">Sources:</span>
+        <span style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); padding: 3px 10px; border-radius: 4px; font-size: 11px;">Node · autotend-bff <span style="color: #22c55e;">●</span></span>
+        <span style="background: rgba(34,197,94,0.15); border: 1px solid rgba(34,197,94,0.3); padding: 3px 10px; border-radius: 4px; font-size: 11px;">Node · web-client <span style="color: #22c55e;">●</span></span>
+        <span style="background: rgba(59,130,246,0.15); border: 1px solid rgba(59,130,246,0.3); padding: 3px 10px; border-radius: 4px; font-size: 11px;">Swift · autotend-ios <span style="color: #22c55e;">●</span></span>
+        <span style="background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); padding: 3px 10px; border-radius: 4px; font-size: 11px;">Kotlin · autotend-android <span style="color: #22c55e;">●</span></span>
+        <span style="background: rgba(139,92,246,0.15); border: 1px solid rgba(139,92,246,0.3); padding: 3px 10px; border-radius: 4px; font-size: 11px;">cloudmock <span style="color: #22c55e;">●</span></span>
+        <span style="opacity: 0.3; font-size: 11px; cursor: pointer;">+ Add</span>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 10px; background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px; font-size: 13px;">
+    Sources identify as <strong>runtime · app-name</strong>, not framework. The devtools doesn't know or care if "autotend-ios" is SwiftUI or UIKit. It just knows it's a Swift process sending HTTP requests and logs.
+  </div>
+</div>
+
+<div class="section">
+  <h3>No-SDK Alternatives Still Work</h3>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 13px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">Proxy mode</div>
+      <div style="opacity: 0.7;">Route traffic through devtools as a proxy. Works with any language, any framework, zero code changes. Network only (no logs/crashes).</div>
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 12px;">
+      <div style="font-weight: bold; margin-bottom: 4px;">cloudmock correlation</div>
+      <div style="opacity: 0.7;">Even without an SDK, cloudmock's own request log shows all API calls. You just lose the client-side perspective (source file, client timing, logs).</div>
+    </div>
+  </div>
+</div>

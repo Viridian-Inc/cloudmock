@@ -1,0 +1,286 @@
+package pipes
+
+import (
+	"crypto/rand"
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/neureaux/cloudmock/pkg/lifecycle"
+)
+
+// Pipe represents an EventBridge Pipe.
+type Pipe struct {
+	ARN              string
+	Name             string
+	Description      string
+	DesiredState     string
+	CurrentState     string
+	Source           string
+	SourceParameters map[string]any
+	Target           string
+	TargetParameters map[string]any
+	RoleArn          string
+	Enrichment       string
+	CreationTime     time.Time
+	LastModifiedTime time.Time
+	Lifecycle        *lifecycle.Machine
+	Tags             map[string]string
+}
+
+// Store manages all Pipes state in memory.
+type Store struct {
+	mu              sync.RWMutex
+	pipes           map[string]*Pipe
+	accountID       string
+	region          string
+	lifecycleConfig *lifecycle.Config
+}
+
+// NewStore returns a new Store for the given account and region.
+func NewStore(accountID, region string) *Store {
+	return &Store{
+		pipes:           make(map[string]*Pipe),
+		accountID:       accountID,
+		region:          region,
+		lifecycleConfig: lifecycle.DefaultConfig(),
+	}
+}
+
+func newUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+func (s *Store) pipeARN(name string) string {
+	return fmt.Sprintf("arn:aws:pipes:%s:%s:pipe/%s", s.region, s.accountID, name)
+}
+
+func createRunningTransitions() []lifecycle.Transition {
+	return []lifecycle.Transition{
+		{From: "CREATING", To: "RUNNING", Delay: 3 * time.Second},
+	}
+}
+
+func createStoppingTransitions() []lifecycle.Transition {
+	return []lifecycle.Transition{
+		{From: "STOPPING", To: "STOPPED", Delay: 3 * time.Second},
+	}
+}
+
+// CreatePipe creates a new pipe.
+func (s *Store) CreatePipe(name, description, source, target, roleArn, enrichment, desiredState string, sourceParams, targetParams map[string]any, tags map[string]string) (*Pipe, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.pipes[name]; ok {
+		return nil, false
+	}
+	if desiredState == "" {
+		desiredState = "RUNNING"
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	now := time.Now().UTC()
+
+	transitions := createRunningTransitions()
+	lm := lifecycle.NewMachine("CREATING", transitions, s.lifecycleConfig)
+
+	pipe := &Pipe{
+		ARN: s.pipeARN(name), Name: name, Description: description,
+		DesiredState: desiredState, CurrentState: "CREATING",
+		Source: source, SourceParameters: sourceParams,
+		Target: target, TargetParameters: targetParams,
+		RoleArn: roleArn, Enrichment: enrichment,
+		CreationTime: now, LastModifiedTime: now,
+		Lifecycle: lm, Tags: tags,
+	}
+
+	lm.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		pipe.CurrentState = string(to)
+	})
+
+	s.pipes[name] = pipe
+	return pipe, true
+}
+
+// DescribePipe returns a pipe by name.
+func (s *Store) DescribePipe(name string) (*Pipe, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	pipe, ok := s.pipes[name]
+	if ok {
+		pipe.CurrentState = string(pipe.Lifecycle.State())
+	}
+	return pipe, ok
+}
+
+// ListPipes returns all pipes, optionally filtered by prefix and state.
+func (s *Store) ListPipes(namePrefix, currentState, desiredState, sourcePrefix string) []*Pipe {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*Pipe, 0, len(s.pipes))
+	for _, pipe := range s.pipes {
+		pipe.CurrentState = string(pipe.Lifecycle.State())
+		if namePrefix != "" && (len(pipe.Name) < len(namePrefix) || pipe.Name[:len(namePrefix)] != namePrefix) {
+			continue
+		}
+		if currentState != "" && pipe.CurrentState != currentState {
+			continue
+		}
+		if desiredState != "" && pipe.DesiredState != desiredState {
+			continue
+		}
+		if sourcePrefix != "" && (len(pipe.Source) < len(sourcePrefix) || pipe.Source[:len(sourcePrefix)] != sourcePrefix) {
+			continue
+		}
+		result = append(result, pipe)
+	}
+	return result
+}
+
+// UpdatePipe updates a pipe.
+func (s *Store) UpdatePipe(name, description, target, roleArn, enrichment, desiredState string, targetParams map[string]any) (*Pipe, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pipe, ok := s.pipes[name]
+	if !ok {
+		return nil, false
+	}
+	if description != "" {
+		pipe.Description = description
+	}
+	if target != "" {
+		pipe.Target = target
+	}
+	if roleArn != "" {
+		pipe.RoleArn = roleArn
+	}
+	if enrichment != "" {
+		pipe.Enrichment = enrichment
+	}
+	if targetParams != nil {
+		pipe.TargetParameters = targetParams
+	}
+	if desiredState != "" {
+		pipe.DesiredState = desiredState
+	}
+	pipe.LastModifiedTime = time.Now().UTC()
+	return pipe, true
+}
+
+// DeletePipe removes a pipe.
+func (s *Store) DeletePipe(name string) (*Pipe, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pipe, ok := s.pipes[name]
+	if !ok {
+		return nil, false
+	}
+	pipe.Lifecycle.Stop()
+	pipe.CurrentState = "DELETING"
+	delete(s.pipes, name)
+	return pipe, true
+}
+
+// StartPipe starts a stopped pipe.
+func (s *Store) StartPipe(name string) (*Pipe, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pipe, ok := s.pipes[name]
+	if !ok {
+		return nil, false
+	}
+	pipe.CurrentState = string(pipe.Lifecycle.State())
+	if pipe.CurrentState != "STOPPED" {
+		return nil, false
+	}
+	pipe.DesiredState = "RUNNING"
+	transitions := createRunningTransitions()
+	lm := lifecycle.NewMachine("CREATING", transitions, s.lifecycleConfig)
+	pipe.Lifecycle = lm
+	pipe.CurrentState = "STARTING"
+	lm.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		pipe.CurrentState = string(to)
+	})
+	pipe.LastModifiedTime = time.Now().UTC()
+	return pipe, true
+}
+
+// StopPipe stops a running pipe.
+func (s *Store) StopPipe(name string) (*Pipe, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	pipe, ok := s.pipes[name]
+	if !ok {
+		return nil, false
+	}
+	pipe.CurrentState = string(pipe.Lifecycle.State())
+	if pipe.CurrentState != "RUNNING" {
+		return nil, false
+	}
+	pipe.Lifecycle.Stop()
+	pipe.DesiredState = "STOPPED"
+	transitions := createStoppingTransitions()
+	lm := lifecycle.NewMachine("STOPPING", transitions, s.lifecycleConfig)
+	pipe.Lifecycle = lm
+	pipe.CurrentState = "STOPPING"
+	lm.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		pipe.CurrentState = string(to)
+	})
+	pipe.LastModifiedTime = time.Now().UTC()
+	return pipe, true
+}
+
+// TagResource applies tags to a pipe by ARN.
+func (s *Store) TagResource(arn string, tags map[string]string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, pipe := range s.pipes {
+		if pipe.ARN == arn {
+			for k, v := range tags {
+				pipe.Tags[k] = v
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// UntagResource removes tags from a pipe by ARN.
+func (s *Store) UntagResource(arn string, keys []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, pipe := range s.pipes {
+		if pipe.ARN == arn {
+			for _, k := range keys {
+				delete(pipe.Tags, k)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// ListTagsForResource returns tags for a pipe by ARN.
+func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, pipe := range s.pipes {
+		if pipe.ARN == arn {
+			cp := make(map[string]string, len(pipe.Tags))
+			for k, v := range pipe.Tags {
+				cp[k] = v
+			}
+			return cp, true
+		}
+	}
+	return nil, false
+}

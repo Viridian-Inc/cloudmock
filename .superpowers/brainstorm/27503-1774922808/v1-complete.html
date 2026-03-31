@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>neureaux-devtools v1 — Complete</title>
+<style>
+  :root { --bg: #0f1117; --surface: #1a1d27; --border: rgba(255,255,255,0.08); --text: #e2e4e9; --muted: rgba(255,255,255,0.45); --accent: #6366f1; --green: #22c55e; --teal: #4AE5F8; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; padding: 0; }
+  .header { background: linear-gradient(135deg, rgba(34,197,94,0.15), rgba(99,102,241,0.1)); border-bottom: 1px solid var(--border); padding: 40px 48px; }
+  .header h1 { font-size: 28px; margin-bottom: 4px; }
+  .header .sub { color: var(--muted); font-size: 15px; }
+  .header .badge { display: inline-block; background: rgba(34,197,94,0.2); color: #4ade80; padding: 4px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; margin-top: 12px; }
+  .content { max-width: 1000px; margin: 0 auto; padding: 32px 48px; }
+  .section { margin-bottom: 32px; }
+  .section h2 { font-size: 17px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; text-align: center; }
+  .stat .num { font-size: 32px; font-weight: 700; color: var(--teal); }
+  .stat .label { font-size: 11px; color: var(--muted); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .view-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+  .view-card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px; }
+  .view-card .icon { font-size: 20px; margin-bottom: 4px; }
+  .view-card h4 { font-size: 12px; margin-bottom: 2px; }
+  .view-card p { font-size: 11px; color: var(--muted); line-height: 1.4; }
+  .check { color: #4ade80; margin-right: 4px; }
+  .cmd { background: rgba(255,255,255,0.05); border: 1px solid var(--border); border-radius: 8px; padding: 16px; font-family: 'SF Mono', monospace; font-size: 13px; line-height: 1.8; overflow-x: auto; }
+  .cmd .comment { color: var(--muted); }
+  .sdk-box { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 18px; }
+  .sdk-box h3 { font-size: 14px; margin-bottom: 8px; }
+  .sdk-box code { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; font-size: 12px; }
+  .sdk-box .usage { font-family: monospace; font-size: 12px; line-height: 1.6; margin-top: 10px; background: rgba(0,0,0,0.3); padding: 12px; border-radius: 6px; }
+  .footnote { margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 12px; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>neureaux-devtools</h1>
+  <div class="sub">Cross-platform developer tools — unified debugging for iOS, Android, Web & Cloud</div>
+  <div class="badge">✓ Version 1 Complete</div>
+</div>
+<div class="content">
+
+  <div class="section">
+    <div class="grid-3">
+      <div class="stat"><div class="num">67</div><div class="label">Source Files</div></div>
+      <div class="stat"><div class="num">11</div><div class="label">Views</div></div>
+      <div class="stat"><div class="num">0</div><div class="label">Errors</div></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>All Views</h2>
+    <div class="view-grid">
+      <div class="view-card"><div class="icon">⚡</div><h4><span class="check">✓</span>Activity</h4><p>Live SSE stream, filters, request inspector</p></div>
+      <div class="view-card"><div class="icon">🗺️</div><h4><span class="check">✓</span>Topology</h4><p>Force-directed graph, 60 nodes, zoom/pan</p></div>
+      <div class="view-card"><div class="icon">☁️</div><h4><span class="check">✓</span>Services</h4><p>98 services, JSON resource browser</p></div>
+      <div class="view-card"><div class="icon">🔍</div><h4><span class="check">✓</span>Traces</h4><p>100 traces, waterfall spans</p></div>
+      <div class="view-card"><div class="icon">📊</div><h4><span class="check">✓</span>Metrics</h4><p>Stat cards, service breakdown</p></div>
+      <div class="view-card"><div class="icon">🎯</div><h4><span class="check">✓</span>SLOs</h4><p>15 windows, compliance tracking</p></div>
+      <div class="view-card"><div class="icon">🚨</div><h4><span class="check">✓</span>Incidents</h4><p>Alerts, acknowledge, resolve</p></div>
+      <div class="view-card"><div class="icon">🔥</div><h4><span class="check">✓</span>Profiler</h4><p>Feature cards, ready for data</p></div>
+      <div class="view-card"><div class="icon">🧪</div><h4><span class="check">✓</span>Chaos</h4><p>Fault injection rules, toggle</p></div>
+      <div class="view-card"><div class="icon">🤖</div><h4><span class="check">✓</span>AI Debug</h4><p>Request explain, response renderer</p></div>
+      <div class="view-card"><div class="icon">⚙️</div><h4><span class="check">✓</span>Settings</h4><p>Connections, config, appearance</p></div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Infrastructure</h2>
+    <div class="grid-2">
+      <div class="sdk-box">
+        <h3>Rust Backend (8 modules)</h3>
+        <p style="color: var(--muted); font-size: 12px; line-height: 1.6;">
+          <span class="check">✓</span> Process manager — spawn/stop/restart cloudmock<br>
+          <span class="check">✓</span> Health monitor — 3s polling, Tauri events<br>
+          <span class="check">✓</span> Admin API bridge — proxy frontend → cloudmock<br>
+          <span class="check">✓</span> Source server — TCP :4580 for SDK connections<br>
+          <span class="check">✓</span> System tray — show/hide, start/stop, quit
+        </p>
+      </div>
+      <div class="sdk-box">
+        <h3>Node SDK <code>@cloudmock/node</code></h3>
+        <p style="color: var(--muted); font-size: 12px; line-height: 1.6;">
+          <span class="check">✓</span> HTTP interceptor — captures all outgoing requests<br>
+          <span class="check">✓</span> Console interceptor — log/warn/error/info/debug<br>
+          <span class="check">✓</span> Error interceptor — uncaught + unhandled rejections<br>
+          <span class="check">✓</span> Auto-correlation via X-CloudMock-Source header<br>
+          <span class="check">✓</span> Silent no-op when devtools offline
+        </p>
+        <div class="usage">
+          <span style="color: #4AE5F8;">import</span> { init } <span style="color: #4AE5F8;">from</span> <span style="color: #36d982;">'@cloudmock/node'</span>;<br>
+          init({ appName: <span style="color: #36d982;">'my-api'</span> });
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>Quick Start</h2>
+    <div class="cmd">
+      <span class="comment"># Install Rust (if needed)</span><br>
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh<br><br>
+      <span class="comment"># Install dependencies</span><br>
+      cd neureaux-devtools && pnpm install<br><br>
+      <span class="comment"># Build cloudmock gateway</span><br>
+      cd ../cloudmock && make build-gateway<br><br>
+      <span class="comment"># Run the app</span><br>
+      cd ../neureaux-devtools && pnpm tauri dev
+    </div>
+  </div>
+
+  <div class="footnote">
+    Spec: <code>cloudmock/docs/superpowers/specs/2026-03-30-neureaux-devtools-design.md</code><br>
+    Project: <code>neureaux-devtools/</code> · 67 files · Tauri v2 + Preact + Rust
+  </div>
+</div>
+</body>
+</html>

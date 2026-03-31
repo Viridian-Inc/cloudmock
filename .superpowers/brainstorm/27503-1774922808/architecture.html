@@ -1,0 +1,103 @@
+<h2>Product Architecture</h2>
+<p class="subtitle">neureaux-devtools — a Tauri desktop app with a new frontend and cloudmock backend</p>
+
+<div class="section">
+  <h3>System Overview</h3>
+  <div class="mockup">
+    <div class="mockup-header">Architecture Diagram</div>
+    <div class="mockup-body" style="font-family: monospace; line-height: 1.8; padding: 20px;">
+      <div style="text-align: center;">
+        <!-- Tauri App -->
+        <div style="border: 2px solid #6366f1; border-radius: 12px; padding: 16px; max-width: 600px; margin: 0 auto 16px;">
+          <div style="font-size: 18px; font-weight: bold; margin-bottom: 12px;">🖥 neureaux-devtools (Tauri v2)</div>
+
+          <!-- Frontend -->
+          <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; margin-bottom: 12px; background: rgba(99,102,241,0.1);">
+            <div style="font-weight: bold; margin-bottom: 8px;">Frontend (Preact + Vite + TypeScript)</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Cloud Services</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Device Inspector</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Network Monitor</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Log Viewer</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Topology</span>
+            </div>
+          </div>
+
+          <!-- Rust Backend -->
+          <div style="border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; padding: 12px; background: rgba(234,88,12,0.1);">
+            <div style="font-weight: bold; margin-bottom: 8px;">Rust Backend (Tauri Commands)</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;">
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">Process Manager</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">ADB Bridge</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">iOS Bridge</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">CDP Bridge</span>
+              <span style="background: rgba(255,255,255,0.1); padding: 4px 10px; border-radius: 4px; font-size: 12px;">System Tray</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="font-size: 20px; margin: 8px 0;">↕ IPC (Tauri Commands + Events) ↕</div>
+
+        <!-- External Processes -->
+        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-top: 8px;">
+          <div style="border: 2px solid #22c55e; border-radius: 8px; padding: 12px; min-width: 140px;">
+            <strong>cloudmock</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">Go binary (headless)</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">:4566 AWS</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">:4599 Admin API</span>
+          </div>
+          <div style="border: 2px solid #f59e0b; border-radius: 8px; padding: 12px; min-width: 140px;">
+            <strong>ADB Server</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">Android Debug Bridge</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Device listing</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Logcat streaming</span>
+          </div>
+          <div style="border: 2px solid #3b82f6; border-radius: 8px; padding: 12px; min-width: 140px;">
+            <strong>xcrun / idb</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">iOS toolchain</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Simulator mgmt</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">os_log streaming</span>
+          </div>
+          <div style="border: 2px solid #ec4899; border-radius: 8px; padding: 12px; min-width: 140px;">
+            <strong>Chrome DevTools</strong><br>
+            <span style="opacity: 0.6; font-size: 12px;">CDP WebSocket</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">Web inspection</span><br>
+            <span style="opacity: 0.5; font-size: 11px;">RN debugging</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Key Design Decisions</h3>
+  <div style="display: grid; gap: 12px;">
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Headless cloudmock</strong> — The Go binary runs without its own dashboard (:4500 disabled). The Tauri frontend talks directly to the admin API on :4599. This avoids port conflicts and gives us full UI control.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Same tech stack as existing dashboard</strong> — Preact + Vite + TypeScript. This means existing dashboard components can be migrated (not rewritten from scratch) into the new app as needed. The API client code is directly reusable.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Rust-native device bridges</strong> — ADB, xcrun/idb, and Chrome DevTools Protocol connections live in Rust. The frontend gets device data via Tauri IPC commands and events, not HTTP polling.
+    </div>
+    <div style="background: rgba(255,255,255,0.05); border-radius: 8px; padding: 14px;">
+      <strong>Event-driven architecture</strong> — Tauri v2 events push real-time data (log lines, device state changes, network requests) to the frontend. No polling loops.
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>MVP Scope (Phase 1)</h3>
+  <div style="background: rgba(34,197,94,0.1); border: 1px solid rgba(34,197,94,0.3); border-radius: 8px; padding: 16px;">
+    <ul style="margin: 0; line-height: 1.8;">
+      <li><strong>Tauri app shell</strong> — window, system tray, native menus</li>
+      <li><strong>Process manager</strong> — start/stop/restart cloudmock gateway from the app</li>
+      <li><strong>Service overview</strong> — list of running AWS services with health status (from :4599/api/services)</li>
+      <li><strong>Request log</strong> — live stream of AWS API calls (from :4599/api/requests + SSE)</li>
+      <li><strong>Basic config UI</strong> — region, profile, IAM mode selection</li>
+    </ul>
+    <p style="opacity: 0.6; margin-top: 12px; margin-bottom: 0;">This gets a working desktop app shipping fast. Device debugging comes in Phase 2+.</p>
+  </div>
+</div>

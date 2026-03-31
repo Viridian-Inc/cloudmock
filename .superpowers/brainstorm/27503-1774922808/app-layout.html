@@ -1,0 +1,193 @@
+<h2>Desktop App Layout</h2>
+<p class="subtitle">How should the main window be organized?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Activity Bar + Panels (VS Code model)</h3>
+      <p>Narrow icon rail on the left, switchable panels. Familiar to every developer.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Layout Preview</div>
+        <div class="mockup-body" style="padding: 0; height: 300px; display: flex; font-size: 12px;">
+          <!-- Activity Bar -->
+          <div style="width: 48px; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 16px; border-right: 1px solid rgba(255,255,255,0.1);">
+            <div style="width: 28px; height: 28px; background: rgba(99,102,241,0.4); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; border-left: 2px solid #6366f1;">☁️</div>
+            <div style="width: 28px; height: 28px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px;">📱</div>
+            <div style="width: 28px; height: 28px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px;">🌐</div>
+            <div style="width: 28px; height: 28px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px;">📋</div>
+            <div style="width: 28px; height: 28px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px;">📊</div>
+            <div style="flex: 1;"></div>
+            <div style="width: 28px; height: 28px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; margin-bottom: 12px;">⚙️</div>
+          </div>
+          <!-- Sidebar -->
+          <div style="width: 220px; background: rgba(0,0,0,0.15); border-right: 1px solid rgba(255,255,255,0.08); padding: 12px;">
+            <div style="font-weight: bold; font-size: 11px; text-transform: uppercase; opacity: 0.5; margin-bottom: 10px;">Cloud Services</div>
+            <div style="padding: 6px 8px; background: rgba(99,102,241,0.15); border-radius: 4px; margin-bottom: 4px;">
+              <span style="color: #22c55e;">●</span> S3
+            </div>
+            <div style="padding: 6px 8px; margin-bottom: 4px;">
+              <span style="color: #22c55e;">●</span> DynamoDB
+            </div>
+            <div style="padding: 6px 8px; margin-bottom: 4px;">
+              <span style="color: #22c55e;">●</span> Lambda
+            </div>
+            <div style="padding: 6px 8px; margin-bottom: 4px;">
+              <span style="color: #22c55e;">●</span> SQS
+            </div>
+            <div style="padding: 6px 8px; margin-bottom: 4px;">
+              <span style="color: #f59e0b;">●</span> Cognito
+            </div>
+            <div style="padding: 6px 8px; margin-bottom: 4px; opacity: 0.4;">
+              <span style="color: #6b7280;">●</span> RDS
+            </div>
+          </div>
+          <!-- Main content -->
+          <div style="flex: 1; padding: 16px;">
+            <div style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">S3</div>
+            <div style="font-size: 11px; opacity: 0.5; margin-bottom: 16px;">3 buckets · 47 objects · healthy</div>
+            <div style="display: flex; gap: 8px; margin-bottom: 16px;">
+              <span style="background: rgba(99,102,241,0.2); padding: 4px 10px; border-radius: 4px; font-size: 11px;">Buckets</span>
+              <span style="background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 4px; font-size: 11px;">Requests</span>
+              <span style="background: rgba(255,255,255,0.05); padding: 4px 10px; border-radius: 4px; font-size: 11px;">Traces</span>
+            </div>
+            <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; font-size: 11px;">
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <span>my-bucket</span><span style="opacity: 0.5;">12 objects</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                <span>uploads</span><span style="opacity: 0.5;">30 objects</span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                <span>assets</span><span style="opacity: 0.5;">5 objects</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Top Tabs + Sidebar (Chrome DevTools model)</h3>
+      <p>Horizontal tabs across the top for major sections, contextual sidebar within each. Native to debugging tools.</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Layout Preview</div>
+        <div class="mockup-body" style="padding: 0; height: 300px; display: flex; flex-direction: column; font-size: 12px;">
+          <!-- Tab bar -->
+          <div style="display: flex; background: rgba(0,0,0,0.3); border-bottom: 1px solid rgba(255,255,255,0.1); padding: 0 12px;">
+            <div style="padding: 10px 16px; border-bottom: 2px solid #6366f1; font-weight: bold;">Cloud</div>
+            <div style="padding: 10px 16px; opacity: 0.5;">Devices</div>
+            <div style="padding: 10px 16px; opacity: 0.5;">Network</div>
+            <div style="padding: 10px 16px; opacity: 0.5;">Logs</div>
+            <div style="padding: 10px 16px; opacity: 0.5;">Topology</div>
+            <div style="flex: 1;"></div>
+            <div style="padding: 10px 16px; opacity: 0.5;">⚙️</div>
+          </div>
+          <!-- Content area -->
+          <div style="flex: 1; display: flex;">
+            <!-- Service list -->
+            <div style="width: 180px; background: rgba(0,0,0,0.1); border-right: 1px solid rgba(255,255,255,0.08); padding: 12px;">
+              <div style="padding: 6px 8px; background: rgba(99,102,241,0.15); border-radius: 4px; margin-bottom: 4px;">
+                <span style="color: #22c55e;">●</span> S3
+              </div>
+              <div style="padding: 6px 8px; margin-bottom: 4px;">
+                <span style="color: #22c55e;">●</span> DynamoDB
+              </div>
+              <div style="padding: 6px 8px; margin-bottom: 4px;">
+                <span style="color: #22c55e;">●</span> Lambda
+              </div>
+              <div style="padding: 6px 8px; margin-bottom: 4px;">
+                <span style="color: #22c55e;">●</span> SQS
+              </div>
+            </div>
+            <!-- Main panel -->
+            <div style="flex: 1; padding: 16px;">
+              <div style="font-size: 16px; font-weight: bold; margin-bottom: 4px;">S3</div>
+              <div style="font-size: 11px; opacity: 0.5; margin-bottom: 16px;">3 buckets · 47 objects</div>
+              <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 10px; font-size: 11px;">
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                  <span>my-bucket</span><span style="opacity: 0.5;">12 objects</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);">
+                  <span>uploads</span><span style="opacity: 0.5;">30 objects</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; padding: 6px 0;">
+                  <span>assets</span><span style="opacity: 0.5;">5 objects</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Workspace Panels (Flipper model)</h3>
+      <p>Resizable panels that can be arranged freely. Each "plugin" gets its own panel. Inspired by Meta's Flipper (now deprecated — opportunity!).</p>
+      <div class="mockup" style="margin-top: 12px;">
+        <div class="mockup-header">Layout Preview</div>
+        <div class="mockup-body" style="padding: 0; height: 300px; display: flex; font-size: 12px;">
+          <!-- Left nav -->
+          <div style="width: 48px; background: rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; padding-top: 12px; gap: 4px; border-right: 1px solid rgba(255,255,255,0.1);">
+            <div style="width: 36px; padding: 6px 0; text-align: center; font-size: 10px; background: rgba(99,102,241,0.2); border-radius: 4px; margin-bottom: 2px;">
+              <div style="font-size: 16px;">☁️</div>
+              <div style="opacity: 0.6;">Cloud</div>
+            </div>
+            <div style="width: 36px; padding: 6px 0; text-align: center; font-size: 10px; margin-bottom: 2px;">
+              <div style="font-size: 16px;">📱</div>
+              <div style="opacity: 0.4;">Device</div>
+            </div>
+            <div style="width: 36px; padding: 6px 0; text-align: center; font-size: 10px; margin-bottom: 2px;">
+              <div style="font-size: 16px;">🔌</div>
+              <div style="opacity: 0.4;">Network</div>
+            </div>
+            <div style="width: 36px; padding: 6px 0; text-align: center; font-size: 10px;">
+              <div style="font-size: 16px;">📋</div>
+              <div style="opacity: 0.4;">Logs</div>
+            </div>
+          </div>
+          <!-- Main workspace - split panels -->
+          <div style="flex: 1; display: flex; flex-direction: column;">
+            <!-- Top row -->
+            <div style="flex: 1; display: flex; border-bottom: 2px solid rgba(255,255,255,0.1);">
+              <!-- Services panel -->
+              <div style="flex: 1; border-right: 2px solid rgba(255,255,255,0.1); padding: 10px;">
+                <div style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-bottom: 8px;">Services</div>
+                <div style="padding: 4px 6px; background: rgba(99,102,241,0.15); border-radius: 3px; margin-bottom: 3px;"><span style="color: #22c55e;">●</span> S3 — 3 buckets</div>
+                <div style="padding: 4px 6px; margin-bottom: 3px;"><span style="color: #22c55e;">●</span> DynamoDB — 2 tables</div>
+                <div style="padding: 4px 6px; margin-bottom: 3px;"><span style="color: #22c55e;">●</span> Lambda — 5 functions</div>
+                <div style="padding: 4px 6px;"><span style="color: #22c55e;">●</span> SQS — 3 queues</div>
+              </div>
+              <!-- Detail panel -->
+              <div style="flex: 1.5; padding: 10px;">
+                <div style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-bottom: 8px;">S3 Detail</div>
+                <div style="font-size: 14px; font-weight: bold; margin-bottom: 8px;">my-bucket</div>
+                <div style="background: rgba(255,255,255,0.03); border-radius: 4px; padding: 6px; font-size: 11px;">
+                  <div style="padding: 3px 0;">hello.txt — 5 bytes</div>
+                  <div style="padding: 3px 0;">config.json — 1.2 KB</div>
+                </div>
+              </div>
+            </div>
+            <!-- Bottom row - request log -->
+            <div style="height: 120px; padding: 10px;">
+              <div style="font-size: 10px; text-transform: uppercase; opacity: 0.4; margin-bottom: 6px;">Request Log</div>
+              <div style="font-size: 11px; font-family: monospace; opacity: 0.7; line-height: 1.6;">
+                <div><span style="color: #22c55e;">200</span> PutObject s3/my-bucket/hello.txt <span style="opacity: 0.4;">12ms</span></div>
+                <div><span style="color: #22c55e;">200</span> GetItem dynamodb/users <span style="opacity: 0.4;">3ms</span></div>
+                <div><span style="color: #f59e0b;">403</span> CreateQueue sqs <span style="opacity: 0.4;">1ms</span></div>
+                <div><span style="color: #22c55e;">200</span> ListBuckets s3 <span style="opacity: 0.4;">2ms</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p style="margin-top: 8px; font-size: 13px; opacity: 0.7;">Note: Meta deprecated Flipper in 2024 — there's a gap in the market for a cross-platform mobile devtool.</p>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,313 @@
+package transfer
+
+import (
+	"fmt"
+	"sync"
+	"time"
+
+	"github.com/neureaux/cloudmock/pkg/lifecycle"
+)
+
+// Server represents an AWS Transfer Family server.
+type Server struct {
+	ServerID              string
+	Arn                   string
+	Domain                string
+	EndpointType          string
+	IdentityProviderType  string
+	LoggingRole           string
+	Protocols             []string
+	State                 string
+	Tags                  map[string]string
+	UserCount             int
+	CreatedAt             time.Time
+	lifecycle             *lifecycle.Machine
+}
+
+// User represents an AWS Transfer Family user.
+type User struct {
+	ServerID       string
+	UserName       string
+	Arn            string
+	HomeDirectory  string
+	HomeDirectoryType string
+	Role           string
+	SshPublicKeys  []*SSHPublicKey
+	Tags           map[string]string
+	CreatedAt      time.Time
+}
+
+// SSHPublicKey represents an SSH public key for a Transfer user.
+type SSHPublicKey struct {
+	SSHPublicKeyID   string
+	SSHPublicKeyBody string
+	DateImported     time.Time
+}
+
+// Store manages Transfer Family resources in memory.
+type Store struct {
+	mu        sync.RWMutex
+	servers   map[string]*Server
+	users     map[string]map[string]*User // serverID -> userName -> User
+	accountID string
+	region    string
+	lcConfig  *lifecycle.Config
+	keySeq    int
+}
+
+// NewStore returns a new empty Transfer Store.
+func NewStore(accountID, region string) *Store {
+	return &Store{
+		servers:   make(map[string]*Server),
+		users:     make(map[string]map[string]*User),
+		accountID: accountID,
+		region:    region,
+		lcConfig:  lifecycle.DefaultConfig(),
+	}
+}
+
+func (s *Store) arnPrefix() string {
+	return fmt.Sprintf("arn:aws:transfer:%s:%s:", s.region, s.accountID)
+}
+
+func (s *Store) newServerID() string {
+	return fmt.Sprintf("s-%012d", time.Now().UnixNano()%1000000000000)
+}
+
+// CreateServer creates a new Transfer server.
+func (s *Store) CreateServer(domain, endpointType, identityProvider, loggingRole string, protocols []string, tags map[string]string) (*Server, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	id := s.newServerID()
+	transitions := []lifecycle.Transition{
+		{From: "OFFLINE", To: "ONLINE", Delay: 2 * time.Second},
+	}
+
+	srv := &Server{
+		ServerID:             id,
+		Arn:                  s.arnPrefix() + "server/" + id,
+		Domain:               domain,
+		EndpointType:         endpointType,
+		IdentityProviderType: identityProvider,
+		LoggingRole:          loggingRole,
+		Protocols:            protocols,
+		State:                "OFFLINE",
+		Tags:                 tags,
+		CreatedAt:            time.Now().UTC(),
+	}
+	srv.lifecycle = lifecycle.NewMachine("OFFLINE", transitions, s.lcConfig)
+	srv.lifecycle.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		srv.State = string(to)
+	})
+
+	s.servers[id] = srv
+	s.users[id] = make(map[string]*User)
+	return srv, nil
+}
+
+// GetServer retrieves a server by ID.
+func (s *Store) GetServer(id string) (*Server, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	srv, ok := s.servers[id]
+	return srv, ok
+}
+
+// ListServers returns all servers.
+func (s *Store) ListServers() []*Server {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*Server, 0, len(s.servers))
+	for _, srv := range s.servers {
+		out = append(out, srv)
+	}
+	return out
+}
+
+// StopServer stops a server, transitioning to STOPPING then OFFLINE.
+func (s *Store) StopServer(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	srv, ok := s.servers[id]
+	if !ok {
+		return fmt.Errorf("server not found: %s", id)
+	}
+	if srv.State != "ONLINE" {
+		return fmt.Errorf("server %s is not online: %s", id, srv.State)
+	}
+	srv.lifecycle.Stop()
+
+	transitions := []lifecycle.Transition{
+		{From: "STOPPING", To: "OFFLINE", Delay: 2 * time.Second},
+	}
+	srv.State = "STOPPING"
+	srv.lifecycle = lifecycle.NewMachine("STOPPING", transitions, s.lcConfig)
+	srv.lifecycle.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		srv.State = string(to)
+	})
+	return nil
+}
+
+// StartServer starts a server, transitioning to ONLINE.
+func (s *Store) StartServer(id string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	srv, ok := s.servers[id]
+	if !ok {
+		return fmt.Errorf("server not found: %s", id)
+	}
+	if srv.State != "OFFLINE" {
+		return fmt.Errorf("server %s is not offline: %s", id, srv.State)
+	}
+	srv.lifecycle.Stop()
+
+	transitions := []lifecycle.Transition{
+		{From: "START_PENDING", To: "ONLINE", Delay: 2 * time.Second},
+	}
+	srv.State = "START_PENDING"
+	srv.lifecycle = lifecycle.NewMachine("START_PENDING", transitions, s.lcConfig)
+	srv.lifecycle.OnTransition(func(from, to lifecycle.State) {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		srv.State = string(to)
+	})
+	return nil
+}
+
+// DeleteServer removes a server.
+func (s *Store) DeleteServer(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	srv, ok := s.servers[id]
+	if !ok {
+		return false
+	}
+	srv.lifecycle.Stop()
+	delete(s.servers, id)
+	delete(s.users, id)
+	return true
+}
+
+// CreateUser creates a new user on a server.
+func (s *Store) CreateUser(serverID, userName, role, homeDir, homeDirType string, tags map[string]string) (*User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.servers[serverID]; !ok {
+		return nil, fmt.Errorf("server not found: %s", serverID)
+	}
+
+	userMap := s.users[serverID]
+	if _, ok := userMap[userName]; ok {
+		return nil, fmt.Errorf("user already exists: %s", userName)
+	}
+
+	user := &User{
+		ServerID:          serverID,
+		UserName:          userName,
+		Arn:               s.arnPrefix() + "user/" + serverID + "/" + userName,
+		HomeDirectory:     homeDir,
+		HomeDirectoryType: homeDirType,
+		Role:              role,
+		Tags:              tags,
+		CreatedAt:         time.Now().UTC(),
+	}
+	userMap[userName] = user
+	s.servers[serverID].UserCount++
+	return user, nil
+}
+
+// GetUser retrieves a user.
+func (s *Store) GetUser(serverID, userName string) (*User, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return nil, false
+	}
+	user, ok := userMap[userName]
+	return user, ok
+}
+
+// ListUsers returns all users for a server.
+func (s *Store) ListUsers(serverID string) []*User {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return nil
+	}
+	out := make([]*User, 0, len(userMap))
+	for _, u := range userMap {
+		out = append(out, u)
+	}
+	return out
+}
+
+// DeleteUser removes a user.
+func (s *Store) DeleteUser(serverID, userName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return false
+	}
+	if _, ok := userMap[userName]; !ok {
+		return false
+	}
+	delete(userMap, userName)
+	s.servers[serverID].UserCount--
+	return true
+}
+
+// ImportSSHPublicKey adds an SSH public key to a user.
+func (s *Store) ImportSSHPublicKey(serverID, userName, keyBody string) (*SSHPublicKey, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return nil, fmt.Errorf("server not found: %s", serverID)
+	}
+	user, ok := userMap[userName]
+	if !ok {
+		return nil, fmt.Errorf("user not found: %s", userName)
+	}
+
+	s.keySeq++
+	key := &SSHPublicKey{
+		SSHPublicKeyID:   fmt.Sprintf("key-%012d", s.keySeq),
+		SSHPublicKeyBody: keyBody,
+		DateImported:     time.Now().UTC(),
+	}
+	user.SshPublicKeys = append(user.SshPublicKeys, key)
+	return key, nil
+}
+
+// DeleteSSHPublicKey removes an SSH public key from a user.
+func (s *Store) DeleteSSHPublicKey(serverID, userName, keyID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return fmt.Errorf("server not found: %s", serverID)
+	}
+	user, ok := userMap[userName]
+	if !ok {
+		return fmt.Errorf("user not found: %s", userName)
+	}
+
+	for i, key := range user.SshPublicKeys {
+		if key.SSHPublicKeyID == keyID {
+			user.SshPublicKeys = append(user.SshPublicKeys[:i], user.SshPublicKeys[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("SSH public key not found: %s", keyID)
+}

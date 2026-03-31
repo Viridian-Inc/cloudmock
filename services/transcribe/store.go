@@ -1,0 +1,336 @@
+package transcribe
+
+import (
+	"crypto/rand"
+	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
+	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/service"
+)
+
+type TranscriptionJobStatus string
+
+const (
+	TranscriptionQueued     TranscriptionJobStatus = "QUEUED"
+	TranscriptionInProgress TranscriptionJobStatus = "IN_PROGRESS"
+	TranscriptionCompleted  TranscriptionJobStatus = "COMPLETED"
+	TranscriptionFailed     TranscriptionJobStatus = "FAILED"
+)
+
+type VocabularyState string
+
+const (
+	VocabularyPending VocabularyState = "PENDING"
+	VocabularyReady   VocabularyState = "READY"
+	VocabularyFailed  VocabularyState = "FAILED"
+)
+
+type TranscriptionJob struct {
+	TranscriptionJobName   string
+	TranscriptionJobStatus TranscriptionJobStatus
+	LanguageCode           string
+	MediaSampleRateHertz   int
+	MediaFormat            string
+	Media                  map[string]any
+	OutputBucketName       string
+	OutputKey              string
+	Settings               map[string]any
+	Transcript             map[string]any
+	CreationTime           time.Time
+	StartTime              *time.Time
+	CompletionTime         *time.Time
+	FailureReason          string
+	Tags                   map[string]string
+	Lifecycle              *lifecycle.Machine
+}
+
+type Vocabulary struct {
+	VocabularyName    string
+	LanguageCode      string
+	VocabularyState   VocabularyState
+	Phrases           []string
+	VocabularyFileUri string
+	LastModifiedTime  time.Time
+	FailureReason     string
+	Tags              map[string]string
+	Lifecycle         *lifecycle.Machine
+}
+
+type Store struct {
+	mu              sync.RWMutex
+	jobs            map[string]*TranscriptionJob // keyed by name
+	vocabularies    map[string]*Vocabulary       // keyed by name
+	tagsByArn       map[string]map[string]string
+	accountID       string
+	region          string
+	lcConfig        *lifecycle.Config
+}
+
+func NewStore(accountID, region string) *Store {
+	return &Store{
+		jobs:         make(map[string]*TranscriptionJob),
+		vocabularies: make(map[string]*Vocabulary),
+		tagsByArn:    make(map[string]map[string]string),
+		accountID:    accountID,
+		region:       region,
+		lcConfig:     lifecycle.DefaultConfig(),
+	}
+}
+
+func newUUID() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
+		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+}
+
+func (s *Store) jobARN(name string) string {
+	return fmt.Sprintf("arn:aws:transcribe:%s:%s:transcription-job/%s", s.region, s.accountID, name)
+}
+
+func (s *Store) vocabularyARN(name string) string {
+	return fmt.Sprintf("arn:aws:transcribe:%s:%s:vocabulary/%s", s.region, s.accountID, name)
+}
+
+// Transcription jobs.
+
+func (s *Store) StartTranscriptionJob(name, languageCode, mediaFormat string, mediaSampleRate int, media map[string]any, outputBucket, outputKey string, settings map[string]any, tags map[string]string) (*TranscriptionJob, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.jobs[name]; exists {
+		return nil, service.NewAWSError("ConflictException",
+			fmt.Sprintf("Transcription job %s already exists", name), http.StatusConflict)
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	if languageCode == "" {
+		languageCode = "en-US"
+	}
+	if mediaFormat == "" {
+		mediaFormat = "mp3"
+	}
+
+	now := time.Now().UTC()
+	startTime := now
+
+	lc := lifecycle.NewMachine(
+		lifecycle.State(TranscriptionQueued),
+		[]lifecycle.Transition{
+			{From: lifecycle.State(TranscriptionQueued), To: lifecycle.State(TranscriptionInProgress), Delay: 500 * time.Millisecond},
+			{From: lifecycle.State(TranscriptionInProgress), To: lifecycle.State(TranscriptionCompleted), Delay: 1 * time.Second},
+		},
+		s.lcConfig,
+	)
+
+	j := &TranscriptionJob{
+		TranscriptionJobName:   name,
+		TranscriptionJobStatus: TranscriptionJobStatus(lc.State()),
+		LanguageCode:           languageCode,
+		MediaSampleRateHertz:   mediaSampleRate,
+		MediaFormat:            mediaFormat,
+		Media:                  media,
+		OutputBucketName:       outputBucket,
+		OutputKey:              outputKey,
+		Settings:               settings,
+		Transcript: map[string]any{
+			"TranscriptFileUri": fmt.Sprintf("https://s3.%s.amazonaws.com/%s/%s.json", s.region, outputBucket, name),
+		},
+		CreationTime: now,
+		StartTime:    &startTime,
+		Tags:         tags,
+		Lifecycle:    lc,
+	}
+	s.jobs[name] = j
+	arn := s.jobARN(name)
+	s.tagsByArn[arn] = tags
+	return j, nil
+}
+
+func (s *Store) GetTranscriptionJob(name string) (*TranscriptionJob, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	j, ok := s.jobs[name]
+	if !ok {
+		return nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Transcription job %s not found", name), http.StatusNotFound)
+	}
+	j.TranscriptionJobStatus = TranscriptionJobStatus(j.Lifecycle.State())
+	if j.TranscriptionJobStatus == TranscriptionCompleted && j.CompletionTime == nil {
+		now := time.Now().UTC()
+		j.CompletionTime = &now
+	}
+	return j, nil
+}
+
+func (s *Store) ListTranscriptionJobs() []*TranscriptionJob {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*TranscriptionJob, 0, len(s.jobs))
+	for _, j := range s.jobs {
+		j.TranscriptionJobStatus = TranscriptionJobStatus(j.Lifecycle.State())
+		out = append(out, j)
+	}
+	return out
+}
+
+func (s *Store) DeleteTranscriptionJob(name string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	j, ok := s.jobs[name]
+	if !ok {
+		return service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Transcription job %s not found", name), http.StatusNotFound)
+	}
+	j.Lifecycle.Stop()
+	delete(s.jobs, name)
+	delete(s.tagsByArn, s.jobARN(name))
+	return nil
+}
+
+// Vocabularies.
+
+func (s *Store) CreateVocabulary(name, languageCode string, phrases []string, vocabFileUri string, tags map[string]string) (*Vocabulary, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.vocabularies[name]; exists {
+		return nil, service.NewAWSError("ConflictException",
+			fmt.Sprintf("Vocabulary %s already exists", name), http.StatusConflict)
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	if languageCode == "" {
+		languageCode = "en-US"
+	}
+
+	lc := lifecycle.NewMachine(
+		lifecycle.State(VocabularyPending),
+		[]lifecycle.Transition{
+			{From: lifecycle.State(VocabularyPending), To: lifecycle.State(VocabularyReady), Delay: 1 * time.Second},
+		},
+		s.lcConfig,
+	)
+
+	v := &Vocabulary{
+		VocabularyName:    name,
+		LanguageCode:      languageCode,
+		VocabularyState:   VocabularyState(lc.State()),
+		Phrases:           phrases,
+		VocabularyFileUri: vocabFileUri,
+		LastModifiedTime:  time.Now().UTC(),
+		Tags:              tags,
+		Lifecycle:         lc,
+	}
+	s.vocabularies[name] = v
+	arn := s.vocabularyARN(name)
+	s.tagsByArn[arn] = tags
+	return v, nil
+}
+
+func (s *Store) GetVocabulary(name string) (*Vocabulary, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	v, ok := s.vocabularies[name]
+	if !ok {
+		return nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Vocabulary %s not found", name), http.StatusNotFound)
+	}
+	v.VocabularyState = VocabularyState(v.Lifecycle.State())
+	return v, nil
+}
+
+func (s *Store) ListVocabularies() []*Vocabulary {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*Vocabulary, 0, len(s.vocabularies))
+	for _, v := range s.vocabularies {
+		v.VocabularyState = VocabularyState(v.Lifecycle.State())
+		out = append(out, v)
+	}
+	return out
+}
+
+func (s *Store) DeleteVocabulary(name string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.vocabularies[name]
+	if !ok {
+		return service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Vocabulary %s not found", name), http.StatusNotFound)
+	}
+	v.Lifecycle.Stop()
+	delete(s.vocabularies, name)
+	delete(s.tagsByArn, s.vocabularyARN(name))
+	return nil
+}
+
+func (s *Store) UpdateVocabulary(name, languageCode string, phrases []string, vocabFileUri string) (*Vocabulary, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	v, ok := s.vocabularies[name]
+	if !ok {
+		return nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Vocabulary %s not found", name), http.StatusNotFound)
+	}
+	if languageCode != "" {
+		v.LanguageCode = languageCode
+	}
+	if phrases != nil {
+		v.Phrases = phrases
+	}
+	if vocabFileUri != "" {
+		v.VocabularyFileUri = vocabFileUri
+	}
+	v.LastModifiedTime = time.Now().UTC()
+	v.Lifecycle.ForceState(lifecycle.State(VocabularyPending))
+	return v, nil
+}
+
+// Tags.
+
+func (s *Store) TagResource(arn string, tags map[string]string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Resource %s not found", arn), http.StatusNotFound)
+	}
+	for k, v := range tags {
+		existing[k] = v
+	}
+	return nil
+}
+
+func (s *Store) UntagResource(arn string, tagKeys []string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Resource %s not found", arn), http.StatusNotFound)
+	}
+	for _, k := range tagKeys {
+		delete(existing, k)
+	}
+	return nil
+}
+
+func (s *Store) ListTagsForResource(arn string) (map[string]string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Resource %s not found", arn), http.StatusNotFound)
+	}
+	cp := make(map[string]string, len(existing))
+	for k, v := range existing {
+		cp[k] = v
+	}
+	return cp, nil
+}

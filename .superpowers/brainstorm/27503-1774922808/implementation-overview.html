@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>neureaux-devtools — Implementation Plan</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #242836;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e4e9;
+    --text-muted: rgba(255,255,255,0.45);
+    --accent: #6366f1;
+    --green: #22c55e;
+    --yellow: #f59e0b;
+    --blue: #3b82f6;
+    --pink: #ec4899;
+    --red: #ef4444;
+    --purple: #8b5cf6;
+    --cyan: #06b6d4;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+    line-height: 1.6;
+    padding: 0;
+  }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, rgba(99,102,241,0.15), rgba(139,92,246,0.1));
+    border-bottom: 1px solid var(--border);
+    padding: 40px 48px;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .header .subtitle { font-size: 15px; color: var(--text-muted); }
+  .header .badges { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+  .header .badge {
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  /* Main content */
+  .content { max-width: 1100px; margin: 0 auto; padding: 32px 48px; }
+
+  /* Section */
+  .section { margin-bottom: 36px; }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section h3 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Platform stack */
+  .stack {
+    display: grid;
+    grid-template-columns: 120px 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .stack-row { display: contents; }
+  .stack-label {
+    background: var(--surface);
+    padding: 14px 16px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+  }
+  .stack-cell {
+    background: var(--surface);
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+  .stack-cell strong { display: block; margin-bottom: 2px; }
+  .stack-cell .desc { font-size: 12px; opacity: 0.5; }
+
+  /* Architecture diagram */
+  .arch {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 28px;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  /* Steps */
+  .steps { display: grid; gap: 12px; }
+  .step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+    display: grid;
+    grid-template-columns: 48px 1fr;
+    gap: 16px;
+    align-items: start;
+  }
+  .step-number {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 15px;
+  }
+  .step-content h4 { font-size: 15px; margin-bottom: 4px; }
+  .step-content .desc { font-size: 13px; opacity: 0.6; margin-bottom: 8px; }
+  .step-content .files {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .step-content .file {
+    background: rgba(255,255,255,0.05);
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-family: monospace;
+    opacity: 0.5;
+  }
+  .step-content .dep {
+    font-size: 11px;
+    opacity: 0.4;
+    margin-top: 6px;
+  }
+
+  /* Views grid */
+  .views-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 10px;
+  }
+  .view-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+  }
+  .view-card .icon { font-size: 22px; margin-bottom: 6px; }
+  .view-card h4 { font-size: 13px; margin-bottom: 4px; }
+  .view-card p { font-size: 12px; opacity: 0.5; line-height: 1.5; }
+  .view-card .phase {
+    margin-top: 8px;
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+
+  /* SDK table */
+  .sdk-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .sdk-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--surface);
+    border-bottom: 2px solid var(--border);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+  }
+  .sdk-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .sdk-table code {
+    background: rgba(255,255,255,0.06);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12px;
+  }
+
+  /* Dependency graph */
+  .dep-graph {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px;
+    font-family: monospace;
+    font-size: 13px;
+    line-height: 2;
+  }
+
+  /* Phase timeline */
+  .phases { display: grid; gap: 12px; }
+  .phase {
+    border-radius: 10px;
+    padding: 16px 20px;
+    border-left: 4px solid;
+  }
+  .phase h4 { font-size: 14px; margin-bottom: 4px; }
+  .phase p { font-size: 13px; opacity: 0.6; }
+  .phase ul { font-size: 13px; opacity: 0.7; margin-top: 6px; padding-left: 18px; }
+
+  .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .footnote {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>neureaux-devtools</h1>
+  <p class="subtitle">Cross-platform developer tools — unified debugging for iOS, Android, Web & Cloud</p>
+  <div class="badges">
+    <span class="badge" style="background: rgba(99,102,241,0.2); color: #818cf8;">Tauri v2</span>
+    <span class="badge" style="background: rgba(139,92,246,0.2); color: #a78bfa;">Preact + Vite</span>
+    <span class="badge" style="background: rgba(234,88,12,0.2); color: #fb923c;">Rust Backend</span>
+    <span class="badge" style="background: rgba(34,197,94,0.2); color: #4ade80;">cloudmock Powered</span>
+    <span class="badge" style="background: rgba(236,72,153,0.2); color: #f472b6;">BLE Mesh</span>
+  </div>
+</div>
+
+<div class="content">
+
+  <!-- Platform Vision -->
+  <div class="section">
+    <h2>Platform Vision</h2>
+    <p style="font-size: 14px; opacity: 0.6; margin-bottom: 16px;">CloudMock as a developer platform (modeled after Kong's approach)</p>
+    <div class="stack">
+      <div class="stack-row">
+        <div class="stack-label">User-Facing</div>
+        <div class="stack-cell"><strong>🖥 Devtools</strong><span class="desc">Tauri desktop app — debug, inspect, test across all platforms</span></div>
+        <div class="stack-cell"><strong>🌐 cloudmock.io</strong><span class="desc">Web console — manage hosted instances, teams, billing</span></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">Platform</div>
+        <div class="stack-cell" style="grid-column: span 2;"><strong>CloudMock Console</strong><span class="desc">Observability · Traces · SLOs · AI Explain · Incidents · Profiling · Chaos (already built)</span></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">Runtime</div>
+        <div class="stack-cell" style="grid-column: span 2;"><strong>CloudMock Gateway</strong><span class="desc">Open-source · 101 services (98 AWS + K8s + ArgoCD) · Plugin system · Runs locally, hosted, or in CI</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Architecture -->
+  <div class="section">
+    <h2>Architecture</h2>
+    <div class="arch">┌─────────────────────────────────────────────────────┐
+│  neureaux devtools (Tauri v2)                       │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  Frontend (Preact + Vite + TypeScript)        │  │
+│  │  Activity · Topology · Services · Traces      │  │
+│  │  Metrics · SLOs · Incidents · Profiler        │  │
+│  │  Chaos · AI Debug                             │  │
+│  └───────────────────────────────────────────────┘  │
+│                                                     │
+│  ┌───────────────────────────────────────────────┐  │
+│  │  Rust Backend (Tauri Commands)                │  │
+│  │  Process Manager · Source Server (WS)         │  │
+│  │  BLE Scanner · System Tray                    │  │
+│  └───────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────┘
+                       │ IPC + HTTP + WebSocket
+         ┌─────────────┼─────────────────┐
+         ▼             ▼                 ▼
+   ┌──────────┐  ┌──────────┐  ┌──────────────┐
+   │cloudmock │  │ App SDKs │  │ BLE Devices  │
+   │ gateway  │  │ (sources)│  │ (mesh topo)  │
+   │ (Go)     │  │          │  │              │
+   │ :4566    │  │ :4580 WS │  │ CoreBluetooth│
+   │ :4599    │  │          │  │              │
+   └──────────┘  └──────────┘  └──────────────┘</div>
+  </div>
+
+  <!-- UI Layout -->
+  <div class="section">
+    <h2>UI: Unified Workspace</h2>
+    <p style="font-size: 14px; opacity: 0.6; margin-bottom: 16px;">Flipper-style resizable panels. Everything is a "source" — no platform silos.</p>
+
+    <div class="views-grid">
+      <div class="view-card">
+        <div class="icon">⚡</div>
+        <h4>Activity</h4>
+        <p>Unified stream from all sources. Logs, network, errors, API calls interleaved.</p>
+        <span class="phase tag" style="background: rgba(34,197,94,0.15); color: #4ade80;">Phase 1</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🗺️</div>
+        <h4>Topology</h4>
+        <p>Service graph + BLE mesh. Apps, cloud services, devices as nodes. Traffic + RSSI as edges.</p>
+        <span class="phase tag" style="background: rgba(99,102,241,0.15); color: #818cf8;">Phase 2</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">☁️</div>
+        <h4>Services</h4>
+        <p>Resource browser — S3 buckets, DDB tables, Lambda functions, K8s namespaces.</p>
+        <span class="phase tag" style="background: rgba(34,197,94,0.15); color: #4ade80;">Phase 1</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🔍</div>
+        <h4>Traces</h4>
+        <p>Distributed waterfall with client spans. Button tap → HTTP → Lambda → DDB → response.</p>
+        <span class="phase tag" style="background: rgba(99,102,241,0.15); color: #818cf8;">Phase 2</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">📊</div>
+        <h4>Metrics</h4>
+        <p>Volume, latency, error rates. Client-side: launch time, frame rate, crash rate.</p>
+        <span class="phase tag" style="background: rgba(99,102,241,0.15); color: #818cf8;">Phase 2</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🎯</div>
+        <h4>SLOs</h4>
+        <p>Burn rate dashboard + error budgets. Client-side: "95% of Swift calls &lt; 500ms".</p>
+        <span class="phase tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Phase 3</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🚨</div>
+        <h4>Incidents</h4>
+        <p>Alert grouping, regression detection. Client crashes alongside server incidents.</p>
+        <span class="phase tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Phase 3</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🔥</div>
+        <h4>Profiler</h4>
+        <p>Flame graphs, CPU/heap profiling across all runtimes.</p>
+        <span class="phase tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Phase 3</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🧪</div>
+        <h4>Chaos</h4>
+        <p>Inject latency, errors, throttling. Test app resilience to degraded backends.</p>
+        <span class="phase tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Phase 3</span>
+      </div>
+      <div class="view-card">
+        <div class="icon">🤖</div>
+        <h4>AI Debug</h4>
+        <p>Select any event → narrative explanation with full cross-stack context.</p>
+        <span class="phase tag" style="background: rgba(245,158,11,0.15); color: #fbbf24;">Phase 3</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Source SDKs -->
+  <div class="section">
+    <h2>Source Integration: Runtime-Level SDKs</h2>
+    <p style="font-size: 14px; opacity: 0.6; margin-bottom: 16px;">3 SDKs cover every framework. Sources identify as runtime · app-name.</p>
+    <table class="sdk-table">
+      <thead>
+        <tr>
+          <th>SDK</th>
+          <th>Hooks Into</th>
+          <th>Covers</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color: #4ade80;">cloudmock/node</strong></td>
+          <td><code>http</code>/<code>fetch</code>, <code>console.*</code>, uncaught exceptions</td>
+          <td>React, React Native, Next.js, Express, Vue, Svelte, Angular, Bun, Deno</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #60a5fa;">cloudmock/swift</strong></td>
+          <td><code>URLSession</code>, <code>os.Logger</code>, exception handler, MetricKit</td>
+          <td>SwiftUI, UIKit, AppKit, Vapor — any Swift app</td>
+        </tr>
+        <tr>
+          <td><strong style="color: #fbbf24;">cloudmock/kotlin</strong></td>
+          <td>OkHttp interceptor, <code>Log.*</code>/Timber, uncaught exception handler</td>
+          <td>Compose, XML Views, KMP, Ktor, Spring — any Kotlin/JVM app</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="margin-top: 12px; display: flex; gap: 12px; flex-wrap: wrap;">
+      <span class="tag" style="background: rgba(255,255,255,0.05);">Dev-only, tree-shaken in prod</span>
+      <span class="tag" style="background: rgba(255,255,255,0.05);">Auto-discovery via mDNS</span>
+      <span class="tag" style="background: rgba(255,255,255,0.05);">Silent no-op when devtools offline</span>
+      <span class="tag" style="background: rgba(255,255,255,0.05);">Auto client↔server correlation</span>
+      <span class="tag" style="background: rgba(255,255,255,0.05);">Proxy mode (zero SDK)</span>
+    </div>
+  </div>
+
+  <!-- Phase 1 Implementation Steps -->
+  <div class="section">
+    <h2>Phase 1 — MVP Implementation Steps</h2>
+    <p style="font-size: 14px; opacity: 0.6; margin-bottom: 16px;">Desktop app + local cloudmock. Steps 4/5/6 run in parallel after 2+3.</p>
+
+    <div class="dep-graph" style="margin-bottom: 16px;">Step 1 (scaffold)
+  ├── Step 2 (rust backend) ──┬── Step 4 (activity view) ──┐
+  │                           ├── Step 7 (system tray)      ├── Step 8 (build)
+  └── Step 3 (frontend)  ─────┼── Step 5 (services view)   │
+                              └── Step 6 (settings view) ──┘</div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-number" style="background: rgba(99,102,241,0.2); color: #818cf8;">1</div>
+        <div class="step-content">
+          <h4>Project Scaffolding</h4>
+          <div class="desc">Tauri v2 + Preact + Vite project at neureaux-devtools/. Dark theme tokens, entry points, Cargo config.</div>
+          <div class="files">
+            <span class="file">package.json</span>
+            <span class="file">vite.config.ts</span>
+            <span class="file">src/main.tsx</span>
+            <span class="file">src/app.tsx</span>
+            <span class="file">src-tauri/Cargo.toml</span>
+            <span class="file">src-tauri/tauri.conf.json</span>
+            <span class="file">src/styles/theme.css</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(234,88,12,0.2); color: #fb923c;">2</div>
+        <div class="step-content">
+          <h4>Rust Backend</h4>
+          <div class="desc">Process manager (spawn/stop Go binary), health polling, admin API bridge, IPC commands.</div>
+          <div class="files">
+            <span class="file">src-tauri/src/state.rs</span>
+            <span class="file">src-tauri/src/process.rs</span>
+            <span class="file">src-tauri/src/health.rs</span>
+            <span class="file">src-tauri/src/bridge.rs</span>
+            <span class="file">src-tauri/src/commands.rs</span>
+          </div>
+          <div class="dep">Depends on: Step 1</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(139,92,246,0.2); color: #a78bfa;">3</div>
+        <div class="step-content">
+          <h4>Frontend Foundation</h4>
+          <div class="desc">Icon rail, resizable split panels, source bar, status bar, connection picker, Tauri IPC hooks.</div>
+          <div class="files">
+            <span class="file">src/components/icon-rail/</span>
+            <span class="file">src/components/panels/</span>
+            <span class="file">src/components/source-bar/</span>
+            <span class="file">src/components/status-bar/</span>
+            <span class="file">src/components/connection-picker/</span>
+            <span class="file">src/hooks/</span>
+            <span class="file">src/lib/api.ts</span>
+          </div>
+          <div class="dep">Depends on: Step 1</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(34,197,94,0.2); color: #4ade80;">4</div>
+        <div class="step-content">
+          <h4>Activity View</h4>
+          <div class="desc">Unified event stream from cloudmock SSE. Live tail, pause/resume, filters, request inspector.</div>
+          <div class="files">
+            <span class="file">src/views/activity/index.tsx</span>
+            <span class="file">src/views/activity/event-list.tsx</span>
+            <span class="file">src/views/activity/event-row.tsx</span>
+            <span class="file">src/views/activity/event-detail.tsx</span>
+          </div>
+          <div class="dep">Depends on: Steps 2 + 3 · Parallel with 5, 6</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(6,182,212,0.2); color: #22d3ee;">5</div>
+        <div class="step-content">
+          <h4>Services View</h4>
+          <div class="desc">Service list with health status, per-service resource browser (S3 buckets, DDB tables, etc.).</div>
+          <div class="files">
+            <span class="file">src/views/services/index.tsx</span>
+            <span class="file">src/views/services/service-list.tsx</span>
+            <span class="file">src/views/services/resource-browser.tsx</span>
+          </div>
+          <div class="dep">Depends on: Steps 2 + 3 · Parallel with 4, 6</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(236,72,153,0.2); color: #f472b6;">6</div>
+        <div class="step-content">
+          <h4>Settings View</h4>
+          <div class="desc">Connection profiles, cloudmock config display, appearance settings.</div>
+          <div class="files">
+            <span class="file">src/views/settings/index.tsx</span>
+            <span class="file">src/views/settings/connections.tsx</span>
+            <span class="file">src/views/settings/config.tsx</span>
+          </div>
+          <div class="dep">Depends on: Steps 2 + 3 · Parallel with 4, 5</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(245,158,11,0.2); color: #fbbf24;">7</div>
+        <div class="step-content">
+          <h4>System Tray</h4>
+          <div class="desc">Show/Hide, Start/Stop/Restart cloudmock, Quit. Close → hide to tray.</div>
+          <div class="files">
+            <span class="file">src-tauri/src/tray.rs</span>
+          </div>
+          <div class="dep">Depends on: Step 2</div>
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step-number" style="background: rgba(255,255,255,0.1); color: var(--text);">8</div>
+        <div class="step-content">
+          <h4>Build & Package</h4>
+          <div class="desc">macOS .app + .dmg. Gateway binary not bundled — separate install. README with setup instructions.</div>
+          <div class="files">
+            <span class="file">README.md</span>
+            <span class="file">.gitignore</span>
+          </div>
+          <div class="dep">Depends on: All previous steps</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Future Phases -->
+  <div class="section">
+    <h2>Product Roadmap</h2>
+    <div class="phases">
+      <div class="phase" style="background: rgba(34,197,94,0.08); border-color: #22c55e;">
+        <h4>Phase 1 — Desktop App MVP <span class="tag" style="background: rgba(34,197,94,0.2); color: #4ade80; margin-left: 8px;">Current</span></h4>
+        <p>Tauri shell, process manager, Activity + Services + Settings views, system tray</p>
+      </div>
+      <div class="phase" style="background: rgba(99,102,241,0.08); border-color: #6366f1;">
+        <h4>Phase 2 — Source SDKs + Full Observability</h4>
+        <ul>
+          <li>Node SDK (@cloudmock/node) — HTTP interception, console capture, errors</li>
+          <li>WebSocket source server in Rust, mDNS auto-discovery</li>
+          <li>Topology view (service graph + app nodes), Traces view, Metrics view</li>
+        </ul>
+      </div>
+      <div class="phase" style="background: rgba(245,158,11,0.08); border-color: #f59e0b;">
+        <h4>Phase 3 — Native SDKs + BLE + Remaining Views</h4>
+        <ul>
+          <li>Swift SDK, Kotlin SDK</li>
+          <li>BLE mesh scanning + topology visualization</li>
+          <li>SLOs, Incidents, Profiler, Chaos, AI Debug views</li>
+          <li>Proxy mode (zero-SDK network capture)</li>
+        </ul>
+      </div>
+      <div class="phase" style="background: rgba(236,72,153,0.08); border-color: #ec4899;">
+        <h4>Phase 4 — cloudmock.io + Hosted Platform</h4>
+        <p>Marketing site, web console, hosted instances, API key auth, team sharing, billing</p>
+      </div>
+      <div class="phase" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.2);">
+        <h4>Phase 5 — Developer Portal + Ecosystem</h4>
+        <p>Service catalog, plugin marketplace, community plugins (GCP/Azure), third-party integrations</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Key Files -->
+  <div class="section">
+    <h2>Critical Reference Files</h2>
+    <table class="sdk-table">
+      <thead>
+        <tr><th>File</th><th>What to Reference</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><code>cloudmock/dashboard/src/api.ts</code></td><td>API client patterns, endpoint paths, ADMIN_BASE URL construction</td></tr>
+        <tr><td><code>cloudmock/dashboard/src/hooks/useSSE.ts</code></td><td>SSE connection pattern, EventSource, event parsing, 500-item cap</td></tr>
+        <tr><td><code>cloudmock/dashboard/src/components/RequestPanel.tsx</code></td><td>Activity view reference — live tail, pause/resume, filters</td></tr>
+        <tr><td><code>cloudmock/dashboard/src/styles/global.css</code></td><td>Dark theme CSS custom properties</td></tr>
+        <tr><td><code>cloudmock/pkg/admin/api.go</code></td><td>SSE format (L636), resources endpoint (L1075), route registrations (L124-170)</td></tr>
+        <tr><td><code>cloudmock/cmd/cloudmock/main.go</code></td><td>Gateway binary discovery logic (L112)</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footnote">
+    Spec: <code>cloudmock/docs/superpowers/specs/2026-03-30-neureaux-devtools-design.md</code><br>
+    Plan: <code>.claude/plans/lively-noodling-moonbeam.md</code>
+  </div>
+
+</div>
+</body>
+</html>

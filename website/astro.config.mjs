@@ -42,6 +42,14 @@ export default defineConfig({
           autogenerate: { directory: "docs/devtools" },
         },
         {
+          label: "Guides",
+          autogenerate: { directory: "docs/guides" },
+        },
+        {
+          label: "Deployment",
+          autogenerate: { directory: "docs/deployment" },
+        },
+        {
           label: "Language Guides",
           autogenerate: { directory: "docs/language-guides" },
         },

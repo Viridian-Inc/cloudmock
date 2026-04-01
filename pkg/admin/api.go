@@ -19,10 +19,12 @@ import (
 	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
+	"github.com/neureaux/cloudmock/pkg/rum"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/neureaux/cloudmock/pkg/monitor"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
@@ -33,6 +35,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
+	"github.com/neureaux/cloudmock/pkg/traffic"
 	"github.com/neureaux/cloudmock/pkg/webhook"
 	"github.com/neureaux/cloudmock/services/lambda"
 	"github.com/neureaux/cloudmock/services/ses"
@@ -115,6 +118,11 @@ type API struct {
 	tenantStore      tenant.Store
 	clerkWebhook     *clerk.WebhookHandler
 	stripeWebhook    *saasstripe.WebhookHandler
+	dashboards       []Dashboard
+	dashboardsMu     sync.RWMutex
+	rumEngine        *rum.Engine
+	monitorService   *monitor.Service
+	trafficEngine    *traffic.Engine
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -164,6 +172,9 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
+	a.mux.HandleFunc("/api/metrics/query", a.handleMetricQuery)
+	a.mux.HandleFunc("/api/dashboards", a.handleDashboards)
+	a.mux.HandleFunc("/api/dashboards/", a.handleDashboardByID)
 	a.mux.HandleFunc("/api/slo", a.handleSLO)
 	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
 	a.mux.HandleFunc("/api/tenants", a.handleTenants)
@@ -196,6 +207,15 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
 	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
+
+	// RUM (Real User Monitoring) endpoints
+	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)
+	a.mux.HandleFunc("/api/rum/vitals", a.handleRUMVitals)
+	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
+	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
+	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+
+	a.seedDefaultDashboard()
 
 	return a
 }
@@ -235,6 +255,9 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
 	a.mux.HandleFunc("/api/metrics", a.handleMetrics)
 	a.mux.HandleFunc("/api/metrics/timeline", a.handleMetricsTimeline)
+	a.mux.HandleFunc("/api/metrics/query", a.handleMetricQuery)
+	a.mux.HandleFunc("/api/dashboards", a.handleDashboards)
+	a.mux.HandleFunc("/api/dashboards/", a.handleDashboardByID)
 	a.mux.HandleFunc("/api/slo", a.handleSLO)
 	a.mux.HandleFunc("/api/blast-radius", a.handleBlastRadius)
 	a.mux.HandleFunc("/api/tenants", a.handleTenants)
@@ -278,6 +301,15 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
 	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
+
+	// RUM (Real User Monitoring) endpoints
+	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)
+	a.mux.HandleFunc("/api/rum/vitals", a.handleRUMVitals)
+	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
+	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
+	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+
+	a.seedDefaultDashboard()
 
 	return a
 }
@@ -3367,6 +3399,22 @@ func (a *API) SetClerkWebhook(h *clerk.WebhookHandler) {
 // SetStripeWebhook sets the Stripe webhook handler for /api/webhooks/stripe.
 func (a *API) SetStripeWebhook(h *saasstripe.WebhookHandler) {
 	a.stripeWebhook = h
+}
+
+// SetTrafficEngine sets the traffic recording/replay engine and registers routes.
+func (a *API) SetTrafficEngine(e *traffic.Engine) {
+	a.trafficEngine = e
+	e.SetBroadcaster(a.broadcaster)
+
+	a.mux.HandleFunc("/api/traffic/recordings", a.handleTrafficRecordings)
+	a.mux.HandleFunc("/api/traffic/recordings/", a.handleTrafficRecordingByID)
+	a.mux.HandleFunc("/api/traffic/record", a.handleTrafficRecordStart)
+	a.mux.HandleFunc("/api/traffic/record/stop", a.handleTrafficRecordStop)
+	a.mux.HandleFunc("/api/traffic/replay", a.handleTrafficReplayStart)
+	a.mux.HandleFunc("/api/traffic/replay/", a.handleTrafficReplayByID)
+	a.mux.HandleFunc("/api/traffic/runs", a.handleTrafficRuns)
+	a.mux.HandleFunc("/api/traffic/synthetic", a.handleTrafficSynthetic)
+	a.mux.HandleFunc("/api/traffic/compare", a.handleTrafficCompare)
 }
 
 // handleAuthLogin handles POST /api/auth/login.

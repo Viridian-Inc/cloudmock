@@ -1,15 +1,18 @@
-.PHONY: build build-gateway build-cli build-cmk build-tools build-plugins build-plugin-example build-dashboard test test-all lint clean proto docker docker-push docker-up docker-down release help
+.PHONY: build build-gateway build-cli build-cmk build-tools build-plugins build-plugin-example build-dashboard dev restart test test-all lint clean proto docker docker-push docker-up docker-down release help
 
 VERSION ?= 1.0.0
+DEVTOOLS_DIR ?= ../neureaux-devtools
 
 help:
 	@echo "Available targets:"
+	@echo "  dev             - Build everything, embed devtools, restart gateway"
+	@echo "  restart         - Kill gateway + restart (no rebuild)"
 	@echo "  build           - Build both gateway and CLI"
 	@echo "  build-gateway   - Build the gateway binary"
 	@echo "  build-cli       - Build the CLI binary"
 	@echo "  build-tools     - Build AWS tool wrappers and CI helper"
 	@echo "  build-plugins   - Build external plugin binaries"
-	@echo "  build-dashboard - Build the web dashboard"
+	@echo "  build-dashboard - Build devtools SPA and embed into Go binary"
 	@echo "  test            - Run all tests"
 	@echo "  lint            - Run golangci-lint"
 	@echo "  clean           - Remove build artifacts"
@@ -19,6 +22,29 @@ help:
 	@echo "  docker-up       - Start Docker containers"
 	@echo "  docker-down     - Stop Docker containers"
 	@echo "  release         - Build cross-platform release binaries"
+
+## dev: one command to build everything, embed devtools, restart gateway
+dev: build-dashboard build-gateway restart
+
+## restart: kill any running gateway and start fresh
+restart:
+	@pkill -9 -f 'bin/gateway' 2>/dev/null || true
+	@for p in 4566 4500 4599 4580 4318; do kill -9 $$(lsof -ti:$$p) 2>/dev/null || true; done
+	@sleep 1
+	@echo "Starting gateway..."
+	@bin/gateway > /tmp/cloudmock.log 2>&1 &
+	@sleep 3
+	@curl -s -o /dev/null -w "Gateway: %{http_code}\n" http://localhost:4599/api/health
+	@echo "Devtools: http://localhost:4500"
+	@echo "Gateway:  http://localhost:4566"
+
+## build-dashboard: build devtools SPA and embed into Go binary
+build-dashboard:
+	@echo "Building devtools SPA..."
+	@cd $(DEVTOOLS_DIR) && pnpm build
+	@rm -rf pkg/dashboard/dist
+	@cp -r $(DEVTOOLS_DIR)/dist pkg/dashboard/dist
+	@echo "Devtools embedded into pkg/dashboard/dist/"
 
 build: build-gateway build-cli build-cmk build-tools build-plugins
 
@@ -88,11 +114,6 @@ release: build-dashboard
 	GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-darwin-amd64 ./cmd/gateway
 	GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o dist/cloudmock-darwin-arm64 ./cmd/gateway
 	GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o dist/cloudmock-windows-amd64.exe ./cmd/gateway
-
-build-dashboard: ## Build devtools UI from neureaux-devtools
-	cd ../neureaux-devtools && pnpm install && pnpm build
-	rm -rf pkg/dashboard/dist
-	cp -r ../neureaux-devtools/dist pkg/dashboard/dist
 
 docker-up:
 	@echo "Starting Docker containers..."

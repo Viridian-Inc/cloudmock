@@ -4,6 +4,7 @@ import (
 	"math"
 	"sort"
 	"sync"
+	"time"
 
 	"github.com/neureaux/cloudmock/pkg/rum"
 )
@@ -317,6 +318,107 @@ func (s *Store) SessionDetail(sessionID string) ([]rum.RUMEvent, error) {
 	sort.Slice(result, func(i, j int) bool {
 		return result[i].Timestamp.Before(result[j].Timestamp)
 	})
+	return result, nil
+}
+
+// RageClicks returns click events marked as rage clicks from the last N minutes.
+func (s *Store) RageClicks(minutes int) ([]rum.ClickEvent, error) {
+	s.mu.RLock()
+	events := s.snapshot()
+	s.mu.RUnlock()
+
+	cutoff := time.Now().Add(-time.Duration(minutes) * time.Minute)
+	var result []rum.ClickEvent
+	for _, e := range events {
+		if e.Type != rum.EventClick || e.Click == nil {
+			continue
+		}
+		if e.Timestamp.Before(cutoff) {
+			continue
+		}
+		if e.Click.IsRage {
+			result = append(result, *e.Click)
+		}
+	}
+	return result, nil
+}
+
+// UserJourneys returns navigation events for a given session, ordered by time.
+func (s *Store) UserJourneys(sessionID string) ([]rum.NavigationEvent, error) {
+	s.mu.RLock()
+	events := s.snapshot()
+	s.mu.RUnlock()
+
+	// Collect navigation events for this session, in order.
+	type timestampedNav struct {
+		ts  time.Time
+		nav rum.NavigationEvent
+	}
+	var navs []timestampedNav
+	for _, e := range events {
+		if e.SessionID != sessionID {
+			continue
+		}
+		if e.Type != rum.EventNavigation || e.Navigation == nil {
+			continue
+		}
+		navs = append(navs, timestampedNav{ts: e.Timestamp, nav: *e.Navigation})
+	}
+	sort.Slice(navs, func(i, j int) bool { return navs[i].ts.Before(navs[j].ts) })
+
+	result := make([]rum.NavigationEvent, len(navs))
+	for i, n := range navs {
+		result[i] = n.nav
+	}
+	return result, nil
+}
+
+// PerformanceByRoute returns aggregated performance metrics per route.
+func (s *Store) PerformanceByRoute() ([]rum.RoutePerformance, error) {
+	s.mu.RLock()
+	events := s.snapshot()
+	s.mu.RUnlock()
+
+	type routeAccum struct {
+		durations []float64
+		ttfbs     []float64
+		count     int
+	}
+
+	routes := map[string]*routeAccum{}
+	for _, e := range events {
+		if e.Type != rum.EventPageLoad || e.PageLoad == nil {
+			continue
+		}
+		pl := e.PageLoad
+		route := pl.Route
+		if route == "" {
+			route = e.URL
+		}
+		acc, ok := routes[route]
+		if !ok {
+			acc = &routeAccum{}
+			routes[route] = acc
+		}
+		acc.count++
+		acc.durations = append(acc.durations, pl.DurationMs)
+		acc.ttfbs = append(acc.ttfbs, pl.TTFB)
+	}
+
+	result := make([]rum.RoutePerformance, 0, len(routes))
+	for route, acc := range routes {
+		rp := rum.RoutePerformance{
+			Route: route,
+			Views: acc.count,
+		}
+		if acc.count > 0 {
+			rp.AvgDurationMs = avg(acc.durations)
+			rp.P75DurationMs = p75Sorted(acc.durations)
+			rp.AvgTTFB = avg(acc.ttfbs)
+		}
+		result = append(result, rp)
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Views > result[j].Views })
 	return result, nil
 }
 

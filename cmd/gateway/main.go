@@ -61,6 +61,9 @@ import (
 	logsmemory "github.com/neureaux/cloudmock/pkg/logstore/memory"
 	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
 	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
+	uptimepkg "github.com/neureaux/cloudmock/pkg/uptime"
+	uptimememory "github.com/neureaux/cloudmock/pkg/uptime/memory"
+	"github.com/neureaux/cloudmock/pkg/worker"
 	"github.com/neureaux/cloudmock/pkg/iac"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	trafficpkg "github.com/neureaux/cloudmock/pkg/traffic"
@@ -805,6 +808,16 @@ func main() {
 		})
 		adminAPI.SetRUMEngine(rumEngine)
 		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
+	}
+
+	// Uptime / endpoint monitoring
+	{
+		uptimeStore := uptimememory.NewStore(1000)
+		workerPool := worker.NewPool(rootCtx, nil)
+		uptimeEngine := uptimepkg.NewEngine(uptimeStore, workerPool, uptimepkg.DefaultEngineConfig())
+		uptimeEngine.StartAll()
+		adminAPI.SetUptimeEngine(uptimeEngine)
+		slog.Info("uptime monitoring engine initialized")
 	}
 
 	// Structured error tracking

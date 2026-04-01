@@ -27,10 +27,14 @@ export interface CloudMockRUMOptions {
 
   /** Disable XHR/fetch resource timing collection. Default false. */
   disableResourceTiming?: boolean;
+
+  /** Disable click tracking (including rage click detection). Default false. */
+  disableClicks?: boolean;
 }
 
 let initialized = false;
 let resourceObserver: PerformanceObserver | null = null;
+let clickHandler: ((e: MouseEvent) => void) | null = null;
 
 /**
  * Initialize CloudMock Real User Monitoring.
@@ -69,6 +73,10 @@ export function init(options: CloudMockRUMOptions): void {
 
   if (!options.disableResourceTiming) {
     observeResourceTiming();
+  }
+
+  if (!options.disableClicks) {
+    observeClicks();
   }
 }
 
@@ -110,7 +118,89 @@ export function destroy(): void {
   disconnectObservers();
   resourceObserver?.disconnect();
   resourceObserver = null;
+  if (clickHandler) {
+    document.removeEventListener('click', clickHandler, true);
+    clickHandler = null;
+  }
   destroyTransport();
+}
+
+// --- Click tracking with rage click detection ---
+
+/** Map from CSS selector → array of click timestamps. */
+const clickTimestamps = new Map<string, number[]>();
+
+/** Rage click threshold: 3+ clicks on the same selector within 1 second. */
+const RAGE_CLICK_THRESHOLD = 3;
+const RAGE_CLICK_WINDOW_MS = 1000;
+
+function getSelector(el: Element): string {
+  if (el.id) return `#${el.id}`;
+  const tag = el.tagName.toLowerCase();
+  const classes = Array.from(el.classList).join('.');
+  const parent = el.parentElement;
+  if (classes) {
+    const sel = `${tag}.${classes}`;
+    // Check uniqueness within parent
+    if (parent && parent.querySelectorAll(sel).length === 1) return sel;
+  }
+  if (parent) {
+    const siblings = Array.from(parent.children);
+    const idx = siblings.indexOf(el) + 1;
+    return `${getSelector(parent)} > ${tag}:nth-child(${idx})`;
+  }
+  return tag;
+}
+
+function truncateText(text: string, maxLen = 50): string {
+  const trimmed = text.trim().replace(/\s+/g, ' ');
+  return trimmed.length > maxLen ? trimmed.slice(0, maxLen) + '...' : trimmed;
+}
+
+function observeClicks(): void {
+  if (typeof document === 'undefined') return;
+
+  clickHandler = (e: MouseEvent) => {
+    const target = e.target as Element | null;
+    if (!target) return;
+
+    const selector = getSelector(target);
+    const now = Date.now();
+
+    // Track timestamps per selector for rage detection.
+    let timestamps = clickTimestamps.get(selector);
+    if (!timestamps) {
+      timestamps = [];
+      clickTimestamps.set(selector, timestamps);
+    }
+    timestamps.push(now);
+
+    // Prune old timestamps outside the window.
+    const cutoff = now - RAGE_CLICK_WINDOW_MS;
+    while (timestamps.length > 0 && timestamps[0] < cutoff) {
+      timestamps.shift();
+    }
+
+    const isRage = timestamps.length >= RAGE_CLICK_THRESHOLD;
+
+    enqueue({
+      type: 'click',
+      session_id: getSessionId(),
+      url: typeof location !== 'undefined' ? location.href : '',
+      user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+      timestamp: new Date().toISOString(),
+      click: {
+        selector,
+        text: truncateText((target as HTMLElement).innerText || ''),
+        x: e.clientX,
+        y: e.clientY,
+        is_rage: isRage,
+        url: typeof location !== 'undefined' ? location.href : '',
+      },
+    });
+  };
+
+  document.addEventListener('click', clickHandler, true);
 }
 
 // --- Resource timing (XHR / fetch) ---

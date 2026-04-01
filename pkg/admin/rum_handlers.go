@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/rum"
 )
@@ -222,4 +223,60 @@ func (a *API) handleRUMSessions(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	writeJSON(w, http.StatusOK, result)
+}
+
+// handleRUMClicks handles GET /api/rum/clicks — returns rage click events.
+func (a *API) handleRUMClicks(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if a.rumEngine == nil {
+		writeError(w, http.StatusServiceUnavailable, "RUM not enabled")
+		return
+	}
+
+	minutes := 60
+	if v := r.URL.Query().Get("minutes"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			minutes = n
+		}
+	}
+
+	clicks, err := a.rumEngine.Store().RageClicks(minutes)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, clicks)
+}
+
+// handleRUMJourneys handles GET /api/rum/journeys/:sessionId — returns navigation journey for a session.
+func (a *API) handleRUMJourneys(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if a.rumEngine == nil {
+		writeError(w, http.StatusServiceUnavailable, "RUM not enabled")
+		return
+	}
+
+	// Extract session ID from path: /api/rum/journeys/{sessionId}
+	sessionID := strings.TrimPrefix(r.URL.Path, "/api/rum/journeys/")
+	if sessionID == "" {
+		writeError(w, http.StatusBadRequest, "session ID required")
+		return
+	}
+
+	journeys, err := a.rumEngine.Store().UserJourneys(sessionID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, journeys)
 }

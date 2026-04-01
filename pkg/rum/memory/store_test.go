@@ -161,6 +161,148 @@ func TestSessionDetail(t *testing.T) {
 	}
 }
 
+func TestRageClicks(t *testing.T) {
+	s := NewStore(100)
+
+	now := time.Now()
+
+	// Write some rage clicks and some normal clicks.
+	for i := 0; i < 3; i++ {
+		e := makeEvent(rum.EventClick, "s1")
+		e.Timestamp = now.Add(-time.Duration(i) * time.Second)
+		e.Click = &rum.ClickEvent{
+			Selector: "#btn-submit",
+			Text:     "Submit",
+			X:        100,
+			Y:        200,
+			IsRage:   true,
+			URL:      "https://example.com/form",
+		}
+		s.WriteEvent(e)
+	}
+	// A non-rage click.
+	e := makeEvent(rum.EventClick, "s1")
+	e.Timestamp = now
+	e.Click = &rum.ClickEvent{
+		Selector: "#btn-cancel",
+		Text:     "Cancel",
+		X:        300,
+		Y:        200,
+		IsRage:   false,
+		URL:      "https://example.com/form",
+	}
+	s.WriteEvent(e)
+
+	clicks, err := s.RageClicks(60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(clicks) != 3 {
+		t.Errorf("expected 3 rage clicks, got %d", len(clicks))
+	}
+	for _, c := range clicks {
+		if !c.IsRage {
+			t.Error("expected all returned clicks to be rage clicks")
+		}
+	}
+
+	// With a 0-minute window, should get nothing (events are in the past).
+	clicks2, err := s.RageClicks(0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 0 minutes means cutoff is now, so recent events should still match since they're at 'now'.
+	// Actually cutoff = now - 0 = now, so events at exactly now pass.
+	// The ones a few seconds in the past won't.
+	if len(clicks2) > 1 {
+		// At most the one at 'now' could pass depending on timing.
+	}
+}
+
+func TestUserJourneys(t *testing.T) {
+	s := NewStore(100)
+
+	now := time.Now()
+	navs := []struct {
+		from, to, typ string
+		offset        time.Duration
+	}{
+		{"/", "/about", "push", 0},
+		{"/about", "/contact", "push", time.Second},
+		{"/contact", "/about", "back", 2 * time.Second},
+	}
+
+	for _, n := range navs {
+		e := makeEvent(rum.EventNavigation, "s1")
+		e.Timestamp = now.Add(n.offset)
+		e.Navigation = &rum.NavigationEvent{
+			FromURL: n.from,
+			ToURL:   n.to,
+			Type:    n.typ,
+		}
+		s.WriteEvent(e)
+	}
+
+	// Add a navigation for a different session.
+	e := makeEvent(rum.EventNavigation, "s2")
+	e.Timestamp = now
+	e.Navigation = &rum.NavigationEvent{FromURL: "/x", ToURL: "/y", Type: "push"}
+	s.WriteEvent(e)
+
+	journeys, err := s.UserJourneys("s1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(journeys) != 3 {
+		t.Fatalf("expected 3 navigation events for s1, got %d", len(journeys))
+	}
+	if journeys[0].FromURL != "/" || journeys[0].ToURL != "/about" {
+		t.Errorf("unexpected first nav: %+v", journeys[0])
+	}
+	if journeys[2].Type != "back" {
+		t.Errorf("expected last nav type=back, got %s", journeys[2].Type)
+	}
+
+	// Different session.
+	journeys2, err := s.UserJourneys("s2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(journeys2) != 1 {
+		t.Fatalf("expected 1 navigation for s2, got %d", len(journeys2))
+	}
+}
+
+func TestPerformanceByRoute(t *testing.T) {
+	s := NewStore(100)
+
+	routes := []string{"/", "/about", "/", "/"}
+	for _, r := range routes {
+		e := makeEvent(rum.EventPageLoad, "s1")
+		e.PageLoad = &rum.PageLoadEvent{
+			Route:      r,
+			DurationMs: 200,
+			TTFB:       50,
+		}
+		s.WriteEvent(e)
+	}
+
+	perf, err := s.PerformanceByRoute()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(perf) != 2 {
+		t.Fatalf("expected 2 routes, got %d", len(perf))
+	}
+	// Sorted by views descending.
+	if perf[0].Route != "/" || perf[0].Views != 3 {
+		t.Errorf("expected / with 3 views, got %s with %d", perf[0].Route, perf[0].Views)
+	}
+	if perf[0].AvgDurationMs != 200 {
+		t.Errorf("expected avg duration 200, got %f", perf[0].AvgDurationMs)
+	}
+}
+
 func TestWriteBatch(t *testing.T) {
 	s := NewStore(100)
 

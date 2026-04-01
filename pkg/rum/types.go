@@ -10,6 +10,8 @@ const (
 	EventWebVital       EventType = "web_vital"
 	EventJSError        EventType = "js_error"
 	EventResourceTiming EventType = "resource_timing"
+	EventClick          EventType = "click"
+	EventNavigation     EventType = "navigation"
 )
 
 // RUMEvent is the envelope for all events sent by the browser SDK.
@@ -26,6 +28,8 @@ type RUMEvent struct {
 	WebVital       *WebVitalEvent       `json:"web_vital,omitempty"`
 	JSError        *JSErrorEvent        `json:"js_error,omitempty"`
 	ResourceTiming *ResourceTimingEvent `json:"resource_timing,omitempty"`
+	Click          *ClickEvent          `json:"click,omitempty"`
+	Navigation     *NavigationEvent     `json:"navigation,omitempty"`
 }
 
 // PageLoadEvent records a full page navigation.
@@ -115,4 +119,30 @@ type SessionSummary struct {
 	PageViews  int       `json:"page_views"`
 	ErrorCount int       `json:"error_count"`
 	UserAgent  string    `json:"user_agent"`
+}
+
+// ClickEvent records a user click interaction.
+type ClickEvent struct {
+	Selector string `json:"selector"`  // CSS selector of clicked element
+	Text     string `json:"text"`      // inner text (truncated)
+	X        int    `json:"x"`
+	Y        int    `json:"y"`
+	IsRage   bool   `json:"is_rage"`   // 3+ clicks on same element in 1s
+	URL      string `json:"url"`
+}
+
+// NavigationEvent records a client-side page navigation.
+type NavigationEvent struct {
+	FromURL string `json:"from_url"`
+	ToURL   string `json:"to_url"`
+	Type    string `json:"type"` // "push", "replace", "back", "forward"
+}
+
+// RoutePerformance aggregates performance metrics per route.
+type RoutePerformance struct {
+	Route         string  `json:"route"`
+	AvgDurationMs float64 `json:"avg_duration_ms"`
+	P75DurationMs float64 `json:"p75_duration_ms"`
+	AvgTTFB       float64 `json:"avg_ttfb_ms"`
+	Views         int     `json:"views"`
 }

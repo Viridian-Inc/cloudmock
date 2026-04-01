@@ -74,7 +74,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/iac"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	trafficpkg "github.com/neureaux/cloudmock/pkg/traffic"
-	trafficmemory "github.com/neureaux/cloudmock/pkg/traffic/memory"
+	trafficfilestore "github.com/neureaux/cloudmock/pkg/traffic/filestore"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	argoplugin "github.com/neureaux/cloudmock/plugins/argocd"
@@ -1060,11 +1060,16 @@ func main() {
 		slog.Info("monitor service started", "eval_interval", evalInterval)
 	}
 
-	// Traffic simulator / replay engine
-	trafficStore := trafficmemory.NewStore()
+	// Traffic simulator / replay engine — file-backed so recordings survive restarts
+	trafficDir := filepath.Join(os.Getenv("HOME"), ".cloudmock", "traffic")
+	trafficStore, err := trafficfilestore.New(trafficDir)
+	if err != nil {
+		slog.Error("failed to create traffic store", "error", err, "dir", trafficDir)
+		trafficStore, _ = trafficfilestore.New(os.TempDir())
+	}
 	trafficEng := trafficpkg.New(trafficStore, requestLog, cfg.Gateway.Port)
 	adminAPI.SetTrafficEngine(trafficEng)
-	slog.Info("traffic replay engine initialized")
+	slog.Info("traffic replay engine initialized", "storage", trafficDir)
 
 	// Annotations store — timeline annotations for team collaboration.
 	annotationStore := annotationspkg.NewStore()

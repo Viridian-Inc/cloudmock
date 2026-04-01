@@ -1,141 +1,164 @@
 # CloudMock
 
-Local AWS. 25 services. One binary.
+**The open-source AWS emulator with built-in observability.**
 
-## Install
+Local AWS development + distributed tracing + error tracking + alerting -- in one tool. Language-agnostic via OpenTelemetry.
 
-```bash
-npx cloudmock                   # zero install
-brew install cloudmock           # macOS / Linux
-docker run -p 4566:4566 -p 4500:4500 ghcr.io/neureaux/cloudmock
-go install github.com/neureaux/cloudmock/cmd/gateway@latest
+```
+  +-----------+        +-------------+        +-----------+
+  |  Your App | -----> |  CloudMock  | -----> |  DevTools |
+  | (any lang)|  AWS   |  98 services|  OTLP  |  :4500    |
+  +-----------+  SDK   +-------------+        +-----------+
+                       traces | metrics | logs | topology
 ```
 
-## Point your SDK
+## Why CloudMock?
 
-### Node.js
+- **98 AWS services** emulated locally -- no AWS account needed
+- **Full observability** -- traces, metrics, logs, and errors in one dashboard
+- **Language-agnostic** -- works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
+- **Desktop DevTools** -- cross-platform UI for traces, topology, and chaos controls
+- **Chaos engineering** -- inject failures to test error handling before production
+- **Free forever locally** -- open source, no account required
+
+## Quick Start
+
+```bash
+npx cloudmock
+# or
+brew install cloudmock
+# or
+docker run -p 4566:4566 -p 4318:4318 -p 4500:4500 neureaux/cloudmock
+```
+
+Point your AWS SDK:
+
+```bash
+export AWS_ENDPOINT_URL=http://localhost:4566
+```
+
+Send traces via OpenTelemetry:
+
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+```
+
+Open DevTools at [http://localhost:4500](http://localhost:4500)
+
+## Usage
+
+### Any AWS SDK
+
+CloudMock is a drop-in replacement for AWS. Point any SDK at `localhost:4566`:
 
 ```js
-const { S3Client, CreateBucketCommand } = require("@aws-sdk/client-s3");
-
+// Node.js
 const client = new S3Client({
   endpoint: "http://localhost:4566",
   region: "us-east-1",
   credentials: { accessKeyId: "test", secretAccessKey: "test" },
   forcePathStyle: true,
 });
-
-await client.send(new CreateBucketCommand({ Bucket: "my-bucket" }));
 ```
-
-### Python
 
 ```python
-import boto3
-
-s3 = boto3.client(
-    "s3",
-    endpoint_url="http://localhost:4566",
-    aws_access_key_id="test",
-    aws_secret_access_key="test",
-    region_name="us-east-1",
-)
-
-s3.create_bucket(Bucket="my-bucket")
+# Python
+s3 = boto3.client("s3", endpoint_url="http://localhost:4566",
+    aws_access_key_id="test", aws_secret_access_key="test")
 ```
-
-### Go
 
 ```go
-cfg, _ := config.LoadDefaultConfig(context.TODO(),
-    config.WithRegion("us-east-1"),
-    config.WithBaseEndpoint("http://localhost:4566"),
-    config.WithCredentialsProvider(aws.CredentialsProviderFunc(
-        func(ctx context.Context) (aws.Credentials, error) {
-            return aws.Credentials{
-                AccessKeyID: "test", SecretAccessKey: "test",
-            }, nil
-        },
-    )),
-)
-client := s3.NewFromConfig(cfg)
+// Go
+cfg, _ := config.LoadDefaultConfig(ctx,
+    config.WithBaseEndpoint("http://localhost:4566"))
 ```
 
-## cmk CLI
+### cmk CLI
 
-`cmk` wraps the AWS CLI with `--endpoint-url` pointed at CloudMock.
+`cmk` wraps the AWS CLI with the endpoint pre-configured:
 
 ```bash
-# Instead of:
-aws --endpoint-url=http://localhost:4566 s3 ls
-
-# Use:
 cmk s3 ls
 cmk dynamodb list-tables
 cmk sqs create-queue --queue-name jobs
 ```
 
-Set `CLOUDMOCK_ENDPOINT` to override the default (`http://localhost:4566`).
-
-## Devtools
-
-Open http://localhost:4500 for the built-in devtools UI. It shows service topology, request traces, metrics, and chaos injection controls.
-
 ## Services
 
-25 Tier 1 services with full API emulation. 429 operations total.
+**25 Tier 1 services** with full API emulation (429 operations):
 
-| Service | Endpoint name | Operations |
-|---|---|---|
-| API Gateway | `apigateway` | 14 |
-| CloudFormation | `cloudformation` | 13 |
-| CloudWatch | `monitoring` | 11 |
-| CloudWatch Logs | `logs` | 14 |
-| Cognito | `cognito-idp` | 14 |
-| DynamoDB | `dynamodb` | 28 |
-| EC2 | `ec2` | 90 |
-| ECR | `ecr` | 12 |
-| ECS | `ecs` | 20 |
-| EventBridge | `events` | 17 |
-| IAM | `iam` | 37 |
-| Kinesis | `kinesis` | 13 |
-| KMS | `kms` | 10 |
-| Lambda | `lambda` | 12 |
-| Data Firehose | `firehose` | 10 |
-| RDS | `rds` | 16 |
-| Route 53 | `route53` | 6 |
-| S3 | `s3` | 27 |
-| Secrets Manager | `secretsmanager` | 10 |
-| SES | `ses` | 7 |
-| SNS | `sns` | 12 |
-| SQS | `sqs` | 13 |
-| SSM Parameter Store | `ssm` | 7 |
-| Step Functions | `states` | 13 |
-| STS | `sts` | 3 |
+S3, DynamoDB, SQS, SNS, Lambda, API Gateway, CloudFormation, CloudWatch, CloudWatch Logs, Cognito, EC2, ECR, ECS, EventBridge, IAM, Kinesis, KMS, Data Firehose, RDS, Route 53, Secrets Manager, SES, SSM, Step Functions, STS
 
-An additional 73 services are available as CRUD stubs (create, describe, list, delete). See [docs/compatibility-matrix.md](docs/compatibility-matrix.md) for the full list.
+**73 additional services** available as CRUD stubs. See the [compatibility matrix](docs/compatibility-matrix.md) for the full list.
 
 ## Configuration
 
-CloudMock reads `cloudmock.yml` from the working directory. Profiles (`minimal`, `standard`, `full`) control which services start. Ports for the gateway (default 4566), devtools (4500), and admin API (4599) are configurable. Persistent state snapshots can be enabled to survive restarts.
+CloudMock reads `cloudmock.yml` from the working directory:
+
+```yaml
+profile: standard          # minimal | standard | full
+gateway:
+  port: 4566
+devtools:
+  port: 4500
+persistence:
+  enabled: true
+  path: .cloudmock/state
+```
 
 See [docs/configuration.md](docs/configuration.md) for the full reference.
 
-## Links
+## Architecture
 
-- [Documentation](https://cloudmock.io/docs)
-- [GitHub Issues](https://github.com/neureaux/cloudmock/issues)
-- [Comparison with LocalStack, Moto, et al.](https://cloudmock.io/docs/reference/comparison)
+CloudMock is a single Go binary that runs an AWS-compatible API gateway, an OpenTelemetry collector, and a web-based DevTools UI. Services are implemented as in-process handlers with a shared plugin framework.
+
+```
+cmd/gateway      -> main entry point
+gateway/         -> HTTP router, AWS request parsing
+services/        -> one package per AWS service
+pkg/otel/        -> OpenTelemetry collector and trace storage
+pkg/dashboard/   -> embedded DevTools web UI
+pkg/admin/       -> admin API for chaos, snapshots, config
+```
+
+See [docs/architecture.md](docs/architecture.md) for details.
+
+## Documentation
+
+- [Getting Started](docs/getting-started.md)
+- [Configuration](docs/configuration.md)
+- [CLI Reference](docs/cli-reference.md)
+- [Architecture](docs/architecture.md)
+- [Admin API](docs/admin-api.md)
+- [Compatibility Matrix](docs/compatibility-matrix.md)
 
 ## Contributing
 
-1. Fork the repository and create a feature branch.
-2. Run tests: `make test`
-3. Add or update service code under `services/<name>/`.
-4. Submit a pull request.
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 
-See [docs/architecture.md](docs/architecture.md) for how the service framework works.
+- Development environment setup
+- Running tests
+- Adding new AWS services
+- PR guidelines
+
+## Comparison
+
+| Feature | CloudMock | LocalStack (Free) | Moto |
+|---|---|---|---|
+| AWS services | 98 | ~25 | ~100 |
+| Distributed tracing | Built-in | No | No |
+| Chaos engineering | Built-in | Pro only | No |
+| DevTools UI | Built-in | Pro only | No |
+| Language | Go (single binary) | Python | Python |
+| License | Apache 2.0 | Apache 2.0 | Apache 2.0 |
+
+## Community
+
+- [GitHub Issues](https://github.com/neureaux/cloudmock/issues) -- bugs and feature requests
+- [GitHub Discussions](https://github.com/neureaux/cloudmock/discussions) -- questions and ideas
 
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE).
+
+Copyright 2026 Neureaux.

@@ -71,7 +71,7 @@ func (e *Engine) StartRecording(ctx context.Context, name string, durationSec in
 		Status:      RecordingActive,
 		Filter:      filter,
 		DurationSec: durationSec,
-		StartedAt:   time.Now().UTC(),
+		StartedAt:   time.Now(), // Use local time to match RequestLog entry timestamps
 	}
 	if err := e.store.SaveRecording(ctx, rec); err != nil {
 		e.mu.Unlock()

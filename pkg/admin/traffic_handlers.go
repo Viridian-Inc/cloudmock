@@ -1,6 +1,7 @@
 package admin
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -107,7 +108,8 @@ func (a *API) handleTrafficRecordStart(w http.ResponseWriter, r *http.Request) {
 		req.Name = "untitled"
 	}
 
-	rec, err := a.trafficEngine.StartRecording(r.Context(), req.Name, req.DurationSec, req.Filter)
+	// Use background context — the capture goroutine must outlive the HTTP request
+	rec, err := a.trafficEngine.StartRecording(context.Background(), req.Name, req.DurationSec, req.Filter)
 	if err != nil {
 		writeError(w, http.StatusConflict, err.Error())
 		return

@@ -500,6 +500,7 @@ func main() {
 	}
 	if autoscalingService != nil {
 		autoscalingService.SetLocator(registry)
+		autoscalingService.SetEventBus(bus)
 	}
 	if cloudfrontService != nil {
 		cloudfrontService.SetLocator(registry)
@@ -532,8 +533,8 @@ func main() {
 	// Simple services (no cross-service locator needed) — registerOrDefer pattern
 	_ = registerOrDefer("acm", func() service.Service { return acmsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("acm-pca", func() service.Service { return acmpcasvc.New(cfg.AccountID, cfg.Region) })
-	_ = registerOrDefer("cloudtrail", func() service.Service { return cloudtrailsvc.New(cfg.AccountID, cfg.Region) })
-	_ = registerOrDefer("config", func() service.Service { return configsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cloudtrail", func() service.Service { return cloudtrailsvc.NewWithBus(cfg.AccountID, cfg.Region, bus) })
+	_ = registerOrDefer("config", func() service.Service { return configsvc.NewWithBus(cfg.AccountID, cfg.Region, bus) })
 	_ = registerOrDefer("organizations", func() service.Service { return organizationssvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("wafv2", func() service.Service { return wafv2svc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("waf-regional", func() service.Service { return wafregionalsvc.New(cfg.AccountID, cfg.Region) })
@@ -1001,6 +1002,7 @@ func main() {
 	}
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
+	gw.SetEventBus(bus)
 	gw.SetPluginManager(pluginMgr)
 	var handler http.Handler = gw
 	// Wrap with chaos middleware for fault injection

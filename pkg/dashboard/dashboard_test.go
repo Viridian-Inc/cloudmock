@@ -47,8 +47,7 @@ func TestHandler_ContainsExpectedElements(t *testing.T) {
 		desc    string
 		snippet string
 	}{
-		{"cloudmock branding", "cloudmock"},
-		{"Figtree font", "Figtree"},
+		{"neureaux devtools branding", "neureaux devtools"},
 		{"HTML doctype", "<!DOCTYPE html>"},
 		{"app mount point", `id="app"`},
 		{"module script", `type="module"`},

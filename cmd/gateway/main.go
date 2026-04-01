@@ -45,6 +45,8 @@ import (
 	"github.com/neureaux/cloudmock/pkg/incident"
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
+	"github.com/neureaux/cloudmock/pkg/monitor"
+	monmemory "github.com/neureaux/cloudmock/pkg/monitor/memory"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/webhook"
@@ -855,6 +857,26 @@ func main() {
 		whDispatcher := webhook.NewDispatcher(whStore)
 		adminAPI.SetWebhookDispatcher(whDispatcher)
 		incService.SetWebhookDispatcher(whDispatcher)
+	}
+
+	// Monitoring and alerting service
+	if cfg.Monitor.Enabled {
+		monStore := monmemory.NewStore()
+
+		var provider monitor.MetricsProvider
+		if sloEngine != nil {
+			provider = monitor.NewGatewayProvider(sloEngine, requestStats)
+		}
+
+		evalInterval, _ := time.ParseDuration(cfg.Monitor.EvalInterval)
+		if evalInterval == 0 {
+			evalInterval = 30 * time.Second
+		}
+
+		monService := monitor.NewService(monStore, monStore, provider, evalInterval)
+		monService.Start(rootCtx)
+		adminAPI.SetMonitorService(monService)
+		slog.Info("monitor service started", "eval_interval", evalInterval)
 	}
 
 	// Traffic simulator / replay engine

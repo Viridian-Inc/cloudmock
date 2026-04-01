@@ -189,6 +189,10 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/views", a.handleViews)
 	a.mux.HandleFunc("/api/regressions", a.handleRegressions)
 	a.mux.HandleFunc("/api/regressions/", a.handleRegressions)
+	a.mux.HandleFunc("/api/monitors", a.handleMonitors)
+	a.mux.HandleFunc("/api/monitors/", a.handleMonitors)
+	a.mux.HandleFunc("/api/alerts", a.handleAlerts)
+	a.mux.HandleFunc("/api/alerts/", a.handleAlerts)
 	a.mux.HandleFunc("/api/audit", a.handleAudit)
 	a.mux.HandleFunc("/api/auth/login", a.handleAuthLogin)
 	a.mux.HandleFunc("/api/auth/register", a.handleAuthRegister)
@@ -279,6 +283,10 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/incidents/", a.handleIncidents)
 	a.mux.HandleFunc("/api/webhooks", a.handleWebhooks)
 	a.mux.HandleFunc("/api/webhooks/", a.handleWebhooks)
+	a.mux.HandleFunc("/api/monitors", a.handleMonitors)
+	a.mux.HandleFunc("/api/monitors/", a.handleMonitors)
+	a.mux.HandleFunc("/api/alerts", a.handleAlerts)
+	a.mux.HandleFunc("/api/alerts/", a.handleAlerts)
 	a.mux.HandleFunc("/api/profile/", a.handleProfile)
 	a.mux.HandleFunc("/api/profiles", a.handleProfiles)
 	a.mux.HandleFunc("/api/profiles/", a.handleProfiles)
@@ -2141,6 +2149,11 @@ func (a *API) SetReportGenerator(g *report.Generator) {
 // SetWebhookDispatcher sets the webhook dispatcher for the admin API.
 func (a *API) SetWebhookDispatcher(d *webhook.Dispatcher) {
 	a.webhookDispatcher = d
+}
+
+// SetMonitorService sets the monitor service for the admin API.
+func (a *API) SetMonitorService(svc *monitor.Service) {
+	a.monitorService = svc
 }
 
 // SetPluginManager sets the plugin manager for the admin API to expose plugin info.

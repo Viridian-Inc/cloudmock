@@ -122,6 +122,12 @@ type IncidentConfig struct {
 	GroupWindow string `yaml:"group_window" json:"group_window"`
 }
 
+// MonitorConfig holds monitoring and alerting configuration.
+type MonitorConfig struct {
+	Enabled      bool   `yaml:"enabled" json:"enabled"`
+	EvalInterval string `yaml:"eval_interval" json:"eval_interval"` // Go duration (default "30s")
+}
+
 // LambdaPricing holds per-invocation pricing for AWS Lambda.
 type LambdaPricing struct {
 	PerGBSecond     float64 `json:"perGBSecond" yaml:"perGBSecond"`
@@ -235,6 +241,13 @@ type CloudflareConfig struct {
 	ZoneID   string `yaml:"zone_id"`
 }
 
+// RUMConfig holds Real User Monitoring configuration.
+type RUMConfig struct {
+	Enabled    bool    `yaml:"enabled" json:"enabled"`
+	SampleRate float64 `yaml:"sample_rate" json:"sample_rate"` // 0.0–1.0
+	MaxEvents  int     `yaml:"max_events" json:"max_events"`   // circular buffer capacity
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -253,7 +266,9 @@ type Config struct {
 	Regression  RegressionConfig         `yaml:"regression"`
 	Cost        CostConfig               `yaml:"cost" json:"cost"`
 	Incidents   IncidentConfig           `yaml:"incidents" json:"incidents"`
+	Monitor     MonitorConfig            `yaml:"monitor" json:"monitor"`
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
+	RUM         RUMConfig                `yaml:"rum" json:"rum"`
 	SaaS        SaaSConfig               `yaml:"saas"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
@@ -311,10 +326,19 @@ func Default() *Config {
 			Enabled:     true,
 			GroupWindow: "5m",
 		},
+		Monitor: MonitorConfig{
+			Enabled:      true,
+			EvalInterval: "30s",
+		},
 		RateLimit: RateLimitConfig{
 			Enabled:           false,
 			RequestsPerSecond: 100,
 			Burst:             200,
+		},
+		RUM: RUMConfig{
+			Enabled:    true,
+			SampleRate: 1.0,
+			MaxEvents:  10000,
 		},
 	}
 }

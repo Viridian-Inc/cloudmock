@@ -25,6 +25,11 @@ iam:
   root_secret_key: test
   # seed_file: /path/to/iam-seed.json
 
+# IaC project directory — auto-provisions DynamoDB tables, Lambda functions,
+# Cognito pools, SQS queues, S3 buckets, and topology from your Pulumi/Terraform source.
+# Also set via: CLOUDMOCK_IAC_DIR env var or --iac flag
+# iac_dir: /path/to/your/pulumi/project
+
 persistence:
   # Set to true to persist state across restarts
   enabled: false

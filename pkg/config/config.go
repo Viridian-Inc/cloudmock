@@ -286,6 +286,8 @@ type Config struct {
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
 	RUM         RUMConfig                `yaml:"rum" json:"rum"`
 	OTLP        OTLPConfig               `yaml:"otlp" json:"otlp"`
+	IaCDir         string                   `yaml:"iac_dir" json:"iac_dir"` // Path to Pulumi/Terraform project
+	IaCEnv         string                   `yaml:"iac_env" json:"iac_env"` // Environment name (dev/stage/prod)
 	SaaS           SaaSConfig               `yaml:"saas"`
 	Notifications  NotificationsConfig      `yaml:"notifications" json:"notifications"`
 	SCM            SCMConfig                `yaml:"scm" json:"scm"`

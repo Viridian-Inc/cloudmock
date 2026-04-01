@@ -215,7 +215,7 @@ func main() {
 
 	configPath := flag.String("config", "", "path to cloudmock YAML config file")
 	pluginDir := flag.String("plugin-dir", "", "directory containing external plugin binaries (default: ~/.cloudmock/plugins/)")
-	iacDir := flag.String("iac", "", "path to Pulumi/Terraform project directory — auto-provisions DynamoDB tables, API routes from IaC source")
+	iacDir := flag.String("iac", "", "path to Pulumi/Terraform project directory — auto-provisions DynamoDB tables, API routes from IaC source (auto-detected if not set)")
 	iacEnv := flag.String("iac-env", "dev", "environment name for IaC resource name resolution (e.g., dev, stage, prod)")
 	flag.Parse()
 
@@ -232,6 +232,27 @@ func main() {
 	}
 
 	cfg.ApplyEnv()
+
+	// Resolve IaC project directory. Priority: --iac flag > CLOUDMOCK_IAC_DIR env > cloudmock.yml iac_dir
+	if *iacDir == "" {
+		if envDir := os.Getenv("CLOUDMOCK_IAC_DIR"); envDir != "" {
+			*iacDir = envDir
+		} else if cfg.IaCDir != "" {
+			*iacDir = cfg.IaCDir
+		}
+	}
+	if *iacDir != "" {
+		if abs, err := filepath.Abs(*iacDir); err == nil {
+			*iacDir = abs
+		}
+		slog.Info("IaC project configured", "path", *iacDir)
+	}
+	if cfg.IaCEnv != "" && *iacEnv == "dev" {
+		*iacEnv = cfg.IaCEnv
+	}
+	if envVal := os.Getenv("CLOUDMOCK_IAC_ENV"); envVal != "" {
+		*iacEnv = envVal
+	}
 
 	// IAM engine and credential store
 	store := iampkg.NewStore(cfg.AccountID)

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"time"
@@ -47,6 +48,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/otlp"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/monitor"
+	notifypkg "github.com/neureaux/cloudmock/pkg/notify"
 	monmemory "github.com/neureaux/cloudmock/pkg/monitor/memory"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
@@ -910,6 +912,102 @@ func main() {
 		whDispatcher := webhook.NewDispatcher(whStore)
 		adminAPI.SetWebhookDispatcher(whDispatcher)
 		incService.SetWebhookDispatcher(whDispatcher)
+
+		// Notification router — smart alert routing to Slack, PagerDuty, email
+		notifyRouter := notifypkg.NewRouter()
+
+		// Load channels and routes from config
+		if len(cfg.Notifications.Channels) > 0 {
+			var channelRefs []notifypkg.ChannelRef
+			channelConfigMap := make(map[string]config.NotifyChannelConfig)
+			for _, ch := range cfg.Notifications.Channels {
+				ref := notifypkg.ChannelRef{Type: ch.Type, Name: ch.Name, Config: make(map[string]string)}
+				switch ch.Type {
+				case "slack":
+					ref.Config["webhook_url"] = ch.WebhookURL
+				case "pagerduty":
+					ref.Config["routing_key"] = ch.RoutingKey
+				case "email":
+					ref.Config["smtp_host"] = ch.SMTPHost
+					ref.Config["smtp_port"] = strconv.Itoa(ch.SMTPPort)
+					ref.Config["username"] = ch.Username
+					ref.Config["password"] = ch.Password
+					ref.Config["from"] = ch.From
+					ref.Config["to"] = ch.To
+				}
+				channelRefs = append(channelRefs, ref)
+				channelConfigMap[ch.Name] = ch
+			}
+			notifyRouter.LoadChannels(channelRefs)
+
+			// Load routes from config, resolving channel names to refs
+			var routes []notifypkg.Route
+			for _, rc := range cfg.Notifications.Routes {
+				route := notifypkg.Route{
+					Name:    rc.Name,
+					Enabled: true,
+					Match: notifypkg.RouteMatch{
+						Services:   rc.Match.Services,
+						Severities: rc.Match.Severities,
+						Types:      rc.Match.Types,
+					},
+				}
+				for _, chName := range rc.Channels {
+					if chCfg, ok := channelConfigMap[chName]; ok {
+						ref := notifypkg.ChannelRef{Type: chCfg.Type, Name: chCfg.Name}
+						route.Channels = append(route.Channels, ref)
+					}
+				}
+				routes = append(routes, route)
+			}
+			notifyRouter.LoadRoutes(routes)
+			slog.Info("notification routing configured", "channels", len(cfg.Notifications.Channels), "routes", len(cfg.Notifications.Routes))
+		}
+
+		// Wire notification router into existing alert callbacks.
+		// The callbacks above are overwritten to also route through the
+		// notification system in addition to incident correlation.
+		if regEngine != nil {
+			regEngine.SetAlertCallback(func(ctx context.Context, r regression.Regression) {
+				incService.OnRegression(ctx, r)
+				notifyRouter.Notify(ctx, notifypkg.Notification{
+					Title:     r.Title,
+					Severity:  string(r.Severity),
+					Service:   r.Service,
+					Type:      "regression",
+					Timestamp: r.DetectedAt,
+					Fields: map[string]string{
+						"Algorithm":  string(r.Algorithm),
+						"Confidence": strconv.Itoa(r.Confidence),
+						"Deploy":     r.DeployID,
+					},
+				})
+			})
+		}
+		if sloEngine != nil {
+			sloEngine.SetAlertFunc(func(service, action string, burnRate, budgetUsed float64) {
+				incService.OnSLOBreach(rootCtx, service, action, burnRate, budgetUsed)
+				severity := "warning"
+				if budgetUsed > 0.9 {
+					severity = "critical"
+				}
+				notifyRouter.Notify(rootCtx, notifypkg.Notification{
+					Title:     fmt.Sprintf("SLO burn rate alert: %s/%s", service, action),
+					Message:   fmt.Sprintf("%.0f%% of error budget consumed, burn rate %.1fx", budgetUsed*100, burnRate),
+					Severity:  severity,
+					Service:   service,
+					Type:      "slo_breach",
+					Timestamp: time.Now(),
+					Fields: map[string]string{
+						"Action":      action,
+						"Burn Rate":   fmt.Sprintf("%.1f", burnRate),
+						"Budget Used": fmt.Sprintf("%.0f%%", budgetUsed*100),
+					},
+				})
+			})
+		}
+
+		adminAPI.SetNotificationRouter(notifyRouter)
 	}
 
 	// Monitoring and alerting service

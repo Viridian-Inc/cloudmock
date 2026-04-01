@@ -28,6 +28,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/incident"
 	"github.com/neureaux/cloudmock/pkg/monitor"
+	"github.com/neureaux/cloudmock/pkg/notify"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
@@ -129,6 +130,7 @@ type API struct {
 	trafficEngine    *traffic.Engine
 	errorStore       errs.ErrorStore
 	logStore         logstore.LogStore
+	notifyRouter     *notify.Router
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -236,6 +238,13 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/logs/ingest", a.handleLogIngest)
 	a.mux.HandleFunc("/api/logs/services", a.handleLogServices)
 	a.mux.HandleFunc("/api/logs/levels", a.handleLogLevels)
+
+	// Notification routing endpoints
+	a.mux.HandleFunc("/api/notify/routes", a.handleNotifyRoutes)
+	a.mux.HandleFunc("/api/notify/routes/", a.handleNotifyRouteByID)
+	a.mux.HandleFunc("/api/notify/channels", a.handleNotifyChannels)
+	a.mux.HandleFunc("/api/notify/test", a.handleNotifyTest)
+	a.mux.HandleFunc("/api/notify/history", a.handleNotifyHistory)
 
 	a.seedDefaultDashboard()
 
@@ -346,6 +355,13 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/logs/ingest", a.handleLogIngest)
 	a.mux.HandleFunc("/api/logs/services", a.handleLogServices)
 	a.mux.HandleFunc("/api/logs/levels", a.handleLogLevels)
+
+	// Notification routing endpoints
+	a.mux.HandleFunc("/api/notify/routes", a.handleNotifyRoutes)
+	a.mux.HandleFunc("/api/notify/routes/", a.handleNotifyRouteByID)
+	a.mux.HandleFunc("/api/notify/channels", a.handleNotifyChannels)
+	a.mux.HandleFunc("/api/notify/test", a.handleNotifyTest)
+	a.mux.HandleFunc("/api/notify/history", a.handleNotifyHistory)
 
 	a.seedDefaultDashboard()
 
@@ -2189,6 +2205,11 @@ func (a *API) SetWebhookDispatcher(d *webhook.Dispatcher) {
 // SetMonitorService sets the monitor service for the admin API.
 func (a *API) SetMonitorService(svc *monitor.Service) {
 	a.monitorService = svc
+}
+
+// SetNotificationRouter sets the notification router for alert routing.
+func (a *API) SetNotificationRouter(nr *notify.Router) {
+	a.notifyRouter = nr
 }
 
 // SetPluginManager sets the plugin manager for the admin API to expose plugin info.

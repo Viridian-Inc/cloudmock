@@ -276,8 +276,43 @@ type Config struct {
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
 	RUM         RUMConfig                `yaml:"rum" json:"rum"`
 	OTLP        OTLPConfig               `yaml:"otlp" json:"otlp"`
-	SaaS        SaaSConfig               `yaml:"saas"`
-	Services    map[string]ServiceConfig `yaml:"services"`
+	SaaS           SaaSConfig               `yaml:"saas"`
+	Notifications  NotificationsConfig      `yaml:"notifications" json:"notifications"`
+	Services       map[string]ServiceConfig `yaml:"services"`
+}
+
+// NotificationsConfig holds alert routing configuration.
+type NotificationsConfig struct {
+	Channels []NotifyChannelConfig `yaml:"channels" json:"channels"`
+	Routes   []NotifyRouteConfig   `yaml:"routes" json:"routes"`
+}
+
+// NotifyChannelConfig defines a notification channel in config.
+type NotifyChannelConfig struct {
+	Type       string `yaml:"type" json:"type"`
+	Name       string `yaml:"name" json:"name"`
+	WebhookURL string `yaml:"webhook_url,omitempty" json:"webhook_url,omitempty"`
+	RoutingKey string `yaml:"routing_key,omitempty" json:"routing_key,omitempty"`
+	SMTPHost   string `yaml:"smtp_host,omitempty" json:"smtp_host,omitempty"`
+	SMTPPort   int    `yaml:"smtp_port,omitempty" json:"smtp_port,omitempty"`
+	Username   string `yaml:"username,omitempty" json:"username,omitempty"`
+	Password   string `yaml:"password,omitempty" json:"password,omitempty"`
+	From       string `yaml:"from,omitempty" json:"from,omitempty"`
+	To         string `yaml:"to,omitempty" json:"to,omitempty"` // comma-separated
+}
+
+// NotifyRouteConfig defines a routing rule in config.
+type NotifyRouteConfig struct {
+	Name     string                `yaml:"name" json:"name"`
+	Match    NotifyRouteMatchConfig `yaml:"match,omitempty" json:"match,omitempty"`
+	Channels []string              `yaml:"channels" json:"channels"` // channel names
+}
+
+// NotifyRouteMatchConfig defines match conditions in config.
+type NotifyRouteMatchConfig struct {
+	Services   []string `yaml:"services,omitempty" json:"services,omitempty"`
+	Severities []string `yaml:"severities,omitempty" json:"severities,omitempty"`
+	Types      []string `yaml:"types,omitempty" json:"types,omitempty"`
 }
 
 // Default returns a Config populated with sensible defaults.

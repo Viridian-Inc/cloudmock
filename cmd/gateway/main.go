@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -12,6 +13,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"syscall"
 
 	"time"
@@ -677,56 +679,15 @@ func main() {
 		}
 	}
 
-	// Auto-load topology + AWS resources from seed file at boot.
-	// Checks: ./topology-seed.json, then ~/.cloudmock/topology-seed.json
-	var topologySeedJSON []byte
-	if *iacDir == "" { // Don't auto-seed if IaC import is active
+	// Auto-load topology seed file (just read it now, provision resources AFTER servers start).
+	if *iacDir == "" {
 		for _, seedPath := range []string{"topology-seed.json", filepath.Join(os.Getenv("HOME"), ".cloudmock", "topology-seed.json")} {
 			data, err := os.ReadFile(seedPath)
 			if err != nil {
 				continue
 			}
-			var seed struct {
-				Nodes     json.RawMessage `json:"nodes"`
-				Edges     json.RawMessage `json:"edges"`
-				Resources struct {
-					DynamoDB []string `json:"dynamodb"`
-					Cognito  []string `json:"cognito"`
-					S3       []string `json:"s3"`
-					SQS      []string `json:"sqs"`
-				} `json:"resources"`
-			}
-			if err := json.Unmarshal(data, &seed); err != nil {
-				slog.Warn("invalid topology seed", "path", seedPath, "error", err)
-				continue
-			}
-			// Provision DynamoDB tables
-			if dynamoSvc, e := registry.Lookup("dynamodb"); e == nil {
-				for _, t := range seed.Resources.DynamoDB {
-					dynamoSvc.HandleRequest(&service.RequestContext{Action: "CreateTable", Body: []byte(fmt.Sprintf(`{"TableName":"%s","KeySchema":[{"AttributeName":"pk","KeyType":"HASH"},{"AttributeName":"sk","KeyType":"RANGE"}],"AttributeDefinitions":[{"AttributeName":"pk","AttributeType":"S"},{"AttributeName":"sk","AttributeType":"S"}],"BillingMode":"PAY_PER_REQUEST"}`, t))})
-				}
-			}
-			// Provision Cognito pools
-			if cognitoSvc, e := registry.Lookup("cognito-idp"); e == nil {
-				for _, p := range seed.Resources.Cognito {
-					cognitoSvc.HandleRequest(&service.RequestContext{Action: "CreateUserPool", Body: []byte(fmt.Sprintf(`{"PoolName":"%s"}`, p))})
-				}
-			}
-			// Provision S3 buckets
-			if s3Svc, e := registry.Lookup("s3"); e == nil {
-				for _, b := range seed.Resources.S3 {
-					s3Svc.HandleRequest(&service.RequestContext{Action: "CreateBucket", Body: []byte(fmt.Sprintf(`{"Bucket":"%s"}`, b))})
-				}
-			}
-			// Provision SQS queues
-			if sqsSvc, e := registry.Lookup("sqs"); e == nil {
-				for _, q := range seed.Resources.SQS {
-					sqsSvc.HandleRequest(&service.RequestContext{Action: "CreateQueue", Body: []byte("Action=CreateQueue&QueueName=" + q)})
-				}
-			}
 			topologySeedJSON = data
-			rc := len(seed.Resources.DynamoDB) + len(seed.Resources.Cognito) + len(seed.Resources.S3) + len(seed.Resources.SQS)
-			slog.Info("auto-loaded topology seed", "path", seedPath, "resources", rc)
+			slog.Info("found topology seed file", "path", seedPath)
 			break
 		}
 	}
@@ -1729,6 +1690,64 @@ func main() {
 	fmt.Printf("  Services:   %d active (%s profile)\n", len(registry.List()), cfg.Profile)
 	fmt.Println()
 	fmt.Printf("Ready. Point your AWS SDK at http://localhost:%d\n\n", cfg.Gateway.Port)
+
+	// Auto-provision resources from seed file AFTER all servers are up.
+	if topologySeedJSON != nil {
+		go func() {
+			time.Sleep(500 * time.Millisecond) // Let servers bind
+			gwBase := fmt.Sprintf("http://localhost:%d", cfg.Gateway.Port)
+			adminBase := fmt.Sprintf("http://localhost:%d", cfg.Admin.Port)
+			client := &http.Client{Timeout: 5 * time.Second}
+
+			var seed struct {
+				Resources struct {
+					DynamoDB []string `json:"dynamodb"`
+					Cognito  []string `json:"cognito"`
+					S3       []string `json:"s3"`
+					SQS      []string `json:"sqs"`
+				} `json:"resources"`
+			}
+			json.Unmarshal(topologySeedJSON, &seed)
+
+			// Provision DynamoDB tables
+			for _, t := range seed.Resources.DynamoDB {
+				body := fmt.Sprintf(`{"TableName":"%s","KeySchema":[{"AttributeName":"pk","KeyType":"HASH"},{"AttributeName":"sk","KeyType":"RANGE"}],"AttributeDefinitions":[{"AttributeName":"pk","AttributeType":"S"},{"AttributeName":"sk","AttributeType":"S"}],"BillingMode":"PAY_PER_REQUEST"}`, t)
+				req, _ := http.NewRequest("POST", gwBase, strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+				req.Header.Set("X-Amz-Target", "DynamoDB_20120810.CreateTable")
+				req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=test/20260101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=fake")
+				client.Do(req)
+			}
+			// Provision Cognito pools
+			for _, p := range seed.Resources.Cognito {
+				body := fmt.Sprintf(`{"PoolName":"%s","AutoVerifiedAttributes":["email"]}`, p)
+				req, _ := http.NewRequest("POST", gwBase, strings.NewReader(body))
+				req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+				req.Header.Set("X-Amz-Target", "AWSCognitoIdentityProviderService.CreateUserPool")
+				req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=test/20260101/us-east-1/cognito-idp/aws4_request, SignedHeaders=host, Signature=fake")
+				client.Do(req)
+			}
+			// Provision S3 buckets
+			for _, b := range seed.Resources.S3 {
+				req, _ := http.NewRequest("PUT", gwBase+"/"+b, nil)
+				req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=test/20260101/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=fake")
+				client.Do(req)
+			}
+			// Provision SQS queues
+			for _, q := range seed.Resources.SQS {
+				req, _ := http.NewRequest("POST", gwBase+"/?Action=CreateQueue&QueueName="+q, nil)
+				req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=test/20260101/us-east-1/sqs/aws4_request, SignedHeaders=host, Signature=fake")
+				client.Do(req)
+			}
+			// Set topology config
+			req, _ := http.NewRequest("PUT", adminBase+"/api/topology/config", bytes.NewReader(topologySeedJSON))
+			req.Header.Set("Content-Type", "application/json")
+			client.Do(req)
+
+			rc := len(seed.Resources.DynamoDB) + len(seed.Resources.Cognito) + len(seed.Resources.S3) + len(seed.Resources.SQS)
+			slog.Info("auto-provisioned from seed file", "tables", len(seed.Resources.DynamoDB), "pools", len(seed.Resources.Cognito), "buckets", len(seed.Resources.S3), "queues", len(seed.Resources.SQS), "total", rc)
+		}()
+	}
 
 	// Wait for termination signal.
 	sigCh := make(chan os.Signal, 1)

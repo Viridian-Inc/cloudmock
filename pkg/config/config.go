@@ -278,7 +278,22 @@ type Config struct {
 	OTLP        OTLPConfig               `yaml:"otlp" json:"otlp"`
 	SaaS           SaaSConfig               `yaml:"saas"`
 	Notifications  NotificationsConfig      `yaml:"notifications" json:"notifications"`
+	SCM            SCMConfig                `yaml:"scm" json:"scm"`
 	Services       map[string]ServiceConfig `yaml:"services"`
+}
+
+// SCMConfig holds source code management integration configuration.
+type SCMConfig struct {
+	Provider string          `yaml:"provider" json:"provider"`
+	Token    string          `yaml:"token" json:"-"` // never serialize the token
+	Repos    []SCMRepoConfig `yaml:"repos" json:"repos"`
+}
+
+// SCMRepoConfig maps a repository to path-strip rules.
+type SCMRepoConfig struct {
+	Owner      string `yaml:"owner" json:"owner"`
+	Repo       string `yaml:"repo" json:"repo"`
+	PathPrefix string `yaml:"path_prefix" json:"path_prefix"`
 }
 
 // NotificationsConfig holds alert routing configuration.

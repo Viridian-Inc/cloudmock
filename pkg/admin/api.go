@@ -40,6 +40,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/neureaux/cloudmock/pkg/uptime"
 	"github.com/neureaux/cloudmock/pkg/webhook"
 	"github.com/neureaux/cloudmock/services/lambda"
 	"github.com/neureaux/cloudmock/services/ses"
@@ -126,11 +127,13 @@ type API struct {
 	dashboards       []Dashboard
 	dashboardsMu     sync.RWMutex
 	rumEngine        *rum.Engine
+	uptimeEngine     *uptime.Engine
 	monitorService   *monitor.Service
 	trafficEngine    *traffic.Engine
 	errorStore       errs.ErrorStore
 	logStore         logstore.LogStore
 	notifyRouter     *notify.Router
+	scm              *scmState
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -226,11 +229,23 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
 	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
 	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+	a.mux.HandleFunc("/api/rum/clicks", a.handleRUMClicks)
+	a.mux.HandleFunc("/api/rum/journeys/", a.handleRUMJourneys)
+
+	// Uptime monitoring endpoints
+	a.mux.HandleFunc("/api/uptime/checks", a.handleUptimeChecks)
+	a.mux.HandleFunc("/api/uptime/checks/", a.handleUptimeCheckByID)
+	a.mux.HandleFunc("/api/uptime/status", a.handleUptimeStatus)
 
 	// Structured error tracking endpoints
 	a.mux.HandleFunc("/api/errors", a.handleErrors)
 	a.mux.HandleFunc("/api/errors/ingest", a.handleErrorIngest)
 	a.mux.HandleFunc("/api/errors/", a.handleErrorByID)
+
+	// SCM / GitHub integration endpoints
+	a.mux.HandleFunc("/api/source/context", a.handleSourceContext)
+	a.mux.HandleFunc("/api/source/suspects", a.handleSourceSuspects)
+	a.mux.HandleFunc("/api/scm/config", a.handleSCMConfig)
 
 	// Log management endpoints
 	a.mux.HandleFunc("/api/logs", a.handleLogs)
@@ -343,11 +358,23 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
 	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
 	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+	a.mux.HandleFunc("/api/rum/clicks", a.handleRUMClicks)
+	a.mux.HandleFunc("/api/rum/journeys/", a.handleRUMJourneys)
+
+	// Uptime monitoring endpoints
+	a.mux.HandleFunc("/api/uptime/checks", a.handleUptimeChecks)
+	a.mux.HandleFunc("/api/uptime/checks/", a.handleUptimeCheckByID)
+	a.mux.HandleFunc("/api/uptime/status", a.handleUptimeStatus)
 
 	// Structured error tracking endpoints
 	a.mux.HandleFunc("/api/errors", a.handleErrors)
 	a.mux.HandleFunc("/api/errors/ingest", a.handleErrorIngest)
 	a.mux.HandleFunc("/api/errors/", a.handleErrorByID)
+
+	// SCM / GitHub integration endpoints
+	a.mux.HandleFunc("/api/source/context", a.handleSourceContext)
+	a.mux.HandleFunc("/api/source/suspects", a.handleSourceSuspects)
+	a.mux.HandleFunc("/api/scm/config", a.handleSCMConfig)
 
 	// Log management endpoints
 	a.mux.HandleFunc("/api/logs", a.handleLogs)

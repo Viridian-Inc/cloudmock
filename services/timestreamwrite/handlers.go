@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -330,12 +331,123 @@ func handleWriteRecords(ctx *service.RequestContext, store *Store) (*service.Res
 	}})
 }
 
+// ---- Query ----
+
+type queryRequest struct {
+	QueryString string `json:"QueryString"`
+}
+
+func handleQuery(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req queryRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.QueryString == "" {
+		return jsonErr(service.ErrValidation("QueryString is required."))
+	}
+
+	// Parse basic SQL to extract database, table, and time range
+	// Expected format: SELECT ... FROM "db"."table" WHERE time BETWEEN 'start' AND 'end'
+	dbName, tableName := extractDBAndTable(req.QueryString)
+	startTime, endTime := extractTimeRange(req.QueryString)
+
+	if dbName == "" || tableName == "" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"Could not parse database and table from query.", http.StatusBadRequest))
+	}
+
+	records, ok := store.QueryRecords(dbName, tableName, startTime, endTime)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Table not found.", http.StatusNotFound))
+	}
+
+	// Build column info from first record's dimensions + measure
+	columnInfo := []map[string]any{
+		{"Name": "time", "Type": map[string]string{"ScalarType": "TIMESTAMP"}},
+		{"Name": "measure_name", "Type": map[string]string{"ScalarType": "VARCHAR"}},
+		{"Name": "measure_value::double", "Type": map[string]string{"ScalarType": "DOUBLE"}},
+	}
+
+	// Add dimension columns from first record
+	if len(records) > 0 {
+		for _, dim := range records[0].Dimensions {
+			columnInfo = append(columnInfo, map[string]any{
+				"Name": dim.Name, "Type": map[string]string{"ScalarType": "VARCHAR"},
+			})
+		}
+	}
+
+	// Build rows
+	rows := make([]map[string]any, len(records))
+	for i, r := range records {
+		data := []map[string]any{
+			{"ScalarValue": r.Time},
+			{"ScalarValue": r.MeasureName},
+			{"ScalarValue": r.MeasureValue},
+		}
+		for _, dim := range r.Dimensions {
+			data = append(data, map[string]any{"ScalarValue": dim.Value})
+		}
+		rows[i] = map[string]any{"Data": data}
+	}
+
+	return jsonOK(map[string]any{
+		"Rows":       rows,
+		"ColumnInfo": columnInfo,
+		"QueryId":    newUUID(),
+	})
+}
+
+// extractDBAndTable parses "db"."table" from a FROM clause.
+func extractDBAndTable(query string) (string, string) {
+	// Look for FROM "db"."table" or FROM db.table
+	upper := strings.ToUpper(query)
+	fromIdx := strings.Index(upper, "FROM")
+	if fromIdx < 0 {
+		return "", ""
+	}
+	rest := strings.TrimSpace(query[fromIdx+4:])
+	// Remove WHERE and everything after
+	whereIdx := strings.Index(strings.ToUpper(rest), "WHERE")
+	if whereIdx > 0 {
+		rest = strings.TrimSpace(rest[:whereIdx])
+	}
+	// Remove surrounding quotes
+	rest = strings.ReplaceAll(rest, "\"", "")
+	parts := strings.SplitN(rest, ".", 2)
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
+}
+
+// extractTimeRange parses BETWEEN 'start' AND 'end' from a WHERE clause.
+func extractTimeRange(query string) (string, string) {
+	upper := strings.ToUpper(query)
+	betweenIdx := strings.Index(upper, "BETWEEN")
+	if betweenIdx < 0 {
+		return "", ""
+	}
+	rest := query[betweenIdx+7:]
+	andIdx := strings.Index(strings.ToUpper(rest), " AND ")
+	if andIdx < 0 {
+		return "", ""
+	}
+	start := strings.TrimSpace(rest[:andIdx])
+	end := strings.TrimSpace(rest[andIdx+5:])
+	// Remove quotes
+	start = strings.Trim(start, "'\"")
+	end = strings.Trim(end, "'\"")
+	return start, end
+}
+
 // ---- DescribeEndpoints ----
 
 func handleDescribeEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	return jsonOK(map[string]any{
 		"Endpoints": []map[string]any{
 			{"Address": fmt.Sprintf("ingest.timestream.%s.amazonaws.com", store.region), "CachePeriodInMinutes": 1440},
+			{"Address": fmt.Sprintf("query.timestream.%s.amazonaws.com", store.region), "CachePeriodInMinutes": 1440},
 		},
 	})
 }

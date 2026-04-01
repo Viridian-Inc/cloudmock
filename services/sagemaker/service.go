@@ -57,6 +57,7 @@ func (s *SageMakerService) Actions() []service.Action {
 		{Name: "ListEndpoints", Method: http.MethodPost, IAMAction: "sagemaker:ListEndpoints"},
 		{Name: "DeleteEndpoint", Method: http.MethodPost, IAMAction: "sagemaker:DeleteEndpoint"},
 		{Name: "UpdateEndpoint", Method: http.MethodPost, IAMAction: "sagemaker:UpdateEndpoint"},
+		{Name: "InvokeEndpoint", Method: http.MethodPost, IAMAction: "sagemaker:InvokeEndpoint"},
 		// Processing jobs
 		{Name: "CreateProcessingJob", Method: http.MethodPost, IAMAction: "sagemaker:CreateProcessingJob"},
 		{Name: "DescribeProcessingJob", Method: http.MethodPost, IAMAction: "sagemaker:DescribeProcessingJob"},
@@ -134,6 +135,8 @@ func (s *SageMakerService) HandleRequest(ctx *service.RequestContext) (*service.
 		return handleDeleteEndpoint(ctx, s.store)
 	case "UpdateEndpoint":
 		return handleUpdateEndpoint(ctx, s.store)
+	case "InvokeEndpoint":
+		return handleInvokeEndpoint(ctx, s.store)
 	// Processing jobs
 	case "CreateProcessingJob":
 		return handleCreateProcessingJob(ctx, s.store)

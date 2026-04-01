@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/routing"
@@ -20,6 +22,7 @@ type Gateway struct {
 	mux      *http.ServeMux
 	store    *iampkg.Store
 	engine   *iampkg.Engine
+	bus      *eventbus.Bus
 }
 
 // New creates a Gateway with routes pre-registered.
@@ -43,6 +46,12 @@ func NewWithIAM(cfg *config.Config, registry *routing.Registry, store *iampkg.St
 	g.store = store
 	g.engine = engine
 	return g
+}
+
+// SetEventBus attaches an event bus to the gateway for publishing API call events.
+// CloudTrail and Config subscribe to these events.
+func (g *Gateway) SetEventBus(bus *eventbus.Bus) {
+	g.bus = bus
 }
 
 // SetPluginManager attaches a plugin manager to the gateway.
@@ -233,6 +242,31 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 
 	// 7. Dispatch to service.
 	resp, svcErr := svc.HandleRequest(ctx)
+
+	// 7b. Publish API call event for CloudTrail / Config subscribers.
+	if g.bus != nil {
+		detail := map[string]any{
+			"eventSource":    svcName + ".amazonaws.com",
+			"eventName":      action,
+			"sourceIPAddress": r.RemoteAddr,
+			"userAgent":      r.UserAgent(),
+		}
+		if svcErr != nil {
+			if awsErr, ok := svcErr.(*service.AWSError); ok {
+				detail["errorCode"] = awsErr.Code
+				detail["errorMessage"] = awsErr.Message
+			}
+		}
+		g.bus.Publish(&eventbus.Event{
+			Source:    svcName,
+			Type:      svcName + ":ApiCall:" + action,
+			Detail:    detail,
+			Time:      time.Now().UTC(),
+			Region:    g.cfg.Region,
+			AccountID: g.cfg.AccountID,
+		})
+	}
+
 	if svcErr != nil {
 		if awsErr, ok := svcErr.(*service.AWSError); ok {
 			format := service.FormatXML

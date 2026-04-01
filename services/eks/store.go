@@ -3,6 +3,7 @@ package eks
 import (
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,7 @@ type Cluster struct {
 	Status             string
 	Endpoint           string
 	CertificateAuthority string
+	OIDCIssuer         string
 	PlatformVersion    string
 	SubnetIDs          []string
 	SecurityGroupIDs   []string
@@ -44,6 +46,7 @@ type Nodegroup struct {
 	Labels            map[string]string
 	Taints            []Taint
 	CapacityType      string // ON_DEMAND, SPOT
+	NodeInstanceIDs   []string // EC2 instance IDs created for this node group
 	CreatedAt         time.Time
 	Tags              map[string]string
 	Lifecycle         *lifecycle.Machine
@@ -107,6 +110,14 @@ type Store struct {
 	accountID       string
 	region          string
 	lifecycleCfg    *lifecycle.Config
+	locator         ServiceLocator
+}
+
+// SetLocator sets the service locator for cross-service EC2 instance management.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
 }
 
 // NewStore returns a new Store for the given account and region.
@@ -148,6 +159,10 @@ func (s *Store) clusterCertAuth() string {
 	return fmt.Sprintf("LS0t%s==", randomHex(32))
 }
 
+func (s *Store) clusterOIDCIssuer(name string) string {
+	return fmt.Sprintf("https://oidc.eks.%s.amazonaws.com/id/%s", s.region, strings.ToUpper(randomHex(16)))
+}
+
 // ---- Cluster operations ----
 
 func (s *Store) CreateCluster(name, version, roleARN, vpcID, serviceCIDR string, subnetIDs, sgIDs []string, tags map[string]string) (*Cluster, bool) {
@@ -175,6 +190,7 @@ func (s *Store) CreateCluster(name, version, roleARN, vpcID, serviceCIDR string,
 		Status:                 "CREATING",
 		Endpoint:               s.clusterEndpoint(name),
 		CertificateAuthority:   s.clusterCertAuth(),
+		OIDCIssuer:             s.clusterOIDCIssuer(name),
 		PlatformVersion:        "eks.1",
 		SubnetIDs:              subnetIDs,
 		SecurityGroupIDs:       sgIDs,
@@ -228,10 +244,10 @@ func (s *Store) ListClusters() []string {
 
 func (s *Store) UpdateClusterConfig(name, version string, subnetIDs, sgIDs []string) (*Cluster, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	c, ok := s.clusters[name]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	if version != "" {
@@ -244,8 +260,11 @@ func (s *Store) UpdateClusterConfig(name, version string, subnetIDs, sgIDs []str
 		c.SecurityGroupIDs = sgIDs
 	}
 	c.Status = "UPDATING"
-	if c.Lifecycle != nil {
-		c.Lifecycle.ForceState("UPDATING")
+	lc := c.Lifecycle
+	s.mu.Unlock()
+
+	if lc != nil {
+		lc.ForceState("UPDATING")
 	}
 	return c, true
 }
@@ -342,10 +361,18 @@ func (s *Store) CreateNodegroup(clusterName, ngName, nodeRole, amiType, capacity
 
 	lm.OnTransition(func(from, to lifecycle.State) {
 		s.mu.Lock()
+		locator := s.locator
+		s.mu.Unlock()
+
+		s.mu.Lock()
 		defer s.mu.Unlock()
 		if ngs, ok := s.nodegroups[clusterName]; ok {
 			if n, ok := ngs[ngName]; ok {
 				n.Status = string(to)
+				// When node group becomes ACTIVE, create EC2 instances
+				if to == "ACTIVE" && from == "CREATING" && n.ScalingConfig != nil && len(n.NodeInstanceIDs) == 0 {
+					n.NodeInstanceIDs = launchNodeInstances(n.ScalingConfig.DesiredSize, clusterName, ngName, locator)
+				}
 			}
 		}
 	})
@@ -411,6 +438,10 @@ func (s *Store) UpdateNodegroupConfig(clusterName, ngName string, scaling *Nodeg
 
 func (s *Store) DeleteNodegroup(clusterName, ngName string) (*Nodegroup, bool) {
 	s.mu.Lock()
+	locator := s.locator
+	s.mu.Unlock()
+
+	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	ngs, ok := s.nodegroups[clusterName]
@@ -425,6 +456,12 @@ func (s *Store) DeleteNodegroup(clusterName, ngName string) (*Nodegroup, bool) {
 	if ng.Lifecycle != nil {
 		ng.Lifecycle.Stop()
 	}
+
+	// Terminate EC2 instances associated with this node group
+	if len(ng.NodeInstanceIDs) > 0 {
+		go terminateNodeInstances(ng.NodeInstanceIDs, locator)
+	}
+
 	delete(ngs, ngName)
 	return ng, true
 }

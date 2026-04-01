@@ -2,6 +2,7 @@ package route53resolver
 
 import (
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -15,6 +16,7 @@ type ResolverEndpoint struct {
 	Name              string
 	Direction         string // INBOUND or OUTBOUND
 	IPAddressCount    int
+	IPAddresses       []string
 	SecurityGroupIds  []string
 	Status            string
 	StatusMessage     string
@@ -115,6 +117,15 @@ func (s *Store) CreateResolverEndpoint(name, direction, vpcID string, securityGr
 		{From: "CREATING", To: "OPERATIONAL", Delay: 3 * time.Second},
 	}
 
+	// Generate IPs in 10.x.x.x range
+	if ipCount <= 0 {
+		ipCount = 2
+	}
+	ipAddresses := make([]string, 0, ipCount)
+	for i := 0; i < ipCount; i++ {
+		ipAddresses = append(ipAddresses, fmt.Sprintf("10.0.%d.%d", s.epSeq, i+1))
+	}
+
 	now := time.Now().UTC()
 	ep := &ResolverEndpoint{
 		ID:               id,
@@ -122,6 +133,7 @@ func (s *Store) CreateResolverEndpoint(name, direction, vpcID string, securityGr
 		Name:             name,
 		Direction:        direction,
 		IPAddressCount:   ipCount,
+		IPAddresses:      ipAddresses,
 		SecurityGroupIds: securityGroupIDs,
 		Status:           "CREATING",
 		StatusMessage:    "Creating",
@@ -181,6 +193,16 @@ func (s *Store) DeleteResolverEndpoint(id string) (*ResolverEndpoint, bool) {
 func (s *Store) CreateResolverRule(name, domainName, ruleType, endpointID string, targetIPs []TargetAddress) (*ResolverRule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Validate target IPs are valid IPv4
+	for _, t := range targetIPs {
+		if t.IP != "" {
+			ip := net.ParseIP(t.IP)
+			if ip == nil || ip.To4() == nil {
+				return nil, fmt.Errorf("invalid target IP address: %s. Must be a valid IPv4 address", t.IP)
+			}
+		}
+	}
 
 	s.ruleSeq++
 	id := fmt.Sprintf("rslvr-rr-%012d", s.ruleSeq)

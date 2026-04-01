@@ -28,13 +28,16 @@ const (
 )
 
 type Block struct {
-	BlockType    string         `json:"BlockType"`
-	Id           string         `json:"Id"`
-	Text         string         `json:"Text,omitempty"`
-	Confidence   float64        `json:"Confidence"`
-	Geometry     map[string]any `json:"Geometry,omitempty"`
+	BlockType     string           `json:"BlockType"`
+	Id            string           `json:"Id"`
+	Text          string           `json:"Text,omitempty"`
+	Confidence    float64          `json:"Confidence"`
+	Geometry      map[string]float64 `json:"Geometry,omitempty"`
 	Relationships []map[string]any `json:"Relationships,omitempty"`
-	Page         int            `json:"Page,omitempty"`
+	EntityTypes   []string         `json:"EntityTypes,omitempty"`
+	Page          int              `json:"Page,omitempty"`
+	RowIndex      int              `json:"RowIndex,omitempty"`
+	ColumnIndex   int              `json:"ColumnIndex,omitempty"`
 }
 
 type ExpenseDocument struct {
@@ -89,27 +92,92 @@ func (s *Store) jobARN(jobId string) string {
 	return fmt.Sprintf("arn:aws:textract:%s:%s:job/%s", s.region, s.accountID, jobId)
 }
 
+// BoundingBox returns a realistic bounding box for a text block.
+func boundingBox(top, left, width, height float64) map[string]float64 {
+	return map[string]float64{
+		"Top": top, "Left": left, "Width": width, "Height": height,
+	}
+}
+
 func mockBlocks() []Block {
+	pageID := newUUID()
+	lineID := newUUID()
+	wordID := newUUID()
+	kvKeyID := newUUID()
+	kvValueID := newUUID()
+	tableID := newUUID()
+	cellID := newUUID()
+
 	return []Block{
 		{
-			BlockType:  "PAGE",
-			Id:         newUUID(),
-			Confidence: 99.9,
-			Page:       1,
+			BlockType:   "PAGE",
+			Id:          pageID,
+			Confidence:  99.9,
+			Page:        1,
+			Geometry:    boundingBox(0.0, 0.0, 1.0, 1.0),
+			Relationships: []map[string]any{
+				{"Type": "CHILD", "Ids": []string{lineID, kvKeyID, tableID}},
+			},
 		},
 		{
-			BlockType:  "LINE",
-			Id:         newUUID(),
-			Text:       "Sample detected text line",
-			Confidence: 98.5,
-			Page:       1,
+			BlockType:   "LINE",
+			Id:          lineID,
+			Text:        "Invoice Number: INV-2024-0042",
+			Confidence:  98.5,
+			Page:        1,
+			Geometry:    boundingBox(0.05, 0.05, 0.45, 0.03),
+			Relationships: []map[string]any{
+				{"Type": "CHILD", "Ids": []string{wordID}},
+			},
 		},
 		{
 			BlockType:  "WORD",
-			Id:         newUUID(),
-			Text:       "Sample",
+			Id:         wordID,
+			Text:       "Invoice",
 			Confidence: 99.1,
 			Page:       1,
+			Geometry:   boundingBox(0.05, 0.05, 0.10, 0.03),
+		},
+		{
+			BlockType:    "KEY_VALUE_SET",
+			Id:           kvKeyID,
+			Text:         "Invoice Number:",
+			Confidence:   96.2,
+			Page:         1,
+			EntityTypes:  []string{"KEY"},
+			Geometry:     boundingBox(0.05, 0.05, 0.20, 0.03),
+			Relationships: []map[string]any{
+				{"Type": "VALUE", "Ids": []string{kvValueID}},
+			},
+		},
+		{
+			BlockType:   "KEY_VALUE_SET",
+			Id:          kvValueID,
+			Text:        "INV-2024-0042",
+			Confidence:  97.8,
+			Page:        1,
+			EntityTypes: []string{"VALUE"},
+			Geometry:    boundingBox(0.05, 0.26, 0.20, 0.03),
+		},
+		{
+			BlockType:  "TABLE",
+			Id:         tableID,
+			Confidence: 95.5,
+			Page:       1,
+			Geometry:   boundingBox(0.10, 0.05, 0.90, 0.30),
+			Relationships: []map[string]any{
+				{"Type": "CHILD", "Ids": []string{cellID}},
+			},
+		},
+		{
+			BlockType:  "CELL",
+			Id:         cellID,
+			Text:       "Widget A",
+			Confidence: 97.0,
+			Page:       1,
+			Geometry:   boundingBox(0.10, 0.05, 0.30, 0.05),
+			RowIndex:   1,
+			ColumnIndex: 1,
 		},
 	}
 }
@@ -190,22 +258,50 @@ func (s *Store) GetJob(jobId string) (*Job, *service.AWSError) {
 
 // Sync operations (AnalyzeDocument, DetectDocumentText).
 
+func blockToMap(b Block) map[string]any {
+	m := map[string]any{
+		"BlockType":  b.BlockType,
+		"Id":         b.Id,
+		"Confidence": b.Confidence,
+		"Page":       b.Page,
+	}
+	if b.Text != "" {
+		m["Text"] = b.Text
+	}
+	if b.Geometry != nil {
+		m["Geometry"] = map[string]any{
+			"BoundingBox": b.Geometry,
+			"Polygon": []map[string]float64{
+				{"X": b.Geometry["Left"], "Y": b.Geometry["Top"]},
+				{"X": b.Geometry["Left"] + b.Geometry["Width"], "Y": b.Geometry["Top"]},
+				{"X": b.Geometry["Left"] + b.Geometry["Width"], "Y": b.Geometry["Top"] + b.Geometry["Height"]},
+				{"X": b.Geometry["Left"], "Y": b.Geometry["Top"] + b.Geometry["Height"]},
+			},
+		}
+	}
+	if len(b.Relationships) > 0 {
+		m["Relationships"] = b.Relationships
+	}
+	if len(b.EntityTypes) > 0 {
+		m["EntityTypes"] = b.EntityTypes
+	}
+	if b.RowIndex > 0 {
+		m["RowIndex"] = b.RowIndex
+		m["ColumnIndex"] = b.ColumnIndex
+	}
+	return m
+}
+
 func (s *Store) AnalyzeDocumentSync(document map[string]any, featureTypes []string) map[string]any {
 	blocks := mockBlocks()
 	blockMaps := make([]map[string]any, 0, len(blocks))
 	for _, b := range blocks {
-		blockMaps = append(blockMaps, map[string]any{
-			"BlockType":  b.BlockType,
-			"Id":         b.Id,
-			"Text":       b.Text,
-			"Confidence": b.Confidence,
-			"Page":       b.Page,
-		})
+		blockMaps = append(blockMaps, blockToMap(b))
 	}
 	return map[string]any{
-		"DocumentMetadata": map[string]any{"Pages": 1},
-		"Blocks":           blockMaps,
-		"AnalyzeDocumentModelVersion": "1.0",
+		"DocumentMetadata":             map[string]any{"Pages": 1},
+		"Blocks":                       blockMaps,
+		"AnalyzeDocumentModelVersion":  "1.0",
 	}
 }
 
@@ -213,18 +309,12 @@ func (s *Store) DetectDocumentTextSync(document map[string]any) map[string]any {
 	blocks := mockBlocks()
 	blockMaps := make([]map[string]any, 0, len(blocks))
 	for _, b := range blocks {
-		blockMaps = append(blockMaps, map[string]any{
-			"BlockType":  b.BlockType,
-			"Id":         b.Id,
-			"Text":       b.Text,
-			"Confidence": b.Confidence,
-			"Page":       b.Page,
-		})
+		blockMaps = append(blockMaps, blockToMap(b))
 	}
 	return map[string]any{
-		"DocumentMetadata":            map[string]any{"Pages": 1},
-		"Blocks":                      blockMaps,
-		"DetectDocumentTextModelVersion": "1.0",
+		"DocumentMetadata":                map[string]any{"Pages": 1},
+		"Blocks":                          blockMaps,
+		"DetectDocumentTextModelVersion":  "1.0",
 	}
 }
 

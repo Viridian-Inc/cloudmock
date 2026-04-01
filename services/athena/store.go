@@ -1,10 +1,18 @@
 package athena
 
 import (
-	"crypto/rand"
+	crand "crypto/rand"
+	"encoding/json"
 	"fmt"
+	"math/rand/v2"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/neureaux/cloudmock/pkg/sqlparse"
 )
 
 // WorkGroup represents an Athena workgroup.
@@ -66,14 +74,34 @@ type QueryExecutionStatistics struct {
 	TotalExecutionTimeInMillis  int64
 }
 
+// QueryResultSet holds mock query results for a completed execution.
+type QueryResultSet struct {
+	ColumnInfo []ColumnInfo
+	Rows       [][]string
+}
+
+// ColumnInfo describes a result column.
+type ColumnInfo struct {
+	Name string
+	Type string
+}
+
 // Store manages all Athena resources in memory.
 type Store struct {
 	mu              sync.RWMutex
 	workGroups      map[string]*WorkGroup
 	namedQueries    map[string]*NamedQuery
 	queryExecutions map[string]*QueryExecution
+	queryResults    map[string]*QueryResultSet // executionID -> results
+	schemaRegistry  *sqlparse.SchemaRegistry
 	accountID       string
 	region          string
+	locator         ServiceLocator
+}
+
+// ServiceLocator resolves other services by name.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
 }
 
 // NewStore creates a new Athena Store with the default "primary" workgroup.
@@ -82,6 +110,8 @@ func NewStore(accountID, region string) *Store {
 		workGroups:      make(map[string]*WorkGroup),
 		namedQueries:    make(map[string]*NamedQuery),
 		queryExecutions: make(map[string]*QueryExecution),
+		queryResults:    make(map[string]*QueryResultSet),
+		schemaRegistry:  sqlparse.NewSchemaRegistry(),
 		accountID:       accountID,
 		region:          region,
 	}
@@ -94,9 +124,73 @@ func NewStore(accountID, region string) *Store {
 	return s
 }
 
+// SetLocator sets the service locator for cross-service lookups.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
+}
+
+// populateSchemaFromGlue attempts to populate the schema registry from the Glue catalog.
+func (s *Store) populateSchemaFromGlue(database string) {
+	if s.locator == nil {
+		return
+	}
+	glueSvc, err := s.locator.Lookup("glue")
+	if err != nil || glueSvc == nil {
+		return
+	}
+
+	// List tables in the database from Glue
+	body, _ := json.Marshal(map[string]string{"DatabaseName": database})
+	ctx := &service.RequestContext{
+		Action:     "GetTables",
+		Body:       body,
+		RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+	}
+	resp, err := glueSvc.HandleRequest(ctx)
+	if err != nil || resp == nil || resp.Body == nil {
+		return
+	}
+
+	// Parse response to extract table/column info
+	data, err := json.Marshal(resp.Body)
+	if err != nil {
+		return
+	}
+	var result struct {
+		TableList []struct {
+			Name              string `json:"Name"`
+			StorageDescriptor struct {
+				Columns []struct {
+					Name string `json:"Name"`
+				} `json:"Columns"`
+			} `json:"StorageDescriptor"`
+		} `json:"TableList"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return
+	}
+	for _, tbl := range result.TableList {
+		cols := make([]string, len(tbl.StorageDescriptor.Columns))
+		for i, c := range tbl.StorageDescriptor.Columns {
+			cols[i] = c.Name
+		}
+		s.schemaRegistry.Register(database, tbl.Name, cols)
+	}
+}
+
+// GetQueryResultSet returns mock results for a completed query execution.
+func (s *Store) GetQueryResultSet(executionID string) (*QueryResultSet, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rs, ok := s.queryResults[executionID]
+	return rs, ok
+}
+
 func newUUID() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	_, _ = crand.Read(b)
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
@@ -222,7 +316,8 @@ func (s *Store) DeleteNamedQuery(id string) bool {
 	return true
 }
 
-// StartQueryExecution creates a new query execution in QUEUED state.
+// StartQueryExecution creates a new query execution, parses and validates the SQL,
+// and generates mock results for SELECT queries.
 func (s *Store) StartQueryExecution(query, database, workGroup, outputLocation string) *QueryExecution {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -245,16 +340,98 @@ func (s *Store) StartQueryExecution(query, database, workGroup, outputLocation s
 		SubmissionTime: now,
 	}
 	s.queryExecutions[qe.ID] = qe
-	// Immediately transition to SUCCEEDED for mock purposes.
+
+	// Parse and validate SQL
+	parsed := sqlparse.Parse(query)
+	if !parsed.IsValid {
+		completionTime := now.Add(50 * time.Millisecond)
+		qe.Status.State = "FAILED"
+		qe.Status.CompletionTime = &completionTime
+		qe.Status.StateChangeReason = "SYNTAX_ERROR: " + strings.Join(parsed.Errors, "; ")
+		qe.Statistics = QueryExecutionStatistics{
+			EngineExecutionTimeInMillis: 10,
+			TotalExecutionTimeInMillis:  20,
+		}
+		return qe
+	}
+
+	// Populate schema from Glue if database is specified
+	if database != "" {
+		s.populateSchemaFromGlue(database)
+	}
+
+	// Validate against schema registry only if it has schemas registered
+	validationErrors := sqlparse.Validate(parsed, s.schemaRegistry)
+	if len(validationErrors) > 0 && s.schemaRegistry.Len() > 0 {
+		completionTime := now.Add(50 * time.Millisecond)
+		qe.Status.State = "FAILED"
+		qe.Status.CompletionTime = &completionTime
+		qe.Status.StateChangeReason = "SEMANTIC_ERROR: " + strings.Join(validationErrors, "; ")
+		qe.Statistics = QueryExecutionStatistics{
+			EngineExecutionTimeInMillis: 20,
+			TotalExecutionTimeInMillis:  30,
+		}
+		return qe
+	}
+
+	// Compute mock data scanned based on query complexity
+	dataScanned := int64(1024) // base
+	dataScanned += int64(len(parsed.Tables)) * 4096
+	dataScanned += int64(len(parsed.Columns)) * 512
+
 	completionTime := now.Add(100 * time.Millisecond)
 	qe.Status.State = "SUCCEEDED"
 	qe.Status.CompletionTime = &completionTime
 	qe.Statistics = QueryExecutionStatistics{
 		EngineExecutionTimeInMillis: 50,
-		DataScannedInBytes:          1024,
+		DataScannedInBytes:          dataScanned,
 		TotalExecutionTimeInMillis:  100,
 	}
+
+	// Generate mock result set for SELECT queries
+	if parsed.StatementType == "SELECT" {
+		s.queryResults[qe.ID] = s.generateMockResults(parsed)
+	}
+
 	return qe
+}
+
+// generateMockResults creates a mock result set based on parsed SQL.
+func (s *Store) generateMockResults(parsed *sqlparse.ParseResult) *QueryResultSet {
+	columns := parsed.Columns
+	if len(columns) == 0 {
+		// SELECT * — try to get columns from schema
+		for _, tbl := range parsed.Tables {
+			if schema, ok := s.schemaRegistry.Lookup(tbl); ok {
+				columns = schema.Columns
+				break
+			}
+		}
+	}
+	if len(columns) == 0 {
+		columns = []string{"col1", "col2", "col3"}
+	}
+
+	colInfo := make([]ColumnInfo, len(columns))
+	for i, c := range columns {
+		colInfo[i] = ColumnInfo{Name: c, Type: "varchar"}
+	}
+
+	// Generate 5-10 mock rows
+	numRows := 5 + rand.IntN(6)
+	rows := make([][]string, numRows)
+	for i := range rows {
+		row := make([]string, len(columns))
+		for j, col := range columns {
+			row[j] = fmt.Sprintf("%s_%d", col, i+1)
+		}
+		rows[i] = row
+	}
+
+	return &QueryResultSet{
+		ColumnInfo: colInfo,
+		Rows:       rows,
+	}
 }
 
 // GetQueryExecution returns a query execution by ID.

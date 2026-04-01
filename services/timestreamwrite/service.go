@@ -39,6 +39,7 @@ func (s *TimestreamWriteService) Actions() []service.Action {
 		{Name: "UpdateTable", Method: http.MethodPost, IAMAction: "timestream:UpdateTable"},
 		{Name: "DeleteTable", Method: http.MethodPost, IAMAction: "timestream:DeleteTable"},
 		{Name: "WriteRecords", Method: http.MethodPost, IAMAction: "timestream:WriteRecords"},
+		{Name: "Query", Method: http.MethodPost, IAMAction: "timestream:Select"},
 		{Name: "DescribeEndpoints", Method: http.MethodPost, IAMAction: "timestream:DescribeEndpoints"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "timestream:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "timestream:UntagResource"},
@@ -74,6 +75,8 @@ func (s *TimestreamWriteService) HandleRequest(ctx *service.RequestContext) (*se
 		return handleDeleteTable(ctx, s.store)
 	case "WriteRecords":
 		return handleWriteRecords(ctx, s.store)
+	case "Query":
+		return handleQuery(ctx, s.store)
 	case "DescribeEndpoints":
 		return handleDescribeEndpoints(ctx, s.store)
 	case "TagResource":

@@ -36,11 +36,15 @@ type BackupLifecycle struct {
 
 // BackupVault represents a backup vault.
 type BackupVault struct {
-	BackupVaultName string
-	BackupVaultArn  string
-	CreationDate    time.Time
+	BackupVaultName        string
+	BackupVaultArn         string
+	CreationDate           time.Time
 	NumberOfRecoveryPoints int64
-	EncryptionKeyArn string
+	EncryptionKeyArn       string
+	Locked                 bool
+	LockDate               *time.Time
+	MinRetentionDays       int64
+	MaxRetentionDays       int64
 }
 
 // BackupJob represents a backup job.
@@ -215,14 +219,37 @@ func (s *Store) ListBackupVaults() []*BackupVault {
 }
 
 // DeleteBackupVault deletes a backup vault.
-func (s *Store) DeleteBackupVault(name string) bool {
+func (s *Store) DeleteBackupVault(name string) (bool, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.vaults[name]; !ok {
-		return false
+	vault, ok := s.vaults[name]
+	if !ok {
+		return false, "not_found"
+	}
+	if vault.Locked {
+		return false, "locked"
+	}
+	if vault.NumberOfRecoveryPoints > 0 {
+		return false, "not_empty"
 	}
 	delete(s.vaults, name)
-	return true
+	return true, ""
+}
+
+// LockBackupVault locks a vault with retention policy.
+func (s *Store) LockBackupVault(name string, minRetention, maxRetention int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[name]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", name)
+	}
+	now := time.Now().UTC()
+	vault.Locked = true
+	vault.LockDate = &now
+	vault.MinRetentionDays = minRetention
+	vault.MaxRetentionDays = maxRetention
+	return nil
 }
 
 // StartBackupJob starts a backup job.
@@ -238,56 +265,67 @@ func (s *Store) StartBackupJob(vaultName, resourceArn, resourceType, iamRoleArn 
 	s.jobSeq++
 	jobID := fmt.Sprintf("job-%012d", s.jobSeq)
 
-	transitions := []lifecycle.Transition{
-		{From: "CREATED", To: "RUNNING", Delay: 1 * time.Second},
-		{From: "RUNNING", To: "COMPLETED", Delay: 3 * time.Second},
-	}
-
 	job := &BackupJob{
-		BackupJobID:     jobID,
-		BackupVaultName: vaultName,
-		BackupVaultArn:  vault.BackupVaultArn,
-		ResourceArn:     resourceArn,
-		ResourceType:    resourceType,
-		State:           "CREATED",
-		StatusMessage:   "Backup job created",
-		CreationDate:    time.Now().UTC(),
+		BackupJobID:       jobID,
+		BackupVaultName:   vaultName,
+		BackupVaultArn:    vault.BackupVaultArn,
+		ResourceArn:       resourceArn,
+		ResourceType:      resourceType,
+		State:             "CREATED",
+		StatusMessage:     "Backup job created",
+		CreationDate:      time.Now().UTC(),
 		BackupSizeInBytes: 1073741824, // 1 GB mock
 	}
-	job.lifecycle = lifecycle.NewMachine("CREATED", transitions, s.lcConfig)
-	job.lifecycle.OnTransition(func(from, to lifecycle.State) {
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		job.State = string(to)
-		if to == "COMPLETED" {
-			now := time.Now().UTC()
-			job.CompletionDate = &now
-			job.StatusMessage = "Backup job completed"
 
-			// Create recovery point
-			s.rpSeq++
-			rpArn := fmt.Sprintf("%srecovery-point:%012d", s.arnPrefix(), s.rpSeq)
-			job.RecoveryPointArn = rpArn
-
-			s.recoveryPts[rpArn] = &RecoveryPoint{
-				RecoveryPointArn:  rpArn,
-				BackupVaultName:   vaultName,
-				BackupVaultArn:    vault.BackupVaultArn,
-				ResourceArn:       resourceArn,
-				ResourceType:      resourceType,
-				CreationDate:      now,
-				Status:            "COMPLETED",
-				BackupSizeInBytes: job.BackupSizeInBytes,
-				IsEncrypted:       true,
-			}
-			vault.NumberOfRecoveryPoints++
-		} else if to == "RUNNING" {
-			job.StatusMessage = "Backup job running"
+	// For instant transitions (default config), complete the job synchronously
+	// to avoid race conditions with async lifecycle callbacks.
+	if s.lcConfig.EffectiveDelay(1*time.Second) <= 0 {
+		s.completeJob(job, vault, vaultName, resourceArn, resourceType)
+	} else {
+		transitions := []lifecycle.Transition{
+			{From: "CREATED", To: "RUNNING", Delay: 1 * time.Second},
+			{From: "RUNNING", To: "COMPLETED", Delay: 3 * time.Second},
 		}
-	})
+		job.lifecycle = lifecycle.NewMachine("CREATED", transitions, s.lcConfig)
+		job.lifecycle.OnTransition(func(from, to lifecycle.State) {
+			s.mu.Lock()
+			defer s.mu.Unlock()
+			job.State = string(to)
+			if to == "COMPLETED" {
+				s.completeJob(job, vault, vaultName, resourceArn, resourceType)
+			} else if to == "RUNNING" {
+				job.StatusMessage = "Backup job running"
+			}
+		})
+	}
 
 	s.jobs[jobID] = job
 	return job, nil
+}
+
+// completeJob finalizes a backup job and creates a recovery point. Must be called with s.mu held.
+func (s *Store) completeJob(job *BackupJob, vault *BackupVault, vaultName, resourceArn, resourceType string) {
+	now := time.Now().UTC()
+	job.State = "COMPLETED"
+	job.CompletionDate = &now
+	job.StatusMessage = "Backup job completed"
+
+	s.rpSeq++
+	rpArn := fmt.Sprintf("%srecovery-point:%012d", s.arnPrefix(), s.rpSeq)
+	job.RecoveryPointArn = rpArn
+
+	s.recoveryPts[rpArn] = &RecoveryPoint{
+		RecoveryPointArn:  rpArn,
+		BackupVaultName:   vaultName,
+		BackupVaultArn:    vault.BackupVaultArn,
+		ResourceArn:       resourceArn,
+		ResourceType:      resourceType,
+		CreationDate:      now,
+		Status:            "COMPLETED",
+		BackupSizeInBytes: job.BackupSizeInBytes,
+		IsEncrypted:       true,
+	}
+	vault.NumberOfRecoveryPoints++
 }
 
 // GetBackupJob retrieves a backup job.
@@ -295,6 +333,9 @@ func (s *Store) GetBackupJob(jobID string) (*BackupJob, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, ok := s.jobs[jobID]
+	if ok && job.lifecycle != nil {
+		job.State = string(job.lifecycle.State())
+	}
 	return job, ok
 }
 

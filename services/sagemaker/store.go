@@ -211,6 +211,17 @@ func newUUID() string {
 		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }
 
+// generateModelArtifacts creates an S3 path for training job output.
+func (s *Store) generateModelArtifacts(jobName string, outputDataConfig map[string]any) map[string]any {
+	s3URI := "s3://sagemaker-" + s.region + "-" + s.accountID + "/" + jobName + "/output/model.tar.gz"
+	if outputDataConfig != nil {
+		if s3OutputPath, ok := outputDataConfig["S3OutputPath"].(string); ok && s3OutputPath != "" {
+			s3URI = s3OutputPath + "/" + jobName + "/output/model.tar.gz"
+		}
+	}
+	return map[string]any{"S3ModelArtifacts": s3URI}
+}
+
 // ARN builders.
 
 func (s *Store) notebookARN(name string) string {
@@ -338,27 +349,35 @@ func (s *Store) DeleteNotebookInstance(name string) *service.AWSError {
 
 func (s *Store) StartNotebookInstance(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	nb, ok := s.notebooks[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Notebook instance %s not found", name), http.StatusNotFound)
 	}
-	nb.Lifecycle.ForceState(lifecycle.State(NotebookPending))
 	nb.LastModifiedTime = time.Now().UTC()
+	lc := nb.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(NotebookPending))
+	}
 	return nil
 }
 
 func (s *Store) StopNotebookInstance(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	nb, ok := s.notebooks[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Notebook instance %s not found", name), http.StatusNotFound)
 	}
-	nb.Lifecycle.ForceState(lifecycle.State(NotebookStopped))
 	nb.LastModifiedTime = time.Now().UTC()
+	lc := nb.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(NotebookStopped))
+	}
 	return nil
 }
 
@@ -424,7 +443,7 @@ func (s *Store) CreateTrainingJob(name string, algorithmSpec map[string]any, rol
 		CreationTime:           now,
 		TrainingStartTime:      &startTime,
 		LastModifiedTime:       now,
-		ModelArtifacts:         map[string]any{"S3ModelArtifacts": "s3://output/model.tar.gz"},
+		ModelArtifacts:         s.generateModelArtifacts(name, outputDataConfig),
 		Tags:                   tags,
 		Lifecycle:              lc,
 	}
@@ -463,16 +482,20 @@ func (s *Store) ListTrainingJobs() []*TrainingJob {
 
 func (s *Store) StopTrainingJob(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	tj, ok := s.trainingJobs[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Training job %s not found", name), http.StatusNotFound)
 	}
-	tj.Lifecycle.ForceState(lifecycle.State(TrainingStopped))
 	now := time.Now().UTC()
 	tj.TrainingEndTime = &now
 	tj.SecondaryStatus = "Stopped"
+	lc := tj.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(TrainingStopped))
+	}
 	return nil
 }
 
@@ -657,33 +680,42 @@ func (s *Store) ListEndpoints() []*Endpoint {
 
 func (s *Store) DeleteEndpoint(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	ep, ok := s.endpoints[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Endpoint %s not found", name), http.StatusNotFound)
 	}
-	ep.Lifecycle.ForceState(lifecycle.State(EndpointDeleting))
 	delete(s.endpoints, name)
 	delete(s.tagsByArn, ep.EndpointArn)
+	lc := ep.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(EndpointDeleting))
+	}
 	return nil
 }
 
 func (s *Store) UpdateEndpoint(name, configName string) (*Endpoint, *service.AWSError) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	ep, ok := s.endpoints[name]
 	if !ok {
+		s.mu.Unlock()
 		return nil, service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Endpoint %s not found", name), http.StatusNotFound)
 	}
 	if _, ok := s.endpointConfigs[configName]; !ok {
+		s.mu.Unlock()
 		return nil, service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Endpoint config %s not found", configName), http.StatusNotFound)
 	}
 	ep.EndpointConfigName = configName
 	ep.LastModifiedTime = time.Now().UTC()
-	ep.Lifecycle.ForceState(lifecycle.State(EndpointUpdating))
+	lc := ep.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(EndpointUpdating))
+	}
 	return ep, nil
 }
 
@@ -757,15 +789,19 @@ func (s *Store) ListProcessingJobs() []*ProcessingJob {
 
 func (s *Store) StopProcessingJob(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	pj, ok := s.processingJobs[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Processing job %s not found", name), http.StatusNotFound)
 	}
-	pj.Lifecycle.ForceState(lifecycle.State(ProcessingStopped))
 	now := time.Now().UTC()
 	pj.ProcessingEndTime = &now
+	lc := pj.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(ProcessingStopped))
+	}
 	return nil
 }
 
@@ -837,15 +873,19 @@ func (s *Store) ListTransformJobs() []*TransformJob {
 
 func (s *Store) StopTransformJob(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	tj, ok := s.transformJobs[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFound",
 			fmt.Sprintf("Transform job %s not found", name), http.StatusNotFound)
 	}
-	tj.Lifecycle.ForceState(lifecycle.State(TransformStopped))
 	now := time.Now().UTC()
 	tj.TransformEndTime = &now
+	lc := tj.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(TransformStopped))
+	}
 	return nil
 }
 

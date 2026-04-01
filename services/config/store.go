@@ -56,6 +56,7 @@ type ConfigurationRecorder struct {
 	RoleARN        string
 	RecordingGroup *RecordingGroup
 	IsRecording    bool
+	subscriptionID string // eventbus subscription ID (unexported)
 }
 
 // RecordingGroup controls which resource types are recorded.
@@ -122,6 +123,7 @@ type Store struct {
 	channels          map[string]*DeliveryChannel
 	conformancePacks  map[string]*ConformancePack
 	evaluationResults map[string][]EvaluationResult // keyed by rule name
+	configItems       map[string][]ConfigurationItem // keyed by "resourceType:resourceId"
 	accountID         string
 	region            string
 }
@@ -134,9 +136,18 @@ func NewStore(accountID, region string) *Store {
 		channels:          make(map[string]*DeliveryChannel),
 		conformancePacks:  make(map[string]*ConformancePack),
 		evaluationResults: make(map[string][]EvaluationResult),
+		configItems:       make(map[string][]ConfigurationItem),
 		accountID:         accountID,
 		region:            region,
 	}
+}
+
+// GetConfigHistory returns configuration items for a resource.
+func (s *Store) GetConfigHistory(resourceType, resourceId string) []ConfigurationItem {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key := resourceType + ":" + resourceId
+	return s.configItems[key]
 }
 
 func newUUID() string {

@@ -153,13 +153,7 @@ func handleGetDocumentTextDetection(ctx *service.RequestContext, store *Store) (
 	if j.Status == JobSucceeded {
 		blockMaps := make([]map[string]any, 0, len(j.Blocks))
 		for _, b := range j.Blocks {
-			blockMaps = append(blockMaps, map[string]any{
-				"BlockType":  b.BlockType,
-				"Id":         b.Id,
-				"Text":       b.Text,
-				"Confidence": b.Confidence,
-				"Page":       b.Page,
-			})
+			blockMaps = append(blockMaps, blockToMap(b))
 		}
 		resp["Blocks"] = blockMaps
 		resp["DetectDocumentTextModelVersion"] = "1.0"
@@ -202,13 +196,7 @@ func handleGetDocumentAnalysis(ctx *service.RequestContext, store *Store) (*serv
 	if j.Status == JobSucceeded {
 		blockMaps := make([]map[string]any, 0, len(j.Blocks))
 		for _, b := range j.Blocks {
-			blockMaps = append(blockMaps, map[string]any{
-				"BlockType":  b.BlockType,
-				"Id":         b.Id,
-				"Text":       b.Text,
-				"Confidence": b.Confidence,
-				"Page":       b.Page,
-			})
+			blockMaps = append(blockMaps, blockToMap(b))
 		}
 		resp["Blocks"] = blockMaps
 		resp["AnalyzeDocumentModelVersion"] = "1.0"

@@ -55,6 +55,7 @@ type CASubject struct {
 type CertificateAuthority struct {
 	Arn                    string
 	Type                   string // ROOT or SUBORDINATE
+	ParentCAArn            string // ARN of parent CA for SUBORDINATE type
 	KeyAlgorithm           string
 	SigningAlgorithm       string
 	Subject                CASubject
@@ -71,14 +72,16 @@ type CertificateAuthority struct {
 
 // IssuedCertificate holds metadata for a certificate issued by a private CA.
 type IssuedCertificate struct {
-	CertificateArn    string
-	CertificateBody   string
-	CertificateChain  string
-	Serial            string
-	IssuedAt          time.Time
-	Revoked           bool
-	RevokedAt         *time.Time
-	RevocationReason  RevocationReason
+	CertificateArn          string
+	CertificateBody         string
+	CertificateChain        string
+	Serial                  string
+	IssuedAt                time.Time
+	NotBefore               *time.Time
+	NotAfter                *time.Time
+	Revoked                 bool
+	RevokedAt               *time.Time
+	RevocationReason        RevocationReason
 	CertificateAuthorityArn string
 }
 
@@ -146,7 +149,8 @@ func (s *Store) buildCertArn(caID, certID string) string {
 }
 
 // CreateCA creates a new private certificate authority.
-func (s *Store) CreateCA(caType, keyAlgo, sigAlgo string, subject CASubject, revocationConfig map[string]any, tags []Tag) (*CertificateAuthority, error) {
+// For SUBORDINATE CAs, parentCAArn should reference an existing ROOT or intermediate CA.
+func (s *Store) CreateCA(caType, keyAlgo, sigAlgo string, subject CASubject, revocationConfig map[string]any, tags []Tag, parentCAArn ...string) (*CertificateAuthority, error) {
 	caID := newUUID()
 	arn := s.buildCAArn(caID)
 	now := time.Now().UTC()
@@ -166,9 +170,15 @@ func (s *Store) CreateCA(caType, keyAlgo, sigAlgo string, subject CASubject, rev
 	}
 	lc := lifecycle.NewMachine(lifecycle.State(CAStatusCreating), transitions, s.lcConfig)
 
+	var parentArn string
+	if len(parentCAArn) > 0 {
+		parentArn = parentCAArn[0]
+	}
+
 	ca := &CertificateAuthority{
 		Arn:                    arn,
 		Type:                   caType,
+		ParentCAArn:            parentArn,
 		KeyAlgorithm:           keyAlgo,
 		SigningAlgorithm:       sigAlgo,
 		Subject:                subject,
@@ -244,67 +254,34 @@ func (s *Store) DeleteCA(arn string) *service.AWSError {
 // UpdateCA updates a CA's status and revocation configuration.
 func (s *Store) UpdateCA(arn string, status string, revocationConfig map[string]any) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	ca, ok := s.cas[arn]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Could not find certificate authority %s.", arn), http.StatusBadRequest)
 	}
+	var lc *lifecycle.Machine
 	if status != "" {
 		ca.Status = CAStatus(status)
 		ca.LastStateChangeAt = time.Now().UTC()
-		if ca.Lifecycle != nil {
-			ca.Lifecycle.ForceState(lifecycle.State(status))
-		}
+		lc = ca.Lifecycle
 	}
 	if revocationConfig != nil {
 		ca.RevocationConfiguration = revocationConfig
+	}
+	s.mu.Unlock()
+
+	// ForceState may trigger OnTransition callback that acquires s.mu.
+	if lc != nil {
+		lc.ForceState(lifecycle.State(status))
 	}
 	return nil
 }
 
 // IssueCertificate issues a new certificate from a CA.
+// Deprecated: use IssueCertificateWithValidity for full control.
 func (s *Store) IssueCertificate(caArn string) (*IssuedCertificate, *service.AWSError) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	ca, ok := s.cas[caArn]
-	if !ok {
-		return nil, service.NewAWSError("ResourceNotFoundException",
-			fmt.Sprintf("Could not find certificate authority %s.", caArn), http.StatusBadRequest)
-	}
-	if ca.Lifecycle != nil {
-		ca.Status = CAStatus(ca.Lifecycle.State())
-	}
-	if ca.Status != CAStatusActive {
-		return nil, service.NewAWSError("InvalidStateException",
-			"Certificate authority is not in ACTIVE state.", http.StatusBadRequest)
-	}
-
-	// Extract caID from ARN
-	caID := ""
-	if len(caArn) > 0 {
-		// arn:aws:acm-pca:region:account:certificate-authority/ID
-		parts := splitLast(caArn, "/")
-		if len(parts) == 2 {
-			caID = parts[1]
-		}
-	}
-
-	certID := newUUID()
-	certArn := s.buildCertArn(caID, certID)
-	now := time.Now().UTC()
-
-	cert := &IssuedCertificate{
-		CertificateArn:          certArn,
-		CertificateBody:         "-----BEGIN CERTIFICATE-----\nMIIBmocked...\n-----END CERTIFICATE-----",
-		CertificateChain:        "-----BEGIN CERTIFICATE-----\nMIIBchain...\n-----END CERTIFICATE-----",
-		Serial:                  generateSerial(),
-		IssuedAt:                now,
-		CertificateAuthorityArn: caArn,
-	}
-
-	s.certs[certArn] = cert
-	return cert, nil
+	return s.IssueCertificateWithValidity(caArn, 365, "")
 }
 
 // GetCertificate returns an issued certificate.

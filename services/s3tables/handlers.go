@@ -2,6 +2,7 @@ package s3tables
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -36,6 +37,9 @@ func handleCreateTableBucket(params map[string]any, store *Store) (*service.Resp
 	}
 	bucket, err := store.CreateTableBucket(name)
 	if err != nil {
+		if strings.Contains(err.Error(), "invalid bucket name") {
+			return jsonErr(service.ErrValidation(err.Error()))
+		}
 		return jsonErr(service.ErrAlreadyExists("TableBucket", name))
 	}
 	return jsonOK(map[string]any{"arn": bucket.TableBucketARN})

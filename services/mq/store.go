@@ -205,16 +205,20 @@ func (s *Store) ListBrokers() []*Broker {
 
 func (s *Store) DeleteBroker(brokerId string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	b, ok := s.brokers[brokerId]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("NotFoundException",
 			fmt.Sprintf("Broker %s not found", brokerId), http.StatusNotFound)
 	}
-	b.Lifecycle.ForceState(lifecycle.State(BrokerDeletionInProgress))
 	delete(s.brokers, brokerId)
 	delete(s.tagsByArn, b.BrokerArn)
 	delete(s.users, brokerId)
+	lc := b.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(BrokerDeletionInProgress))
+	}
 	return nil
 }
 
@@ -240,13 +244,17 @@ func (s *Store) UpdateBroker(brokerId string, hostInstanceType, engineVersion st
 
 func (s *Store) RebootBroker(brokerId string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	b, ok := s.brokers[brokerId]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("NotFoundException",
 			fmt.Sprintf("Broker %s not found", brokerId), http.StatusNotFound)
 	}
-	b.Lifecycle.ForceState(lifecycle.State(BrokerRebootInProgress))
+	lc := b.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(BrokerRebootInProgress))
+	}
 	return nil
 }
 

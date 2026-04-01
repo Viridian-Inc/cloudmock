@@ -63,6 +63,8 @@ type Deployment struct {
 	StartedAt              time.Time
 	CompletedAt            *time.Time
 	PercentageComplete     float64
+	GrowthType             string  // LINEAR or EXPONENTIAL
+	GrowthFactor           float64
 	Lifecycle              *lifecycle.Machine
 	Tags                   map[string]string
 }
@@ -444,10 +446,19 @@ func (s *Store) StartDeployment(appID, envID, strategyID, profileID, configVersi
 	s.nextDeployNum[key]++
 	num := s.nextDeployNum[key]
 
+	strategy := s.deploymentStrategies[strategyID]
+
+	// Compute deployment steps based on strategy.
+	initialPct := strategy.GrowthFactor
+	if initialPct <= 0 {
+		initialPct = 100.0
+	}
+
 	transitions := []lifecycle.Transition{
+		{From: "DEPLOYING", To: "BAKING", Delay: 3 * time.Second},
 		{From: "BAKING", To: "COMPLETE", Delay: 5 * time.Second},
 	}
-	lm := lifecycle.NewMachine("BAKING", transitions, s.lifecycleConfig)
+	lm := lifecycle.NewMachine("DEPLOYING", transitions, s.lifecycleConfig)
 
 	now := time.Now().UTC()
 	dep := &Deployment{
@@ -457,10 +468,12 @@ func (s *Store) StartDeployment(appID, envID, strategyID, profileID, configVersi
 		ConfigurationProfileID: profileID,
 		ConfigurationVersion:   configVersion,
 		DeploymentNumber:       num,
-		State:                  "BAKING",
+		State:                  "DEPLOYING",
 		Description:            description,
 		StartedAt:              now,
-		PercentageComplete:     100.0,
+		PercentageComplete:     initialPct,
+		GrowthType:             strategy.GrowthType,
+		GrowthFactor:           strategy.GrowthFactor,
 		Lifecycle:              lm,
 		Tags:                   tags,
 	}
@@ -469,11 +482,33 @@ func (s *Store) StartDeployment(appID, envID, strategyID, profileID, configVersi
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		dep.State = string(to)
+		if string(to) == "BAKING" {
+			// Advance percentage based on growth type.
+			if dep.GrowthType == "EXPONENTIAL" {
+				dep.PercentageComplete = dep.PercentageComplete * 2
+			} else {
+				// LINEAR: add growth factor each step.
+				dep.PercentageComplete = dep.PercentageComplete + dep.GrowthFactor
+			}
+			if dep.PercentageComplete > 100.0 {
+				dep.PercentageComplete = 100.0
+			}
+		}
 		if string(to) == "COMPLETE" {
+			dep.PercentageComplete = 100.0
 			t := time.Now().UTC()
 			dep.CompletedAt = &t
 		}
 	})
+
+	// In instant mode, the machine may have already transitioned.
+	currentState := string(lm.State())
+	dep.State = currentState
+	if currentState == "COMPLETE" {
+		dep.PercentageComplete = 100.0
+		t := time.Now().UTC()
+		dep.CompletedAt = &t
+	}
 
 	if s.deployments[appID] == nil {
 		s.deployments[appID] = make(map[string][]*Deployment)
@@ -526,26 +561,38 @@ func (s *Store) ListDeployments(appID, envID string) ([]*Deployment, bool) {
 // StopDeployment stops a deployment.
 func (s *Store) StopDeployment(appID, envID string, deploymentNumber int) (*Deployment, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	deps, ok := s.deployments[appID]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	envDeps, ok := deps[envID]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
+	var found *Deployment
 	for _, dep := range envDeps {
 		if dep.DeploymentNumber == deploymentNumber {
-			dep.Lifecycle.Stop()
-			dep.Lifecycle.ForceState("ROLLED_BACK")
-			dep.State = "ROLLED_BACK"
-			t := time.Now().UTC()
-			dep.CompletedAt = &t
-			return dep, true
+			found = dep
+			break
 		}
 	}
-	return nil, false
+	if found == nil {
+		s.mu.Unlock()
+		return nil, false
+	}
+	lc := found.Lifecycle
+	found.State = "ROLLED_BACK"
+	t := time.Now().UTC()
+	found.CompletedAt = &t
+	s.mu.Unlock()
+
+	// ForceState may trigger OnTransition callback that acquires s.mu.
+	lc.Stop()
+	lc.ForceState("ROLLED_BACK")
+
+	return found, true
 }
 
 // TagResource applies tags to a resource by ARN.

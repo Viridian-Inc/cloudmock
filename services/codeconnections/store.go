@@ -105,6 +105,10 @@ func (s *Store) CreateConnection(name, providerType, hostARN string, tags map[st
 	if providerType == "" && hostARN == "" {
 		return nil, service.ErrValidation("Either ProviderType or HostArn is required.")
 	}
+	validProviders := map[string]bool{"GitHub": true, "Bitbucket": true, "GitLab": true, "GitHubEnterpriseServer": true}
+	if providerType != "" && !validProviders[providerType] {
+		return nil, service.ErrValidation("Invalid ProviderType. Must be one of: GitHub, Bitbucket, GitLab, GitHubEnterpriseServer")
+	}
 
 	// Check for duplicate name
 	for _, c := range s.connections {
@@ -198,19 +202,25 @@ func (s *Store) DeleteConnection(arn string) *service.AWSError {
 
 func (s *Store) UpdateConnectionStatus(arn, status string) (*Connection, *service.AWSError) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	conn, ok := s.connections[arn]
 	if !ok {
+		s.mu.Unlock()
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Connection not found: %s", arn), http.StatusNotFound)
 	}
-
-	if conn.lifecycle != nil {
-		conn.lifecycle.Stop()
-		conn.lifecycle.ForceState(lifecycle.State(status))
-	}
+	lc := conn.lifecycle
 	conn.ConnectionStatus = status
+	s.mu.Unlock()
+
+	// ForceState triggers OnTransition callback which may acquire s.mu,
+	// so we must not hold the lock here.
+	if lc != nil {
+		lc.Stop()
+		lc.ForceState(lifecycle.State(status))
+	}
+
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	return conn, nil
 }
 
@@ -228,6 +238,19 @@ func (s *Store) CreateHost(name, providerType, providerEndpoint string, vpcConfi
 	}
 	if providerEndpoint == "" {
 		return nil, service.ErrValidation("ProviderEndpoint is required.")
+	}
+
+	// Validate VPC configuration if provided
+	if vpcConfig != nil {
+		if vpcConfig.VpcID == "" {
+			return nil, service.ErrValidation("VpcConfiguration.VpcId is required when VpcConfiguration is provided.")
+		}
+		if len(vpcConfig.SubnetIDs) == 0 {
+			return nil, service.ErrValidation("VpcConfiguration.SubnetIds must have at least one subnet.")
+		}
+		if len(vpcConfig.SecurityGroupIDs) == 0 {
+			return nil, service.ErrValidation("VpcConfiguration.SecurityGroupIds must have at least one security group.")
+		}
 	}
 
 	if tags == nil {

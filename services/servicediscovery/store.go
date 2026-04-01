@@ -65,10 +65,11 @@ type HealthCheckConfig struct {
 
 // Instance represents an instance registered with a service.
 type Instance struct {
-	ID         string
-	ServiceID  string
-	Attributes map[string]string
-	Tags       map[string]string
+	ID           string
+	ServiceID    string
+	Attributes   map[string]string
+	Tags         map[string]string
+	HealthStatus string // HEALTHY, UNHEALTHY, UNKNOWN
 }
 
 // Store manages all Service Discovery state in memory.
@@ -266,6 +267,7 @@ func (s *Store) RegisterInstance(serviceID, instanceID string, attributes map[st
 	inst := &Instance{
 		ID: instanceID, ServiceID: serviceID,
 		Attributes: attributes, Tags: make(map[string]string),
+		HealthStatus: "HEALTHY",
 	}
 	if s.instances[serviceID] == nil {
 		s.instances[serviceID] = make(map[string]*Instance)
@@ -321,7 +323,8 @@ func (s *Store) ListInstances(serviceID string) ([]*Instance, bool) {
 }
 
 // DiscoverInstances finds instances by namespace and service name.
-func (s *Store) DiscoverInstances(namespaceName, serviceName string, queryParams map[string]string) []*Instance {
+// Only returns HEALTHY instances, matching AWS behavior.
+func (s *Store) DiscoverInstances(namespaceName, serviceName string, queryParams map[string]string, healthFilter string) []*Instance {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	// Find namespace by name
@@ -349,6 +352,13 @@ func (s *Store) DiscoverInstances(namespaceName, serviceName string, queryParams
 	insts := s.instances[svcID]
 	result := make([]*Instance, 0, len(insts))
 	for _, inst := range insts {
+		// Filter by health status (default: HEALTHY only).
+		if healthFilter == "" {
+			healthFilter = "HEALTHY"
+		}
+		if healthFilter != "ALL" && inst.HealthStatus != healthFilter {
+			continue
+		}
 		match := true
 		for k, v := range queryParams {
 			if inst.Attributes[k] != v {
@@ -361,6 +371,34 @@ func (s *Store) DiscoverInstances(namespaceName, serviceName string, queryParams
 		}
 	}
 	return result
+}
+
+// UpdateInstanceCustomHealthStatus updates the health status of an instance.
+func (s *Store) UpdateInstanceCustomHealthStatus(serviceID, instanceID, status string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	insts, ok := s.instances[serviceID]
+	if !ok {
+		return false
+	}
+	inst, ok := insts[instanceID]
+	if !ok {
+		return false
+	}
+	inst.HealthStatus = status
+	return true
+}
+
+// GetNamespaceByName returns a namespace by name.
+func (s *Store) GetNamespaceByName(name string) (*Namespace, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, ns := range s.namespaces {
+		if ns.Name == name {
+			return ns, true
+		}
+	}
+	return nil, false
 }
 
 // TagResource applies tags to a resource by ARN.

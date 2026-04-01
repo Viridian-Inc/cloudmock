@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -221,7 +222,7 @@ type xmlCreateAutoScalingGroupResponse struct {
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
-func handleCreateAutoScalingGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handleCreateAutoScalingGroup(ctx *service.RequestContext, store *Store, locator ServiceLocator, bus *eventbus.Bus) (*service.Response, error) {
 	form := parseForm(ctx)
 	name := form.Get("AutoScalingGroupName")
 	if name == "" {
@@ -259,8 +260,8 @@ func handleCreateAutoScalingGroup(ctx *service.RequestContext, store *Store) (*s
 		tagMap[t.Key] = t.Value
 	}
 
-	_, ok := store.CreateAutoScalingGroup(name, lcName, vpcZoneID, healthCheckType,
-		minSize, maxSize, desiredCapacity, cooldown, hcGrace, azs, tgARNs, tagMap)
+	_, ok := store.CreateAutoScalingGroupWithEC2(name, lcName, vpcZoneID, healthCheckType,
+		minSize, maxSize, desiredCapacity, cooldown, hcGrace, azs, tgARNs, tagMap, locator, bus)
 	if !ok {
 		return xmlErr(service.NewAWSError("AlreadyExists",
 			"AutoScalingGroup by this name already exists - "+name, http.StatusConflict))
@@ -311,7 +312,7 @@ type xmlUpdateAutoScalingGroupResponse struct {
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
-func handleUpdateAutoScalingGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handleUpdateAutoScalingGroup(ctx *service.RequestContext, store *Store, locator ServiceLocator, bus *eventbus.Bus) (*service.Response, error) {
 	form := parseForm(ctx)
 	name := form.Get("AutoScalingGroupName")
 	if name == "" {
@@ -342,8 +343,8 @@ func handleUpdateAutoScalingGroup(ctx *service.RequestContext, store *Store) (*s
 		hcGrace, _ = strconv.Atoi(v)
 	}
 
-	_, ok := store.UpdateAutoScalingGroup(name, lcName, vpcZoneID, healthCheckType,
-		minSize, maxSize, desiredCapacity, cooldown, hcGrace)
+	_, ok := store.UpdateAutoScalingGroupWithEC2(name, lcName, vpcZoneID, healthCheckType,
+		minSize, maxSize, desiredCapacity, cooldown, hcGrace, locator, bus)
 	if !ok {
 		return xmlErr(service.NewAWSError("ResourceNotFound",
 			"AutoScalingGroup '"+name+"' not found.", http.StatusNotFound))
@@ -363,14 +364,14 @@ type xmlDeleteAutoScalingGroupResponse struct {
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
-func handleDeleteAutoScalingGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handleDeleteAutoScalingGroup(ctx *service.RequestContext, store *Store, locator ServiceLocator, bus *eventbus.Bus) (*service.Response, error) {
 	form := parseForm(ctx)
 	name := form.Get("AutoScalingGroupName")
 	if name == "" {
 		return xmlErr(service.ErrValidation("AutoScalingGroupName is required."))
 	}
 
-	if !store.DeleteAutoScalingGroup(name) {
+	if !store.DeleteAutoScalingGroupWithEC2(name, locator, bus) {
 		return xmlErr(service.NewAWSError("ResourceNotFound",
 			"AutoScalingGroup '"+name+"' not found.", http.StatusNotFound))
 	}
@@ -389,7 +390,7 @@ type xmlSetDesiredCapacityResponse struct {
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
-func handleSetDesiredCapacity(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+func handleSetDesiredCapacity(ctx *service.RequestContext, store *Store, locator ServiceLocator, bus *eventbus.Bus) (*service.Response, error) {
 	form := parseForm(ctx)
 	name := form.Get("AutoScalingGroupName")
 	if name == "" {
@@ -400,7 +401,7 @@ func handleSetDesiredCapacity(ctx *service.RequestContext, store *Store) (*servi
 		capacity, _ = strconv.Atoi(v)
 	}
 
-	if !store.SetDesiredCapacity(name, capacity) {
+	if !store.SetDesiredCapacityWithEC2(name, capacity, locator, bus) {
 		return xmlErr(service.NewAWSError("ResourceNotFound",
 			"AutoScalingGroup '"+name+"' not found.", http.StatusNotFound))
 	}

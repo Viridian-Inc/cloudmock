@@ -2,9 +2,14 @@ package identitystore
 
 import (
 	"net/http"
+	"regexp"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+var emailRegex = regexp.MustCompile(`^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$`)
+var phoneRegex = regexp.MustCompile(`^\+[1-9]\d{1,14}$`)
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -83,10 +88,35 @@ func handleCreateUser(params map[string]any, store *Store) (*service.Response, e
 	if es, ok := params["Emails"].([]any); ok {
 		for _, e := range es {
 			if em, ok := e.(map[string]any); ok {
+				value := str(em, "Value")
+				if value != "" && !emailRegex.MatchString(value) {
+					return jsonErr(service.ErrValidation("Invalid email format: " + value))
+				}
 				primary, _ := em["Primary"].(bool)
 				emails = append(emails, Email{
-					Value:   str(em, "Value"),
+					Value:   value,
 					Type:    str(em, "Type"),
+					Primary: primary,
+				})
+			}
+		}
+	}
+
+	var phoneNumbers []PhoneNumber
+	if pns, ok := params["PhoneNumbers"].([]any); ok {
+		for _, p := range pns {
+			if pm, ok := p.(map[string]any); ok {
+				value := str(pm, "Value")
+				if value != "" {
+					cleaned := strings.ReplaceAll(value, "-", "")
+					if !phoneRegex.MatchString(cleaned) {
+						return jsonErr(service.ErrValidation("Invalid phone number format: " + value))
+					}
+				}
+				primary, _ := pm["Primary"].(bool)
+				phoneNumbers = append(phoneNumbers, PhoneNumber{
+					Value:   value,
+					Type:    str(pm, "Type"),
 					Primary: primary,
 				})
 			}
@@ -202,6 +232,17 @@ func handleCreateGroupMembership(params map[string]any, store *Store) (*service.
 	}
 	if identityStoreID == "" || groupID == "" || memberID == "" {
 		return jsonErr(service.ErrValidation("IdentityStoreId, GroupId, and MemberId.UserId are required"))
+	}
+
+	// Validate group exists
+	if _, ok := store.GetGroup(identityStoreID, groupID); !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Group not found: "+groupID, http.StatusNotFound))
+	}
+	// Validate user exists
+	if _, ok := store.GetUser(identityStoreID, memberID); !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"User not found: "+memberID, http.StatusNotFound))
 	}
 
 	membership, err := store.CreateGroupMembership(identityStoreID, groupID, memberID)

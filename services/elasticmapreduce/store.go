@@ -2,11 +2,16 @@ package elasticmapreduce
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"sync"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/mocklog"
+	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // Cluster represents an EMR cluster.
@@ -78,15 +83,22 @@ type InstanceGroupStatus struct {
 	State string
 }
 
+// ServiceLocator resolves other services by name.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
+
 // Store manages all EMR resources in memory.
 type Store struct {
-	mu             sync.RWMutex
-	clusters       map[string]*Cluster
-	steps          map[string][]*Step          // clusterID -> steps
-	instanceGroups map[string][]*InstanceGroup // clusterID -> groups
-	accountID      string
-	region         string
-	lcConfig       *lifecycle.Config
+	mu              sync.RWMutex
+	clusters        map[string]*Cluster
+	steps           map[string][]*Step          // clusterID -> steps
+	instanceGroups  map[string][]*InstanceGroup // clusterID -> groups
+	ec2InstanceIDs  map[string][]string         // clusterID -> EC2 instance IDs
+	accountID       string
+	region          string
+	lcConfig        *lifecycle.Config
+	locator         ServiceLocator
 }
 
 // NewStore creates a new EMR Store.
@@ -95,10 +107,18 @@ func NewStore(accountID, region string) *Store {
 		clusters:       make(map[string]*Cluster),
 		steps:          make(map[string][]*Step),
 		instanceGroups: make(map[string][]*InstanceGroup),
+		ec2InstanceIDs: make(map[string][]string),
 		accountID:      accountID,
 		region:         region,
 		lcConfig:       lifecycle.DefaultConfig(),
 	}
+}
+
+// SetLocator sets the service locator for cross-service lookups.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
 }
 
 func newID() string {
@@ -139,7 +159,6 @@ func clusterTransitions() []lifecycle.Transition {
 
 func (s *Store) RunJobFlow(name, releaseLabel, logUri, serviceRole, jobFlowRole string, apps []Application, tags map[string]string) *Cluster {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	id := newID()
 	c := &Cluster{
 		ID:                  id,
@@ -156,10 +175,77 @@ func (s *Store) RunJobFlow(name, releaseLabel, logUri, serviceRole, jobFlowRole 
 		Lifecycle:           lifecycle.NewMachine("STARTING", clusterTransitions(), s.lcConfig),
 		Status:              ClusterStatus{State: "STARTING"},
 	}
+
+	// Register callback to create EC2 instances when cluster reaches RUNNING
+	locator := s.locator
+	clusterID := id
+	c.Lifecycle.OnTransition(func(from, to lifecycle.State) {
+		if string(to) == "RUNNING" {
+			s.createEC2InstancesForCluster(clusterID, locator)
+		}
+	})
+
 	s.clusters[id] = c
 	s.steps[id] = make([]*Step, 0)
 	s.instanceGroups[id] = make([]*InstanceGroup, 0)
+	s.ec2InstanceIDs[id] = make([]string, 0)
+	s.mu.Unlock()
 	return c
+}
+
+// createEC2InstancesForCluster creates mock EC2 instances for all instance groups.
+func (s *Store) createEC2InstancesForCluster(clusterID string, locator ServiceLocator) {
+	if locator == nil {
+		return
+	}
+	ec2Svc, err := locator.Lookup("ec2")
+	if err != nil || ec2Svc == nil {
+		return
+	}
+
+	s.mu.RLock()
+	groups := s.instanceGroups[clusterID]
+	totalInstances := 0
+	for _, g := range groups {
+		totalInstances += g.InstanceCount
+	}
+	s.mu.RUnlock()
+
+	if totalInstances == 0 {
+		totalInstances = 1 // at least a master
+	}
+
+	// Launch EC2 instances
+	body, _ := json.Marshal(map[string]any{
+		"ImageId":      "ami-emr-" + clusterID,
+		"InstanceType": "m5.xlarge",
+		"MinCount":     totalInstances,
+		"MaxCount":     totalInstances,
+	})
+	ctx := &service.RequestContext{
+		Action:     "RunInstances",
+		Body:       body,
+		RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+	}
+	resp, err := ec2Svc.HandleRequest(ctx)
+	if err != nil || resp == nil || resp.Body == nil {
+		return
+	}
+
+	// Parse instance IDs from response
+	data, _ := json.Marshal(resp.Body)
+	var result struct {
+		Instances []struct {
+			InstanceId string `json:"InstanceId"`
+		} `json:"Instances"`
+	}
+	if json.Unmarshal(data, &result) == nil {
+		s.mu.Lock()
+		for _, inst := range result.Instances {
+			s.ec2InstanceIDs[clusterID] = append(s.ec2InstanceIDs[clusterID], inst.InstanceId)
+		}
+		s.mu.Unlock()
+	}
 }
 
 func (s *Store) GetCluster(id string) (*Cluster, bool) {
@@ -191,12 +277,38 @@ func (s *Store) ListClusters(states []string) []*Cluster {
 
 func (s *Store) TerminateJobFlows(ids []string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	var toTerminate []*lifecycle.Machine
+	var instanceIDsToTerminate []string
+	locator := s.locator
 	for _, id := range ids {
 		if c, ok := s.clusters[id]; ok {
 			if !c.TerminationProtected {
-				c.Lifecycle.ForceState("TERMINATING")
+				toTerminate = append(toTerminate, c.Lifecycle)
+				instanceIDsToTerminate = append(instanceIDsToTerminate, s.ec2InstanceIDs[id]...)
 			}
+		}
+	}
+	s.mu.Unlock()
+
+	for _, lc := range toTerminate {
+		if lc != nil {
+			lc.ForceState("TERMINATING")
+		}
+	}
+
+	// Terminate EC2 instances via locator
+	if locator != nil && len(instanceIDsToTerminate) > 0 {
+		ec2Svc, err := locator.Lookup("ec2")
+		if err == nil && ec2Svc != nil {
+			body, _ := json.Marshal(map[string]any{
+				"InstanceIds": instanceIDsToTerminate,
+			})
+			ctx := &service.RequestContext{
+				Action:     "TerminateInstances",
+				Body:       body,
+				RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+			}
+			_, _ = ec2Svc.HandleRequest(ctx)
 		}
 	}
 }
@@ -225,18 +337,38 @@ func (s *Store) SetVisibleToAllUsers(ids []string, visible bool) {
 
 func (s *Store) AddSteps(clusterID string, steps []Step) ([]string, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.clusters[clusterID]; !ok {
+	c, ok := s.clusters[clusterID]
+	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
+	locator := s.locator
+	logUri := c.LogUri
 	ids := make([]string, len(steps))
 	for i := range steps {
 		steps[i].ID = newStepID()
+		// Steps transition: PENDING → RUNNING → COMPLETED
 		steps[i].Status.State = "COMPLETED"
 		ids[i] = steps[i].ID
 		step := steps[i]
 		s.steps[clusterID] = append(s.steps[clusterID], &step)
 	}
+	s.mu.Unlock()
+
+	// Write mock execution logs for each step
+	if locator != nil {
+		writer := mocklog.NewWriter(locator)
+		for _, step := range steps {
+			logGroup := "/aws/emr/steps"
+			if logUri != "" {
+				logGroup = logUri + "/steps"
+			}
+			phases := []string{"SETUP", "EXECUTE", "CLEANUP"}
+			lines := mocklog.GenerateBuildLines("emr-step", step.ID, phases)
+			writer.WriteBuildLog(logGroup, clusterID+"/"+step.ID, lines)
+		}
+	}
+
 	return ids, true
 }
 
@@ -261,8 +393,8 @@ func (s *Store) GetStep(clusterID, stepID string) (*Step, bool) {
 
 func (s *Store) AddInstanceGroups(clusterID string, groups []InstanceGroup) ([]string, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, ok := s.clusters[clusterID]; !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	ids := make([]string, len(groups))
@@ -274,6 +406,7 @@ func (s *Store) AddInstanceGroups(clusterID string, groups []InstanceGroup) ([]s
 		g := groups[i]
 		s.instanceGroups[clusterID] = append(s.instanceGroups[clusterID], &g)
 	}
+	s.mu.Unlock()
 	return ids, true
 }
 

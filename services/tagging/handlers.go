@@ -2,6 +2,7 @@ package tagging
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -35,14 +36,16 @@ func handleGetResources(params map[string]any, store *Store) (*service.Response,
 		}
 	}
 
-	resourceTypeFilter := ""
-	if v, ok := params["ResourceTypeFilters"].([]any); ok && len(v) > 0 {
-		if sv, ok := v[0].(string); ok {
-			resourceTypeFilter = sv
+	var resourceTypeFilters []string
+	if v, ok := params["ResourceTypeFilters"].([]any); ok {
+		for _, item := range v {
+			if sv, ok := item.(string); ok {
+				resourceTypeFilters = append(resourceTypeFilters, sv)
+			}
 		}
 	}
 
-	entries := store.GetResources(filters, resourceTypeFilter)
+	entries := store.GetResources(filters, resourceTypeFilters)
 	out := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
 		tags := make([]map[string]any, 0, len(entry.Tags))
@@ -50,8 +53,13 @@ func handleGetResources(params map[string]any, store *Store) (*service.Response,
 			tags = append(tags, map[string]any{"Key": k, "Value": v})
 		}
 		out = append(out, map[string]any{
-			"ResourceARN": entry.ARN,
-			"Tags":        tags,
+			"ResourceARN":  entry.ARN,
+			"Tags":         tags,
+			"ComplianceDetails": map[string]any{
+				"NoncompliantKeys":    []string{},
+				"KeysWithNoncompliantValues": []string{},
+				"ComplianceStatus":    true,
+			},
 		})
 	}
 
@@ -93,6 +101,10 @@ func handleTagResources(params map[string]any, store *Store) (*service.Response,
 			}
 		}
 	}
+	if len(arns) == 0 {
+		return jsonErr(service.NewAWSError("InvalidParameterException",
+			"ResourceARNList must contain at least one ARN.", http.StatusBadRequest))
+	}
 
 	tags := make(map[string]string)
 	if v, ok := params["Tags"].(map[string]any); ok {
@@ -100,6 +112,26 @@ func handleTagResources(params map[string]any, store *Store) (*service.Response,
 			if sv, ok := val.(string); ok {
 				tags[k] = sv
 			}
+		}
+	}
+	if len(tags) == 0 {
+		return jsonErr(service.NewAWSError("InvalidParameterException",
+			"Tags must contain at least one tag.", http.StatusBadRequest))
+	}
+
+	// Validate tag key length (max 128 chars) and value length (max 256 chars).
+	for k, v := range tags {
+		if len(k) > 128 {
+			return jsonErr(service.NewAWSError("InvalidParameterException",
+				"Tag key exceeds maximum length of 128 characters.", http.StatusBadRequest))
+		}
+		if len(v) > 256 {
+			return jsonErr(service.NewAWSError("InvalidParameterException",
+				"Tag value exceeds maximum length of 256 characters.", http.StatusBadRequest))
+		}
+		if strings.HasPrefix(k, "aws:") {
+			return jsonErr(service.NewAWSError("InvalidParameterException",
+				"Tag keys beginning with 'aws:' are reserved.", http.StatusBadRequest))
 		}
 	}
 
@@ -131,5 +163,26 @@ func handleUntagResources(params map[string]any, store *Store) (*service.Respons
 	failedMap := store.UntagResources(arns, tagKeys)
 	return jsonOK(map[string]any{
 		"FailedResourcesMap": failedMap,
+	})
+}
+
+func handleGetComplianceSummary(store *Store) (*service.Response, error) {
+	store.mu.RLock()
+	totalResources := len(store.resources)
+	store.mu.RUnlock()
+
+	return jsonOK(map[string]any{
+		"SummaryList": []map[string]any{
+			{
+				"LastUpdated":        "2024-01-01T00:00:00Z",
+				"NonCompliantResources": 0,
+				"TargetId":           "",
+				"TargetIdType":       "",
+				"Region":            store.region,
+				"ResourceType":      "",
+				"ComplianceStatus": totalResources > 0,
+			},
+		},
+		"PaginationToken": "",
 	})
 }

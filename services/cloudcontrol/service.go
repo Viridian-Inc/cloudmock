@@ -7,9 +7,15 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// ServiceLocator provides access to other services for cross-service communication.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
+
 // CloudControlService is the cloudmock implementation of the AWS Cloud Control API.
 type CloudControlService struct {
 	store     *Store
+	locator   ServiceLocator
 	accountID string
 	region    string
 }
@@ -17,6 +23,19 @@ type CloudControlService struct {
 // New returns a new CloudControlService for the given AWS account ID and region.
 func New(accountID, region string) *CloudControlService {
 	return &CloudControlService{store: NewStore(accountID, region), accountID: accountID, region: region}
+}
+
+// SetLocator sets the service locator for cross-service resource type mapping.
+func (s *CloudControlService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
+}
+
+// ResourceTypeToService maps Cloud Control resource type names to cloudmock service names.
+var ResourceTypeToService = map[string]string{
+	"AWS::S3::Bucket":      "s3",
+	"AWS::DynamoDB::Table": "dynamodb",
+	"AWS::SQS::Queue":      "sqs",
+	"AWS::SNS::Topic":      "sns",
 }
 
 // Name returns the AWS service name used for routing.
@@ -47,7 +66,7 @@ func (s *CloudControlService) HandleRequest(ctx *service.RequestContext) (*servi
 
 	switch ctx.Action {
 	case "CreateResource":
-		return handleCreateResource(params, s.store)
+		return handleCreateResource(params, s.store, s.locator, ctx)
 	case "GetResource":
 		return handleGetResource(params, s.store)
 	case "ListResources":

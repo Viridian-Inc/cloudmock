@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -193,6 +194,18 @@ func (s *Store) CreatePolicy(storeId string, definition map[string]any) (*Policy
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			"Policy store not found.", http.StatusNotFound)
 	}
+	// Validate Cedar policy statement if static
+	if staticDef, ok := definition["static"].(map[string]any); ok {
+		if stmt, ok := staticDef["statement"].(string); ok && stmt != "" {
+			stmtLower := strings.ToLower(strings.TrimSpace(stmt))
+			if !strings.HasPrefix(stmtLower, "permit") && !strings.HasPrefix(stmtLower, "forbid") {
+				return nil, service.NewAWSError("ValidationException",
+					"Cedar policy statement must start with 'permit' or 'forbid'.",
+					http.StatusBadRequest)
+			}
+		}
+	}
+
 	policyId := newID()
 	now := time.Now().UTC()
 	policyType := "STATIC"

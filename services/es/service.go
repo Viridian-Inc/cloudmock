@@ -37,6 +37,9 @@ func (s *ESService) Actions() []service.Action {
 		{Name: "AddTags", Method: http.MethodPost, IAMAction: "es:AddTags"},
 		{Name: "RemoveTags", Method: http.MethodPost, IAMAction: "es:RemoveTags"},
 		{Name: "ListTags", Method: http.MethodPost, IAMAction: "es:ListTags"},
+		{Name: "IndexDocument", Method: http.MethodPost, IAMAction: "es:ESHttpPut"},
+		{Name: "Search", Method: http.MethodPost, IAMAction: "es:ESHttpGet"},
+		{Name: "ClusterHealth", Method: http.MethodPost, IAMAction: "es:ESHttpGet"},
 	}
 }
 
@@ -70,6 +73,12 @@ func (s *ESService) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		return handleRemoveTags(ctx, s.store)
 	case "ListTags":
 		return handleListTags(ctx, s.store)
+	case "IndexDocument":
+		return handleIndexDocument(ctx, s.store)
+	case "Search":
+		return handleSearch(ctx, s.store)
+	case "ClusterHealth":
+		return handleClusterHealth(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

@@ -27,11 +27,20 @@ type clusterJSON struct {
 	Status                 string            `json:"status"`
 	Endpoint               string            `json:"endpoint,omitempty"`
 	CertificateAuthority   *certAuthJSON     `json:"certificateAuthority,omitempty"`
+	Identity               *identityJSON     `json:"identity,omitempty"`
 	PlatformVersion        string            `json:"platformVersion,omitempty"`
 	ResourcesVpcConfig     *vpcConfigJSON    `json:"resourcesVpcConfig,omitempty"`
 	KubernetesNetworkConfig *kubeNetJSON     `json:"kubernetesNetworkConfig,omitempty"`
 	CreatedAt              string            `json:"createdAt,omitempty"`
 	Tags                   map[string]string `json:"tags,omitempty"`
+}
+
+type identityJSON struct {
+	Oidc *oidcJSON `json:"oidc,omitempty"`
+}
+
+type oidcJSON struct {
+	Issuer string `json:"issuer"`
 }
 
 type certAuthJSON struct {
@@ -124,6 +133,9 @@ func clusterToJSON(c *Cluster) clusterJSON {
 	}
 	if c.CertificateAuthority != "" {
 		j.CertificateAuthority = &certAuthJSON{Data: c.CertificateAuthority}
+	}
+	if c.OIDCIssuer != "" {
+		j.Identity = &identityJSON{Oidc: &oidcJSON{Issuer: c.OIDCIssuer}}
 	}
 	j.ResourcesVpcConfig = &vpcConfigJSON{
 		SubnetIds:              c.SubnetIDs,

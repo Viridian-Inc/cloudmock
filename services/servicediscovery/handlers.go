@@ -15,6 +15,10 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
+func emptyOK() (*service.Response, error) {
+	return &service.Response{StatusCode: http.StatusOK, Body: struct{}{}, Format: service.FormatJSON}, nil
+}
+
 func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
@@ -547,18 +551,44 @@ func handleDiscoverInstances(ctx *service.RequestContext, store *Store) (*servic
 	if req.NamespaceName == "" || req.ServiceName == "" {
 		return jsonErr(service.ErrValidation("NamespaceName and ServiceName are required."))
 	}
-	instances := store.DiscoverInstances(req.NamespaceName, req.ServiceName, req.QueryParameters)
+	healthFilter := req.HealthStatus
+	instances := store.DiscoverInstances(req.NamespaceName, req.ServiceName, req.QueryParameters, healthFilter)
 	items := make([]httpInstanceSummaryJSON, 0, len(instances))
 	for _, inst := range instances {
 		items = append(items, httpInstanceSummaryJSON{
 			InstanceId:    inst.ID,
 			NamespaceName: req.NamespaceName,
 			ServiceName:   req.ServiceName,
-			HealthStatus:  "HEALTHY",
+			HealthStatus:  inst.HealthStatus,
 			Attributes:    inst.Attributes,
 		})
 	}
 	return jsonOK(&discoverInstancesResponse{Instances: items})
+}
+
+// ---- UpdateInstanceCustomHealthStatus ----
+
+type updateInstanceCustomHealthStatusRequest struct {
+	ServiceId  string `json:"ServiceId"`
+	InstanceId string `json:"InstanceId"`
+	Status     string `json:"Status"`
+}
+
+func handleUpdateInstanceCustomHealthStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateInstanceCustomHealthStatusRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ServiceId == "" || req.InstanceId == "" || req.Status == "" {
+		return jsonErr(service.ErrValidation("ServiceId, InstanceId, and Status are required."))
+	}
+	if req.Status != "HEALTHY" && req.Status != "UNHEALTHY" {
+		return jsonErr(service.ErrValidation("Status must be HEALTHY or UNHEALTHY."))
+	}
+	if !store.UpdateInstanceCustomHealthStatus(req.ServiceId, req.InstanceId, req.Status) {
+		return jsonErr(service.NewAWSError("InstanceNotFound", "Instance not found.", http.StatusNotFound))
+	}
+	return emptyOK()
 }
 
 // ---- TagResource ----

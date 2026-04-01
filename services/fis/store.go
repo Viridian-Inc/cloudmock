@@ -43,18 +43,30 @@ type StopCondition struct {
 	Value  string
 }
 
+// ExperimentActionState tracks the state of an action during an experiment.
+type ExperimentActionState struct {
+	ActionID    string
+	Description string
+	State       string // pending, running, completed, failed
+	StartTime   *time.Time
+	EndTime     *time.Time
+}
+
 // Experiment represents a running or completed experiment.
 type Experiment struct {
-	ID             string
-	TemplateID     string
-	RoleArn        string
-	State          string
-	StateReason    string
-	Tags           map[string]string
-	CreationTime   time.Time
-	StartTime      *time.Time
-	EndTime        *time.Time
-	lifecycle      *lifecycle.Machine
+	ID                string
+	TemplateID        string
+	RoleArn           string
+	State             string
+	StateReason       string
+	Tags              map[string]string
+	CreationTime      time.Time
+	StartTime         *time.Time
+	EndTime           *time.Time
+	Actions           map[string]ExperimentActionState
+	Targets           map[string]ExperimentTarget
+	AffectedResources []string
+	lifecycle         *lifecycle.Machine
 }
 
 // TargetAccountConfiguration represents a target account config.
@@ -166,14 +178,40 @@ func (s *Store) StartExperiment(templateID string, tags map[string]string) (*Exp
 	}
 
 	now := time.Now().UTC()
+
+	// Track actions and targets from template.
+	actionStates := make(map[string]ExperimentActionState)
+	for name, action := range tmpl.Actions {
+		actionStates[name] = ExperimentActionState{
+			ActionID:    action.ActionID,
+			Description: action.Description,
+			State:       "pending",
+		}
+	}
+
+	// Collect all affected resource ARNs from targets.
+	var affectedResources []string
+	for _, target := range tmpl.Targets {
+		affectedResources = append(affectedResources, target.ResourceArns...)
+	}
+
+	// Copy targets for experiment record.
+	expTargets := make(map[string]ExperimentTarget)
+	for k, v := range tmpl.Targets {
+		expTargets[k] = v
+	}
+
 	exp := &Experiment{
-		ID:           id,
-		TemplateID:   templateID,
-		RoleArn:      tmpl.RoleArn,
-		State:        "initiating",
-		StateReason:  "Experiment is initiating",
-		Tags:         tags,
-		CreationTime: now,
+		ID:                id,
+		TemplateID:        templateID,
+		RoleArn:           tmpl.RoleArn,
+		State:             "initiating",
+		StateReason:       "Experiment is initiating",
+		Tags:              tags,
+		CreationTime:      now,
+		Actions:           actionStates,
+		Targets:           expTargets,
+		AffectedResources: affectedResources,
 	}
 	exp.lifecycle = lifecycle.NewMachine("initiating", transitions, s.lcConfig)
 	exp.lifecycle.OnTransition(func(from, to lifecycle.State) {
@@ -184,9 +222,21 @@ func (s *Store) StartExperiment(templateID string, tags map[string]string) (*Exp
 		if to == "running" {
 			exp.StartTime = &now
 			exp.StateReason = "Experiment is running"
+			// Transition all actions to running.
+			for name, as := range exp.Actions {
+				as.State = "running"
+				as.StartTime = &now
+				exp.Actions[name] = as
+			}
 		} else if to == "completed" {
 			exp.EndTime = &now
 			exp.StateReason = "Experiment completed"
+			// Mark all actions as completed.
+			for name, as := range exp.Actions {
+				as.State = "completed"
+				as.EndTime = &now
+				exp.Actions[name] = as
+			}
 		}
 	})
 

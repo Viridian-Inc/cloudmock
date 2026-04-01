@@ -132,8 +132,15 @@ func (s *ManagedBlockchainService) HandleRequest(ctx *service.RequestContext) (*
 					return handleListProposals(networkID, s.store)
 				}
 			}
-			if len(parts) == 3 && method == http.MethodGet {
-				return handleGetProposal(networkID, parts[2], s.store)
+			if len(parts) == 3 {
+				proposalID := parts[2]
+				if method == http.MethodGet {
+					return handleGetProposal(networkID, proposalID, s.store)
+				}
+			}
+			// /networks/{id}/proposals/{proposalId}/votes
+			if len(parts) == 4 && parts[3] == "votes" && method == http.MethodPost {
+				return handleVoteOnProposal(networkID, parts[2], params, s.store)
 			}
 		}
 	}

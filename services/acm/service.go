@@ -6,9 +6,15 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// ServiceLocator provides access to other services for cross-service communication.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
+}
+
 // ACMService is the cloudmock implementation of the AWS Certificate Manager API.
 type ACMService struct {
 	store     *Store
+	locator   ServiceLocator
 	accountID string
 	region    string
 }
@@ -20,6 +26,22 @@ func New(accountID, region string) *ACMService {
 		accountID: accountID,
 		region:    region,
 	}
+}
+
+// NewWithLocator returns a new ACMService with a service locator for cross-service communication.
+func NewWithLocator(accountID, region string, locator ServiceLocator) *ACMService {
+	return &ACMService{
+		store:     NewStore(accountID, region),
+		locator:   locator,
+		accountID: accountID,
+		region:    region,
+	}
+}
+
+// SetLocator sets the service locator for cross-service communication (Route53 validation checks).
+func (s *ACMService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
+	s.store.SetLocator(locator)
 }
 
 // Name returns the AWS service name used for routing.

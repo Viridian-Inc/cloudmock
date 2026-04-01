@@ -3,6 +3,7 @@ package cloudfront
 import (
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -118,7 +119,8 @@ func (s *Store) distributionARN(id string) string {
 }
 
 func domainName(id string) string {
-	return fmt.Sprintf("%s.cloudfront.net", id)
+	// Generate realistic CloudFront distribution domain: d{13alphanumeric}.cloudfront.net
+	return fmt.Sprintf("d%s.cloudfront.net", strings.ToLower(randomUpperHex(13)))
 }
 
 func newETag() string {
@@ -192,10 +194,10 @@ func (s *Store) ListDistributions() []*Distribution {
 
 func (s *Store) UpdateDistribution(id, comment, defaultRootObject, priceClass string, enabled *bool, origins []Origin, defaultBehavior *CacheBehavior, behaviors []CacheBehavior) (*Distribution, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	d, ok := s.distributions[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 
@@ -223,9 +225,12 @@ func (s *Store) UpdateDistribution(id, comment, defaultRootObject, priceClass st
 	d.ETag = newETag()
 	d.LastModified = time.Now().UTC()
 	d.Status = "InProgress"
+	lc := d.Lifecycle
+	s.mu.Unlock()
 
-	if d.Lifecycle != nil {
-		d.Lifecycle.ForceState("InProgress")
+	// ForceState may trigger OnTransition callback that acquires s.mu.
+	if lc != nil {
+		lc.ForceState("InProgress")
 	}
 
 	return d, true

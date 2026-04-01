@@ -125,6 +125,11 @@ func (s *Store) CreateWirelessDevice(name, deviceType, destinationName, descript
 	if deviceType == "" {
 		deviceType = "LoRaWAN"
 	}
+	validTypes := map[string]bool{"LoRaWAN": true, "Sidewalk": true}
+	if !validTypes[deviceType] {
+		return nil, service.NewAWSError("ValidationException",
+			fmt.Sprintf("Invalid device type: %s. Must be LoRaWAN or Sidewalk.", deviceType), http.StatusBadRequest)
+	}
 	id := newUUID()
 	arn := s.deviceARN(id)
 	d := &WirelessDevice{
@@ -280,6 +285,20 @@ func (s *Store) CreateDeviceProfile(name string, loRaWAN, sidewalk map[string]an
 	defer s.mu.Unlock()
 	if tags == nil {
 		tags = make(map[string]string)
+	}
+	// Validate frequency band if LoRaWAN config is provided
+	if loRaWAN != nil {
+		if rfRegion, ok := loRaWAN["RfRegion"].(string); ok && rfRegion != "" {
+			validBands := map[string]bool{
+				"US915": true, "EU868": true, "AU915": true, "AS923-1": true,
+				"AS923-2": true, "AS923-3": true, "AS923-4": true, "CN470": true,
+				"CN779": true, "EU433": true, "IN865": true, "KR920": true, "RU864": true,
+			}
+			if !validBands[rfRegion] {
+				return nil, service.NewAWSError("ValidationException",
+					fmt.Sprintf("Invalid RfRegion: %s.", rfRegion), http.StatusBadRequest)
+			}
+		}
 	}
 	id := newUUID()
 	arn := s.deviceProfileARN(id)

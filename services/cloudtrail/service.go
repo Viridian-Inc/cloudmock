@@ -3,6 +3,7 @@ package cloudtrail
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -11,6 +12,7 @@ type CloudTrailService struct {
 	store     *Store
 	accountID string
 	region    string
+	bus       *eventbus.Bus
 }
 
 // New returns a new CloudTrailService for the given AWS account ID and region.
@@ -19,6 +21,16 @@ func New(accountID, region string) *CloudTrailService {
 		store:     NewStore(accountID, region),
 		accountID: accountID,
 		region:    region,
+	}
+}
+
+// NewWithBus returns a new CloudTrailService wired to an event bus.
+func NewWithBus(accountID, region string, bus *eventbus.Bus) *CloudTrailService {
+	return &CloudTrailService{
+		store:     NewStore(accountID, region),
+		accountID: accountID,
+		region:    region,
+		bus:       bus,
 	}
 }
 
@@ -64,9 +76,9 @@ func (s *CloudTrailService) HandleRequest(ctx *service.RequestContext) (*service
 	case "UpdateTrail":
 		return handleUpdateTrail(ctx, s.store)
 	case "StartLogging":
-		return handleStartLogging(ctx, s.store)
+		return s.handleStartLoggingWithBus(ctx)
 	case "StopLogging":
-		return handleStopLogging(ctx, s.store)
+		return s.handleStopLoggingWithBus(ctx)
 	case "GetTrailStatus":
 		return handleGetTrailStatus(ctx, s.store)
 	case "PutEventSelectors":
@@ -91,4 +103,30 @@ func (s *CloudTrailService) HandleRequest(ctx *service.RequestContext) (*service
 				"The action "+ctx.Action+" is not valid for this web service.",
 				http.StatusBadRequest)
 	}
+}
+
+func (s *CloudTrailService) handleStartLoggingWithBus(ctx *service.RequestContext) (*service.Response, error) {
+	resp, err := handleStartLogging(ctx, s.store)
+	if err != nil {
+		return resp, err
+	}
+	// Subscribe to bus events after successful start
+	var params map[string]any
+	parseJSON(ctx.Body, &params)
+	name, _ := params["Name"].(string)
+	if trail, awsErr := s.store.GetTrail(name); awsErr == nil {
+		s.subscribeTrail(trail)
+	}
+	return resp, err
+}
+
+func (s *CloudTrailService) handleStopLoggingWithBus(ctx *service.RequestContext) (*service.Response, error) {
+	var params map[string]any
+	parseJSON(ctx.Body, &params)
+	name, _ := params["Name"].(string)
+	// Unsubscribe before stopping
+	if trail, awsErr := s.store.GetTrail(name); awsErr == nil {
+		s.unsubscribeTrail(trail)
+	}
+	return handleStopLogging(ctx, s.store)
 }

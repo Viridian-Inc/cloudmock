@@ -78,21 +78,38 @@ type FoundationModel struct {
 	ResponseStreamingSupported bool
 }
 
+// Guardrail represents a Bedrock guardrail for content filtering.
+type Guardrail struct {
+	ID                      string
+	ARN                     string
+	Name                    string
+	Description             string
+	Version                 string
+	BlockedInputMessaging   string
+	BlockedOutputsMessaging string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	Status                  string
+}
+
 type Store struct {
 	mu                   sync.RWMutex
 	customizationJobs    map[string]*ModelCustomizationJob     // keyed by job name
 	provisionedModels    map[string]*ProvisionedModelThroughput // keyed by name
 	foundationModels     []FoundationModel
+	guardrails           map[string]*Guardrail
 	tagsByArn            map[string]map[string]string
 	accountID            string
 	region               string
 	lcConfig             *lifecycle.Config
+	guardrailSeq         int
 }
 
 func NewStore(accountID, region string) *Store {
 	s := &Store{
 		customizationJobs: make(map[string]*ModelCustomizationJob),
 		provisionedModels: make(map[string]*ProvisionedModelThroughput),
+		guardrails:        make(map[string]*Guardrail),
 		tagsByArn:         make(map[string]map[string]string),
 		accountID:         accountID,
 		region:            region,
@@ -256,15 +273,19 @@ func (s *Store) ListModelCustomizationJobs() []*ModelCustomizationJob {
 
 func (s *Store) StopModelCustomizationJob(jobName string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	job, ok := s.customizationJobs[jobName]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Model customization job %s not found", jobName), http.StatusNotFound)
 	}
-	job.Lifecycle.ForceState(lifecycle.State(CustomizationStopped))
 	now := time.Now().UTC()
 	job.EndTime = &now
+	lc := job.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(CustomizationStopped))
+	}
 	return nil
 }
 
@@ -433,4 +454,38 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, *service.AWS
 		cp[k] = v
 	}
 	return cp, nil
+}
+
+// Guardrail operations.
+
+// CreateGuardrail creates a new guardrail.
+func (s *Store) CreateGuardrail(name, description, blockedInputMessaging, blockedOutputsMessaging string) *Guardrail {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.guardrailSeq++
+	id := fmt.Sprintf("gr-%s", newUUID()[:8])
+	arn := fmt.Sprintf("arn:aws:bedrock:%s:%s:guardrail/%s", s.region, s.accountID, id)
+	now := time.Now().UTC()
+	g := &Guardrail{
+		ID:                      id,
+		ARN:                     arn,
+		Name:                    name,
+		Description:             description,
+		Version:                 "DRAFT",
+		BlockedInputMessaging:   blockedInputMessaging,
+		BlockedOutputsMessaging: blockedOutputsMessaging,
+		CreatedAt:               now,
+		UpdatedAt:               now,
+		Status:                  "READY",
+	}
+	s.guardrails[id] = g
+	return g
+}
+
+// GetGuardrail retrieves a guardrail by ID.
+func (s *Store) GetGuardrail(id string) (*Guardrail, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	g, ok := s.guardrails[id]
+	return g, ok
 }

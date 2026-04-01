@@ -135,6 +135,13 @@ func (s *Store) CreateProtection(name, resourceArn string, tags []Tag) (*Protect
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if name == "" {
+		return nil, service.ErrValidation("Name is required.")
+	}
+	if resourceArn == "" {
+		return nil, service.ErrValidation("ResourceArn is required.")
+	}
+
 	// Check for duplicate resource
 	for _, p := range s.protections {
 		if p.ResourceArn == resourceArn {

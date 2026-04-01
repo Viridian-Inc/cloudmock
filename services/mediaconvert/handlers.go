@@ -2,6 +2,7 @@ package mediaconvert
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -51,6 +52,25 @@ func jobResponse(j *Job) map[string]any {
 	return resp
 }
 
+func validateInputURIs(settings map[string]any) *service.AWSError {
+	if settings == nil {
+		return nil
+	}
+	inputs, ok := settings["inputs"].([]any)
+	if !ok {
+		return nil
+	}
+	for _, input := range inputs {
+		if im, ok := input.(map[string]any); ok {
+			fileInput := str(im, "fileInput")
+			if fileInput != "" && !strings.HasPrefix(fileInput, "s3://") {
+				return service.ErrValidation("Input file URI must start with s3://: " + fileInput)
+			}
+		}
+	}
+	return nil
+}
+
 func handleCreateJob(params map[string]any, store *Store) (*service.Response, error) {
 	role := str(params, "role")
 	queue := str(params, "queue")
@@ -58,6 +78,17 @@ func handleCreateJob(params map[string]any, store *Store) (*service.Response, er
 		queue = "Default"
 	}
 	settings, _ := params["settings"].(map[string]any)
+
+	// Validate queue exists
+	if _, ok := store.GetQueue(queue); !ok {
+		return jsonErr(service.NewAWSError("NotFoundException",
+			"Queue not found: "+queue, http.StatusNotFound))
+	}
+
+	// Validate input file URIs
+	if awsErr := validateInputURIs(settings); awsErr != nil {
+		return jsonErr(awsErr)
+	}
 
 	job, _ := store.CreateJob(queue, role, settings)
 	return jsonCreated(map[string]any{"job": jobResponse(job)})

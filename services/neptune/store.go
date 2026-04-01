@@ -38,6 +38,7 @@ type DBInstance struct {
 	Tags            map[string]string
 	CreatedTime     time.Time
 	Lifecycle       *lifecycle.Machine
+	IsWriter        bool   // true for the primary/writer instance
 }
 
 // DBEndpoint holds address and port.
@@ -213,12 +214,16 @@ func (s *Store) ModifyDBCluster(id, engineVersion string) (*DBCluster, bool) {
 
 func (s *Store) DeleteDBCluster(id string) (*DBCluster, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.clusters[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
-	c.Lifecycle.ForceState("deleting")
+	lc := c.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("deleting")
+	}
 	return c, true
 }
 
@@ -233,6 +238,15 @@ func (s *Store) CreateDBInstance(id, clusterID, class, engine, engineVersion str
 	if engine == "" {
 		engine = "neptune"
 	}
+	// Determine if this is the first (writer) instance for this cluster.
+	isWriter := true
+	for _, existing := range s.instances {
+		if existing.ClusterID == clusterID {
+			isWriter = false
+			break
+		}
+	}
+
 	inst := &DBInstance{
 		Identifier:    id,
 		ARN:           s.instanceARN(id),
@@ -248,6 +262,7 @@ func (s *Store) CreateDBInstance(id, clusterID, class, engine, engineVersion str
 		Tags:        tags,
 		CreatedTime: time.Now().UTC(),
 		Lifecycle:   lifecycle.NewMachine("creating", instanceTransitions(), s.lcConfig),
+		IsWriter:    isWriter,
 	}
 	s.instances[id] = inst
 	return inst, true
@@ -291,12 +306,16 @@ func (s *Store) ModifyDBInstance(id, class string) (*DBInstance, bool) {
 
 func (s *Store) DeleteDBInstance(id string) (*DBInstance, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	inst, ok := s.instances[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
-	inst.Lifecycle.ForceState("deleting")
+	lc := inst.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("deleting")
+	}
 	return inst, true
 }
 

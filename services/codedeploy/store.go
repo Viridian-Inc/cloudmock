@@ -81,6 +81,7 @@ type Deployment struct {
 	CreateTime           time.Time
 	StartTime            *time.Time
 	CompleteTime         *time.Time
+	Targets              []*InstanceTarget
 	lifecycle            *lifecycle.Machine
 }
 
@@ -105,6 +106,15 @@ type GitHubLocation struct {
 	CommitID   string
 }
 
+// InstanceDeploymentStatus constants for per-instance lifecycle.
+const (
+	InstanceStatusPending    = "Pending"
+	InstanceStatusInProgress = "InProgress"
+	InstanceStatusSucceeded  = "Succeeded"
+	InstanceStatusFailed     = "Failed"
+	InstanceStatusSkipped    = "Skipped"
+)
+
 // DeploymentTarget represents a deployment target instance.
 type DeploymentTarget struct {
 	DeploymentTargetType string
@@ -118,6 +128,15 @@ type InstanceTarget struct {
 	TargetARN          string
 	Status             string
 	LastUpdatedAt      time.Time
+	LifecycleEvents    []LifecycleEvent
+}
+
+// LifecycleEvent represents a deployment lifecycle hook event.
+type LifecycleEvent struct {
+	LifecycleEventName string
+	Status             string
+	StartTime          time.Time
+	EndTime            *time.Time
 }
 
 // Store is the in-memory store for all CodeDeploy resources.
@@ -377,6 +396,31 @@ func (s *Store) CreateDeployment(appName, groupName, configName, description str
 	deployID := newUUID()
 	now := time.Now().UTC()
 
+	// Build initial targets from deployment group info
+	var targets []*InstanceTarget
+	if groupName != "" {
+		if groups, ok := s.deploymentGroups[appName]; ok {
+			if group, ok := groups[groupName]; ok {
+				// Add auto-scaling group instances as targets
+				for _, asgName := range group.AutoScalingGroups {
+					targets = append(targets, &InstanceTarget{
+						DeploymentID:  deployID,
+						TargetID:      asgName,
+						TargetARN:     fmt.Sprintf("arn:aws:ec2:%s:%s:instance/%s", s.region, s.accountID, asgName),
+						Status:        InstanceStatusPending,
+						LastUpdatedAt: now,
+						LifecycleEvents: []LifecycleEvent{
+							{LifecycleEventName: "BeforeInstall", Status: InstanceStatusPending, StartTime: now},
+							{LifecycleEventName: "AfterInstall", Status: InstanceStatusPending, StartTime: now},
+							{LifecycleEventName: "ApplicationStart", Status: InstanceStatusPending, StartTime: now},
+							{LifecycleEventName: "ValidateService", Status: InstanceStatusPending, StartTime: now},
+						},
+					})
+				}
+			}
+		}
+	}
+
 	d := &Deployment{
 		ID:                   deployID,
 		ARN:                  s.deploymentARN(deployID),
@@ -388,6 +432,7 @@ func (s *Store) CreateDeployment(appName, groupName, configName, description str
 		Description:          description,
 		Creator:              "user",
 		CreateTime:           now,
+		Targets:              targets,
 	}
 
 	// Set up lifecycle: Created -> InProgress -> Succeeded
@@ -403,10 +448,33 @@ func (s *Store) CreateDeployment(appName, groupName, configName, description str
 		if to == lifecycle.State(DeployStatusInProgress) {
 			now := time.Now().UTC()
 			d.StartTime = &now
+			// Move targets to InProgress
+			for _, t := range d.Targets {
+				t.Status = InstanceStatusInProgress
+				t.LastUpdatedAt = now
+			}
 		}
-		if to == lifecycle.State(DeployStatusSucceeded) || to == lifecycle.State(DeployStatusFailed) {
+		if to == lifecycle.State(DeployStatusSucceeded) {
 			now := time.Now().UTC()
 			d.CompleteTime = &now
+			for _, t := range d.Targets {
+				t.Status = InstanceStatusSucceeded
+				t.LastUpdatedAt = now
+				for i := range t.LifecycleEvents {
+					t.LifecycleEvents[i].Status = InstanceStatusSucceeded
+					endTime := now
+					t.LifecycleEvents[i].EndTime = &endTime
+				}
+			}
+		}
+		if to == lifecycle.State(DeployStatusFailed) {
+			now := time.Now().UTC()
+			d.CompleteTime = &now
+			d.Status = "ROLLED_BACK"
+			for _, t := range d.Targets {
+				t.Status = InstanceStatusFailed
+				t.LastUpdatedAt = now
+			}
 		}
 	})
 
@@ -506,19 +574,36 @@ func (s *Store) BatchGetDeploymentTargets(deploymentID string, targetIDs []strin
 			fmt.Sprintf("Deployment does not exist: %s", deploymentID), http.StatusNotFound)
 	}
 
-	// Return synthetic targets
+	if d.lifecycle != nil {
+		d.Status = string(d.lifecycle.State())
+	}
+
+	// Build a map of tracked targets for quick lookup
+	trackedTargets := make(map[string]*InstanceTarget, len(d.Targets))
+	for _, t := range d.Targets {
+		trackedTargets[t.TargetID] = t
+	}
+
 	var targets []*DeploymentTarget
 	for _, tid := range targetIDs {
-		targets = append(targets, &DeploymentTarget{
-			DeploymentTargetType: "InstanceTarget",
-			InstanceTarget: &InstanceTarget{
-				DeploymentID:  d.ID,
-				TargetID:      tid,
-				TargetARN:     fmt.Sprintf("arn:aws:ec2:%s:%s:instance/%s", s.region, s.accountID, tid),
-				Status:        d.Status,
-				LastUpdatedAt: time.Now().UTC(),
-			},
-		})
+		if tracked, ok := trackedTargets[tid]; ok {
+			targets = append(targets, &DeploymentTarget{
+				DeploymentTargetType: "InstanceTarget",
+				InstanceTarget:       tracked,
+			})
+		} else {
+			// Fallback: synthetic target using deployment status
+			targets = append(targets, &DeploymentTarget{
+				DeploymentTargetType: "InstanceTarget",
+				InstanceTarget: &InstanceTarget{
+					DeploymentID:  d.ID,
+					TargetID:      tid,
+					TargetARN:     fmt.Sprintf("arn:aws:ec2:%s:%s:instance/%s", s.region, s.accountID, tid),
+					Status:        d.Status,
+					LastUpdatedAt: time.Now().UTC(),
+				},
+			})
+		}
 	}
 	return targets, nil
 }

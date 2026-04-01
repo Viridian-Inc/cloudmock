@@ -42,6 +42,7 @@ type Trail struct {
 	StopLoggingTime            *time.Time
 	EventSelectors             []EventSelector
 	InsightSelectors           []InsightSelector
+	subscriptionID             string // eventbus subscription ID (unexported)
 }
 
 // EventSelector configures event filtering for a trail.
@@ -84,20 +85,22 @@ type EventResource struct {
 
 // Store is the in-memory store for CloudTrail resources.
 type Store struct {
-	mu        sync.RWMutex
-	trails    map[string]*Trail  // keyed by trail name
-	events    []Event
-	accountID string
-	region    string
+	mu          sync.RWMutex
+	trails      map[string]*Trail  // keyed by trail name
+	events      []Event            // global event log (RecordEvent)
+	trailEvents map[string][]Event // per-trail event log (from bus)
+	accountID   string
+	region      string
 }
 
 // NewStore creates an empty CloudTrail Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		trails:    make(map[string]*Trail),
-		events:    make([]Event, 0),
-		accountID: accountID,
-		region:    region,
+		trails:      make(map[string]*Trail),
+		events:      make([]Event, 0),
+		trailEvents: make(map[string][]Event),
+		accountID:   accountID,
+		region:      region,
 	}
 }
 
@@ -305,23 +308,119 @@ func (s *Store) RecordEvent(eventName, eventSource, username string, resources [
 	s.events = append(s.events, event)
 }
 
+// LookupAttribute is a filter criterion for LookupEvents.
+type LookupAttribute struct {
+	AttributeKey   string
+	AttributeValue string
+}
+
 // LookupEvents returns events matching the given lookup attributes.
-func (s *Store) LookupEvents(maxResults int) []Event {
+func (s *Store) LookupEvents(maxResults int, startTime, endTime *time.Time, attributes []LookupAttribute) []Event {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if maxResults <= 0 || maxResults > len(s.events) {
-		maxResults = len(s.events)
+
+	// Merge global events and all trail events
+	allEvents := make([]Event, 0, len(s.events))
+	allEvents = append(allEvents, s.events...)
+	for _, te := range s.trailEvents {
+		allEvents = append(allEvents, te...)
 	}
-	// Return most recent events first
-	out := make([]Event, 0, maxResults)
-	start := len(s.events) - maxResults
-	if start < 0 {
-		start = 0
+
+	// Deduplicate by EventId
+	seen := make(map[string]bool, len(allEvents))
+	deduped := make([]Event, 0, len(allEvents))
+	for _, e := range allEvents {
+		if !seen[e.EventId] {
+			seen[e.EventId] = true
+			deduped = append(deduped, e)
+		}
 	}
-	for i := len(s.events) - 1; i >= start; i-- {
-		out = append(out, s.events[i])
+
+	// Filter
+	var filtered []Event
+	for _, e := range deduped {
+		if startTime != nil && e.EventTime.Before(*startTime) {
+			continue
+		}
+		if endTime != nil && e.EventTime.After(*endTime) {
+			continue
+		}
+		if !matchesAttributes(e, attributes) {
+			continue
+		}
+		filtered = append(filtered, e)
 	}
-	return out
+
+	if maxResults <= 0 || maxResults > len(filtered) {
+		maxResults = len(filtered)
+	}
+
+	// Sort by time descending (most recent first)
+	// Simple insertion sort since event lists are typically small
+	for i := 1; i < len(filtered); i++ {
+		for j := i; j > 0 && filtered[j].EventTime.After(filtered[j-1].EventTime); j-- {
+			filtered[j], filtered[j-1] = filtered[j-1], filtered[j]
+		}
+	}
+
+	if maxResults > len(filtered) {
+		maxResults = len(filtered)
+	}
+	return filtered[:maxResults]
+}
+
+func matchesAttributes(e Event, attrs []LookupAttribute) bool {
+	for _, attr := range attrs {
+		switch attr.AttributeKey {
+		case "EventSource":
+			if e.EventSource != attr.AttributeValue {
+				return false
+			}
+		case "EventName":
+			if e.EventName != attr.AttributeValue {
+				return false
+			}
+		case "ResourceType":
+			found := false
+			for _, r := range e.Resources {
+				if r.ResourceType == attr.AttributeValue {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case "ResourceName":
+			found := false
+			for _, r := range e.Resources {
+				if r.ResourceName == attr.AttributeValue {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return false
+			}
+		case "Username":
+			if e.Username != attr.AttributeValue {
+				return false
+			}
+		case "EventId":
+			if e.EventId != attr.AttributeValue {
+				return false
+			}
+		case "ReadOnly":
+			if e.ReadOnly != attr.AttributeValue {
+				return false
+			}
+		case "AccessKeyId":
+			if e.AccessKeyId != attr.AttributeValue {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 // AddTags adds tags to a trail.

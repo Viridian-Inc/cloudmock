@@ -131,6 +131,15 @@ func handleGrantPermissions(ctx *service.RequestContext, store *Store) (*service
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
+	if req.Principal.DataLakePrincipalIdentifier == "" {
+		return jsonErr(service.ErrValidation("Principal.DataLakePrincipalIdentifier is required."))
+	}
+	if len(req.Permissions) == 0 {
+		return jsonErr(service.ErrValidation("At least one permission is required."))
+	}
+	if req.Resource.Database == nil && req.Resource.Table == nil {
+		return jsonErr(service.ErrValidation("Resource must specify a Database or Table."))
+	}
 	perm := &Permission{
 		Principal:                  DataLakePrincipal{DataLakePrincipalIdentifier: req.Principal.DataLakePrincipalIdentifier},
 		Resource:                   toPermResource(req.Resource),

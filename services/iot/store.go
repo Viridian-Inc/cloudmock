@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -509,8 +510,34 @@ func (s *Store) AttachThingPrincipal(thingName, principal string) *service.AWSEr
 		return service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Thing %s not found", thingName), http.StatusNotFound)
 	}
+	// Validate that the certificate exists if principal is a cert ARN.
+	if strings.Contains(principal, ":cert/") {
+		certID := principal[strings.LastIndex(principal, "/")+1:]
+		if _, ok := s.certificates[certID]; !ok {
+			return service.NewAWSError("ResourceNotFoundException",
+				fmt.Sprintf("Certificate %s not found", certID), http.StatusNotFound)
+		}
+	}
+	// Prevent duplicate attachment.
+	for _, p := range t.Principals {
+		if p == principal {
+			return nil // Already attached.
+		}
+	}
 	t.Principals = append(t.Principals, principal)
 	return nil
+}
+
+// ListThingPrincipals returns the principals (certificates) attached to a thing.
+func (s *Store) ListThingPrincipals(thingName string) ([]string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.things[thingName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Thing %s not found", thingName), http.StatusNotFound)
+	}
+	return t.Principals, nil
 }
 
 func (s *Store) DetachThingPrincipal(thingName, principal string) *service.AWSError {
@@ -539,6 +566,12 @@ func (s *Store) CreateTopicRule(name, sql, description string, actions []map[str
 	if _, exists := s.topicRules[name]; exists {
 		return nil, service.NewAWSError("ResourceAlreadyExistsException",
 			fmt.Sprintf("Topic rule %s already exists", name), http.StatusConflict)
+	}
+	// Basic SQL-like rule query validation.
+	sqlUpper := strings.ToUpper(strings.TrimSpace(sql))
+	if sql != "" && !strings.HasPrefix(sqlUpper, "SELECT") {
+		return nil, service.NewAWSError("InvalidRequestException",
+			"SQL must begin with SELECT", http.StatusBadRequest)
 	}
 	tr := &TopicRule{
 		RuleName:     name,

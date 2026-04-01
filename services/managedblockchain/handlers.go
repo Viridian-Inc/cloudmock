@@ -43,7 +43,10 @@ func handleCreateNetwork(params map[string]any, store *Store) (*service.Response
 		frameworkVersion = "2.2"
 	}
 
-	net, member, _ := store.CreateNetwork(name, str(params, "Description"), framework, frameworkVersion)
+	net, member, err := store.CreateNetwork(name, str(params, "Description"), framework, frameworkVersion)
+	if err != nil {
+		return jsonErr(service.ErrValidation(err.Error()))
+	}
 	return jsonOK(map[string]any{
 		"NetworkId": net.ID,
 		"MemberId":  member.ID,
@@ -190,6 +193,19 @@ func handleGetProposal(networkID, proposalID string, store *Store) (*service.Res
 			"ExpirationDate":     p.ExpirationDate.Format(time.RFC3339),
 		},
 	})
+}
+
+func handleVoteOnProposal(networkID, proposalID string, params map[string]any, store *Store) (*service.Response, error) {
+	voterMemberID := str(params, "VoterMemberId")
+	vote := str(params, "Vote")
+	if voterMemberID == "" || vote == "" {
+		return jsonErr(service.ErrValidation("VoterMemberId and Vote are required"))
+	}
+	err := store.VoteOnProposal(networkID, proposalID, voterMemberID, vote)
+	if err != nil {
+		return jsonErr(service.NewAWSError("InvalidRequestException", err.Error(), http.StatusBadRequest))
+	}
+	return jsonOK(map[string]any{})
 }
 
 func handleListProposals(networkID string, store *Store) (*service.Response, error) {

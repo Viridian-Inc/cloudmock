@@ -2,9 +2,13 @@ package serverlessrepo
 
 import (
 	"fmt"
+	"regexp"
+	"sort"
 	"sync"
 	"time"
 )
+
+var semverRegex = regexp.MustCompile(`^\d+\.\d+\.\d+(-[a-zA-Z0-9\.\-]+)?(\+[a-zA-Z0-9\.\-]+)?$`)
 
 // Application represents a Serverless Application Repository application.
 type Application struct {
@@ -143,6 +147,15 @@ func (s *Store) CreateApplicationVersion(appID, semanticVersion, sourceCodeURL s
 	if _, ok := s.apps[appID]; !ok {
 		return nil, fmt.Errorf("application not found: %s", appID)
 	}
+	if semanticVersion != "" && !semverRegex.MatchString(semanticVersion) {
+		return nil, fmt.Errorf("invalid semantic version: %s (must match X.Y.Z format)", semanticVersion)
+	}
+	// Check for duplicate version
+	for _, v := range s.versions[appID] {
+		if v.SemanticVersion == semanticVersion {
+			return nil, fmt.Errorf("version already exists: %s", semanticVersion)
+		}
+	}
 
 	ver := &ApplicationVersion{
 		ApplicationID:   appID,
@@ -156,11 +169,16 @@ func (s *Store) CreateApplicationVersion(appID, semanticVersion, sourceCodeURL s
 	return ver, nil
 }
 
-// ListApplicationVersions returns all versions for an application.
+// ListApplicationVersions returns all versions for an application, sorted by version.
 func (s *Store) ListApplicationVersions(appID string) []*ApplicationVersion {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return s.versions[appID]
+	versions := make([]*ApplicationVersion, len(s.versions[appID]))
+	copy(versions, s.versions[appID])
+	sort.Slice(versions, func(i, j int) bool {
+		return versions[i].SemanticVersion < versions[j].SemanticVersion
+	})
+	return versions
 }
 
 // CreateCloudFormationChangeSet creates a change set.

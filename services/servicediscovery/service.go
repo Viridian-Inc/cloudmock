@@ -45,6 +45,7 @@ func (s *ServiceDiscoveryService) Actions() []service.Action {
 		{Name: "GetInstance", Method: http.MethodPost, IAMAction: "servicediscovery:GetInstance"},
 		{Name: "ListInstances", Method: http.MethodPost, IAMAction: "servicediscovery:ListInstances"},
 		{Name: "DiscoverInstances", Method: http.MethodPost, IAMAction: "servicediscovery:DiscoverInstances"},
+		{Name: "UpdateInstanceCustomHealthStatus", Method: http.MethodPost, IAMAction: "servicediscovery:UpdateInstanceCustomHealthStatus"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "servicediscovery:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "servicediscovery:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "servicediscovery:ListTagsForResource"},
@@ -94,6 +95,8 @@ func (s *ServiceDiscoveryService) HandleRequest(ctx *service.RequestContext) (*s
 		return handleListInstances(ctx, s.store)
 	case "DiscoverInstances":
 		return handleDiscoverInstances(ctx, s.store)
+	case "UpdateInstanceCustomHealthStatus":
+		return handleUpdateInstanceCustomHealthStatus(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

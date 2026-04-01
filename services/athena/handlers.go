@@ -425,11 +425,47 @@ func handleGetQueryResults(ctx *service.RequestContext, store *Store) (*service.
 		return jsonErr(service.NewAWSError("InvalidRequestException",
 			"Query has not yet finished. Current state: "+qe.Status.State, http.StatusBadRequest))
 	}
-	// Return empty result set.
+
+	// Return mock result set if available
+	rs, hasResults := store.GetQueryResultSet(req.QueryExecutionId)
+	if hasResults && rs != nil {
+		// Build column info
+		columnInfo := make([]map[string]string, len(rs.ColumnInfo))
+		for i, ci := range rs.ColumnInfo {
+			columnInfo[i] = map[string]string{"Name": ci.Name, "Type": ci.Type}
+		}
+
+		// Build rows - first row is header
+		rows := make([]map[string]any, 0, len(rs.Rows)+1)
+		// Header row
+		headerData := make([]map[string]string, len(rs.ColumnInfo))
+		for i, ci := range rs.ColumnInfo {
+			headerData[i] = map[string]string{"VarCharValue": ci.Name}
+		}
+		rows = append(rows, map[string]any{"Data": headerData})
+		// Data rows
+		for _, row := range rs.Rows {
+			data := make([]map[string]string, len(row))
+			for i, val := range row {
+				data[i] = map[string]string{"VarCharValue": val}
+			}
+			rows = append(rows, map[string]any{"Data": data})
+		}
+
+		return jsonOK(map[string]any{
+			"ResultSet": map[string]any{
+				"Rows":              rows,
+				"ResultSetMetadata": map[string]any{"ColumnInfo": columnInfo},
+			},
+			"UpdateCount": 0,
+		})
+	}
+
+	// Fallback: empty result set for non-SELECT queries
 	return jsonOK(map[string]any{
 		"ResultSet": map[string]any{
-			"Rows":                []any{},
-			"ResultSetMetadata":   map[string]any{"ColumnInfo": []any{}},
+			"Rows":              []any{},
+			"ResultSetMetadata": map[string]any{"ColumnInfo": []any{}},
 		},
 		"UpdateCount": 0,
 	})

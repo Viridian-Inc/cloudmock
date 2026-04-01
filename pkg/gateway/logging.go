@@ -525,6 +525,27 @@ func extractTraceMetadata(r *http.Request) map[string]string {
 }
 
 func extractCallerID(r *http.Request) string {
+	// Prefer explicit source header from SDK-instrumented Lambda functions
+	// e.g. X-Cloudmock-Source: autotend-order-handler
+	if src := r.Header.Get("X-Cloudmock-Source"); src != "" {
+		return src
+	}
+
+	// Fall back to User-Agent which AWS SDKs set to "aws-sdk-nodejs/3.x" etc.
+	// Some custom SDK configs include the function name
+	if ua := r.Header.Get("User-Agent"); ua != "" {
+		// Check for Lambda function name pattern in User-Agent
+		// e.g. "aws-sdk-nodejs/3.x autotend-order-handler"
+		if strings.Contains(ua, "autotend-") {
+			for _, part := range strings.Fields(ua) {
+				if strings.HasPrefix(part, "autotend-") {
+					return part
+				}
+			}
+		}
+	}
+
+	// Fall back to access key from Authorization header
 	auth := r.Header.Get("Authorization")
 	if auth == "" {
 		return ""

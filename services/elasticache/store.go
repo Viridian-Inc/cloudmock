@@ -9,6 +9,14 @@ import (
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
 )
 
+// CacheNode represents a single cache node within a cluster.
+type CacheNode struct {
+	CacheNodeID    string
+	CacheNodeStatus string
+	Endpoint       *Endpoint
+	CreateTime     time.Time
+}
+
 // CacheCluster represents an ElastiCache cache cluster.
 type CacheCluster struct {
 	ID                  string
@@ -28,6 +36,7 @@ type CacheCluster struct {
 	CreatedTime         time.Time
 	Tags                map[string]string
 	Lifecycle           *lifecycle.Machine
+	CacheNodes          []*CacheNode
 }
 
 // Endpoint holds address and port for an ElastiCache resource.
@@ -158,6 +167,18 @@ func (s *Store) CreateCacheCluster(id, engine, engineVersion, nodeType, az, subn
 	}
 	lm := lifecycle.NewMachine("creating", transitions, s.lifecycleCfg)
 
+	now := time.Now().UTC()
+	nodes := make([]*CacheNode, numNodes)
+	for i := 0; i < numNodes; i++ {
+		nodeID := fmt.Sprintf("%04d", i+1)
+		nodes[i] = &CacheNode{
+			CacheNodeID:     nodeID,
+			CacheNodeStatus: "creating",
+			Endpoint:        s.clusterEndpoint(fmt.Sprintf("%s-%s", id, nodeID), port),
+			CreateTime:      now,
+		}
+	}
+
 	cc := &CacheCluster{
 		ID:                      id,
 		ARN:                     s.clusterARN(id),
@@ -172,9 +193,10 @@ func (s *Store) CreateCacheCluster(id, engine, engineVersion, nodeType, az, subn
 		SecurityGroupIDs:        sgIDs,
 		Port:                    port,
 		Endpoint:                s.clusterEndpoint(id, port),
-		CreatedTime:             time.Now().UTC(),
+		CreatedTime:             now,
 		Tags:                    make(map[string]string),
 		Lifecycle:               lm,
+		CacheNodes:              nodes,
 	}
 
 	lm.OnTransition(func(from, to lifecycle.State) {
@@ -182,6 +204,9 @@ func (s *Store) CreateCacheCluster(id, engine, engineVersion, nodeType, az, subn
 		defer s.mu.Unlock()
 		if c, ok := s.clusters[id]; ok {
 			c.Status = string(to)
+			for _, node := range c.CacheNodes {
+				node.CacheNodeStatus = string(to)
+			}
 		}
 	})
 
@@ -211,10 +236,10 @@ func (s *Store) ListCacheClusters(filterID string) []*CacheCluster {
 
 func (s *Store) ModifyCacheCluster(id, nodeType, engineVersion string, numNodes int) (*CacheCluster, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	cc, ok := s.clusters[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	if nodeType != "" {
@@ -227,8 +252,11 @@ func (s *Store) ModifyCacheCluster(id, nodeType, engineVersion string, numNodes 
 		cc.NumCacheNodes = numNodes
 	}
 	cc.Status = "modifying"
-	if cc.Lifecycle != nil {
-		cc.Lifecycle.ForceState("modifying")
+	lc := cc.Lifecycle
+	s.mu.Unlock()
+
+	if lc != nil {
+		lc.ForceState("modifying")
 	}
 	return cc, true
 }
@@ -339,10 +367,10 @@ func (s *Store) ListReplicationGroups(filterID string) []*ReplicationGroup {
 
 func (s *Store) ModifyReplicationGroup(id, description, nodeType, engineVersion, failover string) (*ReplicationGroup, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 
 	rg, ok := s.replicationGroups[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	if description != "" {
@@ -358,8 +386,11 @@ func (s *Store) ModifyReplicationGroup(id, description, nodeType, engineVersion,
 		rg.AutomaticFailover = failover
 	}
 	rg.Status = "modifying"
-	if rg.Lifecycle != nil {
-		rg.Lifecycle.ForceState("modifying")
+	lc := rg.Lifecycle
+	s.mu.Unlock()
+
+	if lc != nil {
+		lc.ForceState("modifying")
 	}
 	return rg, true
 }
@@ -481,6 +512,24 @@ func (s *Store) DeleteCacheParameterGroup(name string) bool {
 	}
 	delete(s.parameterGroups, name)
 	return true
+}
+
+// TestFailover simulates a failover for a replication group node group.
+func (s *Store) TestFailover(id, nodeGroupID string) (*ReplicationGroup, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rg, ok := s.replicationGroups[id]
+	if !ok {
+		return nil, false
+	}
+
+	// Simulate failover: swap primary and first replica in member clusters.
+	if len(rg.MemberClusters) >= 2 {
+		rg.MemberClusters[0], rg.MemberClusters[1] = rg.MemberClusters[1], rg.MemberClusters[0]
+	}
+
+	return rg, true
 }
 
 // ---- Tag operations ----

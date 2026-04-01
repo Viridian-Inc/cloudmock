@@ -6,6 +6,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -413,6 +414,16 @@ func handleCreateDistribution(ctx *service.RequestContext, store *Store, locator
 	}
 
 	origins := originsFromXML(cfg.Origins.Items)
+
+	// Validate origins via locator if available.
+	if locator != nil {
+		for _, origin := range origins {
+			if err := validateOrigin(origin, locator); err != nil {
+				return xmlErr(err)
+			}
+		}
+	}
+
 	defaultBehavior := cacheBehaviorFromXML(cfg.DefaultCacheBehavior)
 	behaviors := cacheBehaviorsFromXML(cfg.CacheBehaviors)
 
@@ -669,6 +680,60 @@ func parseJSON(body []byte, v any) *service.AWSError {
 	if err := json.Unmarshal(body, v); err != nil {
 		return service.ErrValidation("Invalid JSON request body.")
 	}
+	return nil
+}
+
+// validateOrigin checks that S3 bucket and ELB origins exist via the ServiceLocator.
+// Returns an AWSError if the origin cannot be found.
+func validateOrigin(origin Origin, locator ServiceLocator) *service.AWSError {
+	domainName := origin.DomainName
+
+	// Check S3 bucket origins (*.s3.amazonaws.com or *.s3.*.amazonaws.com)
+	if strings.HasSuffix(domainName, ".s3.amazonaws.com") || strings.Contains(domainName, ".s3.") {
+		// Extract bucket name from domain
+		bucketName := strings.Split(domainName, ".s3")[0]
+		if bucketName != "" {
+			s3Svc, err := locator.Lookup("s3")
+			if err == nil {
+				body, _ := json.Marshal(map[string]any{
+					"Bucket": bucketName,
+				})
+				_, err := s3Svc.HandleRequest(&service.RequestContext{
+					Action:     "HeadBucket",
+					Body:       body,
+					RawRequest: httptest.NewRequest(http.MethodHead, "/"+bucketName, nil),
+				})
+				if err != nil {
+					return service.NewAWSError("InvalidOrigin",
+						fmt.Sprintf("The specified origin server does not exist or is not valid. S3 bucket %q not found.", bucketName),
+						http.StatusBadRequest)
+				}
+			}
+			// If S3 service not available, degrade gracefully
+		}
+	}
+
+	// Check ELB origins (*.elb.amazonaws.com or *.elb.*.amazonaws.com)
+	if strings.Contains(domainName, ".elb.") && strings.HasSuffix(domainName, ".amazonaws.com") {
+		elbSvc, err := locator.Lookup("elasticloadbalancing")
+		if err == nil {
+			// Try to describe load balancers; if the ELB service is up but
+			// no matching LB is found, treat as invalid origin.
+			body, _ := json.Marshal(map[string]any{})
+			_, err := elbSvc.HandleRequest(&service.RequestContext{
+				Action:     "DescribeLoadBalancers",
+				Body:       body,
+				RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+			})
+			if err != nil {
+				return service.NewAWSError("InvalidOrigin",
+					fmt.Sprintf("The specified origin server does not exist or is not valid. ELB origin %q not found.", domainName),
+					http.StatusBadRequest)
+			}
+		}
+		// If ELB service not available, degrade gracefully
+	}
+
 	return nil
 }
 

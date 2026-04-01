@@ -38,6 +38,15 @@ type Endpoint struct {
 	CreatedAt          time.Time
 }
 
+// ConnectionTest tracks a test-connection result.
+type ConnectionTest struct {
+	EndpointArn            string
+	ReplicationInstanceArn string
+	Status                 string // successful, testing, failed
+	FailureMessage         string
+	TestedAt               time.Time
+}
+
 // ReplicationTask represents a DMS replication task.
 type ReplicationTask struct {
 	ReplicationTaskIdentifier string
@@ -52,6 +61,10 @@ type ReplicationTask struct {
 	StartedAt                 *time.Time
 	StoppedAt                 *time.Time
 	lifecycle                 *lifecycle.Machine
+	// Table statistics tracked during running state
+	TablesLoaded  int
+	TablesLoading int
+	TablesErrored int
 }
 
 // EventSubscription represents a DMS event subscription.
@@ -72,6 +85,7 @@ type Store struct {
 	endpoints       map[string]*Endpoint
 	tasks           map[string]*ReplicationTask
 	subscriptions   map[string]*EventSubscription
+	connections     []ConnectionTest
 	accountID       string
 	region          string
 	lcConfig        *lifecycle.Config
@@ -284,7 +298,20 @@ func (s *Store) StartReplicationTask(arn string) (*ReplicationTask, error) {
 				s.mu.Lock()
 				defer s.mu.Unlock()
 				task.Status = string(to)
+				if string(to) == "running" {
+					// Simulate table loading completion.
+					task.TablesLoaded = 5
+					task.TablesLoading = 0
+					task.TablesErrored = 0
+				}
 			})
+			// Handle instant mode transition.
+			if string(task.lifecycle.State()) == "running" {
+				task.Status = "running"
+				task.TablesLoaded = 5
+				task.TablesLoading = 0
+				task.TablesErrored = 0
+			}
 			return task, nil
 		}
 	}
@@ -379,4 +406,67 @@ func (s *Store) DeleteEventSubscription(id string) bool {
 	}
 	delete(s.subscriptions, id)
 	return true
+}
+
+// TestConnection tests connectivity to an endpoint (always succeeds in mock).
+func (s *Store) TestConnection(endpointArn, replicationInstanceArn string) (*ConnectionTest, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Verify endpoint exists.
+	var foundEP bool
+	for _, ep := range s.endpoints {
+		if ep.EndpointArn == endpointArn {
+			foundEP = true
+			break
+		}
+	}
+	if !foundEP {
+		return nil, fmt.Errorf("endpoint not found: %s", endpointArn)
+	}
+
+	// Verify replication instance exists.
+	var foundInst bool
+	for _, inst := range s.instances {
+		if inst.ReplicationInstanceArn == replicationInstanceArn {
+			foundInst = true
+			break
+		}
+	}
+	if !foundInst {
+		return nil, fmt.Errorf("replication instance not found: %s", replicationInstanceArn)
+	}
+
+	ct := ConnectionTest{
+		EndpointArn:            endpointArn,
+		ReplicationInstanceArn: replicationInstanceArn,
+		Status:                 "successful",
+		TestedAt:               time.Now().UTC(),
+	}
+	s.connections = append(s.connections, ct)
+	return &ct, nil
+}
+
+// DescribeConnections returns all connection test results.
+func (s *Store) DescribeConnections() []ConnectionTest {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]ConnectionTest, len(s.connections))
+	copy(result, s.connections)
+	return result
+}
+
+// GetReplicationTaskStats returns table statistics for a task.
+func (s *Store) GetReplicationTaskStats(arn string) (loaded, loading, errored int, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, task := range s.tasks {
+		if task.ReplicationTaskArn == arn {
+			if task.lifecycle != nil {
+				task.Status = string(task.lifecycle.State())
+			}
+			return task.TablesLoaded, task.TablesLoading, task.TablesErrored, true
+		}
+	}
+	return 0, 0, 0, false
 }

@@ -3,7 +3,9 @@ package wafregional
 import (
 	"crypto/rand"
 	"fmt"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -370,6 +372,14 @@ func (s *Store) UpdateIPSet(id, changeToken string, updates []map[string]any) *s
 		descType, _ := descMap["Type"].(string)
 		value, _ := descMap["Value"].(string)
 		if action == "INSERT" {
+			// Validate CIDR format
+			if value != "" && strings.Contains(value, "/") {
+				_, _, err := net.ParseCIDR(value)
+				if err != nil {
+					return service.NewAWSError("WAFInvalidParameterException",
+						fmt.Sprintf("Invalid CIDR: %s", value), http.StatusBadRequest)
+				}
+			}
 			ipSet.IPSetDescriptors = append(ipSet.IPSetDescriptors, IPSetDescriptor{
 				Type: descType, Value: value,
 			})

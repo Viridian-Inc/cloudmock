@@ -12,6 +12,7 @@ type PipesService struct {
 	store     *Store
 	accountID string
 	region    string
+	locator   ServiceLocator
 }
 
 // New returns a new PipesService for the given AWS account ID and region.
@@ -21,6 +22,20 @@ func New(accountID, region string) *PipesService {
 		accountID: accountID,
 		region:    region,
 	}
+}
+
+// NewWithLocator returns a new PipesService with a ServiceLocator for cross-service integration.
+func NewWithLocator(accountID, region string, locator ServiceLocator) *PipesService {
+	s := New(accountID, region)
+	s.locator = locator
+	s.store.SetLocator(locator)
+	return s
+}
+
+// SetLocator sets the service locator for cross-service calls.
+func (s *PipesService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
+	s.store.SetLocator(locator)
 }
 
 // Name returns the AWS service name used for routing.

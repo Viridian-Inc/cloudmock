@@ -12,6 +12,7 @@ import (
 type Server struct {
 	ServerID              string
 	Arn                   string
+	Endpoint              string
 	Domain                string
 	EndpointType          string
 	IdentityProviderType  string
@@ -79,14 +80,26 @@ func (s *Store) CreateServer(domain, endpointType, identityProvider, loggingRole
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Validate protocols
+	validProtocols := map[string]bool{"SFTP": true, "FTP": true, "FTPS": true, "AS2": true}
+	for _, p := range protocols {
+		if !validProtocols[p] {
+			return nil, fmt.Errorf("invalid protocol: %s (must be SFTP, FTP, FTPS, or AS2)", p)
+		}
+	}
+
 	id := s.newServerID()
 	transitions := []lifecycle.Transition{
 		{From: "OFFLINE", To: "ONLINE", Delay: 2 * time.Second},
 	}
 
+	// Generate endpoint URL
+	endpoint := fmt.Sprintf("%s.server.transfer.%s.amazonaws.com", id, s.region)
+
 	srv := &Server{
 		ServerID:             id,
 		Arn:                  s.arnPrefix() + "server/" + id,
+		Endpoint:             endpoint,
 		Domain:               domain,
 		EndpointType:         endpointType,
 		IdentityProviderType: identityProvider,
@@ -205,6 +218,11 @@ func (s *Store) CreateUser(serverID, userName, role, homeDir, homeDirType string
 	userMap := s.users[serverID]
 	if _, ok := userMap[userName]; ok {
 		return nil, fmt.Errorf("user already exists: %s", userName)
+	}
+
+	// Validate home directory starts with /
+	if homeDir != "" && homeDir[0] != '/' {
+		return nil, fmt.Errorf("home directory must start with /: %s", homeDir)
 	}
 
 	user := &User{

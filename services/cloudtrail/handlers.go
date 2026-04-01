@@ -3,6 +3,7 @@ package cloudtrail
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -452,7 +453,35 @@ func handleLookupEvents(ctx *service.RequestContext, store *Store) (*service.Res
 		maxResults = int(v)
 	}
 
-	events := store.LookupEvents(maxResults)
+	var startTime, endTime *time.Time
+	if v, ok := params["StartTime"].(float64); ok {
+		t := time.Unix(int64(v), 0).UTC()
+		startTime = &t
+	}
+	if v, ok := params["EndTime"].(float64); ok {
+		t := time.Unix(int64(v), 0).UTC()
+		endTime = &t
+	}
+
+	var attributes []LookupAttribute
+	if rawAttrs, ok := params["LookupAttributes"].([]any); ok {
+		for _, item := range rawAttrs {
+			m, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			attr := LookupAttribute{}
+			if v, ok := m["AttributeKey"].(string); ok {
+				attr.AttributeKey = v
+			}
+			if v, ok := m["AttributeValue"].(string); ok {
+				attr.AttributeValue = v
+			}
+			attributes = append(attributes, attr)
+		}
+	}
+
+	events := store.LookupEvents(maxResults, startTime, endTime, attributes)
 	items := make([]map[string]any, 0, len(events))
 	for _, e := range events {
 		m := map[string]any{

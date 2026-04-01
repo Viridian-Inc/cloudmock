@@ -202,31 +202,41 @@ func (s *Store) UpdateApplication(name, description string) (*Application, bool)
 
 func (s *Store) StartApplication(name string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	app, ok := s.applications[name]
 	if !ok {
+		s.mu.Unlock()
 		return false
 	}
 	state := string(app.Lifecycle.State())
 	if state != "READY" {
+		s.mu.Unlock()
 		return false
 	}
-	app.Lifecycle.ForceState("STARTING")
+	lc := app.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("STARTING")
+	}
 	return true
 }
 
 func (s *Store) StopApplication(name string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	app, ok := s.applications[name]
 	if !ok {
+		s.mu.Unlock()
 		return false
 	}
 	state := string(app.Lifecycle.State())
 	if state != "RUNNING" {
+		s.mu.Unlock()
 		return false
 	}
-	app.Lifecycle.ForceState("STOPPING")
+	lc := app.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("STOPPING")
+	}
 	return true
 }
 

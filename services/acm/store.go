@@ -97,6 +97,14 @@ type Store struct {
 	accountID   string
 	region      string
 	lcConfig    *lifecycle.Config
+	locator     ServiceLocator
+}
+
+// SetLocator sets the service locator for Route53 validation checks.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
 }
 
 // NewStore creates an empty ACM Store.
@@ -371,7 +379,8 @@ func (s *Store) RemoveTags(arn string, tags []Tag) *service.AWSError {
 	return nil
 }
 
-// RenewCertificate triggers renewal for a certificate.
+// RenewCertificate triggers renewal for a certificate. New validation records
+// are generated and the certificate is re-validated.
 func (s *Store) RenewCertificate(arn string) *service.AWSError {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -388,6 +397,20 @@ func (s *Store) RenewCertificate(arn string) *service.AWSError {
 		return service.NewAWSError("InvalidStateException",
 			"Certificate is not in a state that allows renewal.", http.StatusBadRequest)
 	}
+
+	// Generate new validation records for renewal.
+	for i := range cert.DomainValidationOptions {
+		dv := &cert.DomainValidationOptions[i]
+		if dv.ValidationMethod == string(ValidationDNS) {
+			dv.ResourceRecord = &ResourceRecord{
+				Name:  fmt.Sprintf("_cname.%s.", dv.DomainName),
+				Type:  "CNAME",
+				Value: generateValidationValue(),
+			}
+			dv.ValidationStatus = "SUCCESS" // Auto-succeed for renewal of already-issued cert
+		}
+	}
+
 	now := time.Now().UTC()
 	notAfter := now.AddDate(1, 0, 0)
 	cert.IssuedAt = &now

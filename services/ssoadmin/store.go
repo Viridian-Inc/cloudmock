@@ -4,10 +4,16 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
+)
+
+var (
+	iso8601DurationRegex = regexp.MustCompile(`^PT\d+[HM]$|^PT\d+H\d+M$|^P\d+D$`)
+	accountIDRegex12     = regexp.MustCompile(`^\d{12}$`)
 )
 
 // Tag represents a key-value tag.
@@ -150,6 +156,10 @@ func (s *Store) CreatePermissionSet(instanceArn, name, description, sessionDurat
 	arn := s.buildPermissionSetArn(instanceArn, psID)
 	if sessionDuration == "" {
 		sessionDuration = "PT1H"
+	} else if !iso8601DurationRegex.MatchString(sessionDuration) {
+		return nil, service.NewAWSError("ValidationException",
+			fmt.Sprintf("SessionDuration '%s' is not a valid ISO 8601 duration (e.g. PT1H, PT2H30M).", sessionDuration),
+			http.StatusBadRequest)
 	}
 
 	ps := &PermissionSet{
@@ -229,6 +239,11 @@ func (s *Store) DeletePermissionSet(instanceArn, permissionSetArn string) *servi
 func (s *Store) CreateAccountAssignment(instanceArn, permissionSetArn, targetId, targetType, principalId, principalType string) *service.AWSError {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if targetType == "AWS_ACCOUNT" && !accountIDRegex12.MatchString(targetId) {
+		return service.NewAWSError("ValidationException",
+			fmt.Sprintf("TargetId '%s' is not a valid 12-digit AWS account ID.", targetId),
+			http.StatusBadRequest)
+	}
 	assignment := AccountAssignment{
 		InstanceArn:      instanceArn,
 		PermissionSetArn: permissionSetArn,

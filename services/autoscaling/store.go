@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 )
 
 // LaunchConfiguration represents an Auto Scaling launch configuration.
@@ -218,25 +220,52 @@ func (s *Store) CreateAutoScalingGroup(name, lcName, vpcZoneID, healthCheckType 
 		CreatedTime:            time.Now().UTC(),
 	}
 
-	// Create simulated instances to match desired capacity.
-	for i := 0; i < desiredCapacity; i++ {
-		az := ""
-		if len(azs) > 0 {
-			az = azs[i%len(azs)]
-		}
-		s.instanceSeq++
-		inst := &AutoScalingInstance{
-			InstanceID:           fmt.Sprintf("i-%s", randomHex(8)),
-			AutoScalingGroupName: name,
-			AvailabilityZone:     az,
-			LifecycleState:       "InService",
-			HealthStatus:         "Healthy",
-			LaunchConfigName:     lcName,
-		}
-		asg.Instances = append(asg.Instances, inst)
+	s.autoScalingGroups[name] = asg
+
+	// Create simulated instances to match desired capacity using stub IDs.
+	s.reconcileInstances(asg)
+
+	return asg, true
+}
+
+// CreateAutoScalingGroupWithEC2 creates an ASG and provisions instances via EC2 locator.
+func (s *Store) CreateAutoScalingGroupWithEC2(name, lcName, vpcZoneID, healthCheckType string, minSize, maxSize, desiredCapacity, cooldown, hcGrace int, azs, tgARNs []string, tags map[string]string, locator ServiceLocator, bus *eventbus.Bus) (*AutoScalingGroup, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.autoScalingGroups[name]; exists {
+		return nil, false
+	}
+
+	if healthCheckType == "" {
+		healthCheckType = "EC2"
+	}
+	if cooldown == 0 {
+		cooldown = 300
+	}
+
+	asg := &AutoScalingGroup{
+		Name:                   name,
+		ARN:                    s.asgARN(name),
+		LaunchConfigName:       lcName,
+		MinSize:                minSize,
+		MaxSize:                maxSize,
+		DesiredCapacity:        desiredCapacity,
+		DefaultCooldown:        cooldown,
+		AvailabilityZones:      azs,
+		TargetGroupARNs:        tgARNs,
+		HealthCheckType:        healthCheckType,
+		HealthCheckGracePeriod: hcGrace,
+		VPCZoneIdentifier:      vpcZoneID,
+		Status:                 "InService",
+		Instances:              make([]*AutoScalingInstance, 0),
+		Tags:                   tags,
+		CreatedTime:            time.Now().UTC(),
 	}
 
 	s.autoScalingGroups[name] = asg
+	s.reconcileInstancesViaEC2(asg, locator, bus)
+
 	return asg, true
 }
 
@@ -338,6 +367,95 @@ func (s *Store) SetDesiredCapacity(name string, capacity int) bool {
 	}
 	asg.DesiredCapacity = capacity
 	s.reconcileInstances(asg)
+	return true
+}
+
+// SetDesiredCapacityWithEC2 sets desired capacity and reconciles via EC2.
+func (s *Store) SetDesiredCapacityWithEC2(name string, capacity int, locator ServiceLocator, bus *eventbus.Bus) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	asg, ok := s.autoScalingGroups[name]
+	if !ok {
+		return false
+	}
+	asg.DesiredCapacity = capacity
+	s.reconcileInstancesViaEC2(asg, locator, bus)
+	return true
+}
+
+// UpdateAutoScalingGroupWithEC2 updates an ASG and reconciles via EC2 if capacity changed.
+func (s *Store) UpdateAutoScalingGroupWithEC2(name, lcName, vpcZoneID, healthCheckType string, minSize, maxSize, desiredCapacity, cooldown, hcGrace int, locator ServiceLocator, bus *eventbus.Bus) (*AutoScalingGroup, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	asg, ok := s.autoScalingGroups[name]
+	if !ok {
+		return nil, false
+	}
+
+	if lcName != "" {
+		asg.LaunchConfigName = lcName
+	}
+	if vpcZoneID != "" {
+		asg.VPCZoneIdentifier = vpcZoneID
+	}
+	if healthCheckType != "" {
+		asg.HealthCheckType = healthCheckType
+	}
+	if minSize >= 0 {
+		asg.MinSize = minSize
+	}
+	if maxSize > 0 {
+		asg.MaxSize = maxSize
+	}
+	if desiredCapacity >= 0 {
+		asg.DesiredCapacity = desiredCapacity
+		s.reconcileInstancesViaEC2(asg, locator, bus)
+	}
+	if cooldown > 0 {
+		asg.DefaultCooldown = cooldown
+	}
+	if hcGrace > 0 {
+		asg.HealthCheckGracePeriod = hcGrace
+	}
+	return asg, true
+}
+
+// DeleteAutoScalingGroupWithEC2 deletes an ASG and terminates its EC2 instances.
+func (s *Store) DeleteAutoScalingGroupWithEC2(name string, locator ServiceLocator, bus *eventbus.Bus) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	asg, ok := s.autoScalingGroups[name]
+	if !ok {
+		return false
+	}
+
+	// Terminate all instances
+	for _, inst := range asg.Instances {
+		s.terminateEC2Instance(inst.InstanceID, locator)
+		if bus != nil {
+			bus.Publish(&eventbus.Event{
+				Source: "autoscaling",
+				Type:   "autoscaling:EC2_INSTANCE_TERMINATE",
+				Detail: map[string]any{
+					"AutoScalingGroupName": asg.Name,
+					"EC2InstanceId":        inst.InstanceID,
+				},
+			})
+		}
+	}
+
+	delete(s.autoScalingGroups, name)
+
+	// Remove associated policies.
+	if pols, ok := s.policyByName[name]; ok {
+		for _, arn := range pols {
+			delete(s.scalingPolicies, arn)
+		}
+		delete(s.policyByName, name)
+	}
 	return true
 }
 

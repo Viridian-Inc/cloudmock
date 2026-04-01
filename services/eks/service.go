@@ -35,6 +35,7 @@ func NewWithLocator(accountID, region string, locator ServiceLocator) *EKSServic
 // SetLocator sets the service locator for cross-service communication (EC2 for node groups).
 func (s *EKSService) SetLocator(locator ServiceLocator) {
 	s.locator = locator
+	s.store.SetLocator(locator)
 }
 
 // Name returns the AWS service name used for routing.

@@ -39,6 +39,9 @@ func (s *OpenSearchService) Actions() []service.Action {
 		{Name: "ListTags", Method: http.MethodPost, IAMAction: "es:ListTags"},
 		{Name: "UpgradeDomain", Method: http.MethodPost, IAMAction: "es:UpgradeDomain"},
 		{Name: "GetUpgradeStatus", Method: http.MethodPost, IAMAction: "es:GetUpgradeStatus"},
+		{Name: "IndexDocument", Method: http.MethodPost, IAMAction: "es:ESHttpPut"},
+		{Name: "Search", Method: http.MethodPost, IAMAction: "es:ESHttpGet"},
+		{Name: "ClusterHealth", Method: http.MethodPost, IAMAction: "es:ESHttpGet"},
 	}
 }
 
@@ -70,6 +73,12 @@ func (s *OpenSearchService) HandleRequest(ctx *service.RequestContext) (*service
 		return handleUpgradeDomain(ctx, s.store)
 	case "GetUpgradeStatus":
 		return handleGetUpgradeStatus(ctx, s.store)
+	case "IndexDocument":
+		return handleIndexDocument(ctx, s.store)
+	case "Search":
+		return handleSearch(ctx, s.store)
+	case "ClusterHealth":
+		return handleClusterHealth(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

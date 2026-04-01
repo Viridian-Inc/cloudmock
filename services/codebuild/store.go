@@ -79,6 +79,7 @@ type Build struct {
 	BuildNumber     int64
 	BuildStatus     string
 	CurrentPhase    string
+	Phases          []BuildPhase
 	StartTime       time.Time
 	EndTime         *time.Time
 	Source          ProjectSource
@@ -298,6 +299,7 @@ func (s *Store) StartBuild(projectName string, envOverrides *ProjectEnvironment)
 		BuildNumber:   buildNum,
 		BuildStatus:   BuildStatusSubmitted,
 		CurrentPhase:  "SUBMITTED",
+		Phases:        []BuildPhase{{PhaseType: PhaseSubmitted, PhaseStatus: "SUCCEEDED", StartTime: now}},
 		StartTime:     now,
 		Source:        p.Source,
 		Artifacts:     p.Artifacts,
@@ -327,6 +329,12 @@ func (s *Store) StartBuild(projectName string, envOverrides *ProjectEnvironment)
 			b.CurrentPhase = "COMPLETED"
 			now := time.Now().UTC()
 			b.EndTime = &now
+			// Generate full phase history
+			if to == lifecycle.State(BuildStatusSucceeded) {
+				b.Phases = GenerateCompletedPhases(b.StartTime)
+			} else {
+				b.Phases = GenerateFailedPhases(b.StartTime)
+			}
 		}
 	})
 
@@ -348,6 +356,7 @@ func (s *Store) GetBuild(buildID string) (*Build, *service.AWSError) {
 	if b.lifecycle != nil {
 		b.BuildStatus = string(b.lifecycle.State())
 	}
+	s.syncBuildPhases(b)
 	return b, nil
 }
 
@@ -362,12 +371,33 @@ func (s *Store) BatchGetBuilds(ids []string) ([]*Build, []string) {
 			if b.lifecycle != nil {
 				b.BuildStatus = string(b.lifecycle.State())
 			}
+			s.syncBuildPhases(b)
 			found = append(found, b)
 		} else {
 			notFound = append(notFound, id)
 		}
 	}
 	return found, notFound
+}
+
+// syncBuildPhases ensures build phases are populated based on current status.
+// This handles the case where the lifecycle OnTransition callback hasn't fired yet.
+func (s *Store) syncBuildPhases(b *Build) {
+	if b.BuildStatus == BuildStatusSucceeded && len(b.Phases) <= 1 {
+		b.Phases = GenerateCompletedPhases(b.StartTime)
+		b.CurrentPhase = "COMPLETED"
+		if b.EndTime == nil {
+			now := time.Now().UTC()
+			b.EndTime = &now
+		}
+	} else if b.BuildStatus == BuildStatusFailed && len(b.Phases) <= 1 {
+		b.Phases = GenerateFailedPhases(b.StartTime)
+		b.CurrentPhase = "COMPLETED"
+		if b.EndTime == nil {
+			now := time.Now().UTC()
+			b.EndTime = &now
+		}
+	}
 }
 
 func (s *Store) ListBuildsForProject(projectName string) []string {

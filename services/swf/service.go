@@ -53,6 +53,7 @@ func (s *SWFService) Actions() []service.Action {
 		{Name: "PollForActivityTask", Method: http.MethodPost, IAMAction: "swf:PollForActivityTask"},
 		{Name: "RespondActivityTaskCompleted", Method: http.MethodPost, IAMAction: "swf:RespondActivityTaskCompleted"},
 		{Name: "RespondActivityTaskFailed", Method: http.MethodPost, IAMAction: "swf:RespondActivityTaskFailed"},
+		{Name: "GetWorkflowExecutionHistory", Method: http.MethodPost, IAMAction: "swf:GetWorkflowExecutionHistory"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "swf:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "swf:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "swf:ListTagsForResource"},
@@ -118,6 +119,8 @@ func (s *SWFService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleRespondActivityTaskCompleted(ctx, s.store)
 	case "RespondActivityTaskFailed":
 		return handleRespondActivityTaskFailed(ctx, s.store)
+	case "GetWorkflowExecutionHistory":
+		return handleGetWorkflowExecutionHistory(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

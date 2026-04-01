@@ -305,6 +305,52 @@ func (s *Store) WriteRecords(dbName, tableName string, records []Record) bool {
 	return true
 }
 
+// QueryRecords performs a basic query against stored records with optional time range filtering.
+func (s *Store) QueryRecords(dbName, tableName, startTime, endTime string) ([]Record, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.records[dbName] == nil {
+		return nil, false
+	}
+	if _, ok := s.tables[dbName][tableName]; !ok {
+		return nil, false
+	}
+	allRecords := s.records[dbName][tableName]
+
+	// If no time filter, return all
+	if startTime == "" && endTime == "" {
+		result := make([]Record, len(allRecords))
+		copy(result, allRecords)
+		return result, true
+	}
+
+	// Filter by time range
+	var result []Record
+	for _, r := range allRecords {
+		if r.Time == "" {
+			continue
+		}
+		if startTime != "" && r.Time < startTime {
+			continue
+		}
+		if endTime != "" && r.Time > endTime {
+			continue
+		}
+		result = append(result, r)
+	}
+	return result, true
+}
+
+// GetRecordCount returns the number of records in a table.
+func (s *Store) GetRecordCount(dbName, tableName string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.records[dbName] == nil {
+		return 0
+	}
+	return len(s.records[dbName][tableName])
+}
+
 // ---- Tag operations ----
 
 func (s *Store) tagMapByARN(arn string) map[string]string {

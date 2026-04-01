@@ -2,11 +2,17 @@ package glue
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/mocklog"
+	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // Database represents a Glue catalog database.
@@ -57,6 +63,24 @@ type Crawler struct {
 	CreateTime   time.Time
 	LastUpdated  time.Time
 	Tags         map[string]string
+	LastCrawl    *LastCrawlInfo
+}
+
+// LastCrawlInfo holds metadata about the most recent crawler run.
+type LastCrawlInfo struct {
+	Status        string // SUCCEEDED, FAILED
+	ErrorMessage  string
+	LogGroup      string
+	LogStream     string
+	MessagePrefix string
+	StartTime     time.Time
+	TablesCreated int
+	TablesUpdated int
+}
+
+// ServiceLocator resolves other services by name.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
 }
 
 // CrawlerTargets holds crawler target configuration.
@@ -135,6 +159,7 @@ type Store struct {
 	accountID   string
 	region      string
 	lcConfig    *lifecycle.Config
+	locator     ServiceLocator
 }
 
 // NewStore creates a new Glue store.
@@ -369,31 +394,240 @@ func (s *Store) DeleteCrawler(name string) bool {
 	return true
 }
 
-func (s *Store) StartCrawler(name string) bool {
+// SetLocator sets the service locator for cross-service lookups.
+func (s *Store) SetLocator(locator ServiceLocator) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.locator = locator
+}
+
+func (s *Store) StartCrawler(name string) bool {
+	s.mu.Lock()
 	c, ok := s.crawlers[name]
 	if !ok {
+		s.mu.Unlock()
 		return false
 	}
 	if string(c.Lifecycle.State()) != "READY" {
+		s.mu.Unlock()
 		return false
 	}
-	c.Lifecycle.ForceState("RUNNING")
+	crawler := *c // copy for use outside lock
+	lc := c.Lifecycle
+	locator := s.locator
+	s.mu.Unlock()
+
+	if lc != nil {
+		lc.ForceState("RUNNING")
+	}
+
+	// Behavioral: discover S3 objects and generate mock table schemas
+	s.crawlerDiscoverAndCreateTables(&crawler, locator)
+
 	return true
+}
+
+// crawlerDiscoverAndCreateTables looks up S3 via locator, discovers objects,
+// and creates/updates tables in the Glue database.
+func (s *Store) crawlerDiscoverAndCreateTables(crawler *Crawler, locator ServiceLocator) {
+	tablesCreated := 0
+	tablesUpdated := 0
+
+	for _, target := range crawler.Targets.S3Targets {
+		if target.Path == "" {
+			continue
+		}
+
+		// Try to discover S3 objects via locator
+		objectKeys := s.listS3Objects(target.Path, locator)
+
+		// Generate mock table schema from discovered objects
+		tableName, columns := s.inferSchemaFromObjects(target.Path, objectKeys)
+		if tableName == "" {
+			continue
+		}
+
+		// Ensure the database exists
+		s.mu.Lock()
+		if _, ok := s.databases[crawler.DatabaseName]; !ok {
+			// Auto-create the database if it doesn't exist
+			s.databases[crawler.DatabaseName] = &Database{
+				Name:       crawler.DatabaseName,
+				CreateTime: time.Now().UTC(),
+				Parameters: make(map[string]string),
+			}
+			s.tables[crawler.DatabaseName] = make(map[string]*Table)
+		}
+
+		tbls := s.tables[crawler.DatabaseName]
+		now := time.Now().UTC()
+		if _, exists := tbls[tableName]; exists {
+			// Update existing table
+			tbls[tableName].StorageDesc.Columns = columns
+			tbls[tableName].StorageDesc.Location = target.Path
+			tbls[tableName].UpdateTime = now
+			tablesUpdated++
+		} else {
+			// Create new table
+			tbls[tableName] = &Table{
+				Name:         tableName,
+				DatabaseName: crawler.DatabaseName,
+				StorageDesc: StorageDescriptor{
+					Location:     target.Path,
+					InputFormat:  "org.apache.hadoop.mapred.TextInputFormat",
+					OutputFormat: "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat",
+					Columns:      columns,
+				},
+				Parameters: map[string]string{"classification": "csv", "crawlerSchemaDeserializerVersion": "1.0"},
+				CreateTime: now,
+				UpdateTime: now,
+			}
+			tablesCreated++
+		}
+
+		// Update crawler's LastCrawl metadata
+		c := s.crawlers[crawler.Name]
+		if c != nil {
+			c.LastCrawl = &LastCrawlInfo{
+				Status:        "SUCCEEDED",
+				LogGroup:      "/aws-glue/crawlers",
+				LogStream:     crawler.Name,
+				MessagePrefix: crawler.Name,
+				StartTime:     now,
+				TablesCreated: tablesCreated,
+				TablesUpdated: tablesUpdated,
+			}
+		}
+		s.mu.Unlock()
+	}
+}
+
+// listS3Objects queries the S3 service for objects at the given path.
+func (s *Store) listS3Objects(path string, locator ServiceLocator) []string {
+	if locator == nil {
+		return nil
+	}
+	s3Svc, err := locator.Lookup("s3")
+	if err != nil || s3Svc == nil {
+		return nil
+	}
+
+	// Extract bucket and prefix from s3://bucket/prefix/ path
+	trimmed := strings.TrimPrefix(path, "s3://")
+	parts := strings.SplitN(trimmed, "/", 2)
+	if len(parts) == 0 {
+		return nil
+	}
+	bucket := parts[0]
+	prefix := ""
+	if len(parts) > 1 {
+		prefix = parts[1]
+	}
+
+	body, _ := json.Marshal(map[string]string{
+		"Bucket": bucket,
+		"Prefix": prefix,
+	})
+	ctx := &service.RequestContext{
+		Action:     "ListObjectsV2",
+		Body:       body,
+		RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+	}
+	resp, err := s3Svc.HandleRequest(ctx)
+	if err != nil || resp == nil || resp.Body == nil {
+		return nil
+	}
+
+	// Parse response
+	data, err := json.Marshal(resp.Body)
+	if err != nil {
+		return nil
+	}
+	var result struct {
+		Contents []struct {
+			Key string `json:"Key"`
+		} `json:"Contents"`
+	}
+	if err := json.Unmarshal(data, &result); err != nil {
+		return nil
+	}
+	keys := make([]string, len(result.Contents))
+	for i, c := range result.Contents {
+		keys[i] = c.Key
+	}
+	return keys
+}
+
+// inferSchemaFromObjects generates a table name and columns from S3 object keys.
+func (s *Store) inferSchemaFromObjects(path string, objectKeys []string) (string, []Column) {
+	// Derive table name from the path
+	trimmed := strings.TrimPrefix(path, "s3://")
+	trimmed = strings.TrimSuffix(trimmed, "/")
+	parts := strings.Split(trimmed, "/")
+
+	tableName := "default_table"
+	if len(parts) > 1 {
+		tableName = strings.ReplaceAll(parts[len(parts)-1], "-", "_")
+	} else if len(parts) == 1 {
+		tableName = strings.ReplaceAll(parts[0], "-", "_")
+	}
+
+	// Generate mock columns based on object keys or default
+	if len(objectKeys) > 0 {
+		// Infer columns from the first object key's prefix structure
+		columns := []Column{
+			{Name: "id", Type: "bigint"},
+			{Name: "timestamp", Type: "string"},
+			{Name: "data", Type: "string"},
+		}
+		// Add partition-like columns from prefixes
+		for _, key := range objectKeys {
+			keyParts := strings.Split(key, "/")
+			for _, part := range keyParts {
+				if strings.Contains(part, "=") {
+					kv := strings.SplitN(part, "=", 2)
+					colName := strings.ReplaceAll(kv[0], "-", "_")
+					found := false
+					for _, c := range columns {
+						if c.Name == colName {
+							found = true
+							break
+						}
+					}
+					if !found {
+						columns = append(columns, Column{Name: colName, Type: "string"})
+					}
+				}
+			}
+		}
+		return tableName, columns
+	}
+
+	// Default columns when no S3 objects are available
+	return tableName, []Column{
+		{Name: "id", Type: "bigint", Comment: "Auto-generated by crawler"},
+		{Name: "name", Type: "string", Comment: "Auto-generated by crawler"},
+		{Name: "value", Type: "string", Comment: "Auto-generated by crawler"},
+		{Name: "created_at", Type: "timestamp", Comment: "Auto-generated by crawler"},
+	}
 }
 
 func (s *Store) StopCrawler(name string) bool {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.crawlers[name]
 	if !ok {
+		s.mu.Unlock()
 		return false
 	}
 	if string(c.Lifecycle.State()) != "RUNNING" {
+		s.mu.Unlock()
 		return false
 	}
-	c.Lifecycle.ForceState("STOPPING")
+	lc := c.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("STOPPING")
+	}
 	return true
 }
 
@@ -448,8 +682,8 @@ func jobRunTransitions() []lifecycle.Transition {
 
 func (s *Store) StartJobRun(jobName string) (*JobRun, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if _, ok := s.jobs[jobName]; !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	now := time.Now().UTC()
@@ -462,6 +696,17 @@ func (s *Store) StartJobRun(jobName string) (*JobRun, bool) {
 		Lifecycle: lifecycle.NewMachine("STARTING", jobRunTransitions(), s.lcConfig),
 	}
 	s.jobRuns[jobName] = append(s.jobRuns[jobName], run)
+	locator := s.locator
+	s.mu.Unlock()
+
+	// Write mock execution logs via mocklog
+	if locator != nil {
+		writer := mocklog.NewWriter(locator)
+		phases := []string{"INSTALL", "COMPILE", "EXECUTE", "CLEANUP"}
+		lines := mocklog.GenerateBuildLines("glue", run.ID, phases)
+		writer.WriteBuildLog("/aws-glue/jobs/"+jobName, run.ID, lines)
+	}
+
 	return run, true
 }
 

@@ -576,7 +576,4 @@ func handlePutEvaluations(ctx *service.RequestContext, store *Store) (*service.R
 	return jsonOK(map[string]any{"FailedEvaluations": []any{}})
 }
 
-func handleGetResourceConfigHistory(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	// Return empty config history for mock
-	return jsonOK(map[string]any{"configurationItems": []any{}})
-}
+// handleGetResourceConfigHistory is now implemented in service.go as handleGetResourceConfigHistoryWithStore.

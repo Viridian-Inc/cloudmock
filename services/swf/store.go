@@ -48,6 +48,14 @@ type ActivityType struct {
 	DeprecationDate         *time.Time
 }
 
+// HistoryEvent represents a workflow history event.
+type HistoryEvent struct {
+	EventID   int64
+	EventType string
+	Timestamp time.Time
+	Attrs     map[string]any
+}
+
 // WorkflowExecution represents a running workflow execution.
 type WorkflowExecution struct {
 	Domain       string
@@ -66,6 +74,9 @@ type WorkflowExecution struct {
 	DecisionTaskToken   string
 	// Activity task management
 	PendingActivities []PendingActivity
+	// History events
+	History     []HistoryEvent
+	nextEventID int64
 }
 
 // PendingActivity tracks a scheduled activity task.
@@ -359,12 +370,25 @@ func (s *Store) StartWorkflowExecution(domain, workflowID, workflowName, workflo
 		taskList = wt.DefaultTaskList
 	}
 	runID := newRunID()
+	now := time.Now().UTC()
 	exec := &WorkflowExecution{
 		Domain: domain, WorkflowID: workflowID, RunID: runID,
 		WorkflowType: wt, TaskList: taskList, Input: input,
-		Status: "OPEN", StartTime: time.Now().UTC(), Tags: tags,
+		Status: "OPEN", StartTime: now, Tags: tags,
 		PendingDecisionTask: true, DecisionTaskToken: newTaskToken(),
+		nextEventID: 1,
 	}
+
+	// Record initial history events.
+	exec.addEvent("WorkflowExecutionStarted", map[string]any{
+		"input":        input,
+		"taskList":     taskList,
+		"workflowType": map[string]any{"name": workflowName, "version": workflowVersion},
+	})
+	exec.addEvent("DecisionTaskScheduled", map[string]any{
+		"taskList": taskList,
+	})
+
 	execs[execKey(workflowID, runID)] = exec
 	return runID, ""
 }
@@ -520,6 +544,7 @@ func (s *Store) RespondDecisionTaskCompleted(taskToken string, decisions []map[s
 	for _, execs := range s.executions {
 		for _, exec := range execs {
 			if exec.DecisionTaskToken == taskToken {
+				exec.addEvent("DecisionTaskCompleted", nil)
 				// Process decisions
 				for _, decision := range decisions {
 					decisionType, _ := decision["decisionType"].(string)
@@ -529,16 +554,19 @@ func (s *Store) RespondDecisionTaskCompleted(taskToken string, decisions []map[s
 						exec.Status = "COMPLETED"
 						exec.CloseStatus = "COMPLETED"
 						exec.CloseTime = &now
+						exec.addEvent("WorkflowExecutionCompleted", nil)
 					case "FailWorkflowExecution":
 						now := time.Now().UTC()
 						exec.Status = "FAILED"
 						exec.CloseStatus = "FAILED"
 						exec.CloseTime = &now
+						exec.addEvent("WorkflowExecutionFailed", decision)
 					case "CancelWorkflowExecution":
 						now := time.Now().UTC()
 						exec.Status = "CANCELED"
 						exec.CloseStatus = "CANCELED"
 						exec.CloseTime = &now
+						exec.addEvent("WorkflowExecutionCanceled", nil)
 					case "ScheduleActivityTask":
 						attrs, _ := decision["scheduleActivityTaskDecisionAttributes"].(map[string]any)
 						activityID, _ := attrs["activityId"].(string)
@@ -550,6 +578,7 @@ func (s *Store) RespondDecisionTaskCompleted(taskToken string, decisions []map[s
 							TaskToken: newTaskToken(), Input: inputStr,
 							Scheduled: time.Now().UTC(),
 						})
+						exec.addEvent("ActivityTaskScheduled", attrs)
 					}
 				}
 				return true
@@ -619,6 +648,34 @@ func (s *Store) RespondActivityTaskFailed(taskToken, reason, details string) boo
 		}
 	}
 	return false
+}
+
+// addEvent appends a history event to the execution. Caller must hold store lock.
+func (e *WorkflowExecution) addEvent(eventType string, attrs map[string]any) {
+	e.History = append(e.History, HistoryEvent{
+		EventID:   e.nextEventID,
+		EventType: eventType,
+		Timestamp: time.Now().UTC(),
+		Attrs:     attrs,
+	})
+	e.nextEventID++
+}
+
+// GetWorkflowExecutionHistory returns the history for an execution.
+func (s *Store) GetWorkflowExecutionHistory(domain, workflowID, runID string) ([]HistoryEvent, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	execs, ok := s.executions[domain]
+	if !ok {
+		return nil, false
+	}
+	exec, ok := execs[execKey(workflowID, runID)]
+	if !ok {
+		return nil, false
+	}
+	result := make([]HistoryEvent, len(exec.History))
+	copy(result, exec.History)
+	return result, true
 }
 
 // TagResource applies tags to a domain by ARN.

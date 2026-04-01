@@ -219,18 +219,43 @@ func handleCreateAccount(ctx *service.RequestContext, store *Store) (*service.Re
 	}
 	name, _ := params["AccountName"].(string)
 	email, _ := params["Email"].(string)
-	acct, awsErr := store.CreateAccount(name, email)
+	_, status, awsErr := store.CreateAccount(name, email)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}
 	return jsonOK(map[string]any{
 		"CreateAccountStatus": map[string]any{
-			"Id":              newUUID(),
-			"AccountName":     acct.Name,
-			"State":           "SUCCEEDED",
-			"AccountId":       acct.Id,
-			"RequestedTimestamp": float64(acct.JoinedTimestamp.Unix()),
-			"CompletedTimestamp": float64(acct.JoinedTimestamp.Unix()),
+			"Id":                 status.Id,
+			"AccountName":        status.AccountName,
+			"State":              status.State,
+			"AccountId":          status.AccountId,
+			"RequestedTimestamp": float64(status.RequestedTimestamp.Unix()),
+			"CompletedTimestamp": float64(status.CompletedTimestamp.Unix()),
+		},
+	})
+}
+
+func handleDescribeCreateAccountStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	requestID, _ := params["CreateAccountRequestId"].(string)
+	if requestID == "" {
+		return jsonErr(service.ErrValidation("CreateAccountRequestId is required."))
+	}
+	status, awsErr := store.GetCreateAccountStatus(requestID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"CreateAccountStatus": map[string]any{
+			"Id":                 status.Id,
+			"AccountName":        status.AccountName,
+			"State":              status.State,
+			"AccountId":          status.AccountId,
+			"RequestedTimestamp": float64(status.RequestedTimestamp.Unix()),
+			"CompletedTimestamp": float64(status.CompletedTimestamp.Unix()),
 		},
 	})
 }

@@ -876,3 +876,59 @@ func handleListTags(ctx *service.RequestContext, store *Store) (*service.Respons
 	}
 	return jsonOK(map[string]any{"Tags": entriesToTags(tags)})
 }
+
+// ---- InvokeEndpoint ----
+
+func handleInvokeEndpoint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	endpointName := getStr(params, "EndpointName")
+	if endpointName == "" {
+		return jsonErr(service.ErrValidation("EndpointName is required."))
+	}
+
+	ep, awsErr := store.GetEndpoint(endpointName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	status := EndpointStatus(ep.Lifecycle.State())
+	if status != EndpointInService {
+		return jsonErr(service.NewAWSError("ValidationError",
+			"Endpoint is not InService", http.StatusBadRequest))
+	}
+
+	// Return a mock prediction response echoing the input shape with random scores.
+	body := params["Body"]
+	contentType := getStr(params, "ContentType")
+	if contentType == "" {
+		contentType = "application/json"
+	}
+
+	var responseBody any
+	if body != nil {
+		// Echo input with prediction scores appended.
+		responseBody = map[string]any{
+			"predictions": []map[string]any{
+				{"score": 0.95, "label": "positive"},
+				{"score": 0.05, "label": "negative"},
+			},
+			"input": body,
+		}
+	} else {
+		responseBody = map[string]any{
+			"predictions": []map[string]any{
+				{"score": 0.95, "label": "positive"},
+				{"score": 0.05, "label": "negative"},
+			},
+		}
+	}
+
+	return jsonOK(map[string]any{
+		"Body":        responseBody,
+		"ContentType": contentType,
+		"InvokedProductionVariant": "AllTraffic",
+	})
+}

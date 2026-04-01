@@ -459,13 +459,31 @@ func (s *Store) DescribeTargetHealth(tgARN string) ([]*Target, bool) {
 	}
 	result := make([]*Target, 0, len(tg.Targets))
 	for _, t := range tg.Targets {
-		// Simulate that targets become healthy after registration.
+		// For backward compatibility, promote initial to healthy on read
+		// when no health checker is actively running.
 		if t.Health == "initial" {
 			t.Health = "healthy"
 		}
 		result = append(result, t)
 	}
 	return result, true
+}
+
+// DeregisterTargetsWithDraining sets targets to draining state instead of removing.
+func (s *Store) DeregisterTargetsWithDraining(tgARN string, targetIDs []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tg, ok := s.targetGroups[tgARN]
+	if !ok {
+		return false
+	}
+	for _, id := range targetIDs {
+		if t, exists := tg.Targets[id]; exists {
+			t.Health = "draining"
+		}
+	}
+	return true
 }
 
 // ---- Listener operations ----

@@ -410,6 +410,33 @@ func TestUntagApi(t *testing.T) {
 	assert.Nil(t, tags["team"])
 }
 
+// ---- Realistic URL tests ----
+
+func TestGraphqlApiURLs(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	w := doAppSync(t, gw, "CreateGraphqlApi", map[string]any{"name": "url-api"})
+	assert.Equal(t, http.StatusOK, w.Code)
+	api := decodeBody(t, w)["graphqlApi"].(map[string]any)
+	uris := api["uris"].(map[string]any)
+
+	graphqlURL := uris["GRAPHQL"].(string)
+	realtimeURL := uris["REALTIME"].(string)
+
+	assert.Contains(t, graphqlURL, "appsync-api.")
+	assert.Contains(t, graphqlURL, ".amazonaws.com/graphql")
+	assert.True(t, len(graphqlURL) > 40, "GraphQL URL should be realistic length")
+
+	assert.Contains(t, realtimeURL, "wss://")
+	assert.Contains(t, realtimeURL, "appsync-realtime-api.")
+	assert.Contains(t, realtimeURL, ".amazonaws.com/graphql")
+}
+
+func TestCreateGraphqlApiMissingNameReturnsError(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	w := doAppSync(t, gw, "CreateGraphqlApi", map[string]any{})
+	assert.NotEqual(t, http.StatusOK, w.Code)
+}
+
 // ---- Invalid action ----
 
 func TestInvalidAction(t *testing.T) {

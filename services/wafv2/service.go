@@ -53,6 +53,8 @@ func (s *WAFv2Service) Actions() []service.Action {
 		{Name: "PutLoggingConfiguration", Method: http.MethodPost, IAMAction: "wafv2:PutLoggingConfiguration"},
 		{Name: "GetLoggingConfiguration", Method: http.MethodPost, IAMAction: "wafv2:GetLoggingConfiguration"},
 		{Name: "DeleteLoggingConfiguration", Method: http.MethodPost, IAMAction: "wafv2:DeleteLoggingConfiguration"},
+		{Name: "GetSampledRequests", Method: http.MethodPost, IAMAction: "wafv2:GetSampledRequests"},
+		{Name: "CheckRequest", Method: http.MethodPost, IAMAction: "wafv2:CheckRequest"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "wafv2:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "wafv2:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "wafv2:ListTagsForResource"},
@@ -115,6 +117,10 @@ func (s *WAFv2Service) HandleRequest(ctx *service.RequestContext) (*service.Resp
 		return handleGetLoggingConfiguration(ctx, s.store)
 	case "DeleteLoggingConfiguration":
 		return handleDeleteLoggingConfiguration(ctx, s.store)
+	case "GetSampledRequests":
+		return handleGetSampledRequests(ctx, s.store)
+	case "CheckRequest":
+		return handleCheckRequest(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

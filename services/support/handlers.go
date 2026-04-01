@@ -73,18 +73,39 @@ func caseResponse(sc *SupportCase) map[string]any {
 	return resp
 }
 
+// validSeverityCodes is the set of allowed severity codes for support cases.
+var validSeverityCodes = map[string]bool{
+	"low": true, "normal": true, "high": true, "urgent": true, "critical": true,
+}
+
 func handleCreateCase(params map[string]any, store *Store) (*service.Response, error) {
 	subject := str(params, "subject")
 	if subject == "" {
-		return jsonErr(service.ErrValidation("subject is required"))
+		return jsonErr(service.NewAWSError("ValidationException",
+			"1 validation error detected: Value at 'subject' failed to satisfy constraint: Member must not be null",
+			http.StatusBadRequest))
+	}
+
+	severityCode := str(params, "severityCode")
+	if severityCode != "" && !validSeverityCodes[severityCode] {
+		return jsonErr(service.NewAWSError("CaseCreationLimitExceeded",
+			"Invalid severity code: "+severityCode+". Allowed values: low, normal, high, urgent, critical",
+			http.StatusBadRequest))
+	}
+
+	communicationBody := str(params, "communicationBody")
+	if communicationBody == "" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"1 validation error detected: Value at 'communicationBody' failed to satisfy constraint: Member must not be null",
+			http.StatusBadRequest))
 	}
 
 	sc, _ := store.CreateCase(
 		subject,
 		str(params, "serviceCode"),
-		str(params, "severityCode"),
+		severityCode,
 		str(params, "categoryCode"),
-		str(params, "communicationBody"),
+		communicationBody,
 		str(params, "submittedBy"),
 		str(params, "language"),
 		strSlice(params, "ccEmailAddresses"),

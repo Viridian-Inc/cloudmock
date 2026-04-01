@@ -8,6 +8,20 @@ import (
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
 )
 
+// VaultLock represents a vault lock policy.
+type VaultLock struct {
+	Policy    string
+	State     string // InProgress, Locked
+	LockID    string
+	CreatedAt time.Time
+}
+
+// VaultNotification represents vault notification configuration.
+type VaultNotification struct {
+	SNSTopic string
+	Events   []string
+}
+
 // Vault represents a Glacier vault.
 type Vault struct {
 	VaultName         string
@@ -16,6 +30,8 @@ type Vault struct {
 	LastInventoryDate *time.Time
 	NumberOfArchives  int64
 	SizeInBytes       int64
+	Lock              *VaultLock
+	Notification      *VaultNotification
 }
 
 // Archive represents a Glacier archive.
@@ -110,16 +126,86 @@ func (s *Store) ListVaults() []*Vault {
 	return out
 }
 
-// DeleteVault removes a vault.
-func (s *Store) DeleteVault(name string) bool {
+// DeleteVault removes a vault. Returns false, reason if it fails.
+func (s *Store) DeleteVault(name string) (bool, string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if _, ok := s.vaults[name]; !ok {
-		return false
+	vault, ok := s.vaults[name]
+	if !ok {
+		return false, "not_found"
+	}
+	if vault.NumberOfArchives > 0 {
+		return false, "not_empty"
 	}
 	delete(s.vaults, name)
 	delete(s.archives, name)
-	return true
+	return true, ""
+}
+
+// InitiateVaultLock starts the vault lock process (step 1 of 2).
+func (s *Store) InitiateVaultLock(vaultName, policy string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return "", fmt.Errorf("vault not found: %s", vaultName)
+	}
+	if vault.Lock != nil && vault.Lock.State == "Locked" {
+		return "", fmt.Errorf("vault is already locked: %s", vaultName)
+	}
+	s.jobSeq++
+	lockID := fmt.Sprintf("lock-%012d", s.jobSeq)
+	vault.Lock = &VaultLock{
+		Policy:    policy,
+		State:     "InProgress",
+		LockID:    lockID,
+		CreatedAt: time.Now().UTC(),
+	}
+	return lockID, nil
+}
+
+// CompleteVaultLock completes the vault lock (step 2 of 2).
+func (s *Store) CompleteVaultLock(vaultName, lockID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", vaultName)
+	}
+	if vault.Lock == nil || vault.Lock.State != "InProgress" {
+		return fmt.Errorf("no in-progress vault lock for: %s", vaultName)
+	}
+	if vault.Lock.LockID != lockID {
+		return fmt.Errorf("lock ID does not match")
+	}
+	vault.Lock.State = "Locked"
+	return nil
+}
+
+// SetVaultNotifications sets notification config on a vault.
+func (s *Store) SetVaultNotifications(vaultName, snsTopic string, events []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", vaultName)
+	}
+	vault.Notification = &VaultNotification{SNSTopic: snsTopic, Events: events}
+	return nil
+}
+
+// GetVaultNotifications returns vault notification config.
+func (s *Store) GetVaultNotifications(vaultName string) (*VaultNotification, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return nil, fmt.Errorf("vault not found: %s", vaultName)
+	}
+	if vault.Notification == nil {
+		return nil, fmt.Errorf("no notification configuration for vault: %s", vaultName)
+	}
+	return vault.Notification, nil
 }
 
 // UploadArchive uploads an archive to a vault.

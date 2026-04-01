@@ -199,16 +199,20 @@ func (s *Store) ListClusters() []*Cluster {
 
 func (s *Store) DeleteCluster(arn string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.clusters[arn]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("NotFoundException",
 			fmt.Sprintf("Cluster %s not found", arn), http.StatusNotFound)
 	}
-	c.Lifecycle.ForceState(lifecycle.State(ClusterDeleting))
+	lc := c.Lifecycle
 	delete(s.clusters, arn)
 	delete(s.clustersByName, c.ClusterName)
 	delete(s.tagsByArn, arn)
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(ClusterDeleting))
+	}
 	return nil
 }
 

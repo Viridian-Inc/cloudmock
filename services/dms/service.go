@@ -39,6 +39,8 @@ func (s *DMSService) Actions() []service.Action {
 		{Name: "CreateEventSubscription", Method: http.MethodPost, IAMAction: "dms:CreateEventSubscription"},
 		{Name: "DescribeEventSubscriptions", Method: http.MethodPost, IAMAction: "dms:DescribeEventSubscriptions"},
 		{Name: "DeleteEventSubscription", Method: http.MethodPost, IAMAction: "dms:DeleteEventSubscription"},
+		{Name: "TestConnection", Method: http.MethodPost, IAMAction: "dms:TestConnection"},
+		{Name: "DescribeConnections", Method: http.MethodPost, IAMAction: "dms:DescribeConnections"},
 	}
 }
 
@@ -81,6 +83,10 @@ func (s *DMSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDescribeEventSubscriptions(s.store)
 	case "DeleteEventSubscription":
 		return handleDeleteEventSubscription(params, s.store)
+	case "TestConnection":
+		return handleTestConnection(params, s.store)
+	case "DescribeConnections":
+		return handleDescribeConnections(s.store)
 	default:
 		return jsonErr(service.NewAWSError("InvalidAction",
 			"The action "+ctx.Action+" is not valid for this web service.",

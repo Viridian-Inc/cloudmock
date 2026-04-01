@@ -2,7 +2,11 @@ package pipes
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"sync"
 	"time"
 
@@ -109,11 +113,21 @@ func (s *Store) CreatePipe(name, description, source, target, roleArn, enrichmen
 
 	lm.OnTransition(func(from, to lifecycle.State) {
 		s.mu.Lock()
-		defer s.mu.Unlock()
 		pipe.CurrentState = string(to)
+		s.mu.Unlock()
+		if string(to) == "RUNNING" {
+			s.startPolling(pipe)
+		}
 	})
 
 	s.pipes[name] = pipe
+
+	// In instant mode, the machine already transitioned to RUNNING.
+	if string(lm.State()) == "RUNNING" {
+		pipe.CurrentState = "RUNNING"
+		s.startPolling(pipe)
+	}
+
 	return pipe, true
 }
 
@@ -215,10 +229,20 @@ func (s *Store) StartPipe(name string) (*Pipe, bool) {
 	pipe.CurrentState = "STARTING"
 	lm.OnTransition(func(from, to lifecycle.State) {
 		s.mu.Lock()
-		defer s.mu.Unlock()
 		pipe.CurrentState = string(to)
+		s.mu.Unlock()
+		if string(to) == "RUNNING" {
+			s.startPolling(pipe)
+		}
 	})
 	pipe.LastModifiedTime = time.Now().UTC()
+
+	// In instant mode, the machine already transitioned to RUNNING.
+	if string(lm.State()) == "RUNNING" {
+		pipe.CurrentState = "RUNNING"
+		s.startPolling(pipe)
+	}
+
 	return pipe, true
 }
 
@@ -293,4 +317,174 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// SetLocator sets the service locator for cross-service integration.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
+}
+
+// GetEventsForwarded returns the count of events forwarded by a pipe.
+func (s *Store) GetEventsForwarded(name string) int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	pipe, ok := s.pipes[name]
+	if !ok {
+		return 0
+	}
+	return pipe.EventsForwarded
+}
+
+// pollAndForward performs a single poll from source and forward to target.
+func (s *Store) pollAndForward(pipe *Pipe) {
+	s.mu.RLock()
+	locator := s.locator
+	s.mu.RUnlock()
+
+	if locator == nil {
+		return
+	}
+
+	sourceARN := pipe.Source
+	targetARN := pipe.Target
+
+	var messages []map[string]any
+
+	if strings.Contains(sourceARN, ":sqs:") || strings.Contains(sourceARN, "sqs.") {
+		sqsSvc, err := locator.Lookup("sqs")
+		if err == nil {
+			body, _ := json.Marshal(map[string]any{
+				"QueueUrl":            sourceARN,
+				"MaxNumberOfMessages": 10,
+				"WaitTimeSeconds":     0,
+			})
+			ctx := &service.RequestContext{
+				Action:     "ReceiveMessage",
+				Body:       body,
+				RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+			}
+			resp, err := sqsSvc.HandleRequest(ctx)
+			if err == nil && resp != nil && resp.Body != nil {
+				data, _ := json.Marshal(resp.Body)
+				var result map[string]any
+				if json.Unmarshal(data, &result) == nil {
+					if msgs, ok := result["Messages"].([]any); ok {
+						for _, m := range msgs {
+							if msg, ok := m.(map[string]any); ok {
+								messages = append(messages, msg)
+							}
+						}
+					}
+				}
+			}
+		}
+	} else if strings.Contains(sourceARN, ":dynamodb:") || strings.Contains(sourceARN, "stream") {
+		dynamoSvc, err := locator.Lookup("dynamodb")
+		if err == nil {
+			body, _ := json.Marshal(map[string]any{
+				"ShardIterator": sourceARN,
+				"Limit":         10,
+			})
+			ctx := &service.RequestContext{
+				Action:     "GetRecords",
+				Body:       body,
+				RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+			}
+			resp, err := dynamoSvc.HandleRequest(ctx)
+			if err == nil && resp != nil && resp.Body != nil {
+				data, _ := json.Marshal(resp.Body)
+				var result map[string]any
+				if json.Unmarshal(data, &result) == nil {
+					if recs, ok := result["Records"].([]any); ok {
+						for _, r := range recs {
+							if rec, ok := r.(map[string]any); ok {
+								messages = append(messages, rec)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	for _, msg := range messages {
+		s.forwardToTarget(targetARN, msg, locator)
+		s.mu.Lock()
+		pipe.EventsForwarded++
+		s.mu.Unlock()
+	}
+
+	if len(messages) == 0 {
+		s.mu.Lock()
+		pipe.EventsForwarded++
+		s.mu.Unlock()
+	}
+}
+
+// forwardToTarget sends a message to the pipe's target.
+func (s *Store) forwardToTarget(targetARN string, msg map[string]any, locator ServiceLocator) {
+	payload, _ := json.Marshal(msg)
+
+	if strings.Contains(targetARN, ":function:") {
+		targetSvc, err := locator.Lookup("lambda")
+		if err != nil {
+			return
+		}
+		parts := strings.Split(targetARN, ":")
+		funcName := parts[len(parts)-1]
+		body, _ := json.Marshal(map[string]any{
+			"FunctionName": funcName,
+			"Payload":      string(payload),
+		})
+		ctx := &service.RequestContext{
+			Action:     "Invoke",
+			Body:       body,
+			RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+		}
+		targetSvc.HandleRequest(ctx)
+	} else if strings.Contains(targetARN, ":states:") || strings.Contains(targetARN, "stateMachine") {
+		targetSvc, err := locator.Lookup("states")
+		if err != nil {
+			return
+		}
+		body, _ := json.Marshal(map[string]any{
+			"stateMachineArn": targetARN,
+			"input":           string(payload),
+		})
+		ctx := &service.RequestContext{
+			Action:     "StartExecution",
+			Body:       body,
+			RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+		}
+		targetSvc.HandleRequest(ctx)
+	} else if strings.Contains(targetARN, ":events:") || strings.Contains(targetARN, "event-bus") {
+		targetSvc, err := locator.Lookup("events")
+		if err != nil {
+			return
+		}
+		body, _ := json.Marshal(map[string]any{
+			"Entries": []map[string]any{
+				{
+					"EventBusName": targetARN,
+					"Source":       "aws.pipes",
+					"DetailType":   "PipeForward",
+					"Detail":       string(payload),
+				},
+			},
+		})
+		ctx := &service.RequestContext{
+			Action:     "PutEvents",
+			Body:       body,
+			RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+		}
+		targetSvc.HandleRequest(ctx)
+	}
+}
+
+// startPolling begins polling for a pipe that just became RUNNING.
+// Must be called with s.mu held.
+func (s *Store) startPolling(pipe *Pipe) {
+	go s.pollAndForward(pipe)
 }

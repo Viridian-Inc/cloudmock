@@ -845,6 +845,27 @@ func xmlErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatXML}, awsErr
 }
 
+// ---- TestFailover ----
+
+func handleTestFailover(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	rgID := form.Get("ReplicationGroupId")
+	nodeGroupID := form.Get("NodeGroupId")
+	if rgID == "" {
+		return xmlErr(service.ErrValidation("ReplicationGroupId is required."))
+	}
+	rg, ok := store.TestFailover(rgID, nodeGroupID)
+	if !ok {
+		return xmlErr(service.NewAWSError("ReplicationGroupNotFoundFault",
+			"ReplicationGroup "+rgID+" not found", http.StatusNotFound))
+	}
+	return xmlOK(map[string]any{
+		"ReplicationGroupId": rg.ID,
+		"Status":             rg.Status,
+		"MemberClusters":     rg.MemberClusters,
+	})
+}
+
 func newUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)

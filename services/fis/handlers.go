@@ -78,9 +78,9 @@ func templateResponse(t *ExperimentTemplate) map[string]any {
 
 func experimentResponse(e *Experiment) map[string]any {
 	resp := map[string]any{
-		"id":           e.ID,
+		"id":                   e.ID,
 		"experimentTemplateId": e.TemplateID,
-		"roleArn":      e.RoleArn,
+		"roleArn":              e.RoleArn,
 		"state": map[string]any{
 			"status": e.State,
 			"reason": e.StateReason,
@@ -94,6 +94,42 @@ func experimentResponse(e *Experiment) map[string]any {
 	if e.EndTime != nil {
 		resp["endTime"] = e.EndTime.Format(time.RFC3339)
 	}
+
+	// Include action states.
+	if len(e.Actions) > 0 {
+		actions := make(map[string]any)
+		for name, as := range e.Actions {
+			entry := map[string]any{
+				"actionId": as.ActionID,
+				"state":    map[string]any{"status": as.State},
+			}
+			if as.Description != "" {
+				entry["description"] = as.Description
+			}
+			if as.StartTime != nil {
+				entry["startTime"] = as.StartTime.Format(time.RFC3339)
+			}
+			if as.EndTime != nil {
+				entry["endTime"] = as.EndTime.Format(time.RFC3339)
+			}
+			actions[name] = entry
+		}
+		resp["actions"] = actions
+	}
+
+	// Include targets.
+	if len(e.Targets) > 0 {
+		targets := make(map[string]any)
+		for k, v := range e.Targets {
+			targets[k] = map[string]any{
+				"resourceType":  v.ResourceType,
+				"resourceArns":  v.ResourceArns,
+				"selectionMode": v.SelectionMode,
+			}
+		}
+		resp["targets"] = targets
+	}
+
 	return resp
 }
 

@@ -482,6 +482,73 @@ func handleDeleteRegexPatternSet(ctx *service.RequestContext, store *Store) (*se
 	return emptyOK()
 }
 
+func handleGetSampledRequests(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	webACLArn, _ := params["WebAclArn"].(string)
+	maxItems := 100
+	if v, ok := params["MaxItems"].(float64); ok && v > 0 {
+		maxItems = int(v)
+	}
+
+	// Find WebACL ID from ARN
+	var webACLId string
+	store.mu.RLock()
+	for _, acl := range store.webACLs {
+		if acl.ARN == webACLArn {
+			webACLId = acl.Id
+			break
+		}
+	}
+	store.mu.RUnlock()
+
+	samples := store.GetSampledRequests(webACLId, maxItems)
+	items := make([]map[string]any, 0, len(samples))
+	for _, s := range samples {
+		items = append(items, map[string]any{
+			"Request": map[string]any{
+				"ClientIP": s.IP,
+				"URI":      s.URI,
+				"Headers":  s.Headers,
+			},
+			"Timestamp": float64(s.Time.Unix()),
+			"Action":    s.Action,
+			"RuleWithinRuleGroup": s.RuleMatch,
+		})
+	}
+
+	return jsonOK(map[string]any{
+		"SampledRequests": items,
+		"PopulationSize":  len(items),
+	})
+}
+
+func handleCheckRequest(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	webACLId, _ := params["WebACLId"].(string)
+	ip, _ := params["IP"].(string)
+	uri, _ := params["URI"].(string)
+	headers := make(map[string]string)
+	if h, ok := params["Headers"].(map[string]any); ok {
+		for k, v := range h {
+			if s, ok := v.(string); ok {
+				headers[k] = s
+			}
+		}
+	}
+
+	result := store.CheckRequest(webACLId, ip, uri, headers)
+	return jsonOK(map[string]any{
+		"Action":   result.Action,
+		"RuleName": result.RuleName,
+	})
+}
+
 func handleAssociateWebACL(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

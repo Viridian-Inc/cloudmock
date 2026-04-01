@@ -2,6 +2,7 @@ package redshift
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -616,4 +617,121 @@ func handleDescribeTags(ctx *service.RequestContext, store *Store) (*service.Res
 	resp := &xmlDescribeTagsResponse{Xmlns: redshiftXmlns, Meta: xmlResponseMetadata{RequestID: newRequestID()}}
 	resp.Result.TaggedResources = xmlTags
 	return xmlOK(resp)
+}
+
+// ---- Data API handlers (JSON protocol) ----
+
+func jsonOK(body any) (*service.Response, error) {
+	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
+}
+
+func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
+	return &service.Response{Format: service.FormatJSON}, awsErr
+}
+
+func parseJSONBody(body []byte, v any) *service.AWSError {
+	if len(body) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(body, v); err != nil {
+		return service.NewAWSError("ValidationException", "Invalid JSON.", http.StatusBadRequest)
+	}
+	return nil
+}
+
+type executeStatementRequest struct {
+	ClusterIdentifier string `json:"ClusterIdentifier"`
+	Database          string `json:"Database"`
+	Sql               string `json:"Sql"`
+}
+
+func handleExecuteStatement(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req executeStatementRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ClusterIdentifier == "" || req.Sql == "" {
+		return jsonErr(service.ErrValidation("ClusterIdentifier and Sql are required."))
+	}
+	stmt, err := store.ExecuteStatement(req.ClusterIdentifier, req.Database, req.Sql)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"Id":                stmt.ID,
+		"ClusterIdentifier": stmt.ClusterID,
+		"Database":          stmt.Database,
+		"CreatedAt":         float64(stmt.CreatedAt.Unix()),
+		"Status":            stmt.Status,
+	})
+}
+
+type describeStatementRequest struct {
+	Id string `json:"Id"`
+}
+
+func handleDescribeStatement(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeStatementRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	stmt, ok := store.GetStatement(req.Id)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Statement "+req.Id+" not found.", http.StatusNotFound))
+	}
+	result := map[string]any{
+		"Id":                stmt.ID,
+		"ClusterIdentifier": stmt.ClusterID,
+		"Database":          stmt.Database,
+		"Status":            stmt.Status,
+		"CreatedAt":         float64(stmt.CreatedAt.Unix()),
+		"UpdatedAt":         float64(stmt.UpdatedAt.Unix()),
+		"QueryString":       stmt.SQL,
+		"ResultRows":        stmt.ResultRows,
+		"ResultSize":        stmt.ResultSize,
+	}
+	if stmt.Error != "" {
+		result["Error"] = stmt.Error
+	}
+	return jsonOK(result)
+}
+
+type getStatementResultRequest struct {
+	Id string `json:"Id"`
+}
+
+func handleGetStatementResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getStatementResultRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	stmt, ok := store.GetStatement(req.Id)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Statement "+req.Id+" not found.", http.StatusNotFound))
+	}
+	if stmt.Status != "FINISHED" {
+		return jsonErr(service.NewAWSError("ValidationException", "Statement is not finished. Current status: "+stmt.Status, http.StatusBadRequest))
+	}
+
+	// Build column metadata
+	colMeta := make([]map[string]string, len(stmt.ResultColumns))
+	for i, c := range stmt.ResultColumns {
+		colMeta[i] = map[string]string{"name": c.Name, "typeName": c.DataType}
+	}
+
+	// Build records
+	records := make([][]map[string]string, len(stmt.ResultData))
+	for i, row := range stmt.ResultData {
+		record := make([]map[string]string, len(row))
+		for j, val := range row {
+			record[j] = map[string]string{"stringValue": val}
+		}
+		records[i] = record
+	}
+
+	return jsonOK(map[string]any{
+		"ColumnMetadata": colMeta,
+		"Records":        records,
+		"TotalNumRows":   stmt.ResultRows,
+	})
 }

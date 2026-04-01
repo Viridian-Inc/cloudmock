@@ -1,6 +1,8 @@
 package bedrock
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -414,4 +416,135 @@ func handleListTagsForResource(params map[string]any, store *Store) (*service.Re
 		return jsonErr(awsErr)
 	}
 	return jsonOK(map[string]any{"tags": entriesToTags(tags)})
+}
+
+// ---- InvokeModel handler ----
+
+func handleInvokeModel(params map[string]any, store *Store) (*service.Response, error) {
+	modelID := getStr(params, "modelId")
+	if modelID == "" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"modelId is required.", http.StatusBadRequest))
+	}
+
+	// Validate the model exists in foundation models.
+	found := false
+	for _, fm := range store.ListFoundationModels() {
+		if fm.ModelId == modelID || fm.ModelName == modelID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Could not resolve the foundation model from model identifier: "+modelID,
+			http.StatusNotFound))
+	}
+
+	// Parse the body/prompt from the request.
+	body := getStr(params, "body")
+	prompt := "Hello"
+	if body != "" {
+		var bodyMap map[string]any
+		if json.Unmarshal([]byte(body), &bodyMap) == nil {
+			if p, ok := bodyMap["prompt"].(string); ok {
+				prompt = p
+			} else if msgs, ok := bodyMap["messages"].([]any); ok && len(msgs) > 0 {
+				if msg, ok := msgs[0].(map[string]any); ok {
+					if c, ok := msg["content"].(string); ok {
+						prompt = c
+					}
+				}
+			}
+		}
+	}
+
+	// Generate a mock response.
+	mockResponse := map[string]any{
+		"generated_text": fmt.Sprintf("This is a mock response from %s. You asked: %s", modelID, prompt),
+		"stop_reason":    "end_turn",
+		"usage": map[string]any{
+			"input_tokens":  len(prompt) / 4,
+			"output_tokens": 25,
+		},
+	}
+
+	responseBytes, _ := json.Marshal(mockResponse)
+	return jsonOK(map[string]any{
+		"body":        string(responseBytes),
+		"contentType": "application/json",
+	})
+}
+
+// ---- Guardrail handlers ----
+
+func handleCreateGuardrail(params map[string]any, store *Store) (*service.Response, error) {
+	name := getStr(params, "name")
+	if name == "" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"name is required.", http.StatusBadRequest))
+	}
+
+	guardrail := store.CreateGuardrail(name,
+		getStr(params, "description"),
+		getStr(params, "blockedInputMessaging"),
+		getStr(params, "blockedOutputsMessaging"),
+	)
+
+	return jsonCreated(map[string]any{
+		"guardrailId":  guardrail.ID,
+		"guardrailArn": guardrail.ARN,
+		"name":         guardrail.Name,
+		"version":      guardrail.Version,
+		"createdAt":    guardrail.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+func handleApplyGuardrail(params map[string]any, store *Store) (*service.Response, error) {
+	guardrailID := getStr(params, "guardrailIdentifier")
+	if guardrailID == "" {
+		return jsonErr(service.NewAWSError("ValidationException",
+			"guardrailIdentifier is required.", http.StatusBadRequest))
+	}
+	source := getStr(params, "source")
+	if source == "" {
+		source = "INPUT"
+	}
+
+	guardrail, ok := store.GetGuardrail(guardrailID)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Guardrail not found: "+guardrailID, http.StatusNotFound))
+	}
+
+	// Mock content analysis result.
+	content := getStr(params, "content")
+	action := "NONE"
+	if content != "" && len(content) > 500 {
+		action = "GUARDRAIL_INTERVENED"
+	}
+
+	return jsonOK(map[string]any{
+		"action": action,
+		"output": map[string]any{
+			"text": content,
+		},
+		"assessments": []map[string]any{
+			{
+				"guardrailId": guardrail.ID,
+				"topicPolicy": map[string]any{
+					"topics": []any{},
+				},
+				"contentPolicy": map[string]any{
+					"filters": []any{},
+				},
+			},
+		},
+		"guardrailCoverage": map[string]any{
+			"textCharacters": map[string]any{
+				"guarded": len(content),
+				"total":   len(content),
+			},
+		},
+	})
 }

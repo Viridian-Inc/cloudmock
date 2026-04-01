@@ -2019,7 +2019,7 @@ func TestExplainRequest_NotFound(t *testing.T) {
 func TestExplainRequest_MethodNotAllowed(t *testing.T) {
 	api, _ := newTestAPI(t)
 
-	req := httptest.NewRequest(http.MethodPost, "/api/explain/some-id", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/api/explain/some-id", nil)
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, req)
 
@@ -2122,6 +2122,96 @@ func TestExplainRequest_EmptyID(t *testing.T) {
 	api.ServeHTTP(w, req)
 
 	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestExplainRequest_POST_WithRequestID(t *testing.T) {
+	cfg := config.Default()
+	reg := routing.NewRegistry()
+	rl := gateway.NewRequestLog(100)
+	rs := gateway.NewRequestStats()
+
+	now := time.Now()
+	rl.Add(gateway.RequestEntry{
+		ID:         "post-explain-1",
+		Service:    "dynamodb",
+		Action:     "Query",
+		Method:     "POST",
+		Path:       "/",
+		StatusCode: 200,
+		LatencyMs:  45.0,
+		Timestamp:  now,
+	})
+	for i := 0; i < 5; i++ {
+		rl.Add(gateway.RequestEntry{
+			ID:         fmt.Sprintf("post-similar-%d", i),
+			Service:    "dynamodb",
+			Action:     "Query",
+			StatusCode: 200,
+			LatencyMs:  float64(20 + i*3),
+			Timestamp:  now.Add(-time.Duration(i) * time.Minute),
+		})
+	}
+
+	api := admin.New(cfg, reg, rl, rs)
+
+	body := `{"request_id":"post-explain-1"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/explain/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	var resp map[string]any
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+	assert.NotNil(t, resp["request"])
+	assert.NotNil(t, resp["analysis"])
+	assert.NotEmpty(t, resp["narrative"])
+}
+
+func TestExplainRequest_POST_MissingRequestID(t *testing.T) {
+	api, _ := newTestAPI(t)
+
+	body := `{}`
+	req := httptest.NewRequest(http.MethodPost, "/api/explain/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestExplainRequest_POST_NotFound(t *testing.T) {
+	api, _ := newTestAPI(t)
+
+	body := `{"request_id":"nonexistent"}`
+	req := httptest.NewRequest(http.MethodPost, "/api/explain/", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestExplainRequest_POST_InvalidJSON(t *testing.T) {
+	api, _ := newTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/explain/", bytes.NewBufferString("not json"))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestExplainRequest_MethodNotAllowed_PUT(t *testing.T) {
+	api, _ := newTestAPI(t)
+
+	req := httptest.NewRequest(http.MethodPut, "/api/explain/some-id", nil)
+	w := httptest.NewRecorder()
+	api.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusMethodNotAllowed, w.Code)
 }
 
 // ---------------------------------------------------------------------------

@@ -242,7 +242,22 @@ func handleIssueCertificate(ctx *service.RequestContext, store *Store) (*service
 		return jsonErr(service.ErrValidation("CertificateAuthorityArn is required."))
 	}
 
-	cert, awsErr := store.IssueCertificate(caArn)
+	validityDays := 365
+	if validity, ok := params["Validity"].(map[string]any); ok {
+		if v, ok := validity["Value"].(float64); ok {
+			if valType, ok := validity["Type"].(string); ok && valType == "DAYS" {
+				validityDays = int(v)
+			} else if valType == "MONTHS" {
+				validityDays = int(v) * 30
+			} else if valType == "YEARS" {
+				validityDays = int(v) * 365
+			}
+		}
+	}
+
+	sigAlgo, _ := params["SigningAlgorithm"].(string)
+
+	cert, awsErr := store.IssueCertificateWithValidity(caArn, validityDays, sigAlgo)
 	if awsErr != nil {
 		return jsonErr(awsErr)
 	}
@@ -296,6 +311,25 @@ func handleRevokeCertificate(ctx *service.RequestContext, store *Store) (*servic
 	}
 
 	return &service.Response{StatusCode: http.StatusOK, Body: struct{}{}, Format: service.FormatJSON}, nil
+}
+
+func handleGetCertificateAuthorityCsr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	arn, _ := params["CertificateAuthorityArn"].(string)
+	if arn == "" {
+		return jsonErr(service.ErrValidation("CertificateAuthorityArn is required."))
+	}
+
+	csr, awsErr := store.GetCertificateAuthorityCsr(arn)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	return jsonOK(map[string]any{"Csr": csr})
 }
 
 func handleTagCertificateAuthority(ctx *service.RequestContext, store *Store) (*service.Response, error) {

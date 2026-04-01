@@ -172,6 +172,11 @@ func (s *Store) CreateApplicationVersion(appName, versionLabel, description, s3B
 		return nil, fmt.Errorf("application not found: %s", appName)
 	}
 
+	// Enforce version label uniqueness per application
+	if _, exists := s.versions[appName][versionLabel]; exists {
+		return nil, fmt.Errorf("version label already exists for application %s: %s", appName, versionLabel)
+	}
+
 	now := time.Now().UTC()
 	ver := &ApplicationVersion{
 		ApplicationName: appName,
@@ -261,6 +266,9 @@ func (s *Store) GetEnvironment(name string) (*Environment, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	env, ok := s.envs[name]
+	if ok && env.lifecycle != nil {
+		env.Status = string(env.lifecycle.State())
+	}
 	return env, ok
 }
 

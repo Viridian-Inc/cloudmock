@@ -4,11 +4,26 @@ import (
 	"crypto/rand"
 	"fmt"
 	"net/http"
+	"regexp"
 	"sync"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+var (
+	accountIDRegex = regexp.MustCompile(`^\d{12}$`)
+	orgArnRegex    = regexp.MustCompile(`^arn:aws:organizations::\d{12}:organization/o-[a-z0-9]+$`)
+	ouArnRegex     = regexp.MustCompile(`^arn:aws:organizations::\d{12}:ou/o-[a-z0-9]+/ou-[a-z0-9-]+$`)
+	iamArnRegex    = regexp.MustCompile(`^arn:aws:iam::\d{12}:`)
+)
+
+func isValidPrincipal(principal string) bool {
+	return accountIDRegex.MatchString(principal) ||
+		orgArnRegex.MatchString(principal) ||
+		ouArnRegex.MatchString(principal) ||
+		iamArnRegex.MatchString(principal)
+}
 
 // Tag represents a key-value tag.
 type Tag struct {
@@ -115,8 +130,13 @@ func (s *Store) CreateResourceShare(name string, allowExternal bool, principals,
 	}
 	s.shares[share.ResourceShareArn] = share
 
-	// Create associations for principals
+	// Create associations for principals (with validation)
 	for _, principal := range principals {
+		if !isValidPrincipal(principal) {
+			return nil, service.NewAWSError("MalformedArnException",
+				fmt.Sprintf("Principal %s is not a valid 12-digit account ID, IAM ARN, or organization ARN.", principal),
+				http.StatusBadRequest)
+		}
 		s.associations = append(s.associations, ResourceShareAssociation{
 			ResourceShareArn: share.ResourceShareArn,
 			AssociatedEntity: principal,

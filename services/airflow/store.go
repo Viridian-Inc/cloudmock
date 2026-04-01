@@ -170,9 +170,9 @@ func (s *Store) ListEnvironments() []string {
 
 func (s *Store) UpdateEnvironment(name string, airflowVersion, sourceBucketArn, dagS3Path, envClass string, maxWorkers, minWorkers, schedulers int, executionRoleArn, webserverAccessMode string, networkConfig, loggingConfig map[string]any, airflowConfigOptions map[string]string, maintenanceWindow string) (*Environment, *service.AWSError) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	env, ok := s.environments[name]
 	if !ok {
+		s.mu.Unlock()
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Environment %s not found", name), http.StatusNotFound)
 	}
@@ -216,21 +216,29 @@ func (s *Store) UpdateEnvironment(name string, airflowVersion, sourceBucketArn, 
 		env.WeeklyMaintenanceWindowStart = maintenanceWindow
 	}
 	env.LastUpdate = time.Now().UTC()
-	env.Lifecycle.ForceState(lifecycle.State(EnvUpdating))
+	lc := env.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(EnvUpdating))
+	}
 	return env, nil
 }
 
 func (s *Store) DeleteEnvironment(name string) *service.AWSError {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	env, ok := s.environments[name]
 	if !ok {
+		s.mu.Unlock()
 		return service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Environment %s not found", name), http.StatusNotFound)
 	}
-	env.Lifecycle.ForceState(lifecycle.State(EnvDeleting))
+	lc := env.Lifecycle
 	delete(s.environments, name)
 	delete(s.tagsByArn, env.Arn)
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState(lifecycle.State(EnvDeleting))
+	}
 	return nil
 }
 

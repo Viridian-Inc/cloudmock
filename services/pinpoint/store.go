@@ -357,6 +357,18 @@ func (s *Store) UpdateEndpoint(appID, endpointID, channelType, address string, u
 		return nil, fmt.Errorf("application not found: %s", appID)
 	}
 
+	// Validate channel type
+	if channelType != "" {
+		validChannelTypes := map[string]bool{
+			"GCM": true, "APNS": true, "APNS_SANDBOX": true, "APNS_VOIP": true,
+			"APNS_VOIP_SANDBOX": true, "ADM": true, "SMS": true, "VOICE": true,
+			"EMAIL": true, "BAIDU": true, "CUSTOM": true, "IN_APP": true, "PUSH": true,
+		}
+		if !validChannelTypes[channelType] {
+			return nil, fmt.Errorf("invalid channel type: %s", channelType)
+		}
+	}
+
 	ep := &EndpointItem{
 		EndpointID:    endpointID,
 		ApplicationID: appID,

@@ -315,3 +315,39 @@ func handleDeleteEventSubscription(params map[string]any, store *Store) (*servic
 	store.DeleteEventSubscription(id)
 	return jsonOK(map[string]any{"EventSubscription": subscriptionResponse(sub)})
 }
+
+// ---- TestConnection ----
+
+func handleTestConnection(params map[string]any, store *Store) (*service.Response, error) {
+	endpointArn, _ := params["EndpointArn"].(string)
+	replicationInstanceArn, _ := params["ReplicationInstanceArn"].(string)
+	if endpointArn == "" || replicationInstanceArn == "" {
+		return jsonErr(service.ErrValidation("EndpointArn and ReplicationInstanceArn are required."))
+	}
+	ct, err := store.TestConnection(endpointArn, replicationInstanceArn)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", err.Error(), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"Connection": map[string]any{
+			"EndpointArn":            ct.EndpointArn,
+			"ReplicationInstanceArn": ct.ReplicationInstanceArn,
+			"Status":                 ct.Status,
+		},
+	})
+}
+
+// ---- DescribeConnections ----
+
+func handleDescribeConnections(store *Store) (*service.Response, error) {
+	conns := store.DescribeConnections()
+	items := make([]map[string]any, len(conns))
+	for i, c := range conns {
+		items[i] = map[string]any{
+			"EndpointArn":            c.EndpointArn,
+			"ReplicationInstanceArn": c.ReplicationInstanceArn,
+			"Status":                 c.Status,
+		}
+	}
+	return jsonOK(map[string]any{"Connections": items})
+}

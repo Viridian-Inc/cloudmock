@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -51,8 +52,15 @@ func handleListVaults(store *Store) (*service.Response, error) {
 }
 
 func handleDeleteVault(name string, store *Store) (*service.Response, error) {
-	if !store.DeleteVault(name) {
-		return jsonErr(service.ErrNotFound("Vault", name))
+	ok, reason := store.DeleteVault(name)
+	if !ok {
+		switch reason {
+		case "not_empty":
+			return jsonErr(service.NewAWSError("InvalidParameterValueException",
+				"Vault not empty: "+name, http.StatusBadRequest))
+		default:
+			return jsonErr(service.ErrNotFound("Vault", name))
+		}
 	}
 	return jsonNoContent()
 }
@@ -127,6 +135,88 @@ func handleListJobs(vaultName string, store *Store) (*service.Response, error) {
 		out = append(out, jobResponse(j, store))
 	}
 	return jsonOK(map[string]any{"JobList": out})
+}
+
+func handleInitiateVaultLock(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if len(ctx.Body) > 0 {
+		json.Unmarshal(ctx.Body, &params)
+	}
+	policy, _ := params["policy"].(string)
+	if policy == "" {
+		// Accept any structure
+		policyBytes, _ := json.Marshal(params["policy"])
+		policy = string(policyBytes)
+	}
+
+	lockID, err := store.InitiateVaultLock(vaultName, policy)
+	if err != nil {
+		if strings.Contains(err.Error(), "already locked") {
+			return jsonErr(service.NewAWSError("InvalidParameterValueException", err.Error(), http.StatusBadRequest))
+		}
+		return jsonErr(service.ErrNotFound("Vault", vaultName))
+	}
+	return &service.Response{
+		StatusCode: http.StatusCreated,
+		Format:     service.FormatJSON,
+		Headers:    map[string]string{"x-amz-lock-id": lockID},
+	}, nil
+}
+
+func handleCompleteVaultLock(vaultName, lockID string, store *Store) (*service.Response, error) {
+	err := store.CompleteVaultLock(vaultName, lockID)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return jsonErr(service.ErrNotFound("Vault", vaultName))
+		}
+		return jsonErr(service.NewAWSError("InvalidParameterValueException", err.Error(), http.StatusBadRequest))
+	}
+	return jsonNoContent()
+}
+
+func handleSetVaultNotifications(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if len(ctx.Body) > 0 {
+		json.Unmarshal(ctx.Body, &params)
+	}
+	config, _ := params["vaultNotificationConfig"].(map[string]any)
+	if config == nil {
+		return jsonErr(service.ErrValidation("vaultNotificationConfig is required"))
+	}
+	snsTopic, _ := config["SNSTopic"].(string)
+	var events []string
+	if evts, ok := config["Events"].([]any); ok {
+		for _, e := range evts {
+			if s, ok := e.(string); ok {
+				events = append(events, s)
+			}
+		}
+	}
+	if snsTopic == "" {
+		return jsonErr(service.ErrValidation("SNSTopic is required in notification config"))
+	}
+	err := store.SetVaultNotifications(vaultName, snsTopic, events)
+	if err != nil {
+		return jsonErr(service.ErrNotFound("Vault", vaultName))
+	}
+	return jsonNoContent()
+}
+
+func handleGetVaultNotifications(vaultName string, store *Store) (*service.Response, error) {
+	notif, err := store.GetVaultNotifications(vaultName)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			return jsonErr(service.ErrNotFound("Vault", vaultName))
+		}
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"No notification configuration for vault: "+vaultName, http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"vaultNotificationConfig": map[string]any{
+			"SNSTopic": notif.SNSTopic,
+			"Events":   notif.Events,
+		},
+	})
 }
 
 func vaultResponse(v *Vault) map[string]any {

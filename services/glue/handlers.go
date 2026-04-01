@@ -284,6 +284,17 @@ type createCrawlerRequest struct {
 	Tags         map[string]string  `json:"Tags"`
 }
 
+type lastCrawlInfoJSON struct {
+	Status        string  `json:"Status"`
+	ErrorMessage  string  `json:"ErrorMessage,omitempty"`
+	LogGroup      string  `json:"LogGroup,omitempty"`
+	LogStream     string  `json:"LogStream,omitempty"`
+	MessagePrefix string  `json:"MessagePrefix,omitempty"`
+	StartTime     float64 `json:"StartTime,omitempty"`
+	TablesCreated int     `json:"TablesCreated,omitempty"`
+	TablesUpdated int     `json:"TablesUpdated,omitempty"`
+}
+
 type crawlerJSON struct {
 	Name         string             `json:"Name"`
 	Role         string             `json:"Role"`
@@ -294,6 +305,7 @@ type crawlerJSON struct {
 	Schedule     string             `json:"Schedule,omitempty"`
 	CreationTime float64            `json:"CreationTime"`
 	LastUpdated  float64            `json:"LastUpdated"`
+	LastCrawl    *lastCrawlInfoJSON `json:"LastCrawl,omitempty"`
 }
 
 func toCrawlerJSON(c *Crawler) crawlerJSON {
@@ -301,7 +313,7 @@ func toCrawlerJSON(c *Crawler) crawlerJSON {
 	for i, t := range c.Targets.S3Targets {
 		targets[i] = s3TargetJSON{Path: t.Path, Exclusions: t.Exclusions}
 	}
-	return crawlerJSON{
+	cj := crawlerJSON{
 		Name:         c.Name,
 		Role:         c.Role,
 		DatabaseName: c.DatabaseName,
@@ -312,6 +324,19 @@ func toCrawlerJSON(c *Crawler) crawlerJSON {
 		CreationTime: float64(c.CreateTime.Unix()),
 		LastUpdated:  float64(c.LastUpdated.Unix()),
 	}
+	if c.LastCrawl != nil {
+		cj.LastCrawl = &lastCrawlInfoJSON{
+			Status:        c.LastCrawl.Status,
+			ErrorMessage:  c.LastCrawl.ErrorMessage,
+			LogGroup:      c.LastCrawl.LogGroup,
+			LogStream:     c.LastCrawl.LogStream,
+			MessagePrefix: c.LastCrawl.MessagePrefix,
+			StartTime:     float64(c.LastCrawl.StartTime.Unix()),
+			TablesCreated: c.LastCrawl.TablesCreated,
+			TablesUpdated: c.LastCrawl.TablesUpdated,
+		}
+	}
+	return cj
 }
 
 func handleCreateCrawler(ctx *service.RequestContext, store *Store) (*service.Response, error) {

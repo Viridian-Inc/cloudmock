@@ -51,6 +51,7 @@ func (s *OrganizationsService) Actions() []service.Action {
 		{Name: "ListTargetsForPolicy", Method: http.MethodPost, IAMAction: "organizations:ListTargetsForPolicy"},
 		{Name: "EnablePolicyType", Method: http.MethodPost, IAMAction: "organizations:EnablePolicyType"},
 		{Name: "DisablePolicyType", Method: http.MethodPost, IAMAction: "organizations:DisablePolicyType"},
+		{Name: "DescribeCreateAccountStatus", Method: http.MethodPost, IAMAction: "organizations:DescribeCreateAccountStatus"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "organizations:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "organizations:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "organizations:ListTagsForResource"},
@@ -109,6 +110,8 @@ func (s *OrganizationsService) HandleRequest(ctx *service.RequestContext) (*serv
 		return handleEnablePolicyType(ctx, s.store)
 	case "DisablePolicyType":
 		return handleDisablePolicyType(ctx, s.store)
+	case "DescribeCreateAccountStatus":
+		return handleDescribeCreateAccountStatus(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

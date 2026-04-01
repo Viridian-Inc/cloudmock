@@ -98,6 +98,21 @@ func (s *GlacierService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		if len(parts) == 5 && method == http.MethodGet {
 			return handleDescribeJob(vaultName, parts[4], s.store)
 		}
+	case "lock-policy":
+		if len(parts) == 4 && method == http.MethodPost {
+			return handleInitiateVaultLock(ctx, vaultName, s.store)
+		}
+		if len(parts) == 5 && method == http.MethodPost {
+			// Complete vault lock: POST /-/vaults/{name}/lock-policy/{lockId}
+			return handleCompleteVaultLock(vaultName, parts[4], s.store)
+		}
+	case "notification-configuration":
+		if method == http.MethodPut {
+			return handleSetVaultNotifications(ctx, vaultName, s.store)
+		}
+		if method == http.MethodGet {
+			return handleGetVaultNotifications(vaultName, s.store)
+		}
 	}
 
 	return jsonErr(service.NewAWSError("NotImplemented", "Route not implemented", http.StatusNotImplemented))

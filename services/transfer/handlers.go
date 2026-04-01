@@ -2,6 +2,7 @@ package transfer
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -54,6 +55,7 @@ func serverResponse(srv *Server) map[string]any {
 	return map[string]any{
 		"ServerId":             srv.ServerID,
 		"Arn":                  srv.Arn,
+		"Endpoint":             srv.Endpoint,
 		"Domain":               srv.Domain,
 		"EndpointType":         srv.EndpointType,
 		"IdentityProviderType": srv.IdentityProviderType,
@@ -102,8 +104,11 @@ func handleCreateServer(params map[string]any, store *Store) (*service.Response,
 		protocols = []string{"SFTP"}
 	}
 
-	srv, _ := store.CreateServer(domain, endpointType, identityProvider,
+	srv, err := store.CreateServer(domain, endpointType, identityProvider,
 		str(params, "LoggingRole"), protocols, tagsFromParams(params))
+	if err != nil {
+		return jsonErr(service.ErrValidation(err.Error()))
+	}
 	return jsonOK(map[string]any{"ServerId": srv.ServerID})
 }
 
@@ -175,7 +180,14 @@ func handleCreateUser(params map[string]any, store *Store) (*service.Response, e
 
 	user, err := store.CreateUser(serverID, userName, str(params, "Role"), homeDir, homeDirType, tagsFromParams(params))
 	if err != nil {
-		return jsonErr(service.NewAWSError("ResourceExistsException", err.Error(), http.StatusConflict))
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "home directory") {
+			return jsonErr(service.ErrValidation(errMsg))
+		}
+		if strings.Contains(errMsg, "not found") {
+			return jsonErr(service.ErrNotFound("Server", serverID))
+		}
+		return jsonErr(service.NewAWSError("ResourceExistsException", errMsg, http.StatusConflict))
 	}
 	return jsonOK(map[string]any{"ServerId": serverID, "UserName": user.UserName})
 }

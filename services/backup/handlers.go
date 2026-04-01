@@ -183,8 +183,18 @@ func handleDeleteBackupVault(params map[string]any, store *Store) (*service.Resp
 	if name == "" {
 		return jsonErr(service.ErrValidation("BackupVaultName is required"))
 	}
-	if !store.DeleteBackupVault(name) {
-		return jsonErr(service.ErrNotFound("BackupVault", name))
+	ok, reason := store.DeleteBackupVault(name)
+	if !ok {
+		switch reason {
+		case "locked":
+			return jsonErr(service.NewAWSError("InvalidRequestException",
+				"Cannot delete a locked backup vault: "+name, http.StatusBadRequest))
+		case "not_empty":
+			return jsonErr(service.NewAWSError("InvalidRequestException",
+				"Cannot delete backup vault with recovery points: "+name, http.StatusBadRequest))
+		default:
+			return jsonErr(service.ErrNotFound("BackupVault", name))
+		}
 	}
 	return jsonOK(map[string]any{})
 }
@@ -291,6 +301,31 @@ func handleDescribeRecoveryPoint(params map[string]any, store *Store) (*service.
 		"BackupSizeInBytes": rp.BackupSizeInBytes,
 		"IsEncrypted":       rp.IsEncrypted,
 	})
+}
+
+func handlePutBackupVaultLockConfiguration(params map[string]any, store *Store) (*service.Response, error) {
+	name := str(params, "BackupVaultName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("BackupVaultName is required"))
+	}
+	var minRetention, maxRetention int64
+	if v, ok := params["MinRetentionDays"].(float64); ok {
+		minRetention = int64(v)
+	}
+	if v, ok := params["MaxRetentionDays"].(float64); ok {
+		maxRetention = int64(v)
+	}
+	if minRetention < 1 {
+		return jsonErr(service.ErrValidation("MinRetentionDays must be at least 1"))
+	}
+	if maxRetention > 0 && maxRetention < minRetention {
+		return jsonErr(service.ErrValidation("MaxRetentionDays must be >= MinRetentionDays"))
+	}
+	err := store.LockBackupVault(name, minRetention, maxRetention)
+	if err != nil {
+		return jsonErr(service.ErrNotFound("BackupVault", name))
+	}
+	return jsonOK(map[string]any{})
 }
 
 func handleCreateBackupSelection(params map[string]any, store *Store) (*service.Response, error) {

@@ -3,11 +3,55 @@ package redshift
 import (
 	"crypto/rand"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/sqlparse"
 )
+
+// ClusterSchema tracks databases → schemas → tables → columns for a cluster.
+type ClusterSchema struct {
+	Databases map[string]*SchemaDatabase
+}
+
+// SchemaDatabase holds schemas within a database.
+type SchemaDatabase struct {
+	Schemas map[string]*SchemaSchema
+}
+
+// SchemaSchema holds tables within a schema.
+type SchemaSchema struct {
+	Tables map[string]*SchemaTable
+}
+
+// SchemaTable holds columns for a table.
+type SchemaTable struct {
+	Columns []SchemaColumn
+}
+
+// SchemaColumn represents a column in a Redshift table.
+type SchemaColumn struct {
+	Name     string
+	DataType string
+}
+
+// StatementExecution represents a Redshift Data API statement.
+type StatementExecution struct {
+	ID            string
+	ClusterID     string
+	Database      string
+	SQL           string
+	Status        string // SUBMITTED, PICKED, STARTED, FINISHED, FAILED, ABORTED
+	ResultRows    int64
+	ResultSize    int64
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+	Error         string
+	ResultColumns []SchemaColumn
+	ResultData    [][]string
+}
 
 // Cluster represents a Redshift cluster.
 type Cluster struct {
@@ -25,6 +69,7 @@ type Cluster struct {
 	CreatedTime       time.Time
 	Tags              map[string]string
 	Lifecycle         *lifecycle.Machine
+	Schema            *ClusterSchema
 }
 
 // ClusterEndpoint holds address and port.
@@ -72,8 +117,10 @@ type Store struct {
 	mu              sync.RWMutex
 	clusters        map[string]*Cluster
 	snapshots       map[string]*ClusterSnapshot
+	snapshotSchemas map[string]*ClusterSchema // snapshotID -> schema copy
 	subnetGroups    map[string]*ClusterSubnetGroup
 	parameterGroups map[string]*ClusterParameterGroup
+	statements      map[string]*StatementExecution
 	accountID       string
 	region          string
 	lcConfig        *lifecycle.Config
@@ -84,12 +131,67 @@ func NewStore(accountID, region string) *Store {
 	return &Store{
 		clusters:        make(map[string]*Cluster),
 		snapshots:       make(map[string]*ClusterSnapshot),
+		snapshotSchemas: make(map[string]*ClusterSchema),
 		subnetGroups:    make(map[string]*ClusterSubnetGroup),
 		parameterGroups: make(map[string]*ClusterParameterGroup),
+		statements:      make(map[string]*StatementExecution),
 		accountID:       accountID,
 		region:          region,
 		lcConfig:        lifecycle.DefaultConfig(),
 	}
+}
+
+func newDefaultSchema(dbName string) *ClusterSchema {
+	return &ClusterSchema{
+		Databases: map[string]*SchemaDatabase{
+			dbName: {
+				Schemas: map[string]*SchemaSchema{
+					"public": {Tables: make(map[string]*SchemaTable)},
+				},
+			},
+		},
+	}
+}
+
+func copySchema(src *ClusterSchema) *ClusterSchema {
+	if src == nil {
+		return nil
+	}
+	dst := &ClusterSchema{Databases: make(map[string]*SchemaDatabase)}
+	for dbName, db := range src.Databases {
+		dstDB := &SchemaDatabase{Schemas: make(map[string]*SchemaSchema)}
+		for sName, s := range db.Schemas {
+			dstS := &SchemaSchema{Tables: make(map[string]*SchemaTable)}
+			for tName, t := range s.Tables {
+				cols := make([]SchemaColumn, len(t.Columns))
+				copy(cols, t.Columns)
+				dstS.Tables[tName] = &SchemaTable{Columns: cols}
+			}
+			dstDB.Schemas[sName] = dstS
+		}
+		dst.Databases[dbName] = dstDB
+	}
+	return dst
+}
+
+// schemaRegistryForCluster builds a sqlparse.SchemaRegistry from a cluster's schema.
+func schemaRegistryForCluster(cs *ClusterSchema) *sqlparse.SchemaRegistry {
+	reg := sqlparse.NewSchemaRegistry()
+	if cs == nil {
+		return reg
+	}
+	for _, db := range cs.Databases {
+		for _, schema := range db.Schemas {
+			for tName, t := range schema.Tables {
+				cols := make([]string, len(t.Columns))
+				for i, c := range t.Columns {
+					cols[i] = c.Name
+				}
+				reg.Register("", tName, cols)
+			}
+		}
+	}
+	return reg
 }
 
 func newUUID() string {
@@ -157,6 +259,7 @@ func (s *Store) CreateCluster(id, nodeType string, numNodes int, masterUser, dbN
 		CreatedTime:        time.Now().UTC(),
 		Tags:               tags,
 		Lifecycle:          lifecycle.NewMachine("creating", clusterTransitions(), s.lcConfig),
+		Schema:             newDefaultSchema(dbName),
 	}
 	s.clusters[id] = c
 	return c, true
@@ -203,13 +306,17 @@ func (s *Store) ModifyCluster(id, nodeType string, numNodes int) (*Cluster, bool
 
 func (s *Store) DeleteCluster(id string) (*Cluster, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.clusters[id]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
-	c.Lifecycle.ForceState("deleting")
 	c.Status = "deleting"
+	lc := c.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("deleting")
+	}
 	return c, true
 }
 
@@ -249,6 +356,8 @@ func (s *Store) CreateClusterSnapshot(snapshotID, clusterID string, tags map[str
 		Tags:               tags,
 	}
 	s.snapshots[snapshotID] = snap
+	// Copy cluster schema to snapshot
+	s.snapshotSchemas[snapshotID] = copySchema(c.Schema)
 	return snap, true
 }
 
@@ -292,6 +401,13 @@ func (s *Store) RestoreFromClusterSnapshot(newClusterID, snapshotID string) (*Cl
 		Address: fmt.Sprintf("%s.%s.%s.redshift.amazonaws.com", newClusterID, randomHex(8), s.region),
 		Port:    5439,
 	}
+	// Restore schema from snapshot if available
+	var schema *ClusterSchema
+	if ss, ok := s.snapshotSchemas[snapshotID]; ok {
+		schema = copySchema(ss)
+	} else {
+		schema = newDefaultSchema(snap.DBName)
+	}
 	c := &Cluster{
 		Identifier:     newClusterID,
 		ARN:            s.clusterARN(newClusterID),
@@ -304,6 +420,7 @@ func (s *Store) RestoreFromClusterSnapshot(newClusterID, snapshotID string) (*Cl
 		CreatedTime:    time.Now().UTC(),
 		Tags:           make(map[string]string),
 		Lifecycle:      lifecycle.NewMachine("creating", clusterTransitions(), s.lcConfig),
+		Schema:         schema,
 	}
 	s.clusters[newClusterID] = c
 	return c, true
@@ -390,6 +507,103 @@ func (s *Store) DeleteClusterParameterGroup(name string) bool {
 	}
 	delete(s.parameterGroups, name)
 	return true
+}
+
+// ---- Statement operations ----
+
+func (s *Store) ExecuteStatement(clusterID, database, sql string) (*StatementExecution, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	c, ok := s.clusters[clusterID]
+	if !ok {
+		return nil, fmt.Errorf("cluster %s not found", clusterID)
+	}
+
+	now := time.Now().UTC()
+	stmt := &StatementExecution{
+		ID:        newUUID(),
+		ClusterID: clusterID,
+		Database:  database,
+		SQL:       sql,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	// Parse SQL
+	parsed := sqlparse.Parse(sql)
+	if !parsed.IsValid {
+		stmt.Status = "FAILED"
+		stmt.Error = "SYNTAX_ERROR: " + strings.Join(parsed.Errors, "; ")
+		s.statements[stmt.ID] = stmt
+		return stmt, nil
+	}
+
+	// Validate against cluster schema
+	reg := schemaRegistryForCluster(c.Schema)
+	if reg.Len() > 0 {
+		validationErrors := sqlparse.Validate(parsed, reg)
+		if len(validationErrors) > 0 {
+			stmt.Status = "FAILED"
+			stmt.Error = "SEMANTIC_ERROR: " + strings.Join(validationErrors, "; ")
+			s.statements[stmt.ID] = stmt
+			return stmt, nil
+		}
+	}
+
+	// Handle CREATE TABLE — actually update the cluster schema
+	if parsed.StatementType == "CREATE" && len(parsed.Tables) > 0 {
+		tableName := parsed.Tables[0]
+		if c.Schema != nil {
+			dbSchema := c.Schema.Databases[c.DBName]
+			if dbSchema != nil {
+				pubSchema := dbSchema.Schemas["public"]
+				if pubSchema != nil {
+					pubSchema.Tables[tableName] = &SchemaTable{
+						Columns: []SchemaColumn{
+							{Name: "id", DataType: "INTEGER"},
+							{Name: "data", DataType: "VARCHAR"},
+						},
+					}
+				}
+			}
+		}
+	}
+
+	stmt.Status = "FINISHED"
+
+	// Generate mock results for SELECT
+	if parsed.StatementType == "SELECT" {
+		columns := parsed.Columns
+		if len(columns) == 0 {
+			columns = []string{"col1", "col2"}
+		}
+		stmt.ResultColumns = make([]SchemaColumn, len(columns))
+		for i, c := range columns {
+			stmt.ResultColumns[i] = SchemaColumn{Name: c, DataType: "VARCHAR"}
+		}
+		// Generate 5 mock rows
+		stmt.ResultData = make([][]string, 5)
+		for i := range stmt.ResultData {
+			row := make([]string, len(columns))
+			for j, col := range columns {
+				row[j] = fmt.Sprintf("%s_val_%d", col, i+1)
+			}
+			stmt.ResultData[i] = row
+		}
+		stmt.ResultRows = 5
+		stmt.ResultSize = int64(len(columns) * 5 * 20) // approx
+	}
+
+	s.statements[stmt.ID] = stmt
+	return stmt, nil
+}
+
+func (s *Store) GetStatement(id string) (*StatementExecution, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	stmt, ok := s.statements[id]
+	return stmt, ok
 }
 
 // ---- Tag operations ----

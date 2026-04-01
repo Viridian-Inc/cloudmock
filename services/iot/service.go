@@ -62,6 +62,7 @@ func (s *IoTService) Actions() []service.Action {
 		{Name: "DeleteCertificate", Method: http.MethodDelete, IAMAction: "iot:DeleteCertificate"},
 		{Name: "AttachThingPrincipal", Method: http.MethodPut, IAMAction: "iot:AttachThingPrincipal"},
 		{Name: "DetachThingPrincipal", Method: http.MethodDelete, IAMAction: "iot:DetachThingPrincipal"},
+		{Name: "ListThingPrincipals", Method: http.MethodGet, IAMAction: "iot:ListThingPrincipals"},
 		// Topic rules
 		{Name: "CreateTopicRule", Method: http.MethodPost, IAMAction: "iot:CreateTopicRule"},
 		{Name: "GetTopicRule", Method: http.MethodGet, IAMAction: "iot:GetTopicRule"},
@@ -149,6 +150,8 @@ func (s *IoTService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAttachThingPrincipal(params, s.store)
 	case "DetachThingPrincipal":
 		return handleDetachThingPrincipal(params, s.store)
+	case "ListThingPrincipals":
+		return handleListThingPrincipals(params, s.store)
 	case "CreateTopicRule":
 		return handleCreateTopicRule(params, s.store)
 	case "GetTopicRule":

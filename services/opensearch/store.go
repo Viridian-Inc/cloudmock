@@ -9,6 +9,13 @@ import (
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
 )
 
+// Document represents an indexed document.
+type Document struct {
+	ID     string
+	Index  string
+	Source map[string]any
+}
+
 // Domain represents an OpenSearch domain.
 type Domain struct {
 	DomainName     string
@@ -54,6 +61,7 @@ type Store struct {
 	mu           sync.RWMutex
 	domains      map[string]*Domain
 	upgrades     map[string]*UpgradeStatus
+	documents    map[string]map[string][]Document // domainName -> index -> documents
 	accountID    string
 	region       string
 	lcConfig     *lifecycle.Config
@@ -64,6 +72,7 @@ func NewStore(accountID, region string) *Store {
 	return &Store{
 		domains:   make(map[string]*Domain),
 		upgrades:  make(map[string]*UpgradeStatus),
+		documents: make(map[string]map[string][]Document),
 		accountID: accountID,
 		region:    region,
 		lcConfig:  lifecycle.DefaultConfig(),
@@ -106,7 +115,7 @@ func (s *Store) CreateDomain(name, engineVersion string, clusterConfig ClusterCo
 		ARN:           s.domainARN(name),
 		DomainId:      randomHex(16),
 		EngineVersion: engineVersion,
-		Endpoint:      fmt.Sprintf("search-%s-%s.%s.es.amazonaws.com", name, randomHex(8), s.region),
+		Endpoint:      fmt.Sprintf("%s.%s.es.amazonaws.com", name, s.region),
 		Processing:    true,
 		Created:       true,
 		ClusterConfig: clusterConfig,
@@ -239,4 +248,93 @@ func (s *Store) GetUpgradeStatus(name string) (*UpgradeStatus, bool) {
 	defer s.mu.RUnlock()
 	status, ok := s.upgrades[name]
 	return status, ok
+}
+
+// ---- Document operations ----
+
+func (s *Store) IndexDocument(domainName, index, docID string, source map[string]any) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.domains[domainName]; !ok {
+		return "", false
+	}
+	if s.documents[domainName] == nil {
+		s.documents[domainName] = make(map[string][]Document)
+	}
+	if docID == "" {
+		docID = randomHex(10)
+	}
+	// Check if document already exists (update)
+	docs := s.documents[domainName][index]
+	for i, d := range docs {
+		if d.ID == docID {
+			s.documents[domainName][index][i].Source = source
+			return docID, true
+		}
+	}
+	s.documents[domainName][index] = append(docs, Document{
+		ID:     docID,
+		Index:  index,
+		Source: source,
+	})
+	return docID, true
+}
+
+func (s *Store) SearchDocuments(domainName, index string, query map[string]any) ([]Document, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.domains[domainName]; !ok {
+		return nil, false
+	}
+	docs := s.documents[domainName][index]
+	if query == nil || len(query) == 0 {
+		// Return all documents
+		result := make([]Document, len(docs))
+		copy(result, docs)
+		return result, true
+	}
+
+	// Simple equality matching on "match" queries
+	matchQuery, hasMatch := query["match"].(map[string]any)
+	if !hasMatch {
+		// No match filter — return all
+		result := make([]Document, len(docs))
+		copy(result, docs)
+		return result, true
+	}
+
+	var result []Document
+	for _, doc := range docs {
+		matches := true
+		for field, value := range matchQuery {
+			docVal, exists := doc.Source[field]
+			if !exists || fmt.Sprintf("%v", docVal) != fmt.Sprintf("%v", value) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			result = append(result, doc)
+		}
+	}
+	return result, true
+}
+
+// ClusterHealth returns health status based on replica configuration.
+func (s *Store) ClusterHealth(domainName string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	d, ok := s.domains[domainName]
+	if !ok {
+		return "", false
+	}
+	// Update processing state from lifecycle
+	processing := string(d.Lifecycle.State()) == "Processing"
+	if processing || d.Deleted {
+		return "red", true
+	}
+	if d.ClusterConfig.InstanceCount >= 2 {
+		return "green", true
+	}
+	return "yellow", true
 }

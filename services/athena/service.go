@@ -22,6 +22,16 @@ func New(accountID, region string) *AthenaService {
 	}
 }
 
+// SetLocator sets the service locator for cross-service lookups (e.g., Glue catalog).
+func (s *AthenaService) SetLocator(locator ServiceLocator) {
+	s.store.SetLocator(locator)
+}
+
+// RegisterSchema registers a table schema for SQL validation.
+func (s *AthenaService) RegisterSchema(database, table string, columns []string) {
+	s.store.schemaRegistry.Register(database, table, columns)
+}
+
 // Name returns the AWS service name used for routing.
 func (s *AthenaService) Name() string { return "athena" }
 

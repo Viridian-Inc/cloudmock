@@ -208,11 +208,17 @@ func (s *Store) UpdateCluster(name, nodeType, engineVersion string, numShards, n
 
 func (s *Store) DeleteCluster(name string) (*Cluster, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	c, ok := s.clusters[name]
-	if !ok { return nil, false }
-	c.Lifecycle.ForceState("deleting")
+	if !ok {
+		s.mu.Unlock()
+		return nil, false
+	}
 	c.Status = "deleting"
+	lc := c.Lifecycle
+	s.mu.Unlock()
+	if lc != nil {
+		lc.ForceState("deleting")
+	}
 	return c, true
 }
 

@@ -98,6 +98,8 @@ type scheduleResponse struct {
 	KmsKeyArn                  string                  `json:"KmsKeyArn,omitempty"`
 	CreationDate               string                  `json:"CreationDate"`
 	LastModificationDate       string                  `json:"LastModificationDate"`
+	LastInvocationTime         string                  `json:"LastInvocationTime,omitempty"`
+	InvocationCount            int                     `json:"InvocationCount,omitempty"`
 }
 
 func schedToResponse(sched *Schedule) *scheduleResponse {
@@ -108,6 +110,10 @@ func schedToResponse(sched *Schedule) *scheduleResponse {
 		State: sched.State, KmsKeyArn: sched.KmsKeyArn,
 		CreationDate:         sched.CreationDate.Format("2006-01-02T15:04:05Z"),
 		LastModificationDate: sched.LastModificationDate.Format("2006-01-02T15:04:05Z"),
+		InvocationCount:      len(sched.InvocationHistory),
+	}
+	if len(sched.InvocationHistory) > 0 {
+		r.LastInvocationTime = sched.InvocationHistory[len(sched.InvocationHistory)-1].Time.Format("2006-01-02T15:04:05Z")
 	}
 	if sched.FlexibleTimeWindow != nil {
 		r.FlexibleTimeWindow = &flexibleTimeWindowJSON{Mode: sched.FlexibleTimeWindow.Mode, MaximumWindowInMinutes: sched.FlexibleTimeWindow.MaximumWindowInMinutes}

@@ -2,9 +2,17 @@ package scheduler
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
+
+	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // Schedule represents an EventBridge Scheduler schedule.
@@ -24,6 +32,9 @@ type Schedule struct {
 	CreationDate               time.Time
 	LastModificationDate       time.Time
 	Tags                       map[string]string
+	// Behavioral fields
+	InvocationHistory []InvocationRecord
+	cancelFunc        func() // cancels the scheduled worker
 }
 
 // FlexibleTimeWindow configures schedule flexibility.
@@ -37,6 +48,18 @@ type Target struct {
 	Arn     string
 	RoleArn string
 	Input   string
+}
+
+// InvocationRecord tracks a schedule invocation.
+type InvocationRecord struct {
+	Time    time.Time
+	Success bool
+	Error   string
+}
+
+// ServiceLocator resolves other services for cross-service invocation.
+type ServiceLocator interface {
+	Lookup(name string) (service.Service, error)
 }
 
 // ScheduleGroup represents a schedule group.
@@ -56,6 +79,7 @@ type Store struct {
 	scheduleGroups map[string]*ScheduleGroup
 	accountID      string
 	region         string
+	locator        ServiceLocator
 }
 
 // NewStore returns a new Store for the given account and region.
@@ -123,6 +147,7 @@ func (s *Store) CreateSchedule(name, groupName, description, expression, timezon
 		CreationDate: now, LastModificationDate: now, Tags: tags,
 	}
 	s.schedules[groupName][name] = sched
+	s.scheduleExecution(sched)
 	return sched, true
 }
 
@@ -315,6 +340,179 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
 		return cp, true
 	}
 	return nil, false
+}
+
+// SetLocator sets the service locator for cross-service invocation.
+func (s *Store) SetLocator(locator ServiceLocator) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.locator = locator
+}
+
+// GetInvocationHistory returns invocation records for a schedule.
+func (s *Store) GetInvocationHistory(name, groupName string) []InvocationRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if groupName == "" {
+		groupName = "default"
+	}
+	group, ok := s.schedules[groupName]
+	if !ok {
+		return nil
+	}
+	sched, ok := group[name]
+	if !ok {
+		return nil
+	}
+	result := make([]InvocationRecord, len(sched.InvocationHistory))
+	copy(result, sched.InvocationHistory)
+	return result
+}
+
+// parseRateExpression parses "rate(5 minutes)" and returns the duration.
+func parseRateExpression(expr string) (time.Duration, bool) {
+	re := regexp.MustCompile(`^rate\((\d+)\s+(minutes?|hours?|days?)\)$`)
+	matches := re.FindStringSubmatch(expr)
+	if matches == nil {
+		return 0, false
+	}
+	val, _ := strconv.Atoi(matches[1])
+	unit := strings.TrimSuffix(matches[2], "s")
+	switch unit {
+	case "minute":
+		return time.Duration(val) * time.Minute, true
+	case "hour":
+		return time.Duration(val) * time.Hour, true
+	case "day":
+		return time.Duration(val) * 24 * time.Hour, true
+	default:
+		return 0, false
+	}
+}
+
+// isOneTimeExpression returns true if the expression is an "at()" one-time schedule.
+func isOneTimeExpression(expr string) bool {
+	return strings.HasPrefix(expr, "at(")
+}
+
+// invokeTarget invokes the schedule's target via the service locator.
+// Must NOT be called with s.mu held.
+func (s *Store) invokeTarget(sched *Schedule) {
+	if sched.Target == nil || sched.Target.Arn == "" {
+		s.recordInvocation(sched, false, "no target configured")
+		return
+	}
+
+	s.mu.RLock()
+	locator := s.locator
+	s.mu.RUnlock()
+
+	if locator == nil {
+		s.recordInvocation(sched, false, "no service locator")
+		return
+	}
+
+	targetARN := sched.Target.Arn
+	input := sched.Target.Input
+
+	// Determine target service and action from ARN.
+	svcName, action, actionBody := resolveTarget(targetARN, input)
+	if svcName == "" {
+		s.recordInvocation(sched, false, "unrecognized target ARN: "+targetARN)
+		return
+	}
+
+	targetSvc, err := locator.Lookup(svcName)
+	if err != nil {
+		s.recordInvocation(sched, false, "target service not found: "+svcName)
+		return
+	}
+
+	ctx := &service.RequestContext{
+		Action:     action,
+		Body:       actionBody,
+		RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+	}
+	_, err = targetSvc.HandleRequest(ctx)
+	if err != nil {
+		s.recordInvocation(sched, false, err.Error())
+		return
+	}
+	s.recordInvocation(sched, true, "")
+}
+
+// recordInvocation appends an invocation record to the schedule.
+func (s *Store) recordInvocation(sched *Schedule, success bool, errMsg string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sched.InvocationHistory = append(sched.InvocationHistory, InvocationRecord{
+		Time:    time.Now().UTC(),
+		Success: success,
+		Error:   errMsg,
+	})
+}
+
+// resolveTarget determines which service and action to invoke from a target ARN.
+func resolveTarget(arn, input string) (svcName, action string, body []byte) {
+	// Lambda: arn:aws:lambda:...:function:name
+	if strings.Contains(arn, ":function:") {
+		parts := strings.Split(arn, ":")
+		funcName := parts[len(parts)-1]
+		payload := input
+		if payload == "" {
+			payload = "{}"
+		}
+		body, _ = json.Marshal(map[string]any{
+			"FunctionName": funcName,
+			"Payload":      payload,
+		})
+		return "lambda", "Invoke", body
+	}
+	// SQS: arn:aws:sqs:...:queue-name
+	if strings.Contains(arn, ":sqs:") || strings.Contains(arn, "sqs.") {
+		body, _ = json.Marshal(map[string]any{
+			"QueueUrl":    arn,
+			"MessageBody": input,
+		})
+		return "sqs", "SendMessage", body
+	}
+	// SNS: arn:aws:sns:...:topic-name
+	if strings.Contains(arn, ":sns:") {
+		body, _ = json.Marshal(map[string]any{
+			"TopicArn": arn,
+			"Message":  input,
+		})
+		return "sns", "Publish", body
+	}
+	return "", "", nil
+}
+
+// scheduleExecution sets up invocation for a schedule (instant fire for one-time, or store interval info).
+// Must be called with s.mu held.
+func (s *Store) scheduleExecution(sched *Schedule) {
+	if sched.State != "ENABLED" {
+		return
+	}
+
+	expr := sched.ScheduleExpression
+
+	if isOneTimeExpression(expr) {
+		// One-time schedule: fire immediately in mock mode.
+		go s.invokeTarget(sched)
+		return
+	}
+
+	if _, ok := parseRateExpression(expr); ok {
+		// Rate expression: fire once immediately in mock mode.
+		go s.invokeTarget(sched)
+		return
+	}
+
+	// Cron expression or unknown: fire once immediately.
+	if strings.HasPrefix(expr, "cron(") {
+		go s.invokeTarget(sched)
+		return
+	}
 }
 
 func (s *Store) findTagsByARN(arn string) map[string]string {

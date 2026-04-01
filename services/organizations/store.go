@@ -50,6 +50,16 @@ type OrganizationalUnit struct {
 	Tags     []Tag
 }
 
+// CreateAccountStatus tracks the status of a CreateAccount request.
+type CreateAccountStatus struct {
+	Id                 string
+	AccountName        string
+	State              string
+	AccountId          string
+	RequestedTimestamp time.Time
+	CompletedTimestamp time.Time
+}
+
 // Account represents an AWS account in the organization.
 type Account struct {
 	Id              string
@@ -90,27 +100,29 @@ type PolicyTarget struct {
 
 // Store is the in-memory store for Organizations resources.
 type Store struct {
-	mu               sync.RWMutex
-	organization     *Organization
-	roots            map[string]*Root
-	ous              map[string]*OrganizationalUnit
-	accounts         map[string]*Account
-	policies         map[string]*Policy
-	policyAttachments map[string][]PolicyTarget // keyed by policy ID
-	accountID        string
-	region           string
+	mu                   sync.RWMutex
+	organization         *Organization
+	roots                map[string]*Root
+	ous                  map[string]*OrganizationalUnit
+	accounts             map[string]*Account
+	policies             map[string]*Policy
+	policyAttachments    map[string][]PolicyTarget      // keyed by policy ID
+	createAccountStatuses map[string]*CreateAccountStatus // keyed by request ID
+	accountID            string
+	region               string
 }
 
 // NewStore creates an empty Organizations Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		roots:             make(map[string]*Root),
-		ous:               make(map[string]*OrganizationalUnit),
-		accounts:          make(map[string]*Account),
-		policies:          make(map[string]*Policy),
-		policyAttachments: make(map[string][]PolicyTarget),
-		accountID:         accountID,
-		region:            region,
+		roots:                 make(map[string]*Root),
+		ous:                   make(map[string]*OrganizationalUnit),
+		accounts:              make(map[string]*Account),
+		policies:              make(map[string]*Policy),
+		policyAttachments:     make(map[string][]PolicyTarget),
+		createAccountStatuses: make(map[string]*CreateAccountStatus),
+		accountID:             accountID,
+		region:                region,
 	}
 }
 
@@ -312,18 +324,18 @@ func (s *Store) DeleteOU(ouID string) *service.AWSError {
 	return nil
 }
 
-// CreateAccount creates a new account.
-func (s *Store) CreateAccount(name, email string) (*Account, *service.AWSError) {
+// CreateAccount creates a new account and records the creation status.
+func (s *Store) CreateAccount(name, email string) (*Account, *CreateAccountStatus, *service.AWSError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if s.organization == nil {
-		return nil, service.NewAWSError("AWSOrganizationsNotInUseException",
+		return nil, nil, service.NewAWSError("AWSOrganizationsNotInUseException",
 			"Your account is not a member of an organization.", http.StatusBadRequest)
 	}
 
 	if name == "" || email == "" {
-		return nil, service.ErrValidation("AccountName and Email are required.")
+		return nil, nil, service.ErrValidation("AccountName and Email are required.")
 	}
 
 	accountId := newAccountID()
@@ -334,6 +346,7 @@ func (s *Store) CreateAccount(name, email string) (*Account, *service.AWSError) 
 		break
 	}
 
+	now := time.Now().UTC()
 	acct := &Account{
 		Id:              accountId,
 		Arn:             fmt.Sprintf("arn:aws:organizations::%s:account/%s/%s", s.accountID, s.organization.Id, accountId),
@@ -341,12 +354,35 @@ func (s *Store) CreateAccount(name, email string) (*Account, *service.AWSError) 
 		Email:           email,
 		Status:          "ACTIVE",
 		JoinedMethod:    "CREATED",
-		JoinedTimestamp: time.Now().UTC(),
+		JoinedTimestamp: now,
 		ParentId:        rootID,
 	}
 
+	requestID := newUUID()
+	status := &CreateAccountStatus{
+		Id:                 requestID,
+		AccountName:        name,
+		State:              "SUCCEEDED",
+		AccountId:          accountId,
+		RequestedTimestamp: now,
+		CompletedTimestamp: now,
+	}
+
 	s.accounts[accountId] = acct
-	return acct, nil
+	s.createAccountStatuses[requestID] = status
+	return acct, status, nil
+}
+
+// GetCreateAccountStatus returns the status of a CreateAccount request.
+func (s *Store) GetCreateAccountStatus(requestID string) (*CreateAccountStatus, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	status, ok := s.createAccountStatuses[requestID]
+	if !ok {
+		return nil, service.NewAWSError("CreateAccountStatusNotFoundException",
+			fmt.Sprintf("CreateAccount request %s not found.", requestID), http.StatusBadRequest)
+	}
+	return status, nil
 }
 
 // GetAccount returns an account by ID.

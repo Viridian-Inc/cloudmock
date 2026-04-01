@@ -2,6 +2,7 @@ package serverlessrepo
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -115,6 +116,13 @@ func handleDeleteApplication(appID string, store *Store) (*service.Response, err
 func handleCreateApplicationVersion(appID, version string, params map[string]any, store *Store) (*service.Response, error) {
 	ver, err := store.CreateApplicationVersion(appID, version, str(params, "SourceCodeUrl"))
 	if err != nil {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "invalid semantic version") {
+			return jsonErr(service.ErrValidation(errMsg))
+		}
+		if strings.Contains(errMsg, "already exists") {
+			return jsonErr(service.ErrAlreadyExists("ApplicationVersion", version))
+		}
 		return jsonErr(service.ErrNotFound("Application", appID))
 	}
 	return jsonCreated(map[string]any{

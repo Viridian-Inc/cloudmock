@@ -25,6 +25,11 @@ func New(accountID, region string) *EMRService {
 // Name returns the AWS service name used for routing.
 func (s *EMRService) Name() string { return "elasticmapreduce" }
 
+// SetLocator sets the service locator for cross-service lookups (e.g., EC2).
+func (s *EMRService) SetLocator(locator ServiceLocator) {
+	s.store.SetLocator(locator)
+}
+
 // Actions returns the list of EMR API actions supported by this service.
 func (s *EMRService) Actions() []service.Action {
 	return []service.Action{

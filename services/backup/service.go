@@ -42,6 +42,7 @@ func (s *BackupService) Actions() []service.Action {
 		{Name: "GetBackupSelection", Method: http.MethodPost, IAMAction: "backup:GetBackupSelection"},
 		{Name: "ListBackupSelections", Method: http.MethodPost, IAMAction: "backup:ListBackupSelections"},
 		{Name: "DeleteBackupSelection", Method: http.MethodPost, IAMAction: "backup:DeleteBackupSelection"},
+		{Name: "PutBackupVaultLockConfiguration", Method: http.MethodPost, IAMAction: "backup:PutBackupVaultLockConfiguration"},
 	}
 }
 
@@ -90,6 +91,8 @@ func (s *BackupService) HandleRequest(ctx *service.RequestContext) (*service.Res
 		return handleListBackupSelections(params, s.store)
 	case "DeleteBackupSelection":
 		return handleDeleteBackupSelection(params, s.store)
+	case "PutBackupVaultLockConfiguration":
+		return handlePutBackupVaultLockConfiguration(params, s.store)
 	default:
 		return jsonErr(service.NewAWSError("InvalidAction",
 			"The action "+ctx.Action+" is not valid for this web service.",

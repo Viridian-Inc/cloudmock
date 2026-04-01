@@ -3,6 +3,7 @@ package autoscaling
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -15,6 +16,7 @@ type ServiceLocator interface {
 type AutoScalingService struct {
 	store   *Store
 	locator ServiceLocator
+	bus     *eventbus.Bus
 }
 
 // New returns a new AutoScalingService for the given AWS account ID and region.
@@ -35,6 +37,11 @@ func NewWithLocator(accountID, region string, locator ServiceLocator) *AutoScali
 // SetLocator sets the service locator for cross-service communication (EC2 instance creation).
 func (s *AutoScalingService) SetLocator(locator ServiceLocator) {
 	s.locator = locator
+}
+
+// SetEventBus sets the event bus for publishing autoscaling events.
+func (s *AutoScalingService) SetEventBus(bus *eventbus.Bus) {
+	s.bus = bus
 }
 
 // Name returns the AWS service name used for routing.
@@ -83,13 +90,13 @@ func (s *AutoScalingService) HandleRequest(ctx *service.RequestContext) (*servic
 	switch action {
 	// Auto Scaling Groups
 	case "CreateAutoScalingGroup":
-		return handleCreateAutoScalingGroup(ctx, s.store)
+		return handleCreateAutoScalingGroup(ctx, s.store, s.locator, s.bus)
 	case "DescribeAutoScalingGroups":
 		return handleDescribeAutoScalingGroups(ctx, s.store)
 	case "UpdateAutoScalingGroup":
-		return handleUpdateAutoScalingGroup(ctx, s.store)
+		return handleUpdateAutoScalingGroup(ctx, s.store, s.locator, s.bus)
 	case "DeleteAutoScalingGroup":
-		return handleDeleteAutoScalingGroup(ctx, s.store)
+		return handleDeleteAutoScalingGroup(ctx, s.store, s.locator, s.bus)
 	// Launch Configurations
 	case "CreateLaunchConfiguration":
 		return handleCreateLaunchConfiguration(ctx, s.store)
@@ -106,7 +113,7 @@ func (s *AutoScalingService) HandleRequest(ctx *service.RequestContext) (*servic
 		return handleDeletePolicy(ctx, s.store)
 	// Capacity & Instances
 	case "SetDesiredCapacity":
-		return handleSetDesiredCapacity(ctx, s.store)
+		return handleSetDesiredCapacity(ctx, s.store, s.locator, s.bus)
 	case "DescribeAutoScalingInstances":
 		return handleDescribeAutoScalingInstances(ctx, s.store)
 	case "AttachInstances":

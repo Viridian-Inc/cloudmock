@@ -42,15 +42,25 @@ type Node struct {
 	lifecycle        *lifecycle.Machine
 }
 
+// ProposalVote represents a vote on a proposal.
+type ProposalVote struct {
+	MemberID string
+	Vote     string // YES or NO
+}
+
 // Proposal represents a network proposal.
 type Proposal struct {
-	ProposalID  string
-	NetworkID   string
-	Description string
+	ProposalID         string
+	NetworkID          string
+	Description        string
 	ProposedByMemberID string
-	Status      string
-	CreationDate time.Time
-	ExpirationDate time.Time
+	Status             string
+	CreationDate       time.Time
+	ExpirationDate     time.Time
+	YesVoteCount       int
+	NoVoteCount        int
+	OutstandingVoteCount int
+	Votes              []ProposalVote
 }
 
 // Store manages Managed Blockchain resources in memory.
@@ -82,10 +92,23 @@ func NewStore(accountID, region string) *Store {
 	}
 }
 
+// validFrameworks is the set of allowed blockchain frameworks.
+var validFrameworks = map[string]bool{
+	"HYPERLEDGER_FABRIC": true,
+	"ETHEREUM":           true,
+}
+
 // CreateNetwork creates a new network.
 func (s *Store) CreateNetwork(name, description, framework, frameworkVersion string) (*Network, *Member, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if name == "" {
+		return nil, nil, fmt.Errorf("network name is required")
+	}
+	if !validFrameworks[framework] {
+		return nil, nil, fmt.Errorf("invalid framework: %s. Must be HYPERLEDGER_FABRIC or ETHEREUM", framework)
+	}
 
 	s.netSeq++
 	netID := fmt.Sprintf("n-%012d", s.netSeq)
@@ -288,14 +311,16 @@ func (s *Store) CreateProposal(networkID, description, memberID string) (*Propos
 	s.proposalSeq++
 	propID := fmt.Sprintf("p-%012d", s.proposalSeq)
 
+	memberCount := len(s.members[networkID])
 	proposal := &Proposal{
-		ProposalID:         propID,
-		NetworkID:          networkID,
-		Description:        description,
-		ProposedByMemberID: memberID,
-		Status:             "IN_PROGRESS",
-		CreationDate:       time.Now().UTC(),
-		ExpirationDate:     time.Now().UTC().Add(24 * time.Hour),
+		ProposalID:           propID,
+		NetworkID:            networkID,
+		Description:          description,
+		ProposedByMemberID:   memberID,
+		Status:               "IN_PROGRESS",
+		CreationDate:         time.Now().UTC(),
+		ExpirationDate:       time.Now().UTC().Add(24 * time.Hour),
+		OutstandingVoteCount: memberCount,
 	}
 	s.proposals[networkID][propID] = proposal
 	return proposal, nil
@@ -311,6 +336,51 @@ func (s *Store) GetProposal(networkID, proposalID string) (*Proposal, bool) {
 	}
 	p, ok := pMap[proposalID]
 	return p, ok
+}
+
+// VoteOnProposal records a vote on a proposal.
+func (s *Store) VoteOnProposal(networkID, proposalID, voterMemberID, vote string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pMap, ok := s.proposals[networkID]
+	if !ok {
+		return fmt.Errorf("network not found: %s", networkID)
+	}
+	proposal, ok := pMap[proposalID]
+	if !ok {
+		return fmt.Errorf("proposal not found: %s", proposalID)
+	}
+	if proposal.Status != "IN_PROGRESS" {
+		return fmt.Errorf("proposal is not in IN_PROGRESS state")
+	}
+	if vote != "YES" && vote != "NO" {
+		return fmt.Errorf("vote must be YES or NO")
+	}
+
+	// Check for duplicate votes
+	for _, v := range proposal.Votes {
+		if v.MemberID == voterMemberID {
+			return fmt.Errorf("member %s has already voted", voterMemberID)
+		}
+	}
+
+	proposal.Votes = append(proposal.Votes, ProposalVote{MemberID: voterMemberID, Vote: vote})
+	proposal.OutstandingVoteCount--
+	if vote == "YES" {
+		proposal.YesVoteCount++
+	} else {
+		proposal.NoVoteCount++
+	}
+
+	// Check if threshold met (simple majority)
+	totalMembers := len(s.members[networkID])
+	if totalMembers > 0 && proposal.YesVoteCount > totalMembers/2 {
+		proposal.Status = "APPROVED"
+	} else if totalMembers > 0 && proposal.NoVoteCount > totalMembers/2 {
+		proposal.Status = "REJECTED"
+	}
+	return nil
 }
 
 // ListProposals returns all proposals for a network.

@@ -446,6 +446,26 @@ func buildToMap(b *Build) map[string]any {
 	if b.EndTime != nil {
 		m["endTime"] = float64(b.EndTime.Unix())
 	}
+
+	// Include build phases
+	if len(b.Phases) > 0 {
+		phases := make([]map[string]any, len(b.Phases))
+		for i, p := range b.Phases {
+			pm := map[string]any{
+				"phaseType":   string(p.PhaseType),
+				"phaseStatus": p.PhaseStatus,
+				"startTime":   float64(p.StartTime.Unix()),
+			}
+			if p.EndTime != nil {
+				pm["endTime"] = float64(p.EndTime.Unix())
+			}
+			if p.DurationInSec > 0 {
+				pm["durationInSeconds"] = p.DurationInSec
+			}
+			phases[i] = pm
+		}
+		m["phases"] = phases
+	}
 	return m
 }
 

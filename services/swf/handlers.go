@@ -841,6 +841,49 @@ func handleRespondActivityTaskFailed(ctx *service.RequestContext, store *Store) 
 	return emptyOK()
 }
 
+// ---- GetWorkflowExecutionHistory ----
+
+type getHistoryRequest struct {
+	Domain    string `json:"domain"`
+	Execution struct {
+		WorkflowId string `json:"workflowId"`
+		RunId      string `json:"runId"`
+	} `json:"execution"`
+}
+
+type historyEventJSON struct {
+	EventId   int64          `json:"eventId"`
+	EventType string         `json:"eventType"`
+	EventTimestamp float64   `json:"eventTimestamp"`
+}
+
+type getHistoryResponse struct {
+	Events []historyEventJSON `json:"events"`
+}
+
+func handleGetWorkflowExecutionHistory(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getHistoryRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Domain == "" || req.Execution.WorkflowId == "" || req.Execution.RunId == "" {
+		return jsonErr(service.ErrValidation("domain, execution.workflowId, and execution.runId are required."))
+	}
+	history, ok := store.GetWorkflowExecutionHistory(req.Domain, req.Execution.WorkflowId, req.Execution.RunId)
+	if !ok {
+		return jsonErr(service.NewAWSError("UnknownResourceFault", "Workflow execution not found.", http.StatusBadRequest))
+	}
+	events := make([]historyEventJSON, len(history))
+	for i, e := range history {
+		events[i] = historyEventJSON{
+			EventId:        e.EventID,
+			EventType:      e.EventType,
+			EventTimestamp: float64(e.Timestamp.Unix()),
+		}
+	}
+	return jsonOK(&getHistoryResponse{Events: events})
+}
+
 // ---- TagResource ----
 
 type tagResourceRequest struct {

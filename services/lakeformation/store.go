@@ -115,6 +115,9 @@ func (s *Store) PutDataLakeSettings(settings DataLakeSettings) {
 func (s *Store) RegisterResource(arn, roleArn string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if arn == "" {
+		return false
+	}
 	if _, ok := s.resources[arn]; ok {
 		return false
 	}

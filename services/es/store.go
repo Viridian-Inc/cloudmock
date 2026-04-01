@@ -9,6 +9,13 @@ import (
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
 )
 
+// ESDocument represents an indexed document.
+type ESDocument struct {
+	ID     string
+	Index  string
+	Source map[string]any
+}
+
 // Domain represents an Elasticsearch domain.
 type Domain struct {
 	DomainName          string
@@ -30,6 +37,7 @@ type Domain struct {
 type Store struct {
 	mu        sync.RWMutex
 	domains   map[string]*Domain
+	documents map[string]map[string][]ESDocument // domainName -> index -> documents
 	accountID string
 	region    string
 	lcConfig  *lifecycle.Config
@@ -39,6 +47,7 @@ type Store struct {
 func NewStore(accountID, region string) *Store {
 	return &Store{
 		domains:   make(map[string]*Domain),
+		documents: make(map[string]map[string][]ESDocument),
 		accountID: accountID,
 		region:    region,
 		lcConfig:  lifecycle.DefaultConfig(),
@@ -87,7 +96,7 @@ func (s *Store) CreateDomain(name, version, instanceType string, instanceCount i
 		ARN:                 s.domainARN(name),
 		DomainId:            randomHex(16),
 		ElasticsearchVersion: version,
-		Endpoint:            fmt.Sprintf("search-%s-%s.%s.es.amazonaws.com", name, randomHex(8), s.region),
+		Endpoint:            fmt.Sprintf("%s.%s.es.amazonaws.com", name, s.region),
 		Processing:          true,
 		Created:             true,
 		InstanceType:        instanceType,
@@ -195,4 +204,81 @@ func (s *Store) ListTags(arn string) (map[string]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ---- Document operations ----
+
+func (s *Store) IndexDocument(domainName, index, docID string, source map[string]any) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.domains[domainName]; !ok {
+		return "", false
+	}
+	if s.documents[domainName] == nil {
+		s.documents[domainName] = make(map[string][]ESDocument)
+	}
+	if docID == "" {
+		docID = randomHex(10)
+	}
+	docs := s.documents[domainName][index]
+	for i, d := range docs {
+		if d.ID == docID {
+			s.documents[domainName][index][i].Source = source
+			return docID, true
+		}
+	}
+	s.documents[domainName][index] = append(docs, ESDocument{ID: docID, Index: index, Source: source})
+	return docID, true
+}
+
+func (s *Store) SearchDocuments(domainName, index string, query map[string]any) ([]ESDocument, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.domains[domainName]; !ok {
+		return nil, false
+	}
+	docs := s.documents[domainName][index]
+	if query == nil || len(query) == 0 {
+		result := make([]ESDocument, len(docs))
+		copy(result, docs)
+		return result, true
+	}
+	matchQuery, hasMatch := query["match"].(map[string]any)
+	if !hasMatch {
+		result := make([]ESDocument, len(docs))
+		copy(result, docs)
+		return result, true
+	}
+	var result []ESDocument
+	for _, doc := range docs {
+		matches := true
+		for field, value := range matchQuery {
+			docVal, exists := doc.Source[field]
+			if !exists || fmt.Sprintf("%v", docVal) != fmt.Sprintf("%v", value) {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			result = append(result, doc)
+		}
+	}
+	return result, true
+}
+
+func (s *Store) ClusterHealth(domainName string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	d, ok := s.domains[domainName]
+	if !ok {
+		return "", false
+	}
+	processing := string(d.Lifecycle.State()) == "Processing"
+	if processing || d.Deleted {
+		return "red", true
+	}
+	if d.InstanceCount >= 2 {
+		return "green", true
+	}
+	return "yellow", true
 }

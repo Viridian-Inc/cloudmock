@@ -46,6 +46,9 @@ func (s *RedshiftService) Actions() []service.Action {
 		{Name: "CreateTags", Method: http.MethodPost, IAMAction: "redshift:CreateTags"},
 		{Name: "DeleteTags", Method: http.MethodPost, IAMAction: "redshift:DeleteTags"},
 		{Name: "DescribeTags", Method: http.MethodPost, IAMAction: "redshift:DescribeTags"},
+		{Name: "ExecuteStatement", Method: http.MethodPost, IAMAction: "redshift-data:ExecuteStatement"},
+		{Name: "DescribeStatement", Method: http.MethodPost, IAMAction: "redshift-data:DescribeStatement"},
+		{Name: "GetStatementResult", Method: http.MethodPost, IAMAction: "redshift-data:GetStatementResult"},
 	}
 }
 
@@ -97,6 +100,12 @@ func (s *RedshiftService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleDeleteTags(ctx, s.store)
 	case "DescribeTags":
 		return handleDescribeTags(ctx, s.store)
+	case "ExecuteStatement":
+		return handleExecuteStatement(ctx, s.store)
+	case "DescribeStatement":
+		return handleDescribeStatement(ctx, s.store)
+	case "GetStatementResult":
+		return handleGetStatementResult(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

@@ -3,6 +3,7 @@ package config
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/eventbus"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -11,6 +12,7 @@ type ConfigService struct {
 	store     *Store
 	accountID string
 	region    string
+	bus       *eventbus.Bus
 }
 
 // New returns a new ConfigService for the given AWS account ID and region.
@@ -19,6 +21,16 @@ func New(accountID, region string) *ConfigService {
 		store:     NewStore(accountID, region),
 		accountID: accountID,
 		region:    region,
+	}
+}
+
+// NewWithBus returns a new ConfigService wired to an event bus.
+func NewWithBus(accountID, region string, bus *eventbus.Bus) *ConfigService {
+	return &ConfigService{
+		store:     NewStore(accountID, region),
+		accountID: accountID,
+		region:    region,
+		bus:       bus,
 	}
 }
 
@@ -74,9 +86,9 @@ func (s *ConfigService) HandleRequest(ctx *service.RequestContext) (*service.Res
 	case "DeleteDeliveryChannel":
 		return handleDeleteDeliveryChannel(ctx, s.store)
 	case "StartConfigurationRecorder":
-		return handleStartConfigurationRecorder(ctx, s.store)
+		return s.handleStartRecorderWithBus(ctx)
 	case "StopConfigurationRecorder":
-		return handleStopConfigurationRecorder(ctx, s.store)
+		return s.handleStopRecorderWithBus(ctx)
 	case "GetComplianceDetailsByConfigRule":
 		return handleGetComplianceDetailsByConfigRule(ctx, s.store)
 	case "DescribeComplianceByConfigRule":
@@ -90,11 +102,59 @@ func (s *ConfigService) HandleRequest(ctx *service.RequestContext) (*service.Res
 	case "PutEvaluations":
 		return handlePutEvaluations(ctx, s.store)
 	case "GetResourceConfigHistory":
-		return handleGetResourceConfigHistory(ctx, s.store)
+		return s.handleGetResourceConfigHistoryWithStore(ctx)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",
 				"The action "+ctx.Action+" is not valid for this web service.",
 				http.StatusBadRequest)
 	}
+}
+
+func (s *ConfigService) handleStartRecorderWithBus(ctx *service.RequestContext) (*service.Response, error) {
+	resp, err := handleStartConfigurationRecorder(ctx, s.store)
+	if err != nil {
+		return resp, err
+	}
+	// Subscribe to bus
+	var params map[string]any
+	parseJSON(ctx.Body, &params)
+	name, _ := params["ConfigurationRecorderName"].(string)
+	s.startBusRecording(name)
+	return resp, err
+}
+
+func (s *ConfigService) handleStopRecorderWithBus(ctx *service.RequestContext) (*service.Response, error) {
+	var params map[string]any
+	parseJSON(ctx.Body, &params)
+	name, _ := params["ConfigurationRecorderName"].(string)
+	s.stopBusRecording(name)
+	return handleStopConfigurationRecorder(ctx, s.store)
+}
+
+func (s *ConfigService) handleGetResourceConfigHistoryWithStore(ctx *service.RequestContext) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	resourceType, _ := params["resourceType"].(string)
+	resourceId, _ := params["resourceId"].(string)
+
+	items := s.store.GetConfigHistory(resourceType, resourceId)
+	configItems := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		configItems = append(configItems, map[string]any{
+			"resourceType":                item.ResourceType,
+			"resourceId":                  item.ResourceId,
+			"resourceName":                item.ResourceName,
+			"configurationItemCaptureTime": float64(item.ConfigurationItemCaptureTime.Unix()),
+			"configurationItemStatus":     item.ConfigurationItemStatus,
+			"configuration":               item.Configuration,
+			"accountId":                   item.AccountId,
+			"awsRegion":                   item.AwsRegion,
+		})
+	}
+
+	return jsonOK(map[string]any{"configurationItems": configItems})
 }

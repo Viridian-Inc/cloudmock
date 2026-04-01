@@ -43,6 +43,9 @@ func (s *BedrockService) Actions() []service.Action {
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "bedrock:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "bedrock:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "bedrock:ListTagsForResource"},
+		{Name: "InvokeModel", Method: http.MethodPost, IAMAction: "bedrock:InvokeModel"},
+		{Name: "CreateGuardrail", Method: http.MethodPost, IAMAction: "bedrock:CreateGuardrail"},
+		{Name: "ApplyGuardrail", Method: http.MethodPost, IAMAction: "bedrock:ApplyGuardrail"},
 	}
 }
 
@@ -96,6 +99,12 @@ func (s *BedrockService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleUntagResource(params, s.store)
 	case "ListTagsForResource":
 		return handleListTagsForResource(params, s.store)
+	case "InvokeModel":
+		return handleInvokeModel(params, s.store)
+	case "CreateGuardrail":
+		return handleCreateGuardrail(params, s.store)
+	case "ApplyGuardrail":
+		return handleApplyGuardrail(params, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

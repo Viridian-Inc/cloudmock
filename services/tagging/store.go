@@ -1,6 +1,7 @@
 package tagging
 
 import (
+	"strings"
 	"sync"
 )
 
@@ -64,17 +65,51 @@ func (s *Store) UntagResources(arns []string, tagKeys []string) map[string]strin
 	return failedMap
 }
 
-// GetResources returns resources matching the given tag filters.
-func (s *Store) GetResources(tagFilters []TagFilter, resourceTypeFilter string) []*TagEntry {
+// arnMatchesResourceType checks if an ARN matches a resource type filter.
+// Resource type filters use the format "service:resourcetype", e.g., "ec2:instance".
+func arnMatchesResourceType(arn string, resourceType string) bool {
+	// ARN format: arn:aws:service:region:account:resourcetype/id
+	parts := strings.SplitN(arn, ":", 7)
+	if len(parts) < 6 {
+		return false
+	}
+	arnService := parts[2]
+
+	// Handle "service" and "service:resourcetype" filters.
+	filterParts := strings.SplitN(resourceType, ":", 2)
+	filterService := filterParts[0]
+	if arnService != filterService {
+		return false
+	}
+	if len(filterParts) == 1 {
+		return true // Service-only match.
+	}
+	// Check resource type portion.
+	resourcePart := parts[5]
+	if len(parts) == 7 {
+		resourcePart = parts[5] + ":" + parts[6]
+	}
+	return strings.HasPrefix(resourcePart, filterParts[1])
+}
+
+// GetResources returns resources matching the given tag filters and resource type filters.
+func (s *Store) GetResources(tagFilters []TagFilter, resourceTypeFilters []string) []*TagEntry {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	var results []*TagEntry
 	for _, entry := range s.resources {
-		if resourceTypeFilter != "" {
-			// Simple prefix check on the ARN for resource type filtering
-			// e.g., "ec2:instance" would check for "ec2" in the ARN
-			// Real AWS uses more sophisticated matching
+		if len(resourceTypeFilters) > 0 {
+			matched := false
+			for _, rtf := range resourceTypeFilters {
+				if arnMatchesResourceType(entry.ARN, rtf) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
 		}
 
 		if matchesFilters(entry, tagFilters) {
@@ -120,6 +155,13 @@ func (s *Store) GetTagValues(key string) []string {
 		values = append(values, v)
 	}
 	return values
+}
+
+// ResourceCount returns the total number of tagged resources.
+func (s *Store) ResourceCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return len(s.resources)
 }
 
 // TagFilter represents a filter for querying tagged resources.

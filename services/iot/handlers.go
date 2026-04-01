@@ -500,6 +500,18 @@ func handleDetachThingPrincipal(p map[string]any, store *Store) (*service.Respon
 	return emptyOK()
 }
 
+func handleListThingPrincipals(p map[string]any, store *Store) (*service.Response, error) {
+	thingName := getStr(p, "thingName")
+	if thingName == "" {
+		return jsonErr(service.ErrValidation("thingName is required."))
+	}
+	principals, awsErr := store.ListThingPrincipals(thingName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"principals": principals})
+}
+
 // ---- Topic rule handlers ----
 
 func handleCreateTopicRule(p map[string]any, store *Store) (*service.Response, error) {

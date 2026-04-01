@@ -25,6 +25,11 @@ func New(accountID, region string) *GlueService {
 // Name returns the AWS service name used for routing.
 func (s *GlueService) Name() string { return "glue" }
 
+// SetLocator sets the service locator for cross-service lookups (e.g., S3 for crawlers).
+func (s *GlueService) SetLocator(locator ServiceLocator) {
+	s.store.SetLocator(locator)
+}
+
 // Actions returns the list of Glue API actions supported by this service.
 func (s *GlueService) Actions() []service.Action {
 	return []service.Action{

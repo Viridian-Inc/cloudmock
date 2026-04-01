@@ -36,6 +36,7 @@ func (s *ACMPCAService) Actions() []service.Action {
 		{Name: "IssueCertificate", Method: http.MethodPost, IAMAction: "acm-pca:IssueCertificate"},
 		{Name: "GetCertificate", Method: http.MethodPost, IAMAction: "acm-pca:GetCertificate"},
 		{Name: "RevokeCertificate", Method: http.MethodPost, IAMAction: "acm-pca:RevokeCertificate"},
+		{Name: "GetCertificateAuthorityCsr", Method: http.MethodPost, IAMAction: "acm-pca:GetCertificateAuthorityCsr"},
 		{Name: "TagCertificateAuthority", Method: http.MethodPost, IAMAction: "acm-pca:TagCertificateAuthority"},
 		{Name: "UntagCertificateAuthority", Method: http.MethodPost, IAMAction: "acm-pca:UntagCertificateAuthority"},
 		{Name: "ListTags", Method: http.MethodPost, IAMAction: "acm-pca:ListTags"},
@@ -67,6 +68,8 @@ func (s *ACMPCAService) HandleRequest(ctx *service.RequestContext) (*service.Res
 		return handleGetCertificate(ctx, s.store)
 	case "RevokeCertificate":
 		return handleRevokeCertificate(ctx, s.store)
+	case "GetCertificateAuthorityCsr":
+		return handleGetCertificateAuthorityCsr(ctx, s.store)
 	case "TagCertificateAuthority":
 		return handleTagCertificateAuthority(ctx, s.store)
 	case "UntagCertificateAuthority":

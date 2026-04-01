@@ -2,6 +2,7 @@ package es
 
 import (
 	"crypto/rand"
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -313,4 +314,96 @@ func handleListTags(ctx *service.RequestContext, store *Store) (*service.Respons
 	resp := &xmlListTagsResponse{Xmlns: esXmlns, Meta: xmlResponseMetadata{RequestID: newRequestID()}}
 	resp.Result.TagList = xmlTags
 	return xmlOK(resp)
+}
+
+// ---- JSON-based document API handlers ----
+
+func jsonOK(body any) (*service.Response, error) {
+	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
+}
+
+func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
+	return &service.Response{Format: service.FormatJSON}, awsErr
+}
+
+func parseJSONBody(body []byte, v any) *service.AWSError {
+	if len(body) == 0 {
+		return nil
+	}
+	if err := json.Unmarshal(body, v); err != nil {
+		return service.NewAWSError("ValidationException", "Invalid JSON.", http.StatusBadRequest)
+	}
+	return nil
+}
+
+type indexDocumentRequest struct {
+	DomainName string         `json:"DomainName"`
+	Index      string         `json:"Index"`
+	DocumentId string         `json:"DocumentId"`
+	Document   map[string]any `json:"Document"`
+}
+
+func handleIndexDocument(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req indexDocumentRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.DomainName == "" || req.Index == "" {
+		return jsonErr(service.ErrValidation("DomainName and Index are required."))
+	}
+	docID, ok := store.IndexDocument(req.DomainName, req.Index, req.DocumentId, req.Document)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Domain "+req.DomainName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"_index": req.Index, "_id": docID, "result": "created", "_version": 1,
+	})
+}
+
+type searchRequest struct {
+	DomainName string         `json:"DomainName"`
+	Index      string         `json:"Index"`
+	Query      map[string]any `json:"Query"`
+}
+
+func handleSearch(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req searchRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.DomainName == "" || req.Index == "" {
+		return jsonErr(service.ErrValidation("DomainName and Index are required."))
+	}
+	docs, ok := store.SearchDocuments(req.DomainName, req.Index, req.Query)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Domain "+req.DomainName+" not found.", http.StatusNotFound))
+	}
+	hits := make([]map[string]any, len(docs))
+	for i, d := range docs {
+		hits[i] = map[string]any{"_index": d.Index, "_id": d.ID, "_source": d.Source}
+	}
+	return jsonOK(map[string]any{
+		"hits": map[string]any{
+			"total": map[string]any{"value": len(docs), "relation": "eq"},
+			"hits":  hits,
+		},
+	})
+}
+
+type clusterHealthRequest struct {
+	DomainName string `json:"DomainName"`
+}
+
+func handleClusterHealth(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req clusterHealthRequest
+	if awsErr := parseJSONBody(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	health, ok := store.ClusterHealth(req.DomainName)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Domain "+req.DomainName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"cluster_name": req.DomainName, "status": health, "number_of_nodes": 1,
+	})
 }

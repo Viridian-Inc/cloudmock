@@ -61,6 +61,14 @@ func handleRegisterScalableTarget(ctx *service.RequestContext, store *Store) (*s
 	if req.ServiceNamespace == "" || req.ResourceId == "" || req.ScalableDimension == "" {
 		return jsonErr(service.ErrValidation("ServiceNamespace, ResourceId, and ScalableDimension are required."))
 	}
+	validNamespaces := map[string]bool{
+		"ecs": true, "dynamodb": true, "ec2": true, "rds": true,
+		"sagemaker": true, "custom-resource": true, "comprehend": true,
+		"lambda": true, "cassandra": true, "kafka": true, "elasticache": true, "neptune": true,
+	}
+	if !validNamespaces[req.ServiceNamespace] {
+		return jsonErr(service.ErrValidation("ServiceNamespace must be one of: ecs, dynamodb, ec2, rds, sagemaker, custom-resource, comprehend, lambda, cassandra, kafka, elasticache, neptune."))
+	}
 	var suspended *SuspendedState
 	if req.SuspendedState != nil {
 		suspended = &SuspendedState{
@@ -174,6 +182,14 @@ func handlePutScalingPolicy(ctx *service.RequestContext, store *Store) (*service
 	}
 	if req.PolicyName == "" || req.ServiceNamespace == "" || req.ResourceId == "" || req.ScalableDimension == "" {
 		return jsonErr(service.ErrValidation("PolicyName, ServiceNamespace, ResourceId, and ScalableDimension are required."))
+	}
+	if req.PolicyType == "TargetTrackingScaling" {
+		if req.TargetTrackingScalingPolicyConfiguration == nil {
+			return jsonErr(service.ErrValidation("TargetTrackingScalingPolicyConfiguration is required for TargetTrackingScaling policy type."))
+		}
+		if _, ok := req.TargetTrackingScalingPolicyConfiguration["TargetValue"]; !ok {
+			return jsonErr(service.ErrValidation("TargetValue is required in TargetTrackingScalingPolicyConfiguration."))
+		}
 	}
 	policy := store.PutScalingPolicy(req.ServiceNamespace, req.ResourceId, req.ScalableDimension, req.PolicyName, req.PolicyType, req.TargetTrackingScalingPolicyConfiguration, req.StepScalingPolicyConfiguration, nil)
 	return jsonOK(&putScalingPolicyResponse{PolicyARN: policy.PolicyARN, Alarms: []any{}})

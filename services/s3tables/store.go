@@ -1,10 +1,14 @@
 package s3tables
 
 import (
+	"encoding/json"
 	"fmt"
+	"regexp"
 	"sync"
 	"time"
 )
+
+var bucketNameRegex = regexp.MustCompile(`^[a-z0-9][a-z0-9\-]{0,61}[a-z0-9]?$`)
 
 // TableBucket represents an S3 Tables table bucket.
 type TableBucket struct {
@@ -57,6 +61,10 @@ func NewStore(accountID, region string) *Store {
 func (s *Store) CreateTableBucket(name string) (*TableBucket, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if !bucketNameRegex.MatchString(name) {
+		return nil, fmt.Errorf("invalid bucket name: must be lowercase, 3-63 chars, no underscores: %s", name)
+	}
 
 	if _, ok := s.tableBuckets[name]; ok {
 		return nil, fmt.Errorf("table bucket already exists: %s", name)
@@ -115,6 +123,13 @@ func (s *Store) DeleteTableBucket(arn string) bool {
 func (s *Store) CreateTable(bucketARN, namespace, name, format string) (*Table, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if namespace == "" {
+		return nil, fmt.Errorf("namespace is required")
+	}
+	if name == "" {
+		return nil, fmt.Errorf("table name is required")
+	}
 
 	tableMap, ok := s.tables[bucketARN]
 	if !ok {
@@ -188,6 +203,13 @@ func (s *Store) DeleteTable(bucketARN, namespace, name string) bool {
 func (s *Store) PutTablePolicy(tableARN, policy string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	// Validate JSON structure
+	var parsed map[string]any
+	if err := json.Unmarshal([]byte(policy), &parsed); err != nil {
+		return fmt.Errorf("policy is not valid JSON: %v", err)
+	}
+
 	s.policies[tableARN] = &TablePolicy{
 		TableARN:       tableARN,
 		ResourcePolicy: policy,

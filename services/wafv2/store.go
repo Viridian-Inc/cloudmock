@@ -87,6 +87,8 @@ type Store struct {
 	ruleGroups       map[string]*RuleGroup       // keyed by ID
 	ipSets           map[string]*IPSet           // keyed by ID
 	regexPatternSets map[string]*RegexPatternSet // keyed by ID
+	sampledRequests  map[string][]SampledRequest  // keyed by WebACL ID
+	rateCounter      *RateCounter
 	accountID        string
 	region           string
 }
@@ -98,6 +100,8 @@ func NewStore(accountID, region string) *Store {
 		ruleGroups:       make(map[string]*RuleGroup),
 		ipSets:           make(map[string]*IPSet),
 		regexPatternSets: make(map[string]*RegexPatternSet),
+		sampledRequests:  make(map[string][]SampledRequest),
+		rateCounter:      NewRateCounter(),
 		accountID:        accountID,
 		region:           region,
 	}

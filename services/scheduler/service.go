@@ -12,6 +12,7 @@ type SchedulerService struct {
 	store     *Store
 	accountID string
 	region    string
+	locator   ServiceLocator
 }
 
 // New returns a new SchedulerService for the given AWS account ID and region.
@@ -21,6 +22,20 @@ func New(accountID, region string) *SchedulerService {
 		accountID: accountID,
 		region:    region,
 	}
+}
+
+// NewWithLocator returns a new SchedulerService with a ServiceLocator for cross-service invocation.
+func NewWithLocator(accountID, region string, locator ServiceLocator) *SchedulerService {
+	s := New(accountID, region)
+	s.locator = locator
+	s.store.SetLocator(locator)
+	return s
+}
+
+// SetLocator sets the service locator for cross-service calls.
+func (s *SchedulerService) SetLocator(locator ServiceLocator) {
+	s.locator = locator
+	s.store.SetLocator(locator)
 }
 
 // Name returns the AWS service name used for routing.

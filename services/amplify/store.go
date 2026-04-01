@@ -597,26 +597,38 @@ func (s *Store) ListJobs(appID, branchName string) ([]*Job, bool) {
 // StopJob stops a running job.
 func (s *Store) StopJob(appID, branchName, jobID string) (*Job, bool) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	appJobs, ok := s.jobs[appID]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
 	branchJobs, ok := appJobs[branchName]
 	if !ok {
+		s.mu.Unlock()
 		return nil, false
 	}
+	var found *Job
 	for _, job := range branchJobs {
 		if job.JobId == jobID {
-			job.Lifecycle.Stop()
-			job.Lifecycle.ForceState("CANCELLED")
-			job.Status = "CANCELLED"
-			t := time.Now().UTC()
-			job.EndTime = &t
-			return job, true
+			found = job
+			break
 		}
 	}
-	return nil, false
+	if found == nil {
+		s.mu.Unlock()
+		return nil, false
+	}
+	lc := found.Lifecycle
+	found.Status = "CANCELLED"
+	t := time.Now().UTC()
+	found.EndTime = &t
+	s.mu.Unlock()
+
+	// ForceState may trigger OnTransition callback that acquires s.mu.
+	lc.Stop()
+	lc.ForceState("CANCELLED")
+
+	return found, true
 }
 
 // TagResource applies tags to a resource by ARN.

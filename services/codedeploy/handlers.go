@@ -407,13 +407,29 @@ func handleBatchGetDeploymentTargets(ctx *service.RequestContext, store *Store) 
 			"deploymentTargetType": t.DeploymentTargetType,
 		}
 		if t.InstanceTarget != nil {
-			m["instanceTarget"] = map[string]any{
+			it := map[string]any{
 				"deploymentId":  t.InstanceTarget.DeploymentID,
 				"targetId":      t.InstanceTarget.TargetID,
 				"targetArn":     t.InstanceTarget.TargetARN,
 				"status":        t.InstanceTarget.Status,
 				"lastUpdatedAt": float64(t.InstanceTarget.LastUpdatedAt.Unix()),
 			}
+			if len(t.InstanceTarget.LifecycleEvents) > 0 {
+				events := make([]map[string]any, len(t.InstanceTarget.LifecycleEvents))
+				for ei, ev := range t.InstanceTarget.LifecycleEvents {
+					em := map[string]any{
+						"lifecycleEventName": ev.LifecycleEventName,
+						"status":             ev.Status,
+						"startTime":          float64(ev.StartTime.Unix()),
+					}
+					if ev.EndTime != nil {
+						em["endTime"] = float64(ev.EndTime.Unix())
+					}
+					events[ei] = em
+				}
+				it["lifecycleEvents"] = events
+			}
+			m["instanceTarget"] = it
 		}
 		result[i] = m
 	}

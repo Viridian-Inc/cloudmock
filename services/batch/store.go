@@ -120,6 +120,11 @@ type ContainerDetail struct {
 	LogStreamName string
 }
 
+// ServiceLocator resolves other services for cross-service integration.
+type ServiceLocator interface {
+	Lookup(name string) (interface{ HandleRequest(ctx interface{}) (interface{}, error) }, error)
+}
+
 // Store manages Batch resources in memory.
 type Store struct {
 	mu           sync.RWMutex
@@ -357,6 +362,12 @@ func (s *Store) SubmitJob(name, queue, jobDef string, container *ContainerDetail
 	}
 
 	now := time.Now().UTC()
+
+	// Generate log stream name for the job.
+	if container != nil && container.LogStreamName == "" {
+		container.LogStreamName = fmt.Sprintf("batch/job/%s/%s", name, jobID)
+	}
+
 	job := &Job{
 		JobName:       name,
 		JobID:         jobID,
@@ -399,6 +410,9 @@ func (s *Store) GetJob(jobID string) (*Job, bool) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	job, ok := s.jobs[jobID]
+	if ok && job.lifecycle != nil {
+		job.Status = string(job.lifecycle.State())
+	}
 	return job, ok
 }
 
@@ -408,6 +422,9 @@ func (s *Store) ListJobs(queue, status string) []*Job {
 	defer s.mu.RUnlock()
 	out := make([]*Job, 0)
 	for _, job := range s.jobs {
+		if job.lifecycle != nil {
+			job.Status = string(job.lifecycle.State())
+		}
 		if queue != "" && job.JobQueue != queue {
 			continue
 		}
@@ -443,4 +460,35 @@ func (s *Store) CancelJob(jobID, reason string) error {
 // TerminateJob terminates a running job.
 func (s *Store) TerminateJob(jobID, reason string) error {
 	return s.CancelJob(jobID, reason)
+}
+
+// GetComputeEnvironmentVCPUs returns available and desired vCPUs for a compute environment.
+func (s *Store) GetComputeEnvironmentVCPUs(name string) (available, desired int, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ce, exists := s.computeEnvs[name]
+	if !exists || ce.ComputeResources == nil {
+		return 0, 0, false
+	}
+	// Count running jobs that use this CE's queues.
+	usedVCPUs := 0
+	for _, job := range s.jobs {
+		if job.Status == "RUNNING" && job.Container != nil {
+			usedVCPUs += job.Container.Vcpus
+		}
+	}
+	return ce.ComputeResources.MaxvCpus - usedVCPUs, ce.ComputeResources.DesiredvCpus, true
+}
+
+// GetJobDefRevisions returns all revisions for a given job definition name.
+func (s *Store) GetJobDefRevisions(name string) []*JobDefinition {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var revisions []*JobDefinition
+	for _, jd := range s.jobDefs {
+		if jd.JobDefinitionName == name {
+			revisions = append(revisions, jd)
+		}
+	}
+	return revisions
 }

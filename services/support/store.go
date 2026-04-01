@@ -236,13 +236,34 @@ func (s *Store) GetTrustedAdvisorCheckResult(checkID string) (*TrustedAdvisorChe
 		},
 	}
 
-	// Add some mock flagged resources for cost checks
-	if check.Category == "cost_optimizing" {
+	// Add realistic flagged resources based on check category.
+	switch check.Category {
+	case "cost_optimizing":
 		result.Status = "warning"
+		result.ResourcesSummary["resourcesFlagged"] = 3
+		result.FlaggedResources = []map[string]string{
+			{"status": "warning", "region": "us-east-1", "resourceId": "i-0123456789abcdef0", "instanceType": "m5.xlarge", "estimatedMonthlySavings": "$45.60"},
+			{"status": "warning", "region": "us-west-2", "resourceId": "i-0fedcba9876543210", "instanceType": "r5.large", "estimatedMonthlySavings": "$32.10"},
+			{"status": "warning", "region": "eu-west-1", "resourceId": "vol-0abc123def456789", "volumeType": "gp2", "estimatedMonthlySavings": "$12.50"},
+		}
+	case "security":
+		result.Status = "error"
 		result.ResourcesSummary["resourcesFlagged"] = 2
 		result.FlaggedResources = []map[string]string{
-			{"status": "warning", "region": "us-east-1", "resourceId": "i-0123456789abcdef0"},
-			{"status": "warning", "region": "us-west-2", "resourceId": "i-0fedcba9876543210"},
+			{"status": "error", "region": "us-east-1", "resourceId": "sg-0123456789abcdef0", "protocol": "tcp", "port": "22", "ipAddress": "0.0.0.0/0"},
+			{"status": "warning", "region": "us-east-1", "resourceId": "sg-0abcdef012345678", "protocol": "tcp", "port": "3389", "ipAddress": "0.0.0.0/0"},
+		}
+	case "performance":
+		result.Status = "warning"
+		result.ResourcesSummary["resourcesFlagged"] = 1
+		result.FlaggedResources = []map[string]string{
+			{"status": "warning", "region": "us-east-1", "service": "EC2", "limitName": "On-Demand instances", "limitAmount": "20", "currentUsage": "18"},
+		}
+	case "fault_tolerance":
+		result.Status = "warning"
+		result.ResourcesSummary["resourcesFlagged"] = 1
+		result.FlaggedResources = []map[string]string{
+			{"status": "warning", "region": "us-east-1", "resourceId": "mydb-instance", "vpcId": "vpc-0123456", "multiAZ": "false"},
 		}
 	}
 

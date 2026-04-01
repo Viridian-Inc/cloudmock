@@ -76,12 +76,38 @@ func (s *Store) UpdateThingShadow(thingName, shadowName string, state map[string
 	existing, ok := s.shadows[thingName][shadowName]
 	now := time.Now().UTC()
 	if ok {
-		// Merge desired/reported state.
+		// Merge desired/reported state and compute delta.
 		if existing.State == nil {
 			existing.State = make(map[string]any)
 		}
 		for k, v := range state {
-			existing.State[k] = v
+			if vMap, isMap := v.(map[string]any); isMap {
+				if existingMap, isExistingMap := existing.State[k].(map[string]any); isExistingMap {
+					for mk, mv := range vMap {
+						existingMap[mk] = mv
+					}
+				} else {
+					existing.State[k] = v
+				}
+			} else {
+				existing.State[k] = v
+			}
+		}
+		// Compute delta between desired and reported
+		desired, _ := existing.State["desired"].(map[string]any)
+		reported, _ := existing.State["reported"].(map[string]any)
+		if desired != nil && reported != nil {
+			delta := make(map[string]any)
+			for k, dv := range desired {
+				if rv, ok := reported[k]; !ok || fmt.Sprintf("%v", dv) != fmt.Sprintf("%v", rv) {
+					delta[k] = dv
+				}
+			}
+			if len(delta) > 0 {
+				existing.State["delta"] = delta
+			} else {
+				delete(existing.State, "delta")
+			}
 		}
 		existing.Version++
 		existing.Timestamp = now
@@ -95,6 +121,20 @@ func (s *Store) UpdateThingShadow(thingName, shadowName string, state map[string
 		Metadata:   map[string]any{},
 		Version:    1,
 		Timestamp:  now,
+	}
+	// Compute delta for newly created shadow
+	desired, _ := state["desired"].(map[string]any)
+	reported, _ := state["reported"].(map[string]any)
+	if desired != nil && reported != nil {
+		delta := make(map[string]any)
+		for k, dv := range desired {
+			if rv, ok := reported[k]; !ok || fmt.Sprintf("%v", dv) != fmt.Sprintf("%v", rv) {
+				delta[k] = dv
+			}
+		}
+		if len(delta) > 0 {
+			shadow.State["delta"] = delta
+		}
 	}
 	s.shadows[thingName][shadowName] = shadow
 	return shadow, nil

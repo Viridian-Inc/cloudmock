@@ -1,0 +1,42 @@
+{
+  "name": "@cloudmock/rum",
+  "version": "0.1.0",
+  "description": "Real User Monitoring SDK for CloudMock — web vitals, error tracking, session replay",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist/"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm,cjs --dts --minify",
+    "dev": "tsup src/index.ts --format esm,cjs --dts --watch"
+  },
+  "devDependencies": {
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "keywords": [
+    "cloudmock",
+    "rum",
+    "real-user-monitoring",
+    "web-vitals",
+    "performance",
+    "error-tracking"
+  ],
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/neureaux/cloudmock",
+    "directory": "npm/cloudmock-rum"
+  },
+  "sideEffects": false
+}

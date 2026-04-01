@@ -8,6 +8,8 @@ type Dashboard struct {
 	Name        string    `json:"name"`
 	Description string    `json:"description,omitempty"`
 	Widgets     []Widget  `json:"widgets"`
+	Owner       string    `json:"owner,omitempty"`
+	Visibility  string    `json:"visibility,omitempty"` // "private" or "team"
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }

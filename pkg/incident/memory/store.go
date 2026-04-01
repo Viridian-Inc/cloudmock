@@ -14,11 +14,14 @@ import (
 type Store struct {
 	mu        sync.RWMutex
 	incidents []incident.Incident
+	comments  map[string][]incident.Comment // keyed by incident ID
 }
 
 // NewStore creates a new in-memory incident store.
 func NewStore() *Store {
-	return &Store{}
+	return &Store{
+		comments: make(map[string][]incident.Comment),
+	}
 }
 
 // Save appends the incident. If inc.ID is empty, a UUID is generated.
@@ -139,6 +142,42 @@ func containsStr(ss []string, s string) bool {
 		}
 	}
 	return false
+}
+
+// AddComment appends a comment to the given incident.
+func (s *Store) AddComment(incidentID string, comment incident.Comment) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Verify the incident exists.
+	found := false
+	for _, inc := range s.incidents {
+		if inc.ID == incidentID {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return incident.ErrNotFound
+	}
+
+	if comment.ID == "" {
+		comment.ID = uuid.New().String()
+	}
+	comment.IncidentID = incidentID
+	s.comments[incidentID] = append(s.comments[incidentID], comment)
+	return nil
+}
+
+// GetComments returns all comments for the given incident, ordered by creation time.
+func (s *Store) GetComments(incidentID string) ([]incident.Comment, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	comments := s.comments[incidentID]
+	out := make([]incident.Comment, len(comments))
+	copy(out, comments)
+	return out, nil
 }
 
 // Compile-time interface check.

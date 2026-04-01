@@ -16,4 +16,6 @@ type IncidentStore interface {
 	List(ctx context.Context, filter IncidentFilter) ([]Incident, error)
 	Update(ctx context.Context, inc *Incident) error
 	FindActiveByKey(ctx context.Context, service, deployID string, since time.Time) (*Incident, error)
+	AddComment(incidentID string, comment Comment) error
+	GetComments(incidentID string) ([]Comment, error)
 }

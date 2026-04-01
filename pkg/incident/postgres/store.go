@@ -243,5 +243,41 @@ func nullStr(s string) *string {
 	return &s
 }
 
+// AddComment inserts a comment for the given incident.
+func (s *Store) AddComment(incidentID string, comment incident.Comment) error {
+	if comment.ID == "" {
+		comment.ID = uuid.New().String()
+	}
+	_, err := s.pool.Exec(context.Background(),
+		`INSERT INTO incident_comments (id, incident_id, author, body, mentions, created_at)
+		 VALUES ($1, $2, $3, $4, $5, $6)`,
+		comment.ID, incidentID, comment.Author, comment.Body, comment.Mentions, comment.CreatedAt,
+	)
+	return err
+}
+
+// GetComments returns all comments for the given incident, ordered by creation time.
+func (s *Store) GetComments(incidentID string) ([]incident.Comment, error) {
+	rows, err := s.pool.Query(context.Background(),
+		`SELECT id, incident_id, author, body, mentions, created_at
+		 FROM incident_comments WHERE incident_id = $1 ORDER BY created_at ASC`,
+		incidentID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var comments []incident.Comment
+	for rows.Next() {
+		var c incident.Comment
+		if err := rows.Scan(&c.ID, &c.IncidentID, &c.Author, &c.Body, &c.Mentions, &c.CreatedAt); err != nil {
+			return nil, err
+		}
+		comments = append(comments, c)
+	}
+	return comments, rows.Err()
+}
+
 // Compile-time interface check.
 var _ incident.IncidentStore = (*Store)(nil)

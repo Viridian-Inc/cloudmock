@@ -148,7 +148,8 @@ type API struct {
 	syntheticsEngine   *synthetics.Engine
 	securityScanner    *security.Scanner
 	marketplace        *marketplace.Registry
-	persistDir         string // if set, dashboards/views/deploys are persisted here
+	persistDir         string       // if set, dashboards/views/deploys are persisted here
+	dynamoStore        *DynamoStore // if set, dashboards/views/deploys use DynamoDB
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -163,6 +164,20 @@ func (a *API) SetRequestLog(log *gateway.RequestLog, stats *gateway.RequestStats
 // SetSourceServer wires the source server for HTTP event ingestion.
 func (a *API) SetSourceServer(ss *SourceServer) {
 	a.sourceServer = ss
+}
+
+// SetTopologyConfigRaw sets the IaC topology from raw JSON (used by seed file at boot).
+func (a *API) SetTopologyConfigRaw(nodesJSON, edgesJSON json.RawMessage) {
+	var cfg IaCTopologyConfig
+	if nodesJSON != nil {
+		json.Unmarshal(nodesJSON, &cfg.Nodes)
+	}
+	if edgesJSON != nil {
+		json.Unmarshal(edgesJSON, &cfg.Edges)
+	}
+	a.iacTopologyMu.Lock()
+	a.iacTopology = &cfg
+	a.iacTopologyMu.Unlock()
 }
 
 // New creates an admin API handler wired to the given registry, config, and request log/stats.
@@ -3565,6 +3580,35 @@ func (a *API) SetCICDStore(s cicd.Store) {
 	a.mux.HandleFunc("/api/pipelines/", a.handlePipelineByID)
 	a.mux.HandleFunc("/api/ci/summary", a.handleCISummary)
 	a.mux.HandleFunc("/api/webhooks/github", a.handleGitHubWebhook)
+}
+
+// SetDynamoStore configures DynamoDB-backed persistence for dashboards,
+// views, and deploy events. On startup it loads existing data from DynamoDB.
+func (a *API) SetDynamoStore(ds *DynamoStore) {
+	a.dynamoStore = ds
+
+	ctx := context.Background()
+
+	// Load existing dashboards.
+	a.dashboardsMu.Lock()
+	if loaded := ds.LoadDashboards(ctx); len(loaded) > 0 {
+		a.dashboards = loaded
+	}
+	a.dashboardsMu.Unlock()
+
+	// Load existing views.
+	a.viewsMu.Lock()
+	if loaded := ds.LoadViews(ctx); len(loaded) > 0 {
+		a.views = loaded
+	}
+	a.viewsMu.Unlock()
+
+	// Load existing deploys.
+	a.deploysMu.Lock()
+	if loaded := ds.LoadDeploys(ctx); len(loaded) > 0 {
+		a.deploys = loaded
+	}
+	a.deploysMu.Unlock()
 }
 
 // handleAuthLogin handles POST /api/auth/login.

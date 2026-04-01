@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log"
@@ -19,7 +20,11 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/auth"
+	awscfg "github.com/aws/aws-sdk-go-v2/config"
+	awsddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	ddbstore "github.com/neureaux/cloudmock/pkg/dynamostore"
 	authmemory "github.com/neureaux/cloudmock/pkg/auth/memory"
+	authdynamo "github.com/neureaux/cloudmock/pkg/auth/dynamostore"
 	authpg "github.com/neureaux/cloudmock/pkg/auth/postgres"
 	"github.com/neureaux/cloudmock/pkg/ratelimit"
 	saasclerk "github.com/neureaux/cloudmock/pkg/saas/clerk"
@@ -27,8 +32,10 @@ import (
 	"github.com/neureaux/cloudmock/pkg/saas/quota"
 	saasstripe "github.com/neureaux/cloudmock/pkg/saas/stripe"
 	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	tenantdynamo "github.com/neureaux/cloudmock/pkg/saas/tenant/dynamostore"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	auditmemory "github.com/neureaux/cloudmock/pkg/audit/memory"
+	auditdynamo "github.com/neureaux/cloudmock/pkg/audit/dynamostore"
 	auditpg "github.com/neureaux/cloudmock/pkg/audit/postgres"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
@@ -45,17 +52,21 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/incident"
 	incfilestore "github.com/neureaux/cloudmock/pkg/incident/filestore"
+	incdynamo "github.com/neureaux/cloudmock/pkg/incident/dynamostore"
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
 	"github.com/neureaux/cloudmock/pkg/otlp"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/monitor"
 	notifypkg "github.com/neureaux/cloudmock/pkg/notify"
+	mondynamo "github.com/neureaux/cloudmock/pkg/monitor/dynamostore"
 	monfilestore "github.com/neureaux/cloudmock/pkg/monitor/filestore"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/webhook"
+	whdynamo "github.com/neureaux/cloudmock/pkg/webhook/dynamostore"
 	whmemory "github.com/neureaux/cloudmock/pkg/webhook/memory"
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
+	regdynamo "github.com/neureaux/cloudmock/pkg/regression/dynamostore"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
 	errsfilestore "github.com/neureaux/cloudmock/pkg/errors/filestore"
@@ -66,6 +77,7 @@ import (
 	replayfilestore "github.com/neureaux/cloudmock/pkg/replay/filestore"
 	"github.com/neureaux/cloudmock/pkg/filestore"
 	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
+	rumdynamo "github.com/neureaux/cloudmock/pkg/rum/dynamostore"
 	rumfilestore "github.com/neureaux/cloudmock/pkg/rum/filestore"
 	uptimepkg "github.com/neureaux/cloudmock/pkg/uptime"
 	uptimefilestore "github.com/neureaux/cloudmock/pkg/uptime/filestore"
@@ -77,6 +89,7 @@ import (
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	trafficpkg "github.com/neureaux/cloudmock/pkg/traffic"
 	trafficfilestore "github.com/neureaux/cloudmock/pkg/traffic/filestore"
+	trafficdynamo "github.com/neureaux/cloudmock/pkg/traffic/dynamostore"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	argoplugin "github.com/neureaux/cloudmock/plugins/argocd"
@@ -614,6 +627,7 @@ func main() {
 	// This reads DynamoDB table definitions, API Gateway routes, etc. from the
 	// IaC project directory and creates them in CloudMock — no seed scripts needed.
 	var iacMicroservices []iac.MicroserviceDef
+	var topologySeedJSON []byte
 	if *iacDir != "" {
 		iacResult, err := iac.ImportPulumiDir(*iacDir, *iacEnv, slog.Default())
 		if err != nil {
@@ -660,6 +674,60 @@ func main() {
 
 			// Store microservices for topology — will be set on adminAPI after it's created
 			iacMicroservices = iacResult.Microservices
+		}
+	}
+
+	// Auto-load topology + AWS resources from seed file at boot.
+	// Checks: ./topology-seed.json, then ~/.cloudmock/topology-seed.json
+	var topologySeedJSON []byte
+	if *iacDir == "" { // Don't auto-seed if IaC import is active
+		for _, seedPath := range []string{"topology-seed.json", filepath.Join(os.Getenv("HOME"), ".cloudmock", "topology-seed.json")} {
+			data, err := os.ReadFile(seedPath)
+			if err != nil {
+				continue
+			}
+			var seed struct {
+				Nodes     json.RawMessage `json:"nodes"`
+				Edges     json.RawMessage `json:"edges"`
+				Resources struct {
+					DynamoDB []string `json:"dynamodb"`
+					Cognito  []string `json:"cognito"`
+					S3       []string `json:"s3"`
+					SQS      []string `json:"sqs"`
+				} `json:"resources"`
+			}
+			if err := json.Unmarshal(data, &seed); err != nil {
+				slog.Warn("invalid topology seed", "path", seedPath, "error", err)
+				continue
+			}
+			// Provision DynamoDB tables
+			if dynamoSvc, e := registry.Lookup("dynamodb"); e == nil {
+				for _, t := range seed.Resources.DynamoDB {
+					dynamoSvc.HandleRequest(&service.RequestContext{Action: "CreateTable", Body: []byte(fmt.Sprintf(`{"TableName":"%s","KeySchema":[{"AttributeName":"pk","KeyType":"HASH"},{"AttributeName":"sk","KeyType":"RANGE"}],"AttributeDefinitions":[{"AttributeName":"pk","AttributeType":"S"},{"AttributeName":"sk","AttributeType":"S"}],"BillingMode":"PAY_PER_REQUEST"}`, t))})
+				}
+			}
+			// Provision Cognito pools
+			if cognitoSvc, e := registry.Lookup("cognito-idp"); e == nil {
+				for _, p := range seed.Resources.Cognito {
+					cognitoSvc.HandleRequest(&service.RequestContext{Action: "CreateUserPool", Body: []byte(fmt.Sprintf(`{"PoolName":"%s"}`, p))})
+				}
+			}
+			// Provision S3 buckets
+			if s3Svc, e := registry.Lookup("s3"); e == nil {
+				for _, b := range seed.Resources.S3 {
+					s3Svc.HandleRequest(&service.RequestContext{Action: "CreateBucket", Body: []byte(fmt.Sprintf(`{"Bucket":"%s"}`, b))})
+				}
+			}
+			// Provision SQS queues
+			if sqsSvc, e := registry.Lookup("sqs"); e == nil {
+				for _, q := range seed.Resources.SQS {
+					sqsSvc.HandleRequest(&service.RequestContext{Action: "CreateQueue", Body: []byte("Action=CreateQueue&QueueName=" + q)})
+				}
+			}
+			topologySeedJSON = data
+			rc := len(seed.Resources.DynamoDB) + len(seed.Resources.Cognito) + len(seed.Resources.S3) + len(seed.Resources.SQS)
+			slog.Info("auto-loaded topology seed", "path", seedPath, "resources", rc)
+			break
 		}
 	}
 
@@ -748,8 +816,70 @@ func main() {
 			Preferences: pgImpl.NewPreferenceStore(pgPool),
 			Mode:        "production",
 		}
+	case "dynamodb":
+		// DynamoDB mode: in-memory data plane for observability (traces,
+		// requests, metrics) with DynamoDB-backed feature stores (monitors,
+		// incidents, webhooks, etc.) for multi-tenant persistence.
+		requestLog = gateway.NewRequestLog(1000)
+		requestStats = gateway.NewRequestStats()
+		traceStore = gateway.NewTraceStore(500)
+		sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
+
+		dp = &dataplane.DataPlane{
+			Traces:      memory.NewTraceStore(traceStore),
+			TraceW:      memory.NewTraceStore(traceStore),
+			Requests:    memory.NewRequestStore(requestLog),
+			RequestW:    memory.NewRequestStore(requestLog),
+			Metrics:     memory.NewMetricStore(requestStats, requestLog),
+			MetricW:     memory.NewMetricStore(requestStats, requestLog),
+			SLO:         memory.NewSLOStore(sloEngine),
+			Config:      memory.NewConfigStore(cfg),
+			Topology:    memory.NewTopologyStore(),
+			Preferences: memory.NewPreferenceStore(),
+			Mode:        "dynamodb",
+		}
 	default:
 		log.Fatalf("unknown dataplane mode: %q", mode)
+	}
+
+	// DynamoDB store — initialized when mode is "dynamodb". Used by feature
+	// stores below. Shared across all features via the single-table design.
+	var ddbStore *ddbstore.Store
+	if mode == "dynamodb" {
+		tableName := cfg.DataPlane.DynamoDB.TableName
+		if tableName == "" {
+			tableName = "cloudmock-data"
+		}
+
+		var awsOpts []func(*awscfg.LoadOptions) error
+		if cfg.DataPlane.DynamoDB.Region != "" {
+			awsOpts = append(awsOpts, awscfg.WithRegion(cfg.DataPlane.DynamoDB.Region))
+		}
+
+		awsCfg, awsErr := awscfg.LoadDefaultConfig(ctx, awsOpts...)
+		if awsErr != nil {
+			log.Fatalf("aws config: %v", awsErr)
+		}
+
+		var ddbOpts []func(*awsddb.Options)
+		if cfg.DataPlane.DynamoDB.Endpoint != "" {
+			ddbOpts = append(ddbOpts, func(o *awsddb.Options) {
+				o.BaseEndpoint = &cfg.DataPlane.DynamoDB.Endpoint
+			})
+		}
+
+		ddbClient := awsddb.NewFromConfig(awsCfg, ddbOpts...)
+
+		tenantID := cfg.DataPlane.DynamoDB.TenantID
+		if tenantID == "" {
+			tenantID = "default"
+		}
+		ddbStore = ddbstore.New(ddbClient, tableName).WithTenant(tenantID)
+		slog.Info("DynamoDB store initialized",
+			"table", tableName,
+			"tenant", tenantID,
+			"endpoint", cfg.DataPlane.DynamoDB.Endpoint,
+		)
 	}
 
 	// Tenant isolation: when auth is enabled, wrap DataPlane readers so that
@@ -788,10 +918,27 @@ func main() {
 
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
-	// File-backed persistence for dashboards, saved views, and deploy events
-	adminAPI.SetPersistDir(baseDir)
+	// Persistence for dashboards, saved views, and deploy events.
+	if mode == "dynamodb" {
+		adminDynamo := admin.NewDynamoStore(ddbStore)
+		adminAPI.SetDynamoStore(adminDynamo)
+	} else {
+		adminAPI.SetPersistDir(baseDir)
+	}
 	// Also set the direct request log/stats for topology edge enrichment
 	adminAPI.SetRequestLog(requestLog, requestStats)
+
+	// Apply topology seed if loaded at boot
+	if topologySeedJSON != nil {
+		var topoConfig struct {
+			Nodes json.RawMessage `json:"nodes"`
+			Edges json.RawMessage `json:"edges"`
+		}
+		if err := json.Unmarshal(topologySeedJSON, &topoConfig); err == nil {
+			adminAPI.SetTopologyConfigRaw(topoConfig.Nodes, topoConfig.Edges)
+			slog.Info("topology config applied from seed file")
+		}
+	}
 	// Set IaC microservices for topology rendering
 	if len(iacMicroservices) > 0 {
 		adminAPI.SetMicroservices(iacMicroservices)
@@ -801,6 +948,8 @@ func main() {
 	switch mode {
 	case "local":
 		auditLog = auditmemory.NewLogger()
+	case "dynamodb":
+		auditLog = auditdynamo.New(ddbStore)
 	case "production":
 		auditLog = auditpg.NewLogger(pgPool)
 	}
@@ -812,6 +961,8 @@ func main() {
 		switch mode {
 		case "local":
 			userStore = authmemory.NewStore()
+		case "dynamodb":
+			userStore = authdynamo.New(ddbStore)
 		case "production":
 			userStore = authpg.NewStore(pgPool)
 		}
@@ -834,11 +985,17 @@ func main() {
 	tc := tracecompare.New(dp.Traces)
 	adminAPI.SetTraceComparer(tc)
 
-	// RUM (Real User Monitoring) engine — file-backed
+	// RUM (Real User Monitoring) engine
 	if cfg.RUM.Enabled {
-		rumStore, rumErr := rumfilestore.New(filepath.Join(baseDir, "rum"), cfg.RUM.MaxEvents)
-		if rumErr != nil {
-			slog.Error("failed to create RUM file store, falling back to memory", "error", rumErr)
+		var rumStore rumpkg.RUMStore
+		if mode == "dynamodb" {
+			rumStore = rumdynamo.New(ddbStore, 7) // 7-day TTL
+		} else {
+			fsStore, rumErr := rumfilestore.New(filepath.Join(baseDir, "rum"), cfg.RUM.MaxEvents)
+			if rumErr != nil {
+				slog.Error("failed to create RUM file store, falling back to memory", "error", rumErr)
+			}
+			rumStore = fsStore
 		}
 		if rumStore != nil {
 			rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
@@ -921,6 +1078,9 @@ func main() {
 		case "local":
 			regStore = regmemory.NewStore()
 			regSource = regmemory.NewMetricSource(requestLog, traceStore)
+		case "dynamodb":
+			regStore = regdynamo.New(ddbStore)
+			regSource = regmemory.NewMetricSource(requestLog, traceStore)
 		case "production":
 			regStore = regpg.NewStore(pgPool)
 			regSource = regression.NewMetricSource(promClient.API(), duckClient.DB())
@@ -952,6 +1112,8 @@ func main() {
 				slog.Error("failed to create incident file store, falling back to memory", "error", err)
 				incStore = incmemory.NewStore()
 			}
+		case "dynamodb":
+			incStore = incdynamo.New(ddbStore)
 		case "production":
 			incStore = incpg.NewStore(pgPool)
 		}
@@ -994,6 +1156,8 @@ func main() {
 		switch mode {
 		case "local":
 			whStore = whmemory.NewStore()
+		case "dynamodb":
+			whStore = whdynamo.New(ddbStore)
 		case "production":
 			whStore = whpg.NewStore(pgPool)
 		}
@@ -1098,14 +1262,25 @@ func main() {
 		adminAPI.SetNotificationRouter(notifyRouter)
 	}
 
-	// Monitoring and alerting service — file-backed
+	// Monitoring and alerting service
 	if cfg.Monitor.Enabled {
-		monStore, monErr := monfilestore.New(
-			filepath.Join(baseDir, "monitors"),
-			filepath.Join(baseDir, "alerts"),
-		)
-		if monErr != nil {
-			slog.Error("failed to create monitor file store", "error", monErr)
+		var monMonStore monitor.MonitorStore
+		var monAlertStore monitor.AlertStore
+
+		if mode == "dynamodb" {
+			ddbMonStore := mondynamo.New(ddbStore)
+			monMonStore = ddbMonStore
+			monAlertStore = ddbMonStore
+		} else {
+			fsStore, monErr := monfilestore.New(
+				filepath.Join(baseDir, "monitors"),
+				filepath.Join(baseDir, "alerts"),
+			)
+			if monErr != nil {
+				slog.Error("failed to create monitor file store", "error", monErr)
+			}
+			monMonStore = fsStore
+			monAlertStore = fsStore
 		}
 
 		var provider monitor.MetricsProvider
@@ -1118,24 +1293,32 @@ func main() {
 			evalInterval = 30 * time.Second
 		}
 
-		if monStore != nil {
-			monService := monitor.NewService(monStore, monStore, provider, evalInterval)
+		if monMonStore != nil {
+			monService := monitor.NewService(monMonStore, monAlertStore, provider, evalInterval)
 			monService.Start(rootCtx)
 			adminAPI.SetMonitorService(monService)
 		}
 		slog.Info("monitor service started", "eval_interval", evalInterval)
 	}
 
-	// Traffic simulator / replay engine — file-backed so recordings survive restarts
-	trafficDir := filepath.Join(baseDir, "traffic")
-	trafficStore, err := trafficfilestore.New(trafficDir)
-	if err != nil {
-		slog.Error("failed to create traffic store", "error", err, "dir", trafficDir)
-		trafficStore, _ = trafficfilestore.New(os.TempDir())
+	// Traffic simulator / replay engine
+	{
+		var tStore trafficpkg.RecordingStore
+		if mode == "dynamodb" {
+			tStore = trafficdynamo.New(ddbStore)
+		} else {
+			trafficDir := filepath.Join(baseDir, "traffic")
+			fsStore, fsErr := trafficfilestore.New(trafficDir)
+			if fsErr != nil {
+				slog.Error("failed to create traffic store", "error", fsErr, "dir", trafficDir)
+				fsStore, _ = trafficfilestore.New(os.TempDir())
+			}
+			tStore = fsStore
+			slog.Info("traffic replay engine initialized", "storage", trafficDir)
+		}
+		trafficEng := trafficpkg.New(tStore, requestLog, cfg.Gateway.Port)
+		adminAPI.SetTrafficEngine(trafficEng)
 	}
-	trafficEng := trafficpkg.New(trafficStore, requestLog, cfg.Gateway.Port)
-	adminAPI.SetTrafficEngine(trafficEng)
-	slog.Info("traffic replay engine initialized", "storage", trafficDir)
 
 	// Annotations store — file-backed
 	{
@@ -1273,9 +1456,11 @@ func main() {
 	if cfg.SaaS.Enabled {
 		slog.Info("SaaS mode enabled, initializing hosted-tier components")
 
-		// 1. Tenant store (memory or postgres based on dataplane mode).
+		// 1. Tenant store (memory, dynamodb, or postgres based on dataplane mode).
 		var tenantStore tenant.Store
 		switch mode {
+		case "dynamodb":
+			tenantStore = tenantdynamo.New(ddbStore)
 		case "production":
 			tenantStore = tenant.NewPostgresStore(pgPool)
 		default:
@@ -1290,6 +1475,8 @@ func main() {
 			// The adminAPI already has it set; we just need a reference
 			// for the Clerk webhook handler.
 			switch mode {
+			case "dynamodb":
+				userStore = authdynamo.New(ddbStore)
 			case "production":
 				userStore = authpg.NewStore(pgPool)
 			default:

@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/cicd"
-	cicdmemory "github.com/neureaux/cloudmock/pkg/cicd/memory"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 )
 
@@ -91,7 +90,7 @@ func (a *API) handlePipelineByID(w http.ResponseWriter, r *http.Request) {
 
 	p, err := a.cicdStore.GetPipeline(id)
 	if err != nil {
-		if err == cicdmemory.ErrNotFound {
+		if err == cicd.ErrNotFound {
 			writeError(w, http.StatusNotFound, "pipeline not found")
 			return
 		}

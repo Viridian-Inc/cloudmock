@@ -41,6 +41,7 @@ func (a *API) handleDashboards(w http.ResponseWriter, r *http.Request) {
 
 		a.dashboardsMu.Lock()
 		a.dashboards = append(a.dashboards, d)
+		a.persistDashboards()
 		a.dashboardsMu.Unlock()
 
 		a.auditLog(r.Context(), "dashboard.created", "dashboard:"+d.ID, map[string]any{"name": d.Name})
@@ -95,6 +96,7 @@ func (a *API) handleDashboardByID(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		a.dashboards[idx] = update
+		a.persistDashboards()
 		a.dashboardsMu.Unlock()
 
 		a.auditLog(r.Context(), "dashboard.updated", "dashboard:"+id, map[string]any{"name": update.Name})
@@ -109,6 +111,7 @@ func (a *API) handleDashboardByID(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.dashboards = append(a.dashboards[:idx], a.dashboards[idx+1:]...)
+		a.persistDashboards()
 		a.dashboardsMu.Unlock()
 
 		a.auditLog(r.Context(), "dashboard.deleted", "dashboard:"+id, nil)
@@ -183,6 +186,9 @@ func (a *API) seedDefaultDashboard() {
 	if len(a.dashboards) > 0 {
 		return
 	}
+
+	// Will be persisted at the end of this function via defer.
+	defer a.persistDashboards()
 
 	now := time.Now().UTC()
 	a.dashboards = []Dashboard{

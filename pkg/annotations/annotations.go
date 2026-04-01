@@ -26,11 +26,17 @@ type Annotation struct {
 type Store struct {
 	mu          sync.RWMutex
 	annotations []Annotation
+	PersistFunc func(annotations []Annotation) // called after any mutation, if non-nil
 }
 
 // NewStore creates a new in-memory annotation store.
 func NewStore() *Store {
 	return &Store{}
+}
+
+// NewStoreWithData creates an annotation store pre-loaded with data.
+func NewStoreWithData(data []Annotation) *Store {
+	return &Store{annotations: data}
 }
 
 // Create adds an annotation to the store, assigning an ID if empty.
@@ -45,6 +51,11 @@ func (s *Store) Create(a Annotation) error {
 		a.Timestamp = time.Now()
 	}
 	s.annotations = append(s.annotations, a)
+	if s.PersistFunc != nil {
+		snapshot := make([]Annotation, len(s.annotations))
+		copy(snapshot, s.annotations)
+		s.PersistFunc(snapshot)
+	}
 	return nil
 }
 
@@ -73,6 +84,11 @@ func (s *Store) Delete(id string) error {
 	for i, a := range s.annotations {
 		if a.ID == id {
 			s.annotations = append(s.annotations[:i], s.annotations[i+1:]...)
+			if s.PersistFunc != nil {
+				snapshot := make([]Annotation, len(s.annotations))
+				copy(snapshot, s.annotations)
+				s.PersistFunc(snapshot)
+			}
 			return nil
 		}
 	}

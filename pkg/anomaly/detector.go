@@ -35,12 +35,13 @@ type Anomaly struct {
 
 // Detector maintains rolling baselines and detects anomalies.
 type Detector struct {
-	mu        sync.RWMutex
-	baselines map[string]*Baseline // key: "service:metric"
-	anomalies []Anomaly
-	window    time.Duration
-	threshold float64 // std devs for alert (default 2.0)
-	maxAnoms  int     // max anomalies to keep
+	mu          sync.RWMutex
+	baselines   map[string]*Baseline // key: "service:metric"
+	anomalies   []Anomaly
+	window      time.Duration
+	threshold   float64 // std devs for alert (default 2.0)
+	maxAnoms    int     // max anomalies to keep
+	PersistFunc func(baselines []Baseline, anomalies []Anomaly) // called after mutations, if non-nil
 }
 
 // NewDetector creates an anomaly detector with the given window and threshold.
@@ -57,6 +58,18 @@ func NewDetector(window time.Duration, threshold float64) *Detector {
 		threshold: threshold,
 		maxAnoms:  1000,
 	}
+}
+
+// NewDetectorWithData creates an anomaly detector pre-loaded with baselines and anomalies.
+func NewDetectorWithData(window time.Duration, threshold float64, baselines []Baseline, anomalies []Anomaly) *Detector {
+	d := NewDetector(window, threshold)
+	for i := range baselines {
+		key := baselineKey(baselines[i].Service, baselines[i].Metric)
+		b := baselines[i]
+		d.baselines[key] = &b
+	}
+	d.anomalies = anomalies
+	return d
 }
 
 // baselineKey returns the map key for a service+metric pair.

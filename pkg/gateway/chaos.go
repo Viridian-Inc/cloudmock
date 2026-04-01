@@ -24,14 +24,24 @@ type ChaosRule struct {
 
 // ChaosEngine manages a set of chaos/fault injection rules.
 type ChaosEngine struct {
-	mu    sync.RWMutex
-	rules []ChaosRule
-	seq   int
+	mu          sync.RWMutex
+	rules       []ChaosRule
+	seq         int
+	PersistFunc func(rules []ChaosRule) // called after any mutation, if non-nil
 }
 
 // NewChaosEngine creates a new ChaosEngine with no rules.
 func NewChaosEngine() *ChaosEngine {
 	return &ChaosEngine{}
+}
+
+// NewChaosEngineWithRules creates a ChaosEngine pre-loaded with rules.
+// The seq counter is set to len(rules) so new IDs don't collide.
+func NewChaosEngineWithRules(rules []ChaosRule) *ChaosEngine {
+	return &ChaosEngine{
+		rules: rules,
+		seq:   len(rules),
+	}
 }
 
 // Rules returns all configured chaos rules.
@@ -46,46 +56,73 @@ func (ce *ChaosEngine) Rules() []ChaosRule {
 // AddRule adds a new chaos rule and returns it with its assigned ID.
 func (ce *ChaosEngine) AddRule(rule ChaosRule) ChaosRule {
 	ce.mu.Lock()
-	defer ce.mu.Unlock()
 	ce.seq++
 	rule.ID = fmt.Sprintf("chaos-%d", ce.seq)
 	ce.rules = append(ce.rules, rule)
+	snapshot := make([]ChaosRule, len(ce.rules))
+	copy(snapshot, ce.rules)
+	persist := ce.PersistFunc
+	ce.mu.Unlock()
+	if persist != nil {
+		persist(snapshot)
+	}
 	return rule
 }
 
 // UpdateRule updates a rule by ID, returning the updated rule and whether it was found.
 func (ce *ChaosEngine) UpdateRule(id string, update ChaosRule) (ChaosRule, bool) {
 	ce.mu.Lock()
-	defer ce.mu.Unlock()
 	for i, r := range ce.rules {
 		if r.ID == id {
 			update.ID = id
 			ce.rules[i] = update
-			return ce.rules[i], true
+			result := ce.rules[i]
+			snapshot := make([]ChaosRule, len(ce.rules))
+			copy(snapshot, ce.rules)
+			persist := ce.PersistFunc
+			ce.mu.Unlock()
+			if persist != nil {
+				persist(snapshot)
+			}
+			return result, true
 		}
 	}
+	ce.mu.Unlock()
 	return ChaosRule{}, false
 }
 
 // DeleteRule removes a rule by ID, returning whether it was found.
 func (ce *ChaosEngine) DeleteRule(id string) bool {
 	ce.mu.Lock()
-	defer ce.mu.Unlock()
 	for i, r := range ce.rules {
 		if r.ID == id {
 			ce.rules = append(ce.rules[:i], ce.rules[i+1:]...)
+			snapshot := make([]ChaosRule, len(ce.rules))
+			copy(snapshot, ce.rules)
+			persist := ce.PersistFunc
+			ce.mu.Unlock()
+			if persist != nil {
+				persist(snapshot)
+			}
 			return true
 		}
 	}
+	ce.mu.Unlock()
 	return false
 }
 
 // DisableAll disables all rules.
 func (ce *ChaosEngine) DisableAll() {
 	ce.mu.Lock()
-	defer ce.mu.Unlock()
 	for i := range ce.rules {
 		ce.rules[i].Enabled = false
+	}
+	snapshot := make([]ChaosRule, len(ce.rules))
+	copy(snapshot, ce.rules)
+	persist := ce.PersistFunc
+	ce.mu.Unlock()
+	if persist != nil {
+		persist(snapshot)
 	}
 }
 

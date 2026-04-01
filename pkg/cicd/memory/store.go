@@ -1,7 +1,6 @@
 package memory
 
 import (
-	"errors"
 	"sync"
 
 	"github.com/neureaux/cloudmock/pkg/cicd"
@@ -9,8 +8,8 @@ import (
 
 const maxPipelines = 500
 
-// ErrNotFound is returned when a pipeline is not found.
-var ErrNotFound = errors.New("pipeline not found")
+// ErrNotFound is an alias for cicd.ErrNotFound for backward compatibility.
+var ErrNotFound = cicd.ErrNotFound
 
 // Store is an in-memory CI/CD store with a circular buffer for pipelines.
 type Store struct {
@@ -165,3 +164,6 @@ func (s *Store) Summary() cicd.CISummary {
 
 	return summary
 }
+
+// Compile-time interface check.
+var _ cicd.Store = (*Store)(nil)

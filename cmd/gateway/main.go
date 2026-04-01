@@ -44,12 +44,13 @@ import (
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/incident"
+	incfilestore "github.com/neureaux/cloudmock/pkg/incident/filestore"
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
 	"github.com/neureaux/cloudmock/pkg/otlp"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/monitor"
 	notifypkg "github.com/neureaux/cloudmock/pkg/notify"
-	monmemory "github.com/neureaux/cloudmock/pkg/monitor/memory"
+	monfilestore "github.com/neureaux/cloudmock/pkg/monitor/filestore"
 	"github.com/neureaux/cloudmock/pkg/regression"
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/webhook"
@@ -57,16 +58,17 @@ import (
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
-	errsmemory "github.com/neureaux/cloudmock/pkg/errors/memory"
-	logsmemory "github.com/neureaux/cloudmock/pkg/logstore/memory"
+	errsfilestore "github.com/neureaux/cloudmock/pkg/errors/filestore"
+	logsfilestore "github.com/neureaux/cloudmock/pkg/logstore/filestore"
 	annotationspkg "github.com/neureaux/cloudmock/pkg/annotations"
 	anomalypkg "github.com/neureaux/cloudmock/pkg/anomaly"
-	cicdmemory "github.com/neureaux/cloudmock/pkg/cicd/memory"
-	replaymemory "github.com/neureaux/cloudmock/pkg/replay/memory"
+	cicdfilestore "github.com/neureaux/cloudmock/pkg/cicd/filestore"
+	replayfilestore "github.com/neureaux/cloudmock/pkg/replay/filestore"
+	"github.com/neureaux/cloudmock/pkg/filestore"
 	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
-	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
+	rumfilestore "github.com/neureaux/cloudmock/pkg/rum/filestore"
 	uptimepkg "github.com/neureaux/cloudmock/pkg/uptime"
-	uptimememory "github.com/neureaux/cloudmock/pkg/uptime/memory"
+	uptimefilestore "github.com/neureaux/cloudmock/pkg/uptime/filestore"
 	"github.com/neureaux/cloudmock/pkg/marketplace"
 	"github.com/neureaux/cloudmock/pkg/security"
 	"github.com/neureaux/cloudmock/pkg/synthetics"
@@ -757,11 +759,37 @@ func main() {
 		dp.Requests = tenantscope.NewRequestReader(dp.Requests)
 	}
 
-	// Chaos engine for fault injection
-	chaosEngine := gateway.NewChaosEngine()
+	// Base directory for file-backed stores.
+	baseDir := filepath.Join(os.Getenv("HOME"), ".cloudmock")
+
+	// Chaos engine for fault injection — file-backed
+	chaosStore, err := filestore.New[gateway.ChaosRule](filepath.Join(baseDir, "chaos"))
+	if err != nil {
+		slog.Error("failed to create chaos file store", "error", err)
+	}
+	var chaosRules []gateway.ChaosRule
+	if chaosStore != nil {
+		chaosRules, _ = chaosStore.List()
+	}
+	chaosEngine := gateway.NewChaosEngineWithRules(chaosRules)
+	if chaosStore != nil {
+		chaosEngine.PersistFunc = func(rules []gateway.ChaosRule) {
+			// Delete all existing files, then save current rules.
+			if existing, err := chaosStore.List(); err == nil {
+				for _, r := range existing {
+					_ = chaosStore.Delete(r.ID)
+				}
+			}
+			for _, r := range rules {
+				_ = chaosStore.Save(r.ID, r)
+			}
+		}
+	}
 
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
+	// File-backed persistence for dashboards, saved views, and deploy events
+	adminAPI.SetPersistDir(baseDir)
 	// Also set the direct request log/stats for topology edge enrichment
 	adminAPI.SetRequestLog(requestLog, requestStats)
 	// Set IaC microservices for topology rendering
@@ -806,46 +834,71 @@ func main() {
 	tc := tracecompare.New(dp.Traces)
 	adminAPI.SetTraceComparer(tc)
 
-	// RUM (Real User Monitoring) engine
+	// RUM (Real User Monitoring) engine — file-backed
 	if cfg.RUM.Enabled {
-		rumStore := rummemory.NewStore(cfg.RUM.MaxEvents)
-		rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
-			SampleRate: cfg.RUM.SampleRate,
-			MaxEvents:  cfg.RUM.MaxEvents,
-		})
-		adminAPI.SetRUMEngine(rumEngine)
+		rumStore, rumErr := rumfilestore.New(filepath.Join(baseDir, "rum"), cfg.RUM.MaxEvents)
+		if rumErr != nil {
+			slog.Error("failed to create RUM file store, falling back to memory", "error", rumErr)
+		}
+		if rumStore != nil {
+			rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
+				SampleRate: cfg.RUM.SampleRate,
+				MaxEvents:  cfg.RUM.MaxEvents,
+			})
+			adminAPI.SetRUMEngine(rumEngine)
+		}
 		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
 	}
 
-	// Session Replay — stores recorded DOM/interaction sessions for playback.
-	replayStore := replaymemory.NewStore(100)
-	adminAPI.SetReplayStore(replayStore)
-	slog.Info("session replay store initialized", "capacity", 100)
+	// Session Replay — file-backed
+	replayStore, replayErr := replayfilestore.New(filepath.Join(baseDir, "replay"))
+	if replayErr != nil {
+		slog.Error("failed to create replay file store", "error", replayErr)
+	}
+	if replayStore != nil {
+		adminAPI.SetReplayStore(replayStore)
+	}
+	slog.Info("session replay store initialized", "storage", filepath.Join(baseDir, "replay"))
 
 	// ML-Powered Anomaly Detection — learns baselines and detects deviations.
 	anomalyDetector := anomalypkg.NewDetector(7*24*time.Hour, 2.0)
 	adminAPI.SetAnomalyDetector(anomalyDetector)
 	slog.Info("anomaly detector initialized", "window", "7d", "threshold", 2.0)
 
-	// Uptime / endpoint monitoring
+	// Uptime / endpoint monitoring — file-backed
 	{
-		uptimeStore := uptimememory.NewStore(1000)
-		workerPool := worker.NewPool(rootCtx, nil)
-		uptimeEngine := uptimepkg.NewEngine(uptimeStore, workerPool, uptimepkg.DefaultEngineConfig())
-		uptimeEngine.StartAll()
-		adminAPI.SetUptimeEngine(uptimeEngine)
-		slog.Info("uptime monitoring engine initialized")
+		uptimeStore, uptimeErr := uptimefilestore.New(filepath.Join(baseDir, "uptime"), 1000)
+		if uptimeErr != nil {
+			slog.Error("failed to create uptime file store", "error", uptimeErr)
+		}
+		if uptimeStore != nil {
+			workerPool := worker.NewPool(rootCtx, nil)
+			uptimeEngine := uptimepkg.NewEngine(uptimeStore, workerPool, uptimepkg.DefaultEngineConfig())
+			uptimeEngine.StartAll()
+			adminAPI.SetUptimeEngine(uptimeEngine)
+		}
+		slog.Info("uptime monitoring engine initialized", "storage", filepath.Join(baseDir, "uptime"))
 	}
 
-	// Structured error tracking
-	errStore := errsmemory.NewStore(10000)
-	adminAPI.SetErrorStore(errStore)
-	slog.Info("error tracking store initialized", "capacity", 10000)
+	// Structured error tracking — file-backed
+	errStore, errStoreErr := errsfilestore.New(filepath.Join(baseDir, "errors"), 10000)
+	if errStoreErr != nil {
+		slog.Error("failed to create error file store", "error", errStoreErr)
+	}
+	if errStore != nil {
+		adminAPI.SetErrorStore(errStore)
+	}
+	slog.Info("error tracking store initialized", "storage", filepath.Join(baseDir, "errors"))
 
-	// Log management
-	logStore := logsmemory.NewStore(50000)
-	adminAPI.SetLogStore(logStore)
-	slog.Info("log store initialized", "capacity", 50000)
+	// Log management — file-backed
+	logStore, logStoreErr := logsfilestore.New(filepath.Join(baseDir, "logs"), 50000)
+	if logStoreErr != nil {
+		slog.Error("failed to create log file store", "error", logStoreErr)
+	}
+	if logStore != nil {
+		adminAPI.SetLogStore(logStore)
+	}
+	slog.Info("log store initialized", "storage", filepath.Join(baseDir, "logs"))
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -893,7 +946,12 @@ func main() {
 		var incStore incident.IncidentStore
 		switch mode {
 		case "local":
-			incStore = incmemory.NewStore()
+			if fs, err := incfilestore.New(filepath.Join(baseDir, "incidents")); err == nil {
+				incStore = fs
+			} else {
+				slog.Error("failed to create incident file store, falling back to memory", "error", err)
+				incStore = incmemory.NewStore()
+			}
 		case "production":
 			incStore = incpg.NewStore(pgPool)
 		}
@@ -1040,9 +1098,15 @@ func main() {
 		adminAPI.SetNotificationRouter(notifyRouter)
 	}
 
-	// Monitoring and alerting service
+	// Monitoring and alerting service — file-backed
 	if cfg.Monitor.Enabled {
-		monStore := monmemory.NewStore()
+		monStore, monErr := monfilestore.New(
+			filepath.Join(baseDir, "monitors"),
+			filepath.Join(baseDir, "alerts"),
+		)
+		if monErr != nil {
+			slog.Error("failed to create monitor file store", "error", monErr)
+		}
 
 		var provider monitor.MetricsProvider
 		if sloEngine != nil {
@@ -1054,14 +1118,16 @@ func main() {
 			evalInterval = 30 * time.Second
 		}
 
-		monService := monitor.NewService(monStore, monStore, provider, evalInterval)
-		monService.Start(rootCtx)
-		adminAPI.SetMonitorService(monService)
+		if monStore != nil {
+			monService := monitor.NewService(monStore, monStore, provider, evalInterval)
+			monService.Start(rootCtx)
+			adminAPI.SetMonitorService(monService)
+		}
 		slog.Info("monitor service started", "eval_interval", evalInterval)
 	}
 
 	// Traffic simulator / replay engine — file-backed so recordings survive restarts
-	trafficDir := filepath.Join(os.Getenv("HOME"), ".cloudmock", "traffic")
+	trafficDir := filepath.Join(baseDir, "traffic")
 	trafficStore, err := trafficfilestore.New(trafficDir)
 	if err != nil {
 		slog.Error("failed to create traffic store", "error", err, "dir", trafficDir)
@@ -1071,24 +1137,83 @@ func main() {
 	adminAPI.SetTrafficEngine(trafficEng)
 	slog.Info("traffic replay engine initialized", "storage", trafficDir)
 
-	// Annotations store — timeline annotations for team collaboration.
-	annotationStore := annotationspkg.NewStore()
-	adminAPI.SetAnnotationStore(annotationStore)
-	slog.Info("annotation store initialized")
-
-	// CI/CD visibility store — pipelines and test results.
-	cicdStore := cicdmemory.NewStore()
-	adminAPI.SetCICDStore(cicdStore)
-	slog.Info("CI/CD store initialized")
-
-	// Synthetic browser/HTTP tests — scheduled endpoint checks with assertions.
+	// Annotations store — file-backed
 	{
-		synthStore := synthetics.NewStore(500)
+		annotationsDir := filepath.Join(baseDir, "annotations")
+		annStore, _ := filestore.New[annotationspkg.Annotation](annotationsDir)
+		var existing []annotationspkg.Annotation
+		if annStore != nil {
+			existing, _ = annStore.List()
+		}
+		annotationStore := annotationspkg.NewStoreWithData(existing)
+		if annStore != nil {
+			annotationStore.PersistFunc = func(annotations []annotationspkg.Annotation) {
+				// Delete all, then save current.
+				if old, err := annStore.List(); err == nil {
+					for _, a := range old {
+						_ = annStore.Delete(a.ID)
+					}
+				}
+				for _, a := range annotations {
+					_ = annStore.Save(a.ID, a)
+				}
+			}
+		}
+		adminAPI.SetAnnotationStore(annotationStore)
+		slog.Info("annotation store initialized", "storage", annotationsDir)
+	}
+
+	// CI/CD visibility store — file-backed
+	{
+		cs, csErr := cicdfilestore.New(filepath.Join(baseDir, "cicd"))
+		if csErr != nil {
+			slog.Error("failed to create CI/CD file store", "error", csErr)
+		}
+		if cs != nil {
+			adminAPI.SetCICDStore(cs)
+		}
+		slog.Info("CI/CD store initialized", "storage", filepath.Join(baseDir, "cicd"))
+	}
+
+	// Synthetic browser/HTTP tests — file-backed
+	{
+		synthDir := filepath.Join(baseDir, "synthetics")
+		synthTestStore, _ := filestore.New[synthetics.SyntheticTest](filepath.Join(synthDir, "tests"))
+		synthResultStore, _ := filestore.New[map[string][]synthetics.TestResult](filepath.Join(synthDir, "results"))
+
+		var existingTests []synthetics.SyntheticTest
+		existingResults := make(map[string][]synthetics.TestResult)
+		if synthTestStore != nil {
+			existingTests, _ = synthTestStore.List()
+		}
+		if synthResultStore != nil {
+			if r, err := synthResultStore.Get("all"); err == nil {
+				existingResults = r
+			}
+		}
+
+		synthStore := synthetics.NewStoreWithData(500, existingTests, existingResults)
+		if synthTestStore != nil && synthResultStore != nil {
+			synthStore.PersistFunc = func(tests []synthetics.SyntheticTest, results map[string][]synthetics.TestResult) {
+				// Save tests individually.
+				if old, err := synthTestStore.List(); err == nil {
+					for _, t := range old {
+						_ = synthTestStore.Delete(t.ID)
+					}
+				}
+				for _, t := range tests {
+					_ = synthTestStore.Save(t.ID, t)
+				}
+				// Save all results as a single blob.
+				_ = synthResultStore.Save("all", results)
+			}
+		}
+
 		synthWorkerPool := worker.NewPool(rootCtx, nil)
 		synthEngine := synthetics.NewEngine(synthStore, synthWorkerPool)
 		synthEngine.StartAll()
 		adminAPI.SetSyntheticsEngine(synthEngine)
-		slog.Info("synthetics engine initialized")
+		slog.Info("synthetics engine initialized", "storage", synthDir)
 	}
 
 	// Security posture scanner — checks mock resources for misconfigurations.

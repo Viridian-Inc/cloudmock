@@ -1,6 +1,12 @@
 package cicd
 
-import "time"
+import (
+	"errors"
+	"time"
+)
+
+// ErrNotFound is returned when a pipeline is not found.
+var ErrNotFound = errors.New("pipeline not found")
 
 // Pipeline represents a CI/CD pipeline run.
 type Pipeline struct {

@@ -60,10 +60,11 @@ type AssertionResult struct {
 
 // Store holds synthetic tests and their results in memory.
 type Store struct {
-	mu         sync.RWMutex
-	tests      map[string]*SyntheticTest
-	results    map[string][]TestResult // test ID → results (circular buffer)
-	maxResults int
+	mu          sync.RWMutex
+	tests       map[string]*SyntheticTest
+	results     map[string][]TestResult // test ID → results (circular buffer)
+	maxResults  int
+	PersistFunc func(tests []SyntheticTest, results map[string][]TestResult) // called after any mutation
 }
 
 // NewStore creates a store with the given max results per test.
@@ -76,6 +77,25 @@ func NewStore(maxResultsPerTest int) *Store {
 		results:    make(map[string][]TestResult),
 		maxResults: maxResultsPerTest,
 	}
+}
+
+// NewStoreWithData creates a store pre-loaded with data.
+func NewStoreWithData(maxResultsPerTest int, tests []SyntheticTest, results map[string][]TestResult) *Store {
+	if maxResultsPerTest <= 0 {
+		maxResultsPerTest = 100
+	}
+	s := &Store{
+		tests:      make(map[string]*SyntheticTest),
+		results:    results,
+		maxResults: maxResultsPerTest,
+	}
+	if s.results == nil {
+		s.results = make(map[string][]TestResult)
+	}
+	for i := range tests {
+		s.tests[tests[i].ID] = &tests[i]
+	}
+	return s
 }
 
 // AddTest adds a test to the store, generating an ID if needed.
@@ -101,6 +121,7 @@ func (s *Store) AddTest(test SyntheticTest) SyntheticTest {
 		test.Locations = []string{"local"}
 	}
 	s.tests[test.ID] = &test
+	s.callPersist()
 	return test
 }
 
@@ -136,6 +157,7 @@ func (s *Store) DeleteTest(id string) bool {
 	}
 	delete(s.tests, id)
 	delete(s.results, id)
+	s.callPersist()
 	return true
 }
 
@@ -149,6 +171,7 @@ func (s *Store) AddResult(result TestResult) {
 		results = results[len(results)-s.maxResults:]
 	}
 	s.results[result.TestID] = results
+	s.callPersist()
 }
 
 // GetResults returns results for a test, newest first.
@@ -381,4 +404,22 @@ func generateID() string {
 	b := make([]byte, 8)
 	rand.Read(b)
 	return hex.EncodeToString(b)
+}
+
+// callPersist invokes PersistFunc if set. Caller must hold s.mu.
+func (s *Store) callPersist() {
+	if s.PersistFunc == nil {
+		return
+	}
+	tests := make([]SyntheticTest, 0, len(s.tests))
+	for _, t := range s.tests {
+		tests = append(tests, *t)
+	}
+	results := make(map[string][]TestResult, len(s.results))
+	for k, v := range s.results {
+		cp := make([]TestResult, len(v))
+		copy(cp, v)
+		results[k] = cp
+	}
+	s.PersistFunc(tests, results)
 }

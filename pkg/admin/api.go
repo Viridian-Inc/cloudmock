@@ -18,7 +18,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/annotations"
 	"github.com/neureaux/cloudmock/pkg/anomaly"
 	"github.com/neureaux/cloudmock/pkg/auth"
-	cicdmemory "github.com/neureaux/cloudmock/pkg/cicd/memory"
+	"github.com/neureaux/cloudmock/pkg/cicd"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
@@ -144,10 +144,11 @@ type API struct {
 	anomalyDetector  *anomaly.Detector
 	scm              *scmState
 	annotationStore    *annotations.Store
-	cicdStore          *cicdmemory.Store
+	cicdStore          cicd.Store
 	syntheticsEngine   *synthetics.Engine
 	securityScanner    *security.Scanner
 	marketplace        *marketplace.Registry
+	persistDir         string // if set, dashboards/views/deploys are persisted here
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -678,6 +679,7 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		a.views = append(a.views, v)
+		a.persistViews()
 		a.viewsMu.Unlock()
 		a.auditLog(r.Context(), "view.saved", "view:"+v.ID, map[string]any{"name": v.Name})
 		writeJSON(w, http.StatusCreated, v)
@@ -696,6 +698,9 @@ func (a *API) handleViews(w http.ResponseWriter, r *http.Request) {
 				found = true
 				break
 			}
+		}
+		if found {
+			a.persistViews()
 		}
 		a.viewsMu.Unlock()
 		if !found {
@@ -2045,6 +2050,7 @@ func (a *API) handleDeploys(w http.ResponseWriter, r *http.Request) {
 		if len(a.deploys) > 100 {
 			a.deploys = a.deploys[len(a.deploys)-100:]
 		}
+		a.persistDeploys()
 		a.deploysMu.Unlock()
 
 		if a.regressionEngine != nil {
@@ -3553,7 +3559,7 @@ func (a *API) SetAnnotationStore(s *annotations.Store) {
 }
 
 // SetCICDStore sets the CI/CD store for the admin API.
-func (a *API) SetCICDStore(s *cicdmemory.Store) {
+func (a *API) SetCICDStore(s cicd.Store) {
 	a.cicdStore = s
 	a.mux.HandleFunc("/api/pipelines", a.handlePipelines)
 	a.mux.HandleFunc("/api/pipelines/", a.handlePipelineByID)

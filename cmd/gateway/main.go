@@ -59,6 +59,10 @@ import (
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
 	errsmemory "github.com/neureaux/cloudmock/pkg/errors/memory"
 	logsmemory "github.com/neureaux/cloudmock/pkg/logstore/memory"
+	annotationspkg "github.com/neureaux/cloudmock/pkg/annotations"
+	anomalypkg "github.com/neureaux/cloudmock/pkg/anomaly"
+	cicdmemory "github.com/neureaux/cloudmock/pkg/cicd/memory"
+	replaymemory "github.com/neureaux/cloudmock/pkg/replay/memory"
 	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
 	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
 	uptimepkg "github.com/neureaux/cloudmock/pkg/uptime"
@@ -810,6 +814,16 @@ func main() {
 		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
 	}
 
+	// Session Replay — stores recorded DOM/interaction sessions for playback.
+	replayStore := replaymemory.NewStore(100)
+	adminAPI.SetReplayStore(replayStore)
+	slog.Info("session replay store initialized", "capacity", 100)
+
+	// ML-Powered Anomaly Detection — learns baselines and detects deviations.
+	anomalyDetector := anomalypkg.NewDetector(7*24*time.Hour, 2.0)
+	adminAPI.SetAnomalyDetector(anomalyDetector)
+	slog.Info("anomaly detector initialized", "window", "7d", "threshold", 2.0)
+
 	// Uptime / endpoint monitoring
 	{
 		uptimeStore := uptimememory.NewStore(1000)
@@ -1049,6 +1063,16 @@ func main() {
 	adminAPI.SetTrafficEngine(trafficEng)
 	slog.Info("traffic replay engine initialized")
 
+	// Annotations store — timeline annotations for team collaboration.
+	annotationStore := annotationspkg.NewStore()
+	adminAPI.SetAnnotationStore(annotationStore)
+	slog.Info("annotation store initialized")
+
+	// CI/CD visibility store — pipelines and test results.
+	cicdStore := cicdmemory.NewStore()
+	adminAPI.SetCICDStore(cicdStore)
+	slog.Info("CI/CD store initialized")
+
 	// Plugin manager — enables hybrid in-process / external plugin routing.
 	pluginMgr := plugin.NewManager(slog.Default())
 	adminAPI.SetPluginManager(pluginMgr)
@@ -1188,6 +1212,38 @@ func main() {
 		TraceStore:  traceStore,
 		SLOEngine:   sloEngine,
 		DataPlane:   dp,
+		OnRequest: func(service string, latencyMs float64, statusCode int) {
+			// Feed latency and error rate into anomaly detector baselines.
+			anomalyDetector.UpdateBaseline(service, "latency_p50", latencyMs)
+			errorVal := 0.0
+			if statusCode >= 500 {
+				errorVal = 1.0
+			}
+			anomalyDetector.UpdateBaseline(service, "error_rate", errorVal)
+
+			// Check for anomalies and notify if detected.
+			if anom := anomalyDetector.Check(service, "latency_p50", latencyMs); anom != nil {
+				if anom.Severity == "critical" || anom.Severity == "warning" {
+					go func() {
+						if nr := adminAPI.NotifyRouter(); nr != nil {
+							nr.Notify(rootCtx, notifypkg.Notification{
+								Title:     anom.Description,
+								Severity:  anom.Severity,
+								Service:   anom.Service,
+								Type:      "anomaly",
+								Timestamp: anom.DetectedAt,
+								Fields: map[string]string{
+									"Metric":    anom.Metric,
+									"Observed":  fmt.Sprintf("%.2f", anom.Observed),
+									"Expected":  fmt.Sprintf("%.2f", anom.Expected),
+									"Deviation": fmt.Sprintf("%.1f sigma", anom.Deviation),
+								},
+							})
+						}
+					}()
+				}
+			}
+		},
 	})
 
 	var adminHandler http.Handler = adminAPI

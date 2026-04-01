@@ -258,11 +258,16 @@ type RequestBroadcaster interface {
 }
 
 // LoggingMiddlewareOpts holds optional dependencies for LoggingMiddleware.
+// OnRequestFunc is called after each request is logged with the service name,
+// latency in milliseconds, and HTTP status code. Used for anomaly detection.
+type OnRequestFunc func(service string, latencyMs float64, statusCode int)
+
 type LoggingMiddlewareOpts struct {
 	Broadcaster RequestBroadcaster
 	TraceStore  *TraceStore
 	SLOEngine   *SLOEngine
 	DataPlane   *dataplane.DataPlane
+	OnRequest   OnRequestFunc
 }
 
 // LoggingMiddleware wraps a gateway handler and records request data.
@@ -468,6 +473,11 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		// Broadcast request event for SSE clients — always runs regardless of mode.
 		if opts.Broadcaster != nil {
 			opts.Broadcaster.Broadcast("request", entry)
+		}
+
+		// Feed request metrics to anomaly detector or similar consumers.
+		if opts.OnRequest != nil && svcName != "" {
+			opts.OnRequest(svcName, latencyMs, rec.statusCode)
 		}
 	})
 }

@@ -15,7 +15,10 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	"github.com/neureaux/cloudmock/pkg/annotations"
+	"github.com/neureaux/cloudmock/pkg/anomaly"
 	"github.com/neureaux/cloudmock/pkg/auth"
+	cicdmemory "github.com/neureaux/cloudmock/pkg/cicd/memory"
 	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
@@ -32,6 +35,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	"github.com/neureaux/cloudmock/pkg/profiling"
 	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/neureaux/cloudmock/pkg/replay"
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/saas/clerk"
@@ -133,7 +137,11 @@ type API struct {
 	errorStore       errs.ErrorStore
 	logStore         logstore.LogStore
 	notifyRouter     *notify.Router
+	replayStore      replay.Store
+	anomalyDetector  *anomaly.Detector
 	scm              *scmState
+	annotationStore  *annotations.Store
+	cicdStore        *cicdmemory.Store
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -2239,6 +2247,11 @@ func (a *API) SetNotificationRouter(nr *notify.Router) {
 	a.notifyRouter = nr
 }
 
+// NotifyRouter returns the notification router, or nil if not configured.
+func (a *API) NotifyRouter() *notify.Router {
+	return a.notifyRouter
+}
+
 // SetPluginManager sets the plugin manager for the admin API to expose plugin info.
 func (a *API) SetPluginManager(pm *plugin.Manager) {
 	a.pluginManager = pm
@@ -3171,6 +3184,12 @@ func (a *API) handleIncidents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// GET/POST /api/incidents/{id}/comments — delegate to comment handler
+	if strings.HasSuffix(path, "/comments") {
+		a.handleIncidentComments(w, r)
+		return
+	}
+
 	// GET /api/incidents — list
 	if r.Method == http.MethodGet && path == "" {
 		filter := incident.IncidentFilter{
@@ -3511,6 +3530,23 @@ func (a *API) SetTrafficEngine(e *traffic.Engine) {
 	a.mux.HandleFunc("/api/traffic/runs", a.handleTrafficRuns)
 	a.mux.HandleFunc("/api/traffic/synthetic", a.handleTrafficSynthetic)
 	a.mux.HandleFunc("/api/traffic/compare", a.handleTrafficCompare)
+}
+
+// SetAnnotationStore sets the annotation store for the admin API.
+func (a *API) SetAnnotationStore(s *annotations.Store) {
+	a.annotationStore = s
+	a.mux.HandleFunc("/api/annotations", a.handleAnnotations)
+	a.mux.HandleFunc("/api/annotations/", a.handleAnnotationByID)
+	a.mux.HandleFunc("/api/activity-feed", a.handleActivityFeed)
+}
+
+// SetCICDStore sets the CI/CD store for the admin API.
+func (a *API) SetCICDStore(s *cicdmemory.Store) {
+	a.cicdStore = s
+	a.mux.HandleFunc("/api/pipelines", a.handlePipelines)
+	a.mux.HandleFunc("/api/pipelines/", a.handlePipelineByID)
+	a.mux.HandleFunc("/api/ci/summary", a.handleCISummary)
+	a.mux.HandleFunc("/api/webhooks/github", a.handleGitHubWebhook)
 }
 
 // handleAuthLogin handles POST /api/auth/login.

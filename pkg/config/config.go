@@ -81,11 +81,21 @@ type AuthConfig struct {
 
 // DataPlaneConfig holds data plane configuration for request/trace storage.
 type DataPlaneConfig struct {
-	Mode       string           `yaml:"mode" json:"mode"`
+	Mode       string           `yaml:"mode" json:"mode"` // "local", "dynamodb", "production"
 	DuckDB     DuckDBConfig     `yaml:"duckdb" json:"duckdb"`
 	PostgreSQL PostgreSQLConfig `yaml:"postgresql" json:"postgresql"`
 	Prometheus PrometheusConfig `yaml:"prometheus" json:"prometheus"`
 	OTel       OTelConfig       `yaml:"otel" json:"otel"`
+	DynamoDB   DynamoDBStoreConfig `yaml:"dynamodb" json:"dynamodb"`
+}
+
+// DynamoDBStoreConfig holds DynamoDB persistence configuration for the
+// single-table multi-tenant data store.
+type DynamoDBStoreConfig struct {
+	TableName string `yaml:"table_name" json:"table_name"` // default: "cloudmock-data"
+	Region    string `yaml:"region" json:"region"`          // default: from AWS env/config
+	Endpoint  string `yaml:"endpoint" json:"endpoint"`     // optional: for local DynamoDB
+	TenantID  string `yaml:"tenant_id" json:"tenant_id"`   // default tenant for non-SaaS mode
 }
 
 // DuckDBConfig holds DuckDB database configuration.
@@ -472,6 +482,18 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLOUDMOCK_OTEL_ENDPOINT"); v != "" {
 		c.DataPlane.OTel.CollectorEndpoint = v
+	}
+	if v := os.Getenv("CLOUDMOCK_DYNAMODB_TABLE"); v != "" {
+		c.DataPlane.DynamoDB.TableName = v
+	}
+	if v := os.Getenv("CLOUDMOCK_DYNAMODB_REGION"); v != "" {
+		c.DataPlane.DynamoDB.Region = v
+	}
+	if v := os.Getenv("CLOUDMOCK_DYNAMODB_ENDPOINT"); v != "" {
+		c.DataPlane.DynamoDB.Endpoint = v
+	}
+	if v := os.Getenv("CLOUDMOCK_DYNAMODB_TENANT_ID"); v != "" {
+		c.DataPlane.DynamoDB.TenantID = v
 	}
 	if v := os.Getenv("CLOUDMOCK_OTLP_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil {

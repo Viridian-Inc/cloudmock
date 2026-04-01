@@ -22,8 +22,12 @@ All 98 services supported by cloudmock, grouped by tier.
 | Cognito | `cognito-idp` | JSON | CreateUserPool, DeleteUserPool, DescribeUserPool, ListUserPools, CreateUserPoolClient, DescribeUserPoolClient, ListUserPoolClients, AdminCreateUser, AdminGetUser, AdminDeleteUser, AdminSetUserPassword, SignUp, InitiateAuth, AdminConfirmSignUp |
 | API Gateway | `apigateway` | REST-JSON | CreateRestApi, GetRestApis, GetRestApi, DeleteRestApi, CreateResource, GetResources, DeleteResource, PutMethod, GetMethod, PutIntegration, CreateDeployment, GetDeployments, CreateStage, GetStages |
 | Step Functions | `states` | JSON | CreateStateMachine, DeleteStateMachine, DescribeStateMachine, ListStateMachines, UpdateStateMachine, StartExecution, DescribeExecution, StopExecution, ListExecutions, GetExecutionHistory, TagResource, UntagResource, ListTagsForResource |
+
+> **Step Functions note:** State machine management APIs are supported. State machine execution is not yet implemented.
 | Route 53 | `route53` | REST-XML | CreateHostedZone, ListHostedZones, GetHostedZone, DeleteHostedZone, ChangeResourceRecordSets, ListResourceRecordSets |
 | RDS | `rds` | Query | CreateDBInstance, DeleteDBInstance, DescribeDBInstances, ModifyDBInstance, CreateDBCluster, DeleteDBCluster, DescribeDBClusters, CreateDBSnapshot, DeleteDBSnapshot, DescribeDBSnapshots, CreateDBSubnetGroup, DescribeDBSubnetGroups, DeleteDBSubnetGroup, AddTagsToResource, RemoveTagsFromResource, ListTagsForResource |
+
+> **RDS note:** Instance and cluster management APIs are supported. No actual database engine is provided.
 | ECR | `ecr` | JSON | CreateRepository, DeleteRepository, DescribeRepositories, ListImages, BatchGetImage, PutImage, BatchDeleteImage, GetAuthorizationToken, DescribeImageScanFindings, TagResource, UntagResource, ListTagsForResource |
 | ECS | `ecs` | JSON | CreateCluster, DeleteCluster, DescribeClusters, ListClusters, RegisterTaskDefinition, DeregisterTaskDefinition, DescribeTaskDefinition, ListTaskDefinitions, CreateService, DeleteService, DescribeServices, ListServices, UpdateService, RunTask, StopTask, DescribeTasks, ListTasks, TagResource, UntagResource, ListTagsForResource |
 | SES | `email` | Query | SendEmail, SendRawEmail, VerifyEmailIdentity, ListIdentities, DeleteIdentity, GetIdentityVerificationAttributes, ListVerifiedEmailAddresses |
@@ -32,7 +36,11 @@ All 98 services supported by cloudmock, grouped by tier.
 | CloudFormation | `cloudformation` | Query | CreateStack, DeleteStack, DescribeStacks, ListStacks, DescribeStackResources, DescribeStackEvents, GetTemplate, ValidateTemplate, ListExports, CreateChangeSet, DescribeChangeSet, ExecuteChangeSet, DeleteChangeSet |
 | IAM | `iam` | Embedded | CreateUser, GetUser, CreateAccessKey, AttachUserPolicy, GetUserPolicies (via seed file / admin API) |
 | AppSync | `appsync` | REST-JSON | CreateGraphqlApi, GetGraphqlApi, ListGraphqlApis, UpdateGraphqlApi, DeleteGraphqlApi, CreateDataSource, GetDataSource, ListDataSources, UpdateDataSource, DeleteDataSource, CreateResolver, GetResolver, ListResolvers, UpdateResolver, DeleteResolver, CreateFunction, GetFunction, ListFunctions, UpdateFunction, DeleteFunction, CreateApiKey, ListApiKeys, UpdateApiKey, DeleteApiKey, TagResource, UntagResource, ListTagsForResource |
+
+> **AppSync note:** Management APIs (CRUD for APIs, data sources, resolvers, functions, API keys) are fully supported. GraphQL query execution, VTL resolver evaluation, and WebSocket subscriptions are not yet implemented.
 | Lambda | `lambda` | REST-JSON | CreateFunction, DeleteFunction, GetFunction, ListFunctions, UpdateFunctionCode, UpdateFunctionConfiguration, InvokeFunction (stub), AddPermission, RemovePermission, CreateEventSourceMapping, ListEventSourceMappings, TagResource, UntagResource |
+
+> **Lambda note:** Function management APIs are fully supported. Invocation returns a stub 200 response -- actual code execution is not performed.
 
 ---
 

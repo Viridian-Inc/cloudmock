@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#111;color:#fff;font-family:monospace;padding:20px">
+<h2>Trace Polling Test</h2>
+<div>This does exactly what the Activity view does — fetches /api/traces every 3s</div>
+<div id="status" style="margin:10px 0;color:#4AE5F8">Starting...</div>
+<div id="count" style="margin:10px 0;font-size:24px">0 events</div>
+<div id="events" style="max-height:400px;overflow:auto;font-size:12px;line-height:1.8"></div>
+<script>
+let eventCount = 0;
+const seenIds = new Set();
+
+async function pollTraces() {
+  try {
+    const res = await fetch('/api/traces');
+    const traces = await res.json();
+    document.getElementById('status').textContent = `Fetched ${traces.length} traces`;
+    
+    for (const t of traces) {
+      const id = t.TraceID;
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      eventCount++;
+      
+      const div = document.createElement('div');
+      div.style.borderBottom = '1px solid #333';
+      div.style.padding = '2px 0';
+      const status = t.StatusCode;
+      const color = status < 300 ? '#4ade80' : status < 500 ? '#fbbf24' : '#ef4444';
+      div.innerHTML = `<span style="color:${color}">${status}</span> ${t.RootService} ${t.Method} ${t.Path} <span style="color:#666">${t.DurationMs?.toFixed(3)}ms</span>`;
+      document.getElementById('events').prepend(div);
+    }
+    
+    document.getElementById('count').textContent = `${eventCount} events`;
+  } catch (e) {
+    document.getElementById('status').textContent = `Error: ${e.message}`;
+    document.getElementById('status').style.color = '#ef4444';
+  }
+}
+
+pollTraces();
+setInterval(pollTraces, 3000);
+</script>
+</body>
+</html>

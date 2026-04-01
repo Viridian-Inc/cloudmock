@@ -596,18 +596,53 @@ func main() {
 	// Auto-provision resources from IaC source (Pulumi/Terraform).
 	// This reads DynamoDB table definitions, API Gateway routes, etc. from the
 	// IaC project directory and creates them in CloudMock — no seed scripts needed.
+	var iacMicroservices []iac.MicroserviceDef
 	if *iacDir != "" {
 		iacResult, err := iac.ImportPulumiDir(*iacDir, *iacEnv, slog.Default())
 		if err != nil {
 			slog.Error("failed to import IaC", "dir", *iacDir, "error", err)
 		} else {
-			dynamoSvc, lookupErr := registry.Lookup("dynamodb")
-			if lookupErr != nil {
-				slog.Error("DynamoDB service not found for IaC provisioning", "error", lookupErr)
-			} else {
+			// Provision DynamoDB tables
+			if dynamoSvc, lookupErr := registry.Lookup("dynamodb"); lookupErr == nil {
 				iac.ProvisionDynamoTables(iacResult.Tables, dynamoSvc, slog.Default())
-				slog.Info("auto-provisioned resources from IaC", "dir", *iacDir, "env", *iacEnv, "tables", len(iacResult.Tables))
 			}
+			// Provision Lambda functions
+			if lambdaSvc, lookupErr := registry.Lookup("lambda"); lookupErr == nil {
+				iac.ProvisionLambdas(iacResult.Lambdas, lambdaSvc, cfg.AccountID, cfg.Region, slog.Default())
+			}
+			// Provision Cognito User Pools
+			if cognitoSvc, lookupErr := registry.Lookup("cognito-idp"); lookupErr == nil {
+				iac.ProvisionCognitoPools(iacResult.CognitoPools, cognitoSvc, slog.Default())
+			}
+			// Provision SQS Queues
+			if sqsSvc, lookupErr := registry.Lookup("sqs"); lookupErr == nil {
+				iac.ProvisionSQSQueues(iacResult.SQSQueues, sqsSvc, slog.Default())
+			}
+			// Provision SNS Topics
+			if snsSvc, lookupErr := registry.Lookup("sns"); lookupErr == nil {
+				iac.ProvisionSNSTopics(iacResult.SNSTopics, snsSvc, slog.Default())
+			}
+			// Provision S3 Buckets
+			if s3Svc, lookupErr := registry.Lookup("s3"); lookupErr == nil {
+				iac.ProvisionS3Buckets(iacResult.S3Buckets, s3Svc, slog.Default())
+			}
+			// Provision API Gateways
+			if apigwSvc, lookupErr := registry.Lookup("apigateway"); lookupErr == nil {
+				iac.ProvisionAPIGateways(iacResult.APIGateways, apigwSvc, slog.Default())
+			}
+
+			total := len(iacResult.Tables) + len(iacResult.Lambdas) + len(iacResult.CognitoPools) +
+				len(iacResult.SQSQueues) + len(iacResult.SNSTopics) + len(iacResult.S3Buckets) + len(iacResult.APIGateways) +
+				len(iacResult.Microservices)
+			slog.Info("auto-provisioned resources from IaC", "dir", *iacDir, "env", *iacEnv,
+				"tables", len(iacResult.Tables), "lambdas", len(iacResult.Lambdas),
+				"cognito_pools", len(iacResult.CognitoPools), "sqs_queues", len(iacResult.SQSQueues),
+				"sns_topics", len(iacResult.SNSTopics), "s3_buckets", len(iacResult.S3Buckets),
+				"api_gateways", len(iacResult.APIGateways), "microservices", len(iacResult.Microservices),
+				"total", total)
+
+			// Store microservices for topology — will be set on adminAPI after it's created
+			iacMicroservices = iacResult.Microservices
 		}
 	}
 
@@ -714,6 +749,10 @@ func main() {
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	// Also set the direct request log/stats for topology edge enrichment
 	adminAPI.SetRequestLog(requestLog, requestStats)
+	// Set IaC microservices for topology rendering
+	if len(iacMicroservices) > 0 {
+		adminAPI.SetMicroservices(iacMicroservices)
+	}
 	// Audit logger
 	var auditLog audit.Logger
 	switch mode {

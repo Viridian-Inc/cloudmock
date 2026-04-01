@@ -70,7 +70,49 @@ func (a *API) handleRUMVitals(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, overview)
+	// Add computed fields expected by the DevTools frontend.
+	totalEvents := overview.LCP.Good + overview.LCP.NeedsImprovement + overview.LCP.Poor +
+		overview.FID.Good + overview.FID.NeedsImprovement + overview.FID.Poor +
+		overview.CLS.Good + overview.CLS.NeedsImprovement + overview.CLS.Poor +
+		overview.TTFB.Good + overview.TTFB.NeedsImprovement + overview.TTFB.Poor +
+		overview.FCP.Good + overview.FCP.NeedsImprovement + overview.FCP.Poor
+
+	// Calculate UX score (0-100) based on percentage of "good" ratings.
+	totalRated := 0
+	totalGood := 0
+	for _, v := range []rum.VitalRating{overview.LCP, overview.FID, overview.CLS, overview.TTFB, overview.FCP} {
+		total := v.Good + v.NeedsImprovement + v.Poor
+		totalRated += total
+		totalGood += v.Good
+	}
+	score := 0.0
+	if totalRated > 0 {
+		score = float64(totalGood) / float64(totalRated) * 100.0
+	}
+
+	// Add rating strings based on P75 thresholds.
+	addRating := func(v rum.VitalRating, goodThresh, poorThresh float64) map[string]any {
+		rating := "poor"
+		if v.P75 <= goodThresh {
+			rating = "good"
+		} else if v.P75 <= poorThresh {
+			rating = "needs-improvement"
+		}
+		return map[string]any{
+			"p75": v.P75, "good": v.Good, "needs_improvement": v.NeedsImprovement,
+			"poor": v.Poor, "rating": rating,
+		}
+	}
+
+	writeJSON(w, http.StatusOK, map[string]any{
+		"lcp":          addRating(overview.LCP, 2500, 4000),
+		"fid":          addRating(overview.FID, 100, 300),
+		"cls":          addRating(overview.CLS, 0.1, 0.25),
+		"ttfb":         addRating(overview.TTFB, 800, 1800),
+		"fcp":          addRating(overview.FCP, 1800, 3000),
+		"score":        score,
+		"total_events": totalEvents,
+	})
 }
 
 // handleRUMPages handles GET /api/rum/pages — returns per-route performance.
@@ -91,7 +133,18 @@ func (a *API) handleRUMPages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, pages)
+	// Transform to match DevTools expected format.
+	result := make([]map[string]any, len(pages))
+	for i, p := range pages {
+		result[i] = map[string]any{
+			"route":        p.Route,
+			"avg_load_ms":  p.AvgDurationMs,
+			"p75_lcp_ms":   p.P75DurationMs,
+			"avg_cls":      0.0, // Not tracked per-page; use 0
+			"sample_count": p.Views,
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // handleRUMErrors handles GET /api/rum/errors — returns error groups.
@@ -112,7 +165,19 @@ func (a *API) handleRUMErrors(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, groups)
+	// Transform to match DevTools expected format.
+	result := make([]map[string]any, len(groups))
+	for i, g := range groups {
+		result[i] = map[string]any{
+			"fingerprint":       g.Fingerprint,
+			"message":           g.Message,
+			"count":             g.Count,
+			"affected_sessions": g.Sessions,
+			"last_seen":         g.LastSeen.Format("2006-01-02T15:04:05Z"),
+			"sample_stack":      g.Stack,
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // handleRUMSessions handles GET /api/rum/sessions — returns session list.
@@ -140,5 +205,21 @@ func (a *API) handleRUMSessions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	writeJSON(w, http.StatusOK, sessions)
+	// Transform to match DevTools expected format.
+	result := make([]map[string]any, len(sessions))
+	for i, s := range sessions {
+		durationSec := s.LastSeen.Sub(s.StartedAt).Seconds()
+		if durationSec < 0 {
+			durationSec = 0
+		}
+		result[i] = map[string]any{
+			"session_id":   s.SessionID,
+			"start":        s.StartedAt.Format("2006-01-02T15:04:05Z"),
+			"end":          s.LastSeen.Format("2006-01-02T15:04:05Z"),
+			"page_count":   s.PageViews,
+			"error_count":  s.ErrorCount,
+			"duration_sec": durationSec,
+		}
+	}
+	writeJSON(w, http.StatusOK, result)
 }

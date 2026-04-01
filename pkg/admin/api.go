@@ -22,6 +22,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/rum"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/neureaux/cloudmock/pkg/iac"
 	"github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/incident"
 	"github.com/neureaux/cloudmock/pkg/monitor"
@@ -91,8 +92,9 @@ type API struct {
 	sesStore       *ses.Store
 	traceStore     *gateway.TraceStore
 	chaosEngine    *gateway.ChaosEngine
-	iacTopology    *IaCTopologyConfig
-	iacTopologyMu  sync.RWMutex
+	iacTopology      *IaCTopologyConfig
+	iacTopologyMu    sync.RWMutex
+	iacMicroservices []iac.MicroserviceDef
 	deploys        []DeployEvent
 	deploysMu      sync.RWMutex
 	sloEngine      *gateway.SLOEngine
@@ -325,6 +327,11 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 // Broadcaster returns the event broadcaster for use by middleware.
 func (a *API) Broadcaster() *EventBroadcaster {
 	return a.broadcaster
+}
+
+// SetMicroservices sets the IaC-extracted microservice definitions for topology.
+func (a *API) SetMicroservices(ms []iac.MicroserviceDef) {
+	a.iacMicroservices = ms
 }
 
 // SetLambdaLogs sets the Lambda log buffer for the admin API to serve.

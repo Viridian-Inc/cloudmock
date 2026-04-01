@@ -253,11 +253,158 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		case "rds":
 			addNode("rds:databases", "RDS Databases", "rds", "database", "Storage")
 
+		// Skip CloudFormation placeholder (no IaC resources provisioned)
 		case "cloudformation":
-			addNode("cfn:stacks", "CloudFormation", "cloudformation", "stack", "Security")
+			// Will appear when traffic hits it
 
 		case "apigateway":
 			addNode("apigw:apis", "API Gateway", "apigateway", "api", "API")
+
+		default:
+			// Only add services that have actual resources or traffic.
+			// Skip idle services to reduce visual clutter and reflect real usage.
+			if a.serviceHasActivity(svc.Name()) {
+				name := svc.Name()
+				label := serviceDisplayName(name)
+				group := serviceGroup(name)
+				nodeType := serviceNodeType(name)
+				addNode(name+":service", label, name, nodeType, group)
+			}
+		}
+	}
+
+	// 4a-extra. Client apps — Expo mobile/web app connects to BFF
+	addNode("client:expo-app", "AutoTend App", "client", "client", "Client")
+	addEdge("client:expo-app", "apigw:apis", "invoke", "API calls", "config")
+	// BFF connects to API Gateway
+	addEdge("apigw:apis", "lambda:autotend-bff-dev", "trigger", "BFF route", "config")
+
+	// 4b. IaC-extracted microservices (Lambda endpoints with routes + table dependencies)
+	// Track existing node IDs to avoid duplicates with Lambda-discovered functions
+	existingNodeIDs := make(map[string]bool)
+	for _, n := range nodes {
+		existingNodeIDs[n.ID] = true
+	}
+
+	for _, ms := range a.iacMicroservices {
+		nodeID := "microservice:" + ms.Name
+		// Skip if a Lambda node with the same name already exists
+		if existingNodeIDs["lambda:"+ms.Name] {
+			nodeID = "lambda:" + ms.Name // use existing Lambda node ID
+		} else {
+			addNode(nodeID, ms.Name, "lambda", "function", "Compute")
+		}
+		lambdaFunctions[ms.Name] = true
+
+		// Create edges from microservice to its DynamoDB tables
+		for _, table := range ms.Tables {
+			tableID := "dynamodb:" + table
+			if dynamoTables[table] {
+				addEdge(nodeID, tableID, "read_write", "table access", "config")
+			}
+		}
+
+		// Create edge from API Gateway to microservice
+		addEdge("apigw:apis", nodeID, "trigger", fmt.Sprintf("%d routes", len(ms.Routes)), "config")
+
+		// BFF aggregates calls to backend microservices
+		if ms.Name != "bff" {
+			addEdge("lambda:autotend-bff-dev", nodeID, "invoke", "BFF aggregation", "config")
+		}
+	}
+
+	// 4c. Infrastructure edges — key architectural relationships only.
+	// Avoid noisy edges (every function → IAM, every function → Logs) that clutter the graph.
+
+	// Cognito → Lambda triggers (auth hooks)
+	for fn := range lambdaFunctions {
+		if strings.Contains(fn, "cognito") || strings.Contains(fn, "auth") || strings.Contains(fn, "authorizer") {
+			addEdge("cognito:user-pool", "microservice:"+fn, "trigger", "Cognito trigger", "config")
+		}
+	}
+
+	// API Gateway → Cognito authorizer
+	addEdge("apigw:apis", "cognito:user-pool", "read_write", "authorizer", "config")
+
+	// Monitoring chain: CloudWatch → SNS alerts
+	for topic := range snsTopics {
+		if strings.Contains(topic, "alert") {
+			addEdge("cloudwatch:alarms", "sns:"+topic, "publish", "alarm action", "config")
+		}
+	}
+
+	// Auth chain: IAM ↔ STS ↔ KMS
+	addEdge("iam:roles", "sts:identity", "read_write", "assume role", "config")
+	addEdge("kms:keys", "iam:roles", "read_write", "key policy", "config")
+
+	// Secrets Manager — only services that actually use secrets
+	for _, ms := range a.iacMicroservices {
+		if ms.Name == "sso" || ms.Name == "billing" || ms.Name == "stripeWebhook" || ms.Name == "stripe_webhook" {
+			addEdge("microservice:"+ms.Name, "secrets:store", "read_write", "get secret", "config")
+		}
+	}
+
+	// EventBridge — connect event-driven services and standalone Lambdas
+	addEdge("eventbridge:default", "logs:log-groups", "trigger", "event logging", "config")
+	// Standalone Lambda functions (stream processors, scheduled tasks) triggered by EventBridge/DynamoDB Streams
+	for fn := range lambdaFunctions {
+		if strings.Contains(fn, "stream") || strings.Contains(fn, "sync") {
+			addEdge("eventbridge:default", "lambda:"+fn, "trigger", "stream trigger", "config")
+			// Stream processors write to DynamoDB
+			for table := range dynamoTables {
+				if strings.Contains(fn, "dynamodb") {
+					addEdge("lambda:"+fn, "dynamodb:"+table, "read_write", "stream sync", "config")
+					break // just one representative edge
+				}
+			}
+		}
+		if strings.Contains(fn, "expire") || strings.Contains(fn, "scheduled") || strings.Contains(fn, "cron") {
+			addEdge("eventbridge:default", "lambda:"+fn, "trigger", "scheduled", "config")
+		}
+	}
+
+	// Connect webhook/subscription tables to their services
+	if dynamoTables["webhook-dev"] {
+		addEdge("microservice:webhook", "dynamodb:webhook-dev", "read_write", "table access", "config")
+	}
+	if dynamoTables["webhookDelivery-dev"] {
+		addEdge("microservice:webhook", "dynamodb:webhookDelivery-dev", "read_write", "table access", "config")
+	}
+	if dynamoTables["subscription-dev"] {
+		addEdge("microservice:billing", "dynamodb:subscription-dev", "read_write", "table access", "config")
+	}
+	if dynamoTables["notification-dev"] {
+		addEdge("microservice:notification", "dynamodb:notification-dev", "read_write", "table access", "config")
+	}
+
+	// SES — notification service sends email
+	for _, ms := range a.iacMicroservices {
+		if ms.Name == "notification" {
+			addEdge("microservice:"+ms.Name, "ses:email", "publish", "send email", "config")
+		}
+	}
+
+	// Connect isolated DynamoDB tables to microservices by name matching
+	for table := range dynamoTables {
+		tableID := "dynamodb:" + table
+		hasEdge := false
+		for _, e := range edges {
+			if e.Target == tableID || e.Source == tableID {
+				hasEdge = true
+				break
+			}
+		}
+		if !hasEdge {
+			// Try matching table name to a microservice
+			baseName := strings.TrimSuffix(table, "-dev")
+			baseName = strings.TrimSuffix(baseName, "-local")
+			for _, ms := range a.iacMicroservices {
+				if strings.EqualFold(ms.Name, baseName) || strings.Contains(strings.ToLower(ms.Name), strings.ToLower(baseName)) {
+					addEdge("microservice:"+ms.Name, tableID, "read_write", "table access", "config")
+					hasEdge = true
+					break
+				}
+			}
 		}
 	}
 
@@ -738,7 +885,140 @@ func extractJSONField(body, field string) string {
 	return rest[:end]
 }
 
-// ---- Helpers ----
+// serviceHasActivity checks if a service has received any traffic in the request log.
+func (a *API) serviceHasActivity(name string) bool {
+	if a.log == nil {
+		return false
+	}
+	entries := a.log.Recent(name, 1)
+	return len(entries) > 0
+}
+
+// ---- Service metadata helpers ----
+
+// serviceDisplayName returns a human-readable label for an AWS service.
+var serviceDisplayNames = map[string]string{
+	"acm": "ACM", "acm-pca": "ACM PCA", "appconfig": "AppConfig",
+	"application-autoscaling": "App AutoScaling", "appsync": "AppSync",
+	"athena": "Athena", "autoscaling": "Auto Scaling", "backup": "Backup",
+	"batch": "Batch", "bedrock": "Bedrock", "ce": "Cost Explorer",
+	"cloudcontrol": "Cloud Control", "cloudfront": "CloudFront",
+	"cloudtrail": "CloudTrail", "codebuild": "CodeBuild",
+	"codecommit": "CodeCommit", "codeconnections": "CodeConnections",
+	"codedeploy": "CodeDeploy", "codepipeline": "CodePipeline",
+	"codeartifact": "CodeArtifact", "config": "Config",
+	"dms": "DMS", "docdb": "DocumentDB", "ec2": "EC2", "ecr": "ECR",
+	"ecs": "ECS", "eks": "EKS", "elasticache": "ElastiCache",
+	"elasticbeanstalk": "Elastic Beanstalk", "elasticloadbalancing": "ELB",
+	"elasticmapreduce": "EMR", "es": "Elasticsearch", "fis": "FIS",
+	"glacier": "Glacier", "glue": "Glue", "identitystore": "Identity Store",
+	"iot": "IoT", "iot-data": "IoT Data", "iot-wireless": "IoT Wireless",
+	"kafka": "MSK", "kinesis": "Kinesis", "kinesisanalytics": "Kinesis Analytics",
+	"lakeformation": "Lake Formation", "managedblockchain": "Blockchain",
+	"mediaconvert": "MediaConvert", "memorydb": "MemoryDB", "mq": "MQ",
+	"neptune": "Neptune", "opensearch": "OpenSearch", "organizations": "Organizations",
+	"pinpoint": "Pinpoint", "pipes": "EventBridge Pipes", "ram": "RAM",
+	"redshift": "Redshift", "resource-groups": "Resource Groups",
+	"route53": "Route 53", "route53resolver": "Route 53 Resolver",
+	"s3tables": "S3 Tables", "sagemaker": "SageMaker", "scheduler": "Scheduler",
+	"secretsmanager": "Secrets Manager", "serverlessrepo": "SAR",
+	"servicediscovery": "Cloud Map", "shield": "Shield",
+	"sso-admin": "SSO Admin", "support": "Support", "swf": "SWF",
+	"tagging": "Resource Tagging", "textract": "Textract",
+	"timestream-write": "Timestream", "transcribe": "Transcribe",
+	"transfer": "Transfer", "verifiedpermissions": "Verified Permissions",
+	"waf-regional": "WAF Regional", "wafv2": "WAFv2",
+	"firehose": "Firehose", "stepfunctions": "Step Functions",
+	"airflow": "MWAA",
+}
+
+func serviceDisplayName(name string) string {
+	if label, ok := serviceDisplayNames[name]; ok {
+		return label
+	}
+	return strings.ToUpper(name[:1]) + name[1:]
+}
+
+// serviceGroup returns the topology group for a service.
+var serviceGroupMap = map[string]string{
+	// Compute
+	"ec2": "Compute", "lambda": "Compute", "ecs": "Compute", "eks": "Compute",
+	"batch": "Compute", "elasticbeanstalk": "Compute", "lightsail": "Compute",
+	// Storage
+	"s3": "Storage", "glacier": "Storage", "s3tables": "Storage", "backup": "Storage",
+	"rds": "Storage", "dynamodb": "Storage", "docdb": "Storage", "neptune": "Storage",
+	"elasticache": "Storage", "memorydb": "Storage", "redshift": "Storage",
+	"timestream-write": "Storage", "dms": "Storage",
+	// Messaging
+	"sqs": "Messaging", "sns": "Messaging", "events": "Messaging", "pipes": "Messaging",
+	"kinesis": "Messaging", "firehose": "Messaging", "kafka": "Messaging",
+	"mq": "Messaging", "ses": "Messaging", "scheduler": "Messaging",
+	// Auth
+	"iam": "Auth", "sts": "Auth", "cognito-idp": "Auth", "sso-admin": "Auth",
+	"identitystore": "Auth", "verifiedpermissions": "Auth", "organizations": "Auth",
+	// Security
+	"kms": "Security", "secretsmanager": "Security", "ssm": "Security",
+	"acm": "Security", "acm-pca": "Security", "shield": "Security",
+	"wafv2": "Security", "waf-regional": "Security", "ram": "Security",
+	"cloudtrail": "Security", "config": "Security", "guardduty": "Security",
+	// Monitoring
+	"monitoring": "Monitoring", "logs": "Monitoring", "xray": "Monitoring",
+	// API
+	"apigateway": "API", "appsync": "API", "cloudfront": "API",
+	"elasticloadbalancing": "API", "route53": "API", "route53resolver": "API",
+	// CI/CD
+	"codebuild": "Integrations", "codepipeline": "Integrations", "codedeploy": "Integrations",
+	"codecommit": "Integrations", "codeconnections": "Integrations", "codeartifact": "Integrations",
+	"cloudformation": "Integrations", "cloudcontrol": "Integrations",
+	// ML/AI
+	"sagemaker": "Admin", "bedrock": "Admin", "textract": "Admin",
+	"transcribe": "Admin", "mediaconvert": "Admin",
+	// App Services
+	"appconfig": "Features", "servicediscovery": "Features",
+	"swf": "Features", "stepfunctions": "Features", "airflow": "Features",
+	// Other
+	"iot": "Integrations", "iot-data": "Integrations", "iot-wireless": "Integrations",
+	"glue": "Admin", "athena": "Admin", "lakeformation": "Admin",
+	"opensearch": "Admin", "es": "Admin", "kinesisanalytics": "Admin",
+	"fis": "Monitoring", "support": "Admin", "ce": "Admin",
+	"tagging": "Security", "resource-groups": "Security",
+	"pinpoint": "Features", "managedblockchain": "Integrations",
+	"serverlessrepo": "Integrations", "transfer": "Integrations",
+	"account": "Auth",
+}
+
+func serviceGroup(name string) string {
+	if g, ok := serviceGroupMap[name]; ok {
+		return g
+	}
+	return "Features"
+}
+
+// serviceNodeType returns the visual node type for a service.
+func serviceNodeType(name string) string {
+	switch {
+	case strings.Contains(name, "lambda") || strings.Contains(name, "batch") || strings.Contains(name, "ecs") || strings.Contains(name, "eks"):
+		return "compute"
+	case strings.Contains(name, "sqs") || strings.Contains(name, "sns") || strings.Contains(name, "kinesis") || strings.Contains(name, "kafka"):
+		return "queue"
+	case strings.Contains(name, "s3") || strings.Contains(name, "glacier"):
+		return "bucket"
+	case strings.Contains(name, "rds") || strings.Contains(name, "dynamo") || strings.Contains(name, "docdb") || strings.Contains(name, "neptune") || strings.Contains(name, "redis") || strings.Contains(name, "elasticache"):
+		return "database"
+	case strings.Contains(name, "iam") || strings.Contains(name, "sts") || strings.Contains(name, "cognito") || strings.Contains(name, "sso"):
+		return "identity"
+	case strings.Contains(name, "waf") || strings.Contains(name, "shield") || strings.Contains(name, "kms") || strings.Contains(name, "acm"):
+		return "security"
+	case strings.Contains(name, "cloudwatch") || strings.Contains(name, "logs") || strings.Contains(name, "monitoring"):
+		return "monitoring"
+	case strings.Contains(name, "code") || strings.Contains(name, "pipeline"):
+		return "cicd"
+	default:
+		return "service"
+	}
+}
+
+// ---- ARN Helpers ----
 
 // arnLastPart extracts the last segment of an ARN (after the last : or /).
 func arnLastPart(arn string) string {

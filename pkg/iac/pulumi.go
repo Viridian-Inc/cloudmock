@@ -9,6 +9,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -16,6 +18,19 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+// iacCtx creates a RequestContext for IaC provisioning calls.
+func iacCtx(action, svcName string, body []byte) *service.RequestContext {
+	return &service.RequestContext{
+		Action:     action,
+		Service:    svcName,
+		Body:       body,
+		Region:     "us-east-1",
+		AccountID:  "000000000000",
+		RawRequest: httptest.NewRequest(http.MethodPost, "/", nil),
+		Identity:   &service.CallerIdentity{AccountID: "000000000000", ARN: "arn:aws:iam::000000000000:root", IsRoot: true},
+	}
+}
 
 // DynamoTableDef holds a parsed DynamoDB table definition from IaC source.
 type DynamoTableDef struct {
@@ -47,10 +62,63 @@ type LSIDef struct {
 	Projection string `json:"projectionType"`
 }
 
+// LambdaDef holds a parsed Lambda function definition.
+type LambdaDef struct {
+	Name    string `json:"name"`
+	Runtime string `json:"runtime"`
+	Handler string `json:"handler"`
+	Timeout int    `json:"timeout"`
+	Memory  int    `json:"memory"`
+}
+
+// CognitoDef holds a parsed Cognito User Pool definition.
+type CognitoDef struct {
+	Name string `json:"name"`
+}
+
+// SQSQueueDef holds a parsed SQS queue definition.
+type SQSQueueDef struct {
+	Name string `json:"name"`
+}
+
+// SNSTopicDef holds a parsed SNS topic definition.
+type SNSTopicDef struct {
+	Name string `json:"name"`
+}
+
+// S3BucketDef holds a parsed S3 bucket definition.
+type S3BucketDef struct {
+	Name string `json:"name"`
+}
+
+// APIGatewayDef holds a parsed API Gateway definition.
+type APIGatewayDef struct {
+	Name string `json:"name"`
+}
+
+// MicroserviceDef holds a parsed Lambda-backed microservice with its API routes.
+type MicroserviceDef struct {
+	Name   string          `json:"name"`
+	Routes []MicroserviceRoute `json:"routes"`
+	Tables []string        `json:"tables,omitempty"` // DynamoDB tables this service accesses
+}
+
+// MicroserviceRoute is an API route (method + path).
+type MicroserviceRoute struct {
+	Method string `json:"method"`
+	Path   string `json:"path"`
+}
+
 // IaCImportResult holds all resources extracted from IaC source.
 type IaCImportResult struct {
-	Tables []DynamoTableDef `json:"tables"`
-	// Future: Routes, Lambdas, etc.
+	Tables        []DynamoTableDef  `json:"tables"`
+	Lambdas       []LambdaDef       `json:"lambdas"`
+	CognitoPools  []CognitoDef      `json:"cognito_pools"`
+	SQSQueues     []SQSQueueDef     `json:"sqs_queues"`
+	SNSTopics     []SNSTopicDef     `json:"sns_topics"`
+	S3Buckets     []S3BucketDef     `json:"s3_buckets"`
+	APIGateways   []APIGatewayDef   `json:"api_gateways"`
+	Microservices []MicroserviceDef `json:"microservices"`
 }
 
 // ImportPulumiDir scans a Pulumi project directory for resource definitions.
@@ -71,25 +139,116 @@ func ImportPulumiDir(dir string, environment string, logger *slog.Logger) (*IaCI
 		if !strings.HasSuffix(path, ".ts") {
 			return nil
 		}
-
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil // Skip unreadable files
-		}
-
-		src := string(content)
-		if !strings.Contains(src, "aws.dynamodb.Table") {
+		// Skip node_modules and test files
+		if strings.Contains(path, "node_modules") || strings.Contains(path, ".test.") {
 			return nil
 		}
 
-		tables := parseDynamoTables(src, environment)
-		if len(tables) > 0 {
-			logger.Info("found DynamoDB tables in IaC", "file", path, "count", len(tables))
-			result.Tables = append(result.Tables, tables...)
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		src := string(content)
+
+		// DynamoDB tables
+		if strings.Contains(src, "aws.dynamodb.Table") {
+			tables := parseDynamoTables(src, environment)
+			if len(tables) > 0 {
+				logger.Info("found DynamoDB tables in IaC", "file", path, "count", len(tables))
+				result.Tables = append(result.Tables, tables...)
+			}
+		}
+
+		// Lambda functions
+		if strings.Contains(src, "aws.lambda.Function") {
+			lambdas := parseLambdaFunctions(src, environment)
+			if len(lambdas) > 0 {
+				logger.Info("found Lambda functions in IaC", "file", path, "count", len(lambdas))
+				result.Lambdas = append(result.Lambdas, lambdas...)
+			}
+		}
+
+		// Cognito User Pools
+		if strings.Contains(src, "aws.cognito.UserPool") {
+			pools := parseCognitoPools(src, environment)
+			if len(pools) > 0 {
+				logger.Info("found Cognito User Pools in IaC", "file", path, "count", len(pools))
+				result.CognitoPools = append(result.CognitoPools, pools...)
+			}
+		}
+
+		// SQS Queues
+		if strings.Contains(src, "aws.sqs.Queue") {
+			queues := parseSQSQueues(src, environment)
+			if len(queues) > 0 {
+				logger.Info("found SQS queues in IaC", "file", path, "count", len(queues))
+				result.SQSQueues = append(result.SQSQueues, queues...)
+			}
+		}
+
+		// SNS Topics
+		if strings.Contains(src, "aws.sns.Topic") {
+			topics := parseSNSTopics(src, environment)
+			if len(topics) > 0 {
+				logger.Info("found SNS topics in IaC", "file", path, "count", len(topics))
+				result.SNSTopics = append(result.SNSTopics, topics...)
+			}
+		}
+
+		// S3 Buckets
+		if strings.Contains(src, "aws.s3.Bucket") || strings.Contains(src, "aws.s3.BucketV2") {
+			buckets := parseS3Buckets(src, environment)
+			if len(buckets) > 0 {
+				logger.Info("found S3 buckets in IaC", "file", path, "count", len(buckets))
+				result.S3Buckets = append(result.S3Buckets, buckets...)
+			}
+		}
+
+		// API Gateway
+		if strings.Contains(src, "aws.apigateway.RestApi") || strings.Contains(src, "aws.apigatewayv2.Api") {
+			apis := parseAPIGateways(src, environment)
+			if len(apis) > 0 {
+				logger.Info("found API Gateways in IaC", "file", path, "count", len(apis))
+				result.APIGateways = append(result.APIGateways, apis...)
+			}
+		}
+
+		// Lambda endpoint microservices (AutotendLambdaEndpointModuleResource)
+		if strings.Contains(src, "AutotendLambdaEndpointModuleResource") && strings.Contains(src, "name:") {
+			microservices := parseLambdaEndpoints(src, environment)
+			if len(microservices) > 0 {
+				logger.Info("found Lambda endpoint microservices in IaC", "file", path, "count", len(microservices))
+				result.Microservices = append(result.Microservices, microservices...)
+			}
 		}
 
 		return nil
 	})
+
+	// Also look for extractedRoutes.json in the data/ directory
+	routesPath := filepath.Join(dir, "data", "extractedRoutes.json")
+	if routesData, err := os.ReadFile(routesPath); err == nil {
+		routes := parseExtractedRoutes(routesData)
+		if len(routes) > 0 {
+			logger.Info("found extracted API routes", "file", routesPath, "services", len(routes))
+			// Merge routes into existing microservices, matching by normalized name
+			// (handles camelCase vs snake_case: accessControl == access_control)
+			existingNormalized := make(map[string]int)
+			for i, ms := range result.Microservices {
+				existingNormalized[normalizeName(ms.Name)] = i
+			}
+			for _, ms := range routes {
+				norm := normalizeName(ms.Name)
+				if idx, ok := existingNormalized[norm]; ok {
+					result.Microservices[idx].Routes = ms.Routes
+				} else {
+					result.Microservices = append(result.Microservices, ms)
+					existingNormalized[norm] = len(result.Microservices) - 1
+				}
+			}
+		}
+	}
 
 	if err != nil {
 		return nil, fmt.Errorf("walk pulumi dir: %w", err)
@@ -131,10 +290,44 @@ func parseDynamoTables(src string, environment string) []DynamoTableDef {
 	return tables
 }
 
-// resolveTemplateName replaces ${environmentSuffix} with -environment.
+// normalizeName converts camelCase/snake_case to a canonical lowercase form for dedup.
+// accessControl → accesscontrol, access_control → accesscontrol, stripeWebhook → stripewebhook
+func normalizeName(name string) string {
+	return strings.ToLower(strings.ReplaceAll(name, "_", ""))
+}
+
+// extractLocalVars scans TypeScript source for const/let variable assignments
+// and resolves their template literal values. Handles patterns like:
+//   const resourceName = `autotend-bff-${environment}`;
+func extractLocalVars(src string, env string) map[string]string {
+	vars := make(map[string]string)
+	// Match: const/let varName = `template-${var}`;
+	pattern := regexp.MustCompile("(?:const|let)\\s+(\\w+)\\s*=\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		varName := match[1]
+		value := resolveTemplateName(match[2], env)
+		// Also resolve already-found vars
+		for k, v := range vars {
+			value = strings.ReplaceAll(value, "${"+k+"}", v)
+		}
+		vars[varName] = value
+	}
+	// Also match string assignments: const x = "value";
+	strPattern := regexp.MustCompile("(?:const|let)\\s+(\\w+)\\s*=\\s*\"([^\"]+)\"")
+	for _, match := range strPattern.FindAllStringSubmatch(src, -1) {
+		vars[match[1]] = match[2]
+	}
+	return vars
+}
+
+// resolveTemplateName replaces template literals with environment-based values.
+// Returns empty string if unresolvable template variables remain.
 func resolveTemplateName(raw string, env string) string {
 	raw = strings.ReplaceAll(raw, "${environmentSuffix}", "-"+env)
 	raw = strings.ReplaceAll(raw, "${environment}", env)
+	raw = strings.ReplaceAll(raw, "${env}", env)
+	// Common Pulumi patterns: ${name}, ${resourceName}, ${nameSanitized}, ${bucketName}
+	// If any ${...} remain, they're unresolvable — return as-is (callers filter with strings.Contains)
 	return raw
 }
 
@@ -308,6 +501,152 @@ func extractLSIs(block string) []LSIDef {
 	return lsis
 }
 
+// parseLambdaEndpoints extracts AutotendLambdaEndpointModuleResource definitions.
+// These are the high-level microservice definitions with name and table dependencies.
+func parseLambdaEndpoints(src string, env string) []MicroserviceDef {
+	var services []MicroserviceDef
+	// Match: new AutotendLambdaEndpointModuleResource(`autotend-lep-NAME-env`, { name: "NAME", ...
+	pattern := regexp.MustCompile(`new\s+AutotendLambdaEndpointModuleResource\s*\(\s*` + "`" + `[^` + "`" + `]+` + "`" + `\s*,\s*\{`)
+	matches := pattern.FindAllStringIndex(src, -1)
+
+	for _, match := range matches {
+		blockStart := match[1] - 1
+		blockEnd := findMatchingBrace(src, blockStart)
+		if blockEnd < 0 {
+			continue
+		}
+		block := src[blockStart : blockEnd+1]
+
+		// Extract name
+		name := extractStringField(block, "name")
+		if name == "" {
+			continue
+		}
+
+		// Extract table dependencies from allowedTables array
+		var tables []string
+		tablePattern := regexp.MustCompile(`tables\.(\w+)`)
+		if atStart := strings.Index(block, "allowedTables:"); atStart >= 0 {
+			atEnd := strings.Index(block[atStart:], "]")
+			if atEnd > 0 {
+				atBlock := block[atStart : atStart+atEnd]
+				for _, tm := range tablePattern.FindAllStringSubmatch(atBlock, -1) {
+					tables = append(tables, tm[1]+"-"+env)
+				}
+			}
+		}
+
+		services = append(services, MicroserviceDef{
+			Name:   name,
+			Tables: tables,
+		})
+	}
+	return services
+}
+
+// parseExtractedRoutes parses the data/extractedRoutes.json file.
+func parseExtractedRoutes(data []byte) []MicroserviceDef {
+	var raw map[string][]struct {
+		Method string `json:"method"`
+		Path   string `json:"path"`
+	}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil
+	}
+
+	var services []MicroserviceDef
+	for name, routes := range raw {
+		ms := MicroserviceDef{Name: name}
+		for _, r := range routes {
+			ms.Routes = append(ms.Routes, MicroserviceRoute{
+				Method: r.Method,
+				Path:   r.Path,
+			})
+		}
+		services = append(services, ms)
+	}
+	return services
+}
+
+// parseLambdaFunctions extracts Lambda function definitions from Pulumi TypeScript.
+func parseLambdaFunctions(src string, env string) []LambdaDef {
+	// Pre-scan for local variable assignments like: const resourceName = `autotend-bff-${environment}`;
+	localVars := extractLocalVars(src, env)
+
+	var lambdas []LambdaDef
+	pattern := regexp.MustCompile("new\\s+aws\\.lambda\\.Function\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		// Resolve local variable references like ${resourceName}
+		for varName, varVal := range localVars {
+			name = strings.ReplaceAll(name, "${"+varName+"}", varVal)
+		}
+		lambdas = append(lambdas, LambdaDef{
+			Name:    name,
+			Runtime: "nodejs20.x",
+			Handler: "index.handler",
+			Timeout: 30,
+			Memory:  128,
+		})
+	}
+	return lambdas
+}
+
+// parseCognitoPools extracts Cognito User Pool definitions.
+func parseCognitoPools(src string, env string) []CognitoDef {
+	var pools []CognitoDef
+	pattern := regexp.MustCompile("new\\s+aws\\.cognito\\.UserPool\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		pools = append(pools, CognitoDef{Name: name})
+	}
+	return pools
+}
+
+// parseSQSQueues extracts SQS queue definitions.
+func parseSQSQueues(src string, env string) []SQSQueueDef {
+	var queues []SQSQueueDef
+	pattern := regexp.MustCompile("new\\s+aws\\.sqs\\.Queue\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		queues = append(queues, SQSQueueDef{Name: name})
+	}
+	return queues
+}
+
+// parseSNSTopics extracts SNS topic definitions.
+func parseSNSTopics(src string, env string) []SNSTopicDef {
+	var topics []SNSTopicDef
+	pattern := regexp.MustCompile("new\\s+aws\\.sns\\.Topic\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		topics = append(topics, SNSTopicDef{Name: name})
+	}
+	return topics
+}
+
+// parseS3Buckets extracts S3 bucket definitions.
+func parseS3Buckets(src string, env string) []S3BucketDef {
+	var buckets []S3BucketDef
+	pattern := regexp.MustCompile("new\\s+aws\\.s3\\.(?:Bucket|BucketV2)\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		buckets = append(buckets, S3BucketDef{Name: name})
+	}
+	return buckets
+}
+
+// parseAPIGateways extracts API Gateway definitions.
+func parseAPIGateways(src string, env string) []APIGatewayDef {
+	var apis []APIGatewayDef
+	pattern := regexp.MustCompile("new\\s+aws\\.(?:apigateway\\.RestApi|apigatewayv2\\.Api)\\s*\\(\\s*`([^`]+)`")
+	for _, match := range pattern.FindAllStringSubmatch(src, -1) {
+		name := resolveTemplateName(match[1], env)
+		apis = append(apis, APIGatewayDef{Name: name})
+	}
+	return apis
+}
+
 func findMatchingBrace(s string, start int) int {
 	if start >= len(s) || s[start] != '{' {
 		return -1
@@ -438,13 +777,7 @@ func provisionTable(table DynamoTableDef, dynamoSvc service.Service, logger *slo
 
 	body, _ := json.Marshal(req)
 
-	ctx := &service.RequestContext{
-		Action:  "CreateTable",
-		Service: "dynamodb",
-		Body:    body,
-	}
-
-	_, err := dynamoSvc.HandleRequest(ctx)
+	_, err := dynamoSvc.HandleRequest(iacCtx("CreateTable", "dynamodb", body))
 	if err != nil {
 		// Ignore "already exists" errors
 		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "ResourceInUseException") {
@@ -455,4 +788,134 @@ func provisionTable(table DynamoTableDef, dynamoSvc service.Service, logger *slo
 
 	logger.Info("provisioned table from IaC", "table", table.Name, "hashKey", table.HashKey, "rangeKey", table.RangeKey, "gsis", len(table.GSIs))
 	return nil
+}
+
+// ProvisionLambdas creates Lambda functions in CloudMock.
+func ProvisionLambdas(lambdas []LambdaDef, lambdaSvc service.Service, accountID, region string, logger *slog.Logger) {
+	for _, fn := range lambdas {
+		if strings.Contains(fn.Name, "${") {
+			continue // skip unresolved template literals
+		}
+		body, _ := json.Marshal(map[string]any{
+			"FunctionName": fn.Name,
+			"Runtime":      fn.Runtime,
+			"Handler":      fn.Handler,
+			"Role":         fmt.Sprintf("arn:aws:iam::%s:role/%s-role", accountID, fn.Name),
+			"Code":         map[string]any{"ZipFile": "UEsFBgAAAAAAAAAAAAAAAAAAAAAAAA=="},
+			"Timeout":      fn.Timeout,
+			"MemorySize":   fn.Memory,
+		})
+		// Lambda uses REST path routing: POST /2015-03-31/functions
+		req := httptest.NewRequest(http.MethodPost, "/2015-03-31/functions", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := &service.RequestContext{
+			Action: "CreateFunction", Service: "lambda", Body: body,
+			Region: region, AccountID: accountID, RawRequest: req,
+			Identity: &service.CallerIdentity{AccountID: accountID, ARN: "arn:aws:iam::" + accountID + ":root", IsRoot: true},
+		}
+		if _, err := lambdaSvc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision Lambda", "name", fn.Name, "error", err)
+		} else {
+			logger.Info("provisioned Lambda from IaC", "name", fn.Name)
+		}
+	}
+}
+
+// ProvisionCognitoPools creates Cognito User Pools in CloudMock.
+func ProvisionCognitoPools(pools []CognitoDef, cognitoSvc service.Service, logger *slog.Logger) {
+	for _, pool := range pools {
+		body, _ := json.Marshal(map[string]any{"PoolName": pool.Name})
+		ctx := iacCtx("CreateUserPool", "cognito-idp", body)
+		if _, err := cognitoSvc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision Cognito pool", "name", pool.Name, "error", err)
+		} else {
+			logger.Info("provisioned Cognito pool from IaC", "name", pool.Name)
+		}
+	}
+}
+
+// ProvisionSQSQueues creates SQS queues in CloudMock.
+func ProvisionSQSQueues(queues []SQSQueueDef, sqsSvc service.Service, logger *slog.Logger) {
+	for _, q := range queues {
+		if strings.Contains(q.Name, "${") {
+			continue
+		}
+		// SQS uses JSON with QueueName
+		body, _ := json.Marshal(map[string]any{"QueueName": q.Name})
+		ctx := iacCtx("CreateQueue", "sqs", body)
+		if _, err := sqsSvc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision SQS queue", "name", q.Name, "error", err)
+		} else {
+			logger.Info("provisioned SQS queue from IaC", "name", q.Name)
+		}
+	}
+}
+
+// ProvisionSNSTopics creates SNS topics in CloudMock.
+func ProvisionSNSTopics(topics []SNSTopicDef, snsSvc service.Service, logger *slog.Logger) {
+	for _, t := range topics {
+		if strings.Contains(t.Name, "${") {
+			continue
+		}
+		// SNS CreateTopic uses form-encoded: Action=CreateTopic&Name=xxx
+		formBody := "Action=CreateTopic&Name=" + t.Name
+		ctx := iacCtx("CreateTopic", "sns", []byte(formBody))
+		if _, err := snsSvc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision SNS topic", "name", t.Name, "error", err)
+		} else {
+			logger.Info("provisioned SNS topic from IaC", "name", t.Name)
+		}
+	}
+}
+
+// ProvisionS3Buckets creates S3 buckets in CloudMock.
+func ProvisionS3Buckets(buckets []S3BucketDef, s3Svc service.Service, logger *slog.Logger) {
+	for _, b := range buckets {
+		if strings.Contains(b.Name, "${") {
+			continue
+		}
+		// S3 CreateBucket uses PUT /{bucket} with empty body
+		req := httptest.NewRequest(http.MethodPut, "/"+b.Name, nil)
+		ctx := &service.RequestContext{
+			Action: "CreateBucket", Service: "s3", Body: nil,
+			RawRequest: req, Params: map[string]string{"bucket": b.Name},
+			Identity: &service.CallerIdentity{AccountID: "000000000000", ARN: "arn:aws:iam::000000000000:root", IsRoot: true},
+		}
+		if _, err := s3Svc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision S3 bucket", "name", b.Name, "error", err)
+		} else {
+			logger.Info("provisioned S3 bucket from IaC", "name", b.Name)
+		}
+	}
+}
+
+// ProvisionAPIGateways creates API Gateway REST APIs in CloudMock.
+func ProvisionAPIGateways(apis []APIGatewayDef, apigwSvc service.Service, logger *slog.Logger) {
+	for _, api := range apis {
+		if strings.Contains(api.Name, "${") {
+			continue
+		}
+		body, _ := json.Marshal(map[string]any{"name": api.Name})
+		req := httptest.NewRequest(http.MethodPost, "/restapis", strings.NewReader(string(body)))
+		req.Header.Set("Content-Type", "application/json")
+		ctx := &service.RequestContext{
+			Action: "CreateRestApi", Service: "apigateway", Body: body,
+			RawRequest: req,
+			Identity: &service.CallerIdentity{AccountID: "000000000000", ARN: "arn:aws:iam::000000000000:root", IsRoot: true},
+		}
+		if _, err := apigwSvc.HandleRequest(ctx); err != nil && !isAlreadyExists(err) {
+			logger.Warn("failed to provision API Gateway", "name", api.Name, "error", err)
+		} else {
+			logger.Info("provisioned API Gateway from IaC", "name", api.Name)
+		}
+	}
+}
+
+func isAlreadyExists(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "already exists") ||
+		strings.Contains(msg, "ResourceInUseException") ||
+		strings.Contains(msg, "ConflictException") ||
+		strings.Contains(msg, "AlreadyExists") ||
+		strings.Contains(msg, "BucketAlreadyOwnedByYou")
 }

@@ -163,7 +163,8 @@ func (a *API) handleTrafficReplayStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	run, err := a.trafficEngine.StartReplay(r.Context(), req.RecordingID, req.Speed)
+	// Use background context — replay goroutine must outlive the HTTP request
+	run, err := a.trafficEngine.StartReplay(context.Background(), req.RecordingID, req.Speed)
 	if err != nil {
 		writeError(w, http.StatusBadRequest, err.Error())
 		return

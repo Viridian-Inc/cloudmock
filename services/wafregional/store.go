@@ -289,6 +289,18 @@ func (s *Store) UpdateRule(id, changeToken string, updates []map[string]any) *se
 		negated, _ := predMap["Negated"].(bool)
 		predType, _ := predMap["Type"].(string)
 		dataId, _ := predMap["DataId"].(string)
+		// Validate predicate type
+		if predType != "" {
+			validPredicateTypes := map[string]bool{
+				"IPMatch": true, "ByteMatch": true, "SqlInjectionMatch": true,
+				"GeoMatch": true, "SizeConstraint": true, "XssMatch": true,
+				"RegexMatch": true,
+			}
+			if !validPredicateTypes[predType] {
+				return service.NewAWSError("WAFInvalidParameterException",
+					fmt.Sprintf("Invalid predicate type: %s", predType), http.StatusBadRequest)
+			}
+		}
 		if action == "INSERT" {
 			rule.Predicates = append(rule.Predicates, Predicate{
 				Negated: negated, Type: predType, DataId: dataId,

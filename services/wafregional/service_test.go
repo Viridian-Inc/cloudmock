@@ -242,6 +242,78 @@ func TestWAFRegional_UpdateWebACL_AddRule(t *testing.T) {
 	assert.Len(t, rules, 1)
 }
 
+func TestWAFRegional_IPSet_InvalidCIDR(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateIPSet", map[string]any{
+		"Name": "cidr-ipset", "ChangeToken": "ct",
+	}))
+	ipSetID := respBody(t, resp)["IPSet"].(map[string]any)["IPSetId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateIPSet", map[string]any{
+		"IPSetId":     ipSetID,
+		"ChangeToken": "ct",
+		"Updates": []any{
+			map[string]any{
+				"Action": "INSERT",
+				"IPSetDescriptor": map[string]any{
+					"Type":  "IPV4",
+					"Value": "999.999.999.999/32",
+				},
+			},
+		},
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "WAFInvalidParameterException")
+}
+
+func TestWAFRegional_IPSet_ValidCIDR(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateIPSet", map[string]any{
+		"Name": "valid-cidr-ipset", "ChangeToken": "ct",
+	}))
+	ipSetID := respBody(t, resp)["IPSet"].(map[string]any)["IPSetId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateIPSet", map[string]any{
+		"IPSetId":     ipSetID,
+		"ChangeToken": "ct",
+		"Updates": []any{
+			map[string]any{
+				"Action": "INSERT",
+				"IPSetDescriptor": map[string]any{
+					"Type":  "IPV4",
+					"Value": "10.0.0.0/24",
+				},
+			},
+		},
+	}))
+	require.NoError(t, err)
+}
+
+func TestWAFRegional_Rule_InvalidPredicateType(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateRule", map[string]any{
+		"Name": "pred-rule", "MetricName": "m", "ChangeToken": "ct",
+	}))
+	ruleID := respBody(t, resp)["Rule"].(map[string]any)["RuleId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateRule", map[string]any{
+		"RuleId":      ruleID,
+		"ChangeToken": "ct",
+		"Updates": []any{
+			map[string]any{
+				"Action": "INSERT",
+				"Predicate": map[string]any{
+					"Negated": false,
+					"Type":    "InvalidPredicateType",
+					"DataId":  "some-id",
+				},
+			},
+		},
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "WAFInvalidParameterException")
+}
+
 func TestWAFRegional_InvalidAction(t *testing.T) {
 	s := newService()
 	_, err := s.HandleRequest(jsonCtx("BogusAction", map[string]any{}))

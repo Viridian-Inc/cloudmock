@@ -146,7 +146,10 @@ func handleCreateResolverRule(params map[string]any, store *Store) (*service.Res
 		}
 	}
 
-	rule, _ := store.CreateResolverRule(str(params, "Name"), domainName, ruleType, str(params, "ResolverEndpointId"), targetIPs)
+	rule, err := store.CreateResolverRule(str(params, "Name"), domainName, ruleType, str(params, "ResolverEndpointId"), targetIPs)
+	if err != nil {
+		return jsonErr(service.ErrValidation(err.Error()))
+	}
 	return jsonOK(map[string]any{"ResolverRule": ruleResponse(rule)})
 }
 

@@ -144,18 +144,20 @@
 ## Category 5: Integrations
 
 ### 5.1 OpenTelemetry (OTLP) Ingestion
-**Priority:** P0
-**Summary:** Accept traces, metrics, and logs via the OpenTelemetry Protocol (OTLP/gRPC and OTLP/HTTP).
-**Description:** OpenTelemetry is the industry standard. Platform Engineers (Persona 3) won't consider a tool that doesn't support it. Need: OTLP/gRPC endpoint on port 4317, OTLP/HTTP endpoint on port 4318, trace/metric/log mapping to our internal data model.
+**Priority:** P0 (merged with 6.2 — Language-Agnostic Instrumentation)
+**Summary:** Accept traces, metrics, and logs via the OpenTelemetry Protocol (OTLP/gRPC and OTLP/HTTP). This is the foundation of our language-agnostic approach — any language with an OTel SDK works with CloudMock.
+**Description:** See item 6.2 for the full language-agnostic strategy. The OTLP endpoints are the core of this: port 4317 (gRPC) and 4318 (HTTP) accept standard OpenTelemetry data from Go, Python, Java, Node.js, Rust, C#, Ruby, PHP, and any other language with an OTel SDK.
 **Acceptance Criteria:**
-- [ ] OTLP/gRPC endpoint accepting traces
-- [ ] OTLP/HTTP endpoint accepting traces
-- [ ] OTLP metrics ingestion
-- [ ] OTLP logs ingestion
+- [ ] OTLP/gRPC endpoint on port 4317 (traces, metrics, logs)
+- [ ] OTLP/HTTP endpoint on port 4318 (traces, metrics, logs)
+- [ ] Map OTel spans → CloudMock trace model
+- [ ] Map OTel metrics → CloudMock metrics model
+- [ ] Map OTel logs → CloudMock log model
 - [ ] Traces appear in existing trace viewer
 - [ ] Works with otel-collector and direct SDK export
-**Justification:** New Relic, Datadog, Sentry, and Honeycomb all support OTLP. It's the minimum bar for production adoption. Without it, we're development-only.
-**Opportunity:** "Works with your existing OpenTelemetry instrumentation" means zero migration cost. Huge for adoption.
+- [ ] Verified with: Go, Python, Java, Node.js, Rust OTel SDKs
+**Justification:** This is what makes CloudMock language-agnostic. No proprietary SDK required. Any OTel-instrumented app works by changing one endpoint URL.
+**Opportunity:** Honeycomb's entire positioning is "OTel-native." We match that AND add local AWS emulation. No competitor offers both.
 
 ### 5.2 GitHub / GitLab Integration
 **Priority:** P1
@@ -198,18 +200,31 @@
 **Justification:** User feedback: "must be as easy as LocalStack — one command, zero config." This is the #1 adoption barrier.
 **Opportunity:** If setup takes >2 minutes, developers will abandon. This is existential for growth.
 
-### 6.2 Source SDK for Node.js
+### 6.2 Language-Agnostic Instrumentation (OTel-First)
 **Priority:** P0
-**Summary:** `@cloudmock/node` SDK that auto-instruments HTTP requests, captures logs, and forwards to DevTools.
-**Description:** Phase 2 deliverable. Intercepts: fetch, http/https modules, console.* calls. Adds `X-CloudMock-Source` header for request correlation. Auto-discovers CloudMock via mDNS or localhost fallback.
+**Summary:** Accept any language's telemetry via OpenTelemetry, then provide thin convenience SDKs per language for CloudMock-specific features.
+**Description:** The platform MUST NOT require a CloudMock-specific SDK to work. Any app instrumented with standard OpenTelemetry (Go, Python, Java, Rust, C#, Ruby, PHP, etc.) should work by pointing OTLP export to CloudMock. Our per-language SDKs (@cloudmock/node, cloudmock-swift, cloudmock-kotlin) are optional thin layers that add: source correlation headers, auto-discovery, RUM capture, and enhanced context — but are never required.
+
+**Architecture:**
+```
+Any Language → OpenTelemetry SDK → OTLP export → CloudMock (port 4317/4318)
+                                                    ↓
+                                              Traces, Metrics, Logs in DevTools
+
+Optional: @cloudmock/node → OTel Node SDK + source correlation + auto-discovery
+Optional: cloudmock-swift → OTel Swift SDK + URLSession hooks + mobile RUM  
+Optional: cloudmock-kotlin → OTel Android SDK + OkHttp hooks + mobile RUM
+```
+
 **Acceptance Criteria:**
-- [ ] `npm install @cloudmock/node` + one-line setup
-- [ ] HTTP/fetch interception (outgoing requests)
-- [ ] Console.log/warn/error capture
-- [ ] Request → trace correlation
-- [ ] Auto-discovery of CloudMock endpoint
-**Justification:** Without a source SDK, DevTools can only observe CloudMock's side of the conversation. The SDK completes the story: "what your app did" + "what AWS did."
-**Opportunity:** This is what makes us a *platform* not just a mock server. The SDK is our distribution channel.
+- [ ] OTLP/gRPC endpoint on port 4317 (traces, metrics, logs)
+- [ ] OTLP/HTTP endpoint on port 4318 (traces, metrics, logs)
+- [ ] Any OTel-instrumented app works with zero CloudMock-specific code
+- [ ] Go, Python, Java, Node.js, Rust verified working via OTel SDK
+- [ ] `@cloudmock/node` as optional convenience wrapper (adds source headers, auto-discovery, console capture)
+- [ ] Documentation: "Works with any language that has an OpenTelemetry SDK"
+**Justification:** Language lock-in is a dealbreaker for Platform Engineers (Persona 3). OpenTelemetry is the industry standard — Honeycomb is OTel-native and it's their biggest selling point. By building on OTel, we support 15+ languages on day 1 without writing 15 SDKs.
+**Opportunity:** "Works with your existing instrumentation" = zero migration cost. Teams already using OTel with Datadog/New Relic can try CloudMock by changing one endpoint URL. This is the fastest possible adoption path.
 
 ### 6.3 Documentation Site
 **Priority:** P0
@@ -269,11 +284,11 @@
 
 ### P0 — Must Ship for V1
 1. One-command bootstrap (`cmk` CLI) — DX
-2. Source SDK for Node.js — DX
+2. Language-agnostic instrumentation (OTel-first + optional convenience SDKs) — DX
 3. Documentation site — DX
 4. Structured error tracking with grouping — Error Tracking
 5. Unified log viewer — Log Management
-6. OpenTelemetry (OTLP) ingestion — Integrations
+6. OpenTelemetry (OTLP) ingestion (ports 4317/4318) — Integrations
 7. Smart alert routing (Slack/PagerDuty/Email) — Alerting
 
 ### P1 — Ship Within 2 Weeks of V1
@@ -294,8 +309,24 @@
 20. Database query monitoring — Performance
 
 ### P3 — Post-V1
-21. Mobile crash reporting (Swift/Kotlin SDKs)
+21. Mobile convenience SDKs (cloudmock-swift, cloudmock-kotlin — thin OTel wrappers + RUM + BLE)
 22. Natural language querying
 23. Synthetic multi-step browser tests
 24. Security monitoring
 25. Plugin marketplace
+
+---
+
+## Design Principle: Language Agnosticism
+
+**Core rule:** CloudMock MUST work with any language via standard OpenTelemetry. Our per-language SDKs are convenience layers, never requirements.
+
+| Layer | Required? | What It Does |
+|-------|-----------|-------------|
+| **OTLP endpoints (4317/4318)** | Universal | Accepts traces/metrics/logs from any OTel SDK |
+| **@cloudmock/node** | Optional | Adds: auto-discovery, console capture, source headers, RUM |
+| **cloudmock-swift** | Optional | Adds: URLSession hooks, MetricKit, mobile RUM, BLE mesh |
+| **cloudmock-kotlin** | Optional | Adds: OkHttp hooks, Timber capture, mobile RUM, BLE mesh |
+| **@cloudmock/rum** | Optional | Browser-only: web vitals, session replay, error capture |
+
+A Go service, a Python Lambda, a Rust microservice, and a Java Spring Boot app should all "just work" by setting `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`.

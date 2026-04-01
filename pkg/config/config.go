@@ -248,6 +248,12 @@ type RUMConfig struct {
 	MaxEvents  int     `yaml:"max_events" json:"max_events"`   // circular buffer capacity
 }
 
+// OTLPConfig holds OTLP ingestion endpoint configuration.
+type OTLPConfig struct {
+	Enabled bool `yaml:"enabled" json:"enabled"`
+	Port    int  `yaml:"port" json:"port"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -269,6 +275,7 @@ type Config struct {
 	Monitor     MonitorConfig            `yaml:"monitor" json:"monitor"`
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
 	RUM         RUMConfig                `yaml:"rum" json:"rum"`
+	OTLP        OTLPConfig               `yaml:"otlp" json:"otlp"`
 	SaaS        SaaSConfig               `yaml:"saas"`
 	Services    map[string]ServiceConfig `yaml:"services"`
 }
@@ -339,6 +346,10 @@ func Default() *Config {
 			Enabled:    true,
 			SampleRate: 1.0,
 			MaxEvents:  10000,
+		},
+		OTLP: OTLPConfig{
+			Enabled: true,
+			Port:    4318,
 		},
 	}
 }
@@ -411,6 +422,16 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLOUDMOCK_OTEL_ENDPOINT"); v != "" {
 		c.DataPlane.OTel.CollectorEndpoint = v
+	}
+	if v := os.Getenv("CLOUDMOCK_OTLP_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			c.OTLP.Port = p
+		}
+	}
+	if v := os.Getenv("CLOUDMOCK_OTLP_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			c.OTLP.Enabled = b
+		}
 	}
 	if v := os.Getenv("CLOUDMOCK_SAAS_ENABLED"); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {

@@ -44,6 +44,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/gateway"
 	"github.com/neureaux/cloudmock/pkg/incident"
 	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
+	"github.com/neureaux/cloudmock/pkg/otlp"
 	incpg "github.com/neureaux/cloudmock/pkg/incident/postgres"
 	"github.com/neureaux/cloudmock/pkg/monitor"
 	monmemory "github.com/neureaux/cloudmock/pkg/monitor/memory"
@@ -54,6 +55,8 @@ import (
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
+	errsmemory "github.com/neureaux/cloudmock/pkg/errors/memory"
+	logsmemory "github.com/neureaux/cloudmock/pkg/logstore/memory"
 	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
 	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
 	"github.com/neureaux/cloudmock/pkg/iac"
@@ -802,6 +805,16 @@ func main() {
 		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
 	}
 
+	// Structured error tracking
+	errStore := errsmemory.NewStore(10000)
+	adminAPI.SetErrorStore(errStore)
+	slog.Info("error tracking store initialized", "capacity", 10000)
+
+	// Log management
+	logStore := logsmemory.NewStore(50000)
+	adminAPI.SetLogStore(logStore)
+	slog.Info("log store initialized", "capacity", 50000)
+
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
 	// (they are registered lazily). In that case, skip optional admin wiring.
@@ -1103,6 +1116,27 @@ func main() {
 		}
 	}()
 
+	// OTLP/HTTP ingestion server — accepts OpenTelemetry traces, metrics, and logs.
+	var otlpServer *http.Server
+	if cfg.OTLP.Enabled {
+		otlpHandler := otlp.NewServer(dp, bus, cfg.Region, cfg.AccountID)
+		otlpAddr := fmt.Sprintf(":%d", cfg.OTLP.Port)
+		otlpServer = &http.Server{
+			Addr:              otlpAddr,
+			Handler:           otlpHandler,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      60 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		go func() {
+			slog.Info("cloudmock OTLP/HTTP server starting", "addr", otlpAddr)
+			if err := otlpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("OTLP server exited", "error", err)
+			}
+		}()
+	}
+
 	// Dashboard — serves SPA + admin API on a single origin (no CORS needed)
 	var dashServer *http.Server
 	if cfg.Dashboard.Enabled {
@@ -1178,6 +1212,9 @@ func main() {
 	fmt.Printf("  Gateway:    http://localhost:%d\n", cfg.Gateway.Port)
 	fmt.Printf("  Devtools:   http://localhost:%d  <-- open in browser\n", cfg.Dashboard.Port)
 	fmt.Printf("  Admin API:  http://localhost:%d\n", cfg.Admin.Port)
+	if cfg.OTLP.Enabled {
+		fmt.Printf("  OTLP/HTTP:  http://localhost:%d  <-- set OTEL_EXPORTER_OTLP_ENDPOINT\n", cfg.OTLP.Port)
+	}
 	fmt.Printf("  Services:   %d active (%s profile)\n", len(registry.List()), cfg.Profile)
 	fmt.Println()
 	fmt.Printf("Ready. Point your AWS SDK at http://localhost:%d\n\n", cfg.Gateway.Port)
@@ -1203,6 +1240,11 @@ func main() {
 	if dashServer != nil {
 		if err := dashServer.Shutdown(shutdownCtx); err != nil {
 			slog.Error("dashboard shutdown error", "error", err)
+		}
+	}
+	if otlpServer != nil {
+		if err := otlpServer.Shutdown(shutdownCtx); err != nil {
+			slog.Error("OTLP server shutdown error", "error", err)
 		}
 	}
 

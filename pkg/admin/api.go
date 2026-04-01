@@ -19,6 +19,8 @@ import (
 	"github.com/neureaux/cloudmock/pkg/audit"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/cost"
+	errs "github.com/neureaux/cloudmock/pkg/errors"
+	"github.com/neureaux/cloudmock/pkg/logstore"
 	"github.com/neureaux/cloudmock/pkg/rum"
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	"github.com/neureaux/cloudmock/pkg/gateway"
@@ -125,6 +127,8 @@ type API struct {
 	rumEngine        *rum.Engine
 	monitorService   *monitor.Service
 	trafficEngine    *traffic.Engine
+	errorStore       errs.ErrorStore
+	logStore         logstore.LogStore
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -220,6 +224,18 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
 	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
 	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+
+	// Structured error tracking endpoints
+	a.mux.HandleFunc("/api/errors", a.handleErrors)
+	a.mux.HandleFunc("/api/errors/ingest", a.handleErrorIngest)
+	a.mux.HandleFunc("/api/errors/", a.handleErrorByID)
+
+	// Log management endpoints
+	a.mux.HandleFunc("/api/logs", a.handleLogs)
+	a.mux.HandleFunc("/api/logs/stream", a.handleLogStream)
+	a.mux.HandleFunc("/api/logs/ingest", a.handleLogIngest)
+	a.mux.HandleFunc("/api/logs/services", a.handleLogServices)
+	a.mux.HandleFunc("/api/logs/levels", a.handleLogLevels)
 
 	a.seedDefaultDashboard()
 
@@ -318,6 +334,18 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/rum/pages", a.handleRUMPages)
 	a.mux.HandleFunc("/api/rum/errors", a.handleRUMErrors)
 	a.mux.HandleFunc("/api/rum/sessions", a.handleRUMSessions)
+
+	// Structured error tracking endpoints
+	a.mux.HandleFunc("/api/errors", a.handleErrors)
+	a.mux.HandleFunc("/api/errors/ingest", a.handleErrorIngest)
+	a.mux.HandleFunc("/api/errors/", a.handleErrorByID)
+
+	// Log management endpoints
+	a.mux.HandleFunc("/api/logs", a.handleLogs)
+	a.mux.HandleFunc("/api/logs/stream", a.handleLogStream)
+	a.mux.HandleFunc("/api/logs/ingest", a.handleLogIngest)
+	a.mux.HandleFunc("/api/logs/services", a.handleLogServices)
+	a.mux.HandleFunc("/api/logs/levels", a.handleLogLevels)
 
 	a.seedDefaultDashboard()
 

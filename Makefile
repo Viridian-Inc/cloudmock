@@ -1,4 +1,4 @@
-.PHONY: build build-gateway build-cli build-tools build-plugins build-plugin-example build-dashboard test test-all lint clean proto docker docker-push docker-up docker-down release help
+.PHONY: build build-gateway build-cli build-cmk build-tools build-plugins build-plugin-example build-dashboard test test-all lint clean proto docker docker-push docker-up docker-down release help
 
 VERSION ?= 1.0.0
 
@@ -20,7 +20,7 @@ help:
 	@echo "  docker-down     - Stop Docker containers"
 	@echo "  release         - Build cross-platform release binaries"
 
-build: build-gateway build-cli build-tools build-plugins
+build: build-gateway build-cli build-cmk build-tools build-plugins
 
 build-gateway:
 	@echo "Building gateway..."
@@ -31,6 +31,11 @@ build-cli:
 	@echo "Building CLI..."
 	@mkdir -p bin
 	@go build -o bin/cloudmock ./cmd/cloudmock
+
+build-cmk:
+	@echo "Building cmk..."
+	@mkdir -p bin
+	@go build -ldflags="-s -w" -o bin/cmk ./cmd/cmk
 
 build-tools:
 	@echo "Building tool wrappers..."

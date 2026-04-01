@@ -67,6 +67,9 @@ import (
 	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
 	uptimepkg "github.com/neureaux/cloudmock/pkg/uptime"
 	uptimememory "github.com/neureaux/cloudmock/pkg/uptime/memory"
+	"github.com/neureaux/cloudmock/pkg/marketplace"
+	"github.com/neureaux/cloudmock/pkg/security"
+	"github.com/neureaux/cloudmock/pkg/synthetics"
 	"github.com/neureaux/cloudmock/pkg/worker"
 	"github.com/neureaux/cloudmock/pkg/iac"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
@@ -1072,6 +1075,30 @@ func main() {
 	cicdStore := cicdmemory.NewStore()
 	adminAPI.SetCICDStore(cicdStore)
 	slog.Info("CI/CD store initialized")
+
+	// Synthetic browser/HTTP tests — scheduled endpoint checks with assertions.
+	{
+		synthStore := synthetics.NewStore(500)
+		synthWorkerPool := worker.NewPool(rootCtx, nil)
+		synthEngine := synthetics.NewEngine(synthStore, synthWorkerPool)
+		synthEngine.StartAll()
+		adminAPI.SetSyntheticsEngine(synthEngine)
+		slog.Info("synthetics engine initialized")
+	}
+
+	// Security posture scanner — checks mock resources for misconfigurations.
+	{
+		secScanner := security.NewScanner(registry)
+		adminAPI.SetSecurityScanner(secScanner)
+		slog.Info("security scanner initialized")
+	}
+
+	// Plugin marketplace — search and (placeholder) install community plugins.
+	{
+		mpRegistry := marketplace.NewRegistry()
+		adminAPI.SetMarketplace(mpRegistry)
+		slog.Info("marketplace initialized", "listings", len(mpRegistry.List()))
+	}
 
 	// Plugin manager — enables hybrid in-process / external plugin routing.
 	pluginMgr := plugin.NewManager(slog.Default())

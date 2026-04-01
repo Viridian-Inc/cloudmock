@@ -42,6 +42,9 @@ import (
 	saasstripe "github.com/neureaux/cloudmock/pkg/saas/stripe"
 	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/neureaux/cloudmock/pkg/marketplace"
+	"github.com/neureaux/cloudmock/pkg/security"
+	"github.com/neureaux/cloudmock/pkg/synthetics"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	"github.com/neureaux/cloudmock/pkg/traffic"
 	"github.com/neureaux/cloudmock/pkg/uptime"
@@ -140,8 +143,11 @@ type API struct {
 	replayStore      replay.Store
 	anomalyDetector  *anomaly.Detector
 	scm              *scmState
-	annotationStore  *annotations.Store
-	cicdStore        *cicdmemory.Store
+	annotationStore    *annotations.Store
+	cicdStore          *cicdmemory.Store
+	syntheticsEngine   *synthetics.Engine
+	securityScanner    *security.Scanner
+	marketplace        *marketplace.Registry
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -268,6 +274,9 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/notify/channels", a.handleNotifyChannels)
 	a.mux.HandleFunc("/api/notify/test", a.handleNotifyTest)
 	a.mux.HandleFunc("/api/notify/history", a.handleNotifyHistory)
+
+	// Natural language query endpoint
+	a.mux.HandleFunc("/api/ask", a.handleAsk)
 
 	a.seedDefaultDashboard()
 
@@ -397,6 +406,9 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/notify/channels", a.handleNotifyChannels)
 	a.mux.HandleFunc("/api/notify/test", a.handleNotifyTest)
 	a.mux.HandleFunc("/api/notify/history", a.handleNotifyHistory)
+
+	// Natural language query endpoint
+	a.mux.HandleFunc("/api/ask", a.handleAsk)
 
 	a.seedDefaultDashboard()
 

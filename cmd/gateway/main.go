@@ -52,8 +52,12 @@ import (
 	whpg "github.com/neureaux/cloudmock/pkg/webhook/postgres"
 	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
 	regpg "github.com/neureaux/cloudmock/pkg/regression/postgres"
+	rumpkg "github.com/neureaux/cloudmock/pkg/rum"
+	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
 	"github.com/neureaux/cloudmock/pkg/iac"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
+	trafficpkg "github.com/neureaux/cloudmock/pkg/traffic"
+	trafficmemory "github.com/neureaux/cloudmock/pkg/traffic/memory"
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	argoplugin "github.com/neureaux/cloudmock/plugins/argocd"
@@ -745,6 +749,17 @@ func main() {
 	tc := tracecompare.New(dp.Traces)
 	adminAPI.SetTraceComparer(tc)
 
+	// RUM (Real User Monitoring) engine
+	if cfg.RUM.Enabled {
+		rumStore := rummemory.NewStore(cfg.RUM.MaxEvents)
+		rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
+			SampleRate: cfg.RUM.SampleRate,
+			MaxEvents:  cfg.RUM.MaxEvents,
+		})
+		adminAPI.SetRUMEngine(rumEngine)
+		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
+	}
+
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
 	// (they are registered lazily). In that case, skip optional admin wiring.
@@ -841,6 +856,12 @@ func main() {
 		adminAPI.SetWebhookDispatcher(whDispatcher)
 		incService.SetWebhookDispatcher(whDispatcher)
 	}
+
+	// Traffic simulator / replay engine
+	trafficStore := trafficmemory.NewStore()
+	trafficEng := trafficpkg.New(trafficStore, requestLog, cfg.Gateway.Port)
+	adminAPI.SetTrafficEngine(trafficEng)
+	slog.Info("traffic replay engine initialized")
 
 	// Plugin manager — enables hybrid in-process / external plugin routing.
 	pluginMgr := plugin.NewManager(slog.Default())

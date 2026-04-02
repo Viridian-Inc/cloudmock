@@ -78,13 +78,41 @@ type Tag struct {
 	PropagateAtLaunch bool
 }
 
+// ScheduledAction represents a scheduled scaling action.
+type ScheduledAction struct {
+	ScheduledActionName  string
+	ScheduledActionARN   string
+	AutoScalingGroupName string
+	DesiredCapacity      int
+	MinSize              int
+	MaxSize              int
+	Recurrence           string
+	StartTime            string
+	EndTime              string
+	TimeZone             string
+}
+
+// LifecycleHook represents a lifecycle hook on an ASG.
+type LifecycleHook struct {
+	LifecycleHookName        string
+	AutoScalingGroupName     string
+	LifecycleTransition      string // autoscaling:EC2_INSTANCE_LAUNCHING or TERMINATING
+	NotificationTargetARN    string
+	RoleARN                  string
+	NotificationMetadata     string
+	HeartbeatTimeout         int
+	DefaultResult            string
+}
+
 // Store manages all Auto Scaling resources.
 type Store struct {
 	mu                   sync.RWMutex
-	launchConfigs        map[string]*LaunchConfiguration   // keyed by name
-	autoScalingGroups    map[string]*AutoScalingGroup       // keyed by name
-	scalingPolicies      map[string]*ScalingPolicy          // keyed by ARN
-	policyByName         map[string]map[string]string       // asgName -> policyName -> ARN
+	launchConfigs        map[string]*LaunchConfiguration    // keyed by name
+	autoScalingGroups    map[string]*AutoScalingGroup        // keyed by name
+	scalingPolicies      map[string]*ScalingPolicy           // keyed by ARN
+	policyByName         map[string]map[string]string        // asgName -> policyName -> ARN
+	scheduledActions     map[string]*ScheduledAction         // key: asgName|actionName
+	lifecycleHooks       map[string]*LifecycleHook           // key: asgName|hookName
 	accountID            string
 	region               string
 	instanceSeq          int
@@ -97,6 +125,8 @@ func NewStore(accountID, region string) *Store {
 		autoScalingGroups: make(map[string]*AutoScalingGroup),
 		scalingPolicies:   make(map[string]*ScalingPolicy),
 		policyByName:      make(map[string]map[string]string),
+		scheduledActions:  make(map[string]*ScheduledAction),
+		lifecycleHooks:    make(map[string]*LifecycleHook),
 		accountID:         accountID,
 		region:            region,
 	}
@@ -695,6 +725,229 @@ func (s *Store) DeleteTags(tags []Tag) {
 			delete(asg.Tags, t.Key)
 		}
 	}
+}
+
+// ---- Scheduled Actions ----
+
+func scheduledActionKey(asgName, actionName string) string {
+	return asgName + "|" + actionName
+}
+
+func (s *Store) scheduledActionARN(asgName, actionName string) string {
+	return fmt.Sprintf("arn:aws:autoscaling:%s:%s:scheduledUpdateGroupAction:*:autoScalingGroupName/%s:scheduledActionName/%s",
+		s.region, s.accountID, asgName, actionName)
+}
+
+// PutScheduledAction creates or updates a scheduled action.
+func (s *Store) PutScheduledAction(asgName, actionName, recurrence, startTime, endTime, timeZone string, desiredCapacity, minSize, maxSize int) (*ScheduledAction, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.autoScalingGroups[asgName]; !ok {
+		return nil, false
+	}
+	key := scheduledActionKey(asgName, actionName)
+	if existing, ok := s.scheduledActions[key]; ok {
+		if recurrence != "" {
+			existing.Recurrence = recurrence
+		}
+		existing.StartTime = startTime
+		existing.EndTime = endTime
+		existing.TimeZone = timeZone
+		if desiredCapacity >= 0 {
+			existing.DesiredCapacity = desiredCapacity
+		}
+		if minSize >= 0 {
+			existing.MinSize = minSize
+		}
+		if maxSize >= 0 {
+			existing.MaxSize = maxSize
+		}
+		return existing, true
+	}
+	sa := &ScheduledAction{
+		ScheduledActionName:  actionName,
+		ScheduledActionARN:   s.scheduledActionARN(asgName, actionName),
+		AutoScalingGroupName: asgName,
+		Recurrence:           recurrence,
+		StartTime:            startTime,
+		EndTime:              endTime,
+		TimeZone:             timeZone,
+		DesiredCapacity:      desiredCapacity,
+		MinSize:              minSize,
+		MaxSize:              maxSize,
+	}
+	s.scheduledActions[key] = sa
+	return sa, true
+}
+
+// DescribeScheduledActions returns scheduled actions for an ASG.
+func (s *Store) DescribeScheduledActions(asgName string, actionNames []string) []*ScheduledAction {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	nameSet := make(map[string]bool, len(actionNames))
+	for _, n := range actionNames {
+		nameSet[n] = true
+	}
+	result := make([]*ScheduledAction, 0)
+	for _, sa := range s.scheduledActions {
+		if asgName != "" && sa.AutoScalingGroupName != asgName {
+			continue
+		}
+		if len(nameSet) > 0 && !nameSet[sa.ScheduledActionName] {
+			continue
+		}
+		result = append(result, sa)
+	}
+	return result
+}
+
+// DeleteScheduledAction removes a scheduled action.
+func (s *Store) DeleteScheduledAction(asgName, actionName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := scheduledActionKey(asgName, actionName)
+	if _, ok := s.scheduledActions[key]; !ok {
+		return false
+	}
+	delete(s.scheduledActions, key)
+	return true
+}
+
+// ---- Lifecycle Hooks ----
+
+func lifecycleHookKey(asgName, hookName string) string {
+	return asgName + "|" + hookName
+}
+
+// PutLifecycleHook creates or updates a lifecycle hook.
+func (s *Store) PutLifecycleHook(asgName, hookName, transition, targetARN, roleARN, metadata, defaultResult string, heartbeatTimeout int) (*LifecycleHook, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.autoScalingGroups[asgName]; !ok {
+		return nil, false
+	}
+	key := lifecycleHookKey(asgName, hookName)
+	if existing, ok := s.lifecycleHooks[key]; ok {
+		if transition != "" {
+			existing.LifecycleTransition = transition
+		}
+		if targetARN != "" {
+			existing.NotificationTargetARN = targetARN
+		}
+		if roleARN != "" {
+			existing.RoleARN = roleARN
+		}
+		if metadata != "" {
+			existing.NotificationMetadata = metadata
+		}
+		if defaultResult != "" {
+			existing.DefaultResult = defaultResult
+		}
+		if heartbeatTimeout > 0 {
+			existing.HeartbeatTimeout = heartbeatTimeout
+		}
+		return existing, true
+	}
+	hook := &LifecycleHook{
+		LifecycleHookName:     hookName,
+		AutoScalingGroupName:  asgName,
+		LifecycleTransition:   transition,
+		NotificationTargetARN: targetARN,
+		RoleARN:               roleARN,
+		NotificationMetadata:  metadata,
+		DefaultResult:         defaultResult,
+		HeartbeatTimeout:      heartbeatTimeout,
+	}
+	if hook.DefaultResult == "" {
+		hook.DefaultResult = "ABANDON"
+	}
+	if hook.HeartbeatTimeout == 0 {
+		hook.HeartbeatTimeout = 3600
+	}
+	s.lifecycleHooks[key] = hook
+	return hook, true
+}
+
+// DescribeLifecycleHooks returns lifecycle hooks for an ASG.
+func (s *Store) DescribeLifecycleHooks(asgName string, hookNames []string) []*LifecycleHook {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	nameSet := make(map[string]bool, len(hookNames))
+	for _, n := range hookNames {
+		nameSet[n] = true
+	}
+	result := make([]*LifecycleHook, 0)
+	for _, hook := range s.lifecycleHooks {
+		if asgName != "" && hook.AutoScalingGroupName != asgName {
+			continue
+		}
+		if len(nameSet) > 0 && !nameSet[hook.LifecycleHookName] {
+			continue
+		}
+		result = append(result, hook)
+	}
+	return result
+}
+
+// DeleteLifecycleHook removes a lifecycle hook.
+func (s *Store) DeleteLifecycleHook(asgName, hookName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key := lifecycleHookKey(asgName, hookName)
+	if _, ok := s.lifecycleHooks[key]; !ok {
+		return false
+	}
+	delete(s.lifecycleHooks, key)
+	return true
+}
+
+// ExecutePolicy simulates executing a scaling policy by adjusting desired capacity.
+func (s *Store) ExecutePolicy(asgName, policyName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	asg, ok := s.autoScalingGroups[asgName]
+	if !ok {
+		return false
+	}
+	// Find the policy and apply its adjustment.
+	pols, ok := s.policyByName[asgName]
+	if !ok {
+		return false
+	}
+	policyARN, ok := pols[policyName]
+	if !ok {
+		return false
+	}
+	pol := s.scalingPolicies[policyARN]
+	if pol == nil {
+		return false
+	}
+	newDesired := asg.DesiredCapacity + pol.ScalingAdjustment
+	if newDesired < asg.MinSize {
+		newDesired = asg.MinSize
+	}
+	if newDesired > asg.MaxSize {
+		newDesired = asg.MaxSize
+	}
+	asg.DesiredCapacity = newDesired
+	s.reconcileInstances(asg)
+	return true
+}
+
+// EnableMetricsCollection enables metrics collection for an ASG.
+func (s *Store) EnableMetricsCollection(asgName, granularity string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.autoScalingGroups[asgName]
+	return ok
+}
+
+// DisableMetricsCollection disables metrics collection for an ASG.
+func (s *Store) DisableMetricsCollection(asgName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	_, ok := s.autoScalingGroups[asgName]
+	return ok
 }
 
 // ---- utility ----

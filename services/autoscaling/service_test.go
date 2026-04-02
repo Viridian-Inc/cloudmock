@@ -600,3 +600,159 @@ func TestAS_InvalidAction(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	assert.Contains(t, body(t, w), "InvalidAction")
 }
+
+// ---- Scheduled Actions ----
+
+func createTestASG(t *testing.T, h http.Handler, name string) {
+	t.Helper()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, asReq(t, map[string]string{
+		"Action":                  "CreateLaunchConfiguration",
+		"LaunchConfigurationName": "lc-for-" + name,
+		"ImageId":                 "ami-test",
+		"InstanceType":            "t3.micro",
+	}))
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, asReq(t, map[string]string{
+		"Action":                  "CreateAutoScalingGroup",
+		"AutoScalingGroupName":    name,
+		"LaunchConfigurationName": "lc-for-" + name,
+		"MinSize":                 "1",
+		"MaxSize":                 "5",
+		"DesiredCapacity":         "2",
+		"AvailabilityZones.member.1": "us-east-1a",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code, body(t, w2))
+}
+
+func TestAS_ScheduledActions(t *testing.T) {
+	h := newASGGateway(t)
+	createTestASG(t, h, "sched-asg")
+
+	// PutScheduledUpdateGroupAction
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, asReq(t, map[string]string{
+		"Action":               "PutScheduledUpdateGroupAction",
+		"AutoScalingGroupName": "sched-asg",
+		"ScheduledActionName":  "scale-up",
+		"DesiredCapacity":      "3",
+		"Recurrence":           "0 12 * * *",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, body(t, w))
+
+	// DescribeScheduledActions
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, asReq(t, map[string]string{
+		"Action":               "DescribeScheduledActions",
+		"AutoScalingGroupName": "sched-asg",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+	assert.Contains(t, body(t, w2), "scale-up")
+
+	// DeleteScheduledAction
+	w3 := httptest.NewRecorder()
+	h.ServeHTTP(w3, asReq(t, map[string]string{
+		"Action":               "DeleteScheduledAction",
+		"AutoScalingGroupName": "sched-asg",
+		"ScheduledActionName":  "scale-up",
+	}))
+	require.Equal(t, http.StatusOK, w3.Code)
+}
+
+// ---- Lifecycle Hooks ----
+
+func TestAS_LifecycleHooks(t *testing.T) {
+	h := newASGGateway(t)
+	createTestASG(t, h, "hook-asg")
+
+	// PutLifecycleHook
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, asReq(t, map[string]string{
+		"Action":                  "PutLifecycleHook",
+		"AutoScalingGroupName":    "hook-asg",
+		"LifecycleHookName":       "my-hook",
+		"LifecycleTransition":     "autoscaling:EC2_INSTANCE_LAUNCHING",
+		"DefaultResult":           "CONTINUE",
+		"HeartbeatTimeout":        "300",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, body(t, w))
+
+	// DescribeLifecycleHooks
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, asReq(t, map[string]string{
+		"Action":               "DescribeLifecycleHooks",
+		"AutoScalingGroupName": "hook-asg",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+	assert.Contains(t, body(t, w2), "my-hook")
+
+	// CompleteLifecycleAction
+	w3 := httptest.NewRecorder()
+	h.ServeHTTP(w3, asReq(t, map[string]string{
+		"Action":               "CompleteLifecycleAction",
+		"AutoScalingGroupName": "hook-asg",
+		"LifecycleHookName":    "my-hook",
+		"LifecycleActionResult": "CONTINUE",
+	}))
+	require.Equal(t, http.StatusOK, w3.Code)
+
+	// DeleteLifecycleHook
+	w4 := httptest.NewRecorder()
+	h.ServeHTTP(w4, asReq(t, map[string]string{
+		"Action":               "DeleteLifecycleHook",
+		"AutoScalingGroupName": "hook-asg",
+		"LifecycleHookName":    "my-hook",
+	}))
+	require.Equal(t, http.StatusOK, w4.Code)
+}
+
+// ---- ExecutePolicy ----
+
+func TestAS_ExecutePolicy(t *testing.T) {
+	h := newASGGateway(t)
+	createTestASG(t, h, "exec-asg")
+
+	// Create policy
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, asReq(t, map[string]string{
+		"Action":               "PutScalingPolicy",
+		"AutoScalingGroupName": "exec-asg",
+		"PolicyName":           "scale-out",
+		"AdjustmentType":       "ChangeInCapacity",
+		"ScalingAdjustment":    "1",
+	}))
+	require.Equal(t, http.StatusOK, w.Code)
+
+	// Execute policy
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, asReq(t, map[string]string{
+		"Action":               "ExecutePolicy",
+		"AutoScalingGroupName": "exec-asg",
+		"PolicyName":           "scale-out",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+}
+
+// ---- Metrics Collection ----
+
+func TestAS_MetricsCollection(t *testing.T) {
+	h := newASGGateway(t)
+	createTestASG(t, h, "metrics-asg")
+
+	// Enable
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, asReq(t, map[string]string{
+		"Action":               "EnableMetricsCollection",
+		"AutoScalingGroupName": "metrics-asg",
+		"Granularity":          "1Minute",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, body(t, w))
+
+	// Disable
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, asReq(t, map[string]string{
+		"Action":               "DisableMetricsCollection",
+		"AutoScalingGroupName": "metrics-asg",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+}

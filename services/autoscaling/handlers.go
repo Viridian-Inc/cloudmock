@@ -732,6 +732,278 @@ func handleDeleteTags(ctx *service.RequestContext, store *Store) (*service.Respo
 	})
 }
 
+// ---- ExecutePolicy ----
+
+type xmlExecutePolicyResponse struct {
+	XMLName xml.Name            `xml:"ExecutePolicyResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleExecutePolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	policyName := form.Get("PolicyName")
+	if policyName == "" {
+		return xmlErr(service.ErrValidation("PolicyName is required."))
+	}
+	store.ExecutePolicy(asgName, policyName)
+	return xmlOK(&xmlExecutePolicyResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- PutScheduledUpdateGroupAction ----
+
+type xmlPutScheduledActionResponse struct {
+	XMLName xml.Name            `xml:"PutScheduledUpdateGroupActionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handlePutScheduledUpdateGroupAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	actionName := form.Get("ScheduledActionName")
+	if asgName == "" || actionName == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName and ScheduledActionName are required."))
+	}
+	desiredCapacity := -1
+	if v := form.Get("DesiredCapacity"); v != "" {
+		fmt.Sscanf(v, "%d", &desiredCapacity)
+	}
+	minSize := -1
+	if v := form.Get("MinSize"); v != "" {
+		fmt.Sscanf(v, "%d", &minSize)
+	}
+	maxSize := -1
+	if v := form.Get("MaxSize"); v != "" {
+		fmt.Sscanf(v, "%d", &maxSize)
+	}
+	_, ok := store.PutScheduledAction(asgName, actionName, form.Get("Recurrence"), form.Get("StartTime"), form.Get("EndTime"), form.Get("TimeZone"), desiredCapacity, minSize, maxSize)
+	if !ok {
+		return xmlErr(service.ErrNotFound("AutoScalingGroup", asgName))
+	}
+	return xmlOK(&xmlPutScheduledActionResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- DescribeScheduledActions ----
+
+type xmlScheduledAction struct {
+	ScheduledActionName  string `xml:"ScheduledActionName"`
+	ScheduledActionARN   string `xml:"ScheduledActionARN"`
+	AutoScalingGroupName string `xml:"AutoScalingGroupName"`
+	DesiredCapacity      int    `xml:"DesiredCapacity,omitempty"`
+	MinSize              int    `xml:"MinSize,omitempty"`
+	MaxSize              int    `xml:"MaxSize,omitempty"`
+	Recurrence           string `xml:"Recurrence,omitempty"`
+	StartTime            string `xml:"StartTime,omitempty"`
+	EndTime              string `xml:"EndTime,omitempty"`
+	TimeZone             string `xml:"TimeZone,omitempty"`
+}
+
+type xmlDescribeScheduledActionsResult struct {
+	ScheduledUpdateGroupActions struct {
+		Members []xmlScheduledAction `xml:"member"`
+	} `xml:"ScheduledUpdateGroupActions"`
+}
+
+type xmlDescribeScheduledActionsResponse struct {
+	XMLName xml.Name                           `xml:"DescribeScheduledActionsResponse"`
+	Xmlns   string                             `xml:"xmlns,attr"`
+	Result  xmlDescribeScheduledActionsResult  `xml:"DescribeScheduledActionsResult"`
+	Meta    xmlResponseMetadata                `xml:"ResponseMetadata"`
+}
+
+func handleDescribeScheduledActions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	actionNames := parseMemberList(form, "ScheduledActionNames")
+	actions := store.DescribeScheduledActions(asgName, actionNames)
+	members := make([]xmlScheduledAction, 0, len(actions))
+	for _, sa := range actions {
+		members = append(members, xmlScheduledAction{
+			ScheduledActionName:  sa.ScheduledActionName,
+			ScheduledActionARN:   sa.ScheduledActionARN,
+			AutoScalingGroupName: sa.AutoScalingGroupName,
+			DesiredCapacity:      sa.DesiredCapacity,
+			MinSize:              sa.MinSize,
+			MaxSize:              sa.MaxSize,
+			Recurrence:           sa.Recurrence,
+			StartTime:            sa.StartTime,
+			EndTime:              sa.EndTime,
+			TimeZone:             sa.TimeZone,
+		})
+	}
+	resp := &xmlDescribeScheduledActionsResponse{
+		Xmlns: asXmlns,
+		Meta:  xmlResponseMetadata{RequestID: newUUIDHandler()},
+	}
+	resp.Result.ScheduledUpdateGroupActions.Members = members
+	return xmlOK(resp)
+}
+
+// ---- DeleteScheduledAction ----
+
+type xmlDeleteScheduledActionResponse struct {
+	XMLName xml.Name            `xml:"DeleteScheduledActionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDeleteScheduledAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	actionName := form.Get("ScheduledActionName")
+	if asgName == "" || actionName == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName and ScheduledActionName are required."))
+	}
+	store.DeleteScheduledAction(asgName, actionName)
+	return xmlOK(&xmlDeleteScheduledActionResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- EnableMetricsCollection ----
+
+type xmlEnableMetricsCollectionResponse struct {
+	XMLName xml.Name            `xml:"EnableMetricsCollectionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleEnableMetricsCollection(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	granularity := form.Get("Granularity")
+	if asgName == "" || granularity == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName and Granularity are required."))
+	}
+	store.EnableMetricsCollection(asgName, granularity)
+	return xmlOK(&xmlEnableMetricsCollectionResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- DisableMetricsCollection ----
+
+type xmlDisableMetricsCollectionResponse struct {
+	XMLName xml.Name            `xml:"DisableMetricsCollectionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDisableMetricsCollection(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	if asgName == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName is required."))
+	}
+	store.DisableMetricsCollection(asgName)
+	return xmlOK(&xmlDisableMetricsCollectionResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- PutLifecycleHook ----
+
+type xmlPutLifecycleHookResponse struct {
+	XMLName xml.Name            `xml:"PutLifecycleHookResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handlePutLifecycleHook(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	hookName := form.Get("LifecycleHookName")
+	if asgName == "" || hookName == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName and LifecycleHookName are required."))
+	}
+	heartbeat := 3600
+	if v := form.Get("HeartbeatTimeout"); v != "" {
+		fmt.Sscanf(v, "%d", &heartbeat)
+	}
+	_, ok := store.PutLifecycleHook(asgName, hookName,
+		form.Get("LifecycleTransition"), form.Get("NotificationTargetARN"), form.Get("RoleARN"),
+		form.Get("NotificationMetadata"), form.Get("DefaultResult"), heartbeat)
+	if !ok {
+		return xmlErr(service.ErrNotFound("AutoScalingGroup", asgName))
+	}
+	return xmlOK(&xmlPutLifecycleHookResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- DescribeLifecycleHooks ----
+
+type xmlLifecycleHook struct {
+	LifecycleHookName     string `xml:"LifecycleHookName"`
+	AutoScalingGroupName  string `xml:"AutoScalingGroupName"`
+	LifecycleTransition   string `xml:"LifecycleTransition,omitempty"`
+	NotificationTargetARN string `xml:"NotificationTargetARN,omitempty"`
+	RoleARN               string `xml:"RoleARN,omitempty"`
+	DefaultResult         string `xml:"DefaultResult"`
+	HeartbeatTimeout      int    `xml:"HeartbeatTimeout"`
+}
+
+type xmlDescribeLifecycleHooksResult struct {
+	LifecycleHooks struct {
+		Members []xmlLifecycleHook `xml:"member"`
+	} `xml:"LifecycleHooks"`
+}
+
+type xmlDescribeLifecycleHooksResponse struct {
+	XMLName xml.Name                          `xml:"DescribeLifecycleHooksResponse"`
+	Xmlns   string                            `xml:"xmlns,attr"`
+	Result  xmlDescribeLifecycleHooksResult   `xml:"DescribeLifecycleHooksResult"`
+	Meta    xmlResponseMetadata               `xml:"ResponseMetadata"`
+}
+
+func handleDescribeLifecycleHooks(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	hookNames := parseMemberList(form, "LifecycleHookNames")
+	hooks := store.DescribeLifecycleHooks(asgName, hookNames)
+	members := make([]xmlLifecycleHook, 0, len(hooks))
+	for _, h := range hooks {
+		members = append(members, xmlLifecycleHook{
+			LifecycleHookName:     h.LifecycleHookName,
+			AutoScalingGroupName:  h.AutoScalingGroupName,
+			LifecycleTransition:   h.LifecycleTransition,
+			NotificationTargetARN: h.NotificationTargetARN,
+			RoleARN:               h.RoleARN,
+			DefaultResult:         h.DefaultResult,
+			HeartbeatTimeout:      h.HeartbeatTimeout,
+		})
+	}
+	resp := &xmlDescribeLifecycleHooksResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}}
+	resp.Result.LifecycleHooks.Members = members
+	return xmlOK(resp)
+}
+
+// ---- DeleteLifecycleHook ----
+
+type xmlDeleteLifecycleHookResponse struct {
+	XMLName xml.Name            `xml:"DeleteLifecycleHookResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDeleteLifecycleHook(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	asgName := form.Get("AutoScalingGroupName")
+	hookName := form.Get("LifecycleHookName")
+	if asgName == "" || hookName == "" {
+		return xmlErr(service.ErrValidation("AutoScalingGroupName and LifecycleHookName are required."))
+	}
+	store.DeleteLifecycleHook(asgName, hookName)
+	return xmlOK(&xmlDeleteLifecycleHookResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
+// ---- CompleteLifecycleAction ----
+
+type xmlCompleteLifecycleActionResponse struct {
+	XMLName xml.Name            `xml:"CompleteLifecycleActionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleCompleteLifecycleAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	// In mock, completing a lifecycle action is a no-op.
+	return xmlOK(&xmlCompleteLifecycleActionResponse{Xmlns: asXmlns, Meta: xmlResponseMetadata{RequestID: newUUIDHandler()}})
+}
+
 // ---- helper functions ----
 
 func parseForm(ctx *service.RequestContext) url.Values {

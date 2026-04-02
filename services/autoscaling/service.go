@@ -63,6 +63,19 @@ func (s *AutoScalingService) Actions() []service.Action {
 		{Name: "PutScalingPolicy", Method: http.MethodPost, IAMAction: "autoscaling:PutScalingPolicy"},
 		{Name: "DescribePolicies", Method: http.MethodPost, IAMAction: "autoscaling:DescribePolicies"},
 		{Name: "DeletePolicy", Method: http.MethodPost, IAMAction: "autoscaling:DeletePolicy"},
+		{Name: "ExecutePolicy", Method: http.MethodPost, IAMAction: "autoscaling:ExecutePolicy"},
+		// Scheduled Actions
+		{Name: "PutScheduledUpdateGroupAction", Method: http.MethodPost, IAMAction: "autoscaling:PutScheduledUpdateGroupAction"},
+		{Name: "DescribeScheduledActions", Method: http.MethodPost, IAMAction: "autoscaling:DescribeScheduledActions"},
+		{Name: "DeleteScheduledAction", Method: http.MethodPost, IAMAction: "autoscaling:DeleteScheduledAction"},
+		// Metrics Collection
+		{Name: "EnableMetricsCollection", Method: http.MethodPost, IAMAction: "autoscaling:EnableMetricsCollection"},
+		{Name: "DisableMetricsCollection", Method: http.MethodPost, IAMAction: "autoscaling:DisableMetricsCollection"},
+		// Lifecycle Hooks
+		{Name: "PutLifecycleHook", Method: http.MethodPost, IAMAction: "autoscaling:PutLifecycleHook"},
+		{Name: "DescribeLifecycleHooks", Method: http.MethodPost, IAMAction: "autoscaling:DescribeLifecycleHooks"},
+		{Name: "DeleteLifecycleHook", Method: http.MethodPost, IAMAction: "autoscaling:DeleteLifecycleHook"},
+		{Name: "CompleteLifecycleAction", Method: http.MethodPost, IAMAction: "autoscaling:CompleteLifecycleAction"},
 		// Capacity & Instances
 		{Name: "SetDesiredCapacity", Method: http.MethodPost, IAMAction: "autoscaling:SetDesiredCapacity"},
 		{Name: "DescribeAutoScalingInstances", Method: http.MethodPost, IAMAction: "autoscaling:DescribeAutoScalingInstances"},
@@ -111,6 +124,29 @@ func (s *AutoScalingService) HandleRequest(ctx *service.RequestContext) (*servic
 		return handleDescribePolicies(ctx, s.store)
 	case "DeletePolicy":
 		return handleDeletePolicy(ctx, s.store)
+	case "ExecutePolicy":
+		return handleExecutePolicy(ctx, s.store)
+	// Scheduled Actions
+	case "PutScheduledUpdateGroupAction":
+		return handlePutScheduledUpdateGroupAction(ctx, s.store)
+	case "DescribeScheduledActions":
+		return handleDescribeScheduledActions(ctx, s.store)
+	case "DeleteScheduledAction":
+		return handleDeleteScheduledAction(ctx, s.store)
+	// Metrics Collection
+	case "EnableMetricsCollection":
+		return handleEnableMetricsCollection(ctx, s.store)
+	case "DisableMetricsCollection":
+		return handleDisableMetricsCollection(ctx, s.store)
+	// Lifecycle Hooks
+	case "PutLifecycleHook":
+		return handlePutLifecycleHook(ctx, s.store)
+	case "DescribeLifecycleHooks":
+		return handleDescribeLifecycleHooks(ctx, s.store)
+	case "DeleteLifecycleHook":
+		return handleDeleteLifecycleHook(ctx, s.store)
+	case "CompleteLifecycleAction":
+		return handleCompleteLifecycleAction(ctx, s.store)
 	// Capacity & Instances
 	case "SetDesiredCapacity":
 		return handleSetDesiredCapacity(ctx, s.store, s.locator, s.bus)

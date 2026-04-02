@@ -55,10 +55,17 @@ func (s *IoTService) Actions() []service.Action {
 		{Name: "AttachPolicy", Method: http.MethodPut, IAMAction: "iot:AttachPolicy"},
 		{Name: "DetachPolicy", Method: http.MethodPost, IAMAction: "iot:DetachPolicy"},
 		{Name: "ListAttachedPolicies", Method: http.MethodPost, IAMAction: "iot:ListAttachedPolicies"},
+		{Name: "ListTargetsForPolicy", Method: http.MethodPost, IAMAction: "iot:ListTargetsForPolicy"},
+		// Jobs
+		{Name: "CreateJob", Method: http.MethodPut, IAMAction: "iot:CreateJob"},
+		{Name: "DescribeJob", Method: http.MethodGet, IAMAction: "iot:DescribeJob"},
+		{Name: "ListJobs", Method: http.MethodGet, IAMAction: "iot:ListJobs"},
+		{Name: "CancelJob", Method: http.MethodPut, IAMAction: "iot:CancelJob"},
 		// Certificates
 		{Name: "CreateKeysAndCertificate", Method: http.MethodPost, IAMAction: "iot:CreateKeysAndCertificate"},
 		{Name: "DescribeCertificate", Method: http.MethodGet, IAMAction: "iot:DescribeCertificate"},
 		{Name: "ListCertificates", Method: http.MethodGet, IAMAction: "iot:ListCertificates"},
+		{Name: "UpdateCertificate", Method: http.MethodPut, IAMAction: "iot:UpdateCertificate"},
 		{Name: "DeleteCertificate", Method: http.MethodDelete, IAMAction: "iot:DeleteCertificate"},
 		{Name: "AttachThingPrincipal", Method: http.MethodPut, IAMAction: "iot:AttachThingPrincipal"},
 		{Name: "DetachThingPrincipal", Method: http.MethodDelete, IAMAction: "iot:DetachThingPrincipal"},
@@ -138,12 +145,24 @@ func (s *IoTService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDetachPolicy(params, s.store)
 	case "ListAttachedPolicies":
 		return handleListAttachedPolicies(params, s.store)
+	case "ListTargetsForPolicy":
+		return handleListTargetsForPolicy(params, s.store)
+	case "CreateJob":
+		return handleCreateJob(params, s.store)
+	case "DescribeJob":
+		return handleDescribeJob(params, s.store)
+	case "ListJobs":
+		return handleListJobs(s.store)
+	case "CancelJob":
+		return handleCancelJob(params, s.store)
 	case "CreateKeysAndCertificate":
 		return handleCreateKeysAndCertificate(params, s.store)
 	case "DescribeCertificate":
 		return handleDescribeCertificate(params, s.store)
 	case "ListCertificates":
 		return handleListCertificates(s.store)
+	case "UpdateCertificate":
+		return handleUpdateCertificate(params, s.store)
 	case "DeleteCertificate":
 		return handleDeleteCertificate(params, s.store)
 	case "AttachThingPrincipal":

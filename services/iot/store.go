@@ -67,6 +67,27 @@ type TopicRule struct {
 	CreationDate time.Time
 }
 
+type Job struct {
+	JobID          string
+	JobArn         string
+	Description    string
+	TargetArns     []string
+	Status         string // IN_PROGRESS, COMPLETED, CANCELLED, DELETION_IN_PROGRESS
+	DocumentSource string
+	Document       string
+	CreationDate   time.Time
+	LastUpdated    time.Time
+	CompletedAt    *time.Time
+}
+
+type JobExecution struct {
+	JobID          string
+	ThingArn       string
+	Status         string
+	QueuedAt       time.Time
+	StartedAt      *time.Time
+}
+
 type Store struct {
 	mu           sync.RWMutex
 	things       map[string]*Thing       // keyed by name
@@ -75,6 +96,7 @@ type Store struct {
 	policies     map[string]*Policy      // keyed by name
 	certificates map[string]*Certificate // keyed by certificateId
 	topicRules   map[string]*TopicRule   // keyed by rule name
+	jobs         map[string]*Job         // keyed by job ID
 	tagsByArn    map[string]map[string]string
 	accountID    string
 	region       string
@@ -88,6 +110,7 @@ func NewStore(accountID, region string) *Store {
 		policies:     make(map[string]*Policy),
 		certificates: make(map[string]*Certificate),
 		topicRules:   make(map[string]*TopicRule),
+		jobs:         make(map[string]*Job),
 		tagsByArn:    make(map[string]map[string]string),
 		accountID:    accountID,
 		region:       region,
@@ -124,6 +147,9 @@ func (s *Store) certificateARN(id string) string {
 }
 func (s *Store) topicRuleARN(name string) string {
 	return fmt.Sprintf("arn:aws:iot:%s:%s:rule/%s", s.region, s.accountID, name)
+}
+func (s *Store) jobARN(id string) string {
+	return fmt.Sprintf("arn:aws:iot:%s:%s:job/%s", s.region, s.accountID, id)
 }
 
 // Things.
@@ -664,4 +690,102 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, *service.AWS
 		cp[k] = v
 	}
 	return cp, nil
+}
+
+// UpdateCertificate changes the status of a certificate.
+func (s *Store) UpdateCertificate(certId, newStatus string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cert, ok := s.certificates[certId]
+	if !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Certificate %s not found", certId), http.StatusNotFound)
+	}
+	validStatuses := map[string]bool{"ACTIVE": true, "INACTIVE": true, "REVOKED": true}
+	if !validStatuses[newStatus] {
+		return service.NewAWSError("InvalidRequestException",
+			fmt.Sprintf("Invalid certificate status: %s", newStatus), http.StatusBadRequest)
+	}
+	cert.Status = newStatus
+	return nil
+}
+
+// ListTargetsForPolicy returns the targets (ARNs) a policy is attached to.
+func (s *Store) ListTargetsForPolicy(policyName string) ([]string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	p, ok := s.policies[policyName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Policy %s not found", policyName), http.StatusNotFound)
+	}
+	cp := make([]string, len(p.Targets))
+	copy(cp, p.Targets)
+	return cp, nil
+}
+
+// Jobs.
+
+func (s *Store) CreateJob(jobID, description, documentSource, document string, targetArns []string) (*Job, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, exists := s.jobs[jobID]; exists {
+		return nil, service.NewAWSError("ResourceAlreadyExistsException",
+			fmt.Sprintf("Job %s already exists", jobID), http.StatusConflict)
+	}
+	now := time.Now().UTC()
+	j := &Job{
+		JobID:          jobID,
+		JobArn:         s.jobARN(jobID),
+		Description:    description,
+		TargetArns:     targetArns,
+		Status:         "IN_PROGRESS",
+		DocumentSource: documentSource,
+		Document:       document,
+		CreationDate:   now,
+		LastUpdated:    now,
+	}
+	s.jobs[jobID] = j
+	s.tagsByArn[j.JobArn] = make(map[string]string)
+	return j, nil
+}
+
+func (s *Store) DescribeJob(jobID string) (*Job, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	j, ok := s.jobs[jobID]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Job %s not found", jobID), http.StatusNotFound)
+	}
+	return j, nil
+}
+
+func (s *Store) ListJobs() []*Job {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*Job, 0, len(s.jobs))
+	for _, j := range s.jobs {
+		out = append(out, j)
+	}
+	return out
+}
+
+func (s *Store) CancelJob(jobID string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	j, ok := s.jobs[jobID]
+	if !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Job %s not found", jobID), http.StatusNotFound)
+	}
+	if j.Status == "COMPLETED" || j.Status == "CANCELLED" {
+		return service.NewAWSError("InvalidRequestException",
+			fmt.Sprintf("Job %s is already in a terminal state: %s", jobID, j.Status), http.StatusBadRequest)
+	}
+	now := time.Now().UTC()
+	j.Status = "CANCELLED"
+	j.LastUpdated = now
+	j.CompletedAt = &now
+	return nil
 }

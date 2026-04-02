@@ -598,6 +598,95 @@ func handleTagResource(p map[string]any, store *Store) (*service.Response, error
 	return emptyOK()
 }
 
+func handleUpdateCertificate(p map[string]any, store *Store) (*service.Response, error) {
+	certId := getStr(p, "certificateId")
+	newStatus := getStr(p, "newStatus")
+	if certId == "" || newStatus == "" {
+		return jsonErr(service.ErrValidation("certificateId and newStatus are required."))
+	}
+	if awsErr := store.UpdateCertificate(certId, newStatus); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
+func handleListTargetsForPolicy(p map[string]any, store *Store) (*service.Response, error) {
+	policyName := getStr(p, "policyName")
+	if policyName == "" {
+		return jsonErr(service.ErrValidation("policyName is required."))
+	}
+	targets, awsErr := store.ListTargetsForPolicy(policyName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"targets": targets})
+}
+
+func handleCreateJob(p map[string]any, store *Store) (*service.Response, error) {
+	jobID := getStr(p, "jobId")
+	if jobID == "" {
+		return jsonErr(service.ErrValidation("jobId is required."))
+	}
+	targets := getStringSlice(p, "targets")
+	j, awsErr := store.CreateJob(jobID, getStr(p, "description"), getStr(p, "documentSource"), getStr(p, "document"), targets)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"jobId": j.JobID, "jobArn": j.JobArn, "description": j.Description})
+}
+
+func handleDescribeJob(p map[string]any, store *Store) (*service.Response, error) {
+	jobID := getStr(p, "jobId")
+	if jobID == "" {
+		return jsonErr(service.ErrValidation("jobId is required."))
+	}
+	j, awsErr := store.DescribeJob(jobID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	jobDoc := map[string]any{
+		"jobId":          j.JobID,
+		"jobArn":         j.JobArn,
+		"targets":        j.TargetArns,
+		"description":    j.Description,
+		"status":         j.Status,
+		"documentSource": j.DocumentSource,
+		"createdAt":      j.CreationDate.Format(time.RFC3339),
+		"lastUpdatedAt":  j.LastUpdated.Format(time.RFC3339),
+	}
+	if j.CompletedAt != nil {
+		jobDoc["completedAt"] = j.CompletedAt.Format(time.RFC3339)
+	}
+	return jsonOK(map[string]any{"job": jobDoc})
+}
+
+func handleListJobs(store *Store) (*service.Response, error) {
+	jobs := store.ListJobs()
+	entries := make([]map[string]any, 0, len(jobs))
+	for _, j := range jobs {
+		entries = append(entries, map[string]any{
+			"jobId":         j.JobID,
+			"jobArn":        j.JobArn,
+			"status":        j.Status,
+			"createdAt":     j.CreationDate.Format(time.RFC3339),
+			"lastUpdatedAt": j.LastUpdated.Format(time.RFC3339),
+		})
+	}
+	return jsonOK(map[string]any{"jobs": entries})
+}
+
+func handleCancelJob(p map[string]any, store *Store) (*service.Response, error) {
+	jobID := getStr(p, "jobId")
+	if jobID == "" {
+		return jsonErr(service.ErrValidation("jobId is required."))
+	}
+	if awsErr := store.CancelJob(jobID); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	j, _ := store.DescribeJob(jobID)
+	return jsonOK(map[string]any{"jobId": j.JobID, "jobArn": j.JobArn, "description": j.Description})
+}
+
 func handleUntagResource(p map[string]any, store *Store) (*service.Response, error) {
 	arn := getStr(p, "resourceArn")
 	if arn == "" {

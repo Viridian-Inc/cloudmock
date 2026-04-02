@@ -460,3 +460,176 @@ func TestIoT_ListThingPrincipals_NotFound(t *testing.T) {
 	_, err := s.HandleRequest(jsonCtx("ListThingPrincipals", map[string]any{"thingName": "nonexistent"}))
 	require.Error(t, err)
 }
+
+// ---- Test: UpdateCertificate ----
+
+func TestIoT_UpdateCertificate(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateKeysAndCertificate", map[string]any{"setAsActive": true}))
+	require.NoError(t, err)
+	certId := respBody(t, createResp)["certificateId"].(string)
+
+	// Deactivate
+	_, err = s.HandleRequest(jsonCtx("UpdateCertificate", map[string]any{
+		"certificateId": certId, "newStatus": "INACTIVE",
+	}))
+	require.NoError(t, err)
+
+	descResp, err := s.HandleRequest(jsonCtx("DescribeCertificate", map[string]any{"certificateId": certId}))
+	require.NoError(t, err)
+	certDesc := respBody(t, descResp)["certificateDescription"].(map[string]any)
+	assert.Equal(t, "INACTIVE", certDesc["status"])
+}
+
+func TestIoT_UpdateCertificateRevoke(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateKeysAndCertificate", map[string]any{"setAsActive": false}))
+	require.NoError(t, err)
+	certId := respBody(t, createResp)["certificateId"].(string)
+
+	_, err = s.HandleRequest(jsonCtx("UpdateCertificate", map[string]any{
+		"certificateId": certId, "newStatus": "REVOKED",
+	}))
+	require.NoError(t, err)
+
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeCertificate", map[string]any{"certificateId": certId}))
+	certDesc := respBody(t, descResp)["certificateDescription"].(map[string]any)
+	assert.Equal(t, "REVOKED", certDesc["status"])
+}
+
+func TestIoT_UpdateCertificateInvalidStatus(t *testing.T) {
+	s := newService()
+	createResp, _ := s.HandleRequest(jsonCtx("CreateKeysAndCertificate", map[string]any{"setAsActive": true}))
+	certId := respBody(t, createResp)["certificateId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateCertificate", map[string]any{
+		"certificateId": certId, "newStatus": "BADSTATUS",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "InvalidRequestException", awsErr.Code)
+}
+
+// ---- Test: ListTargetsForPolicy ----
+
+func TestIoT_ListTargetsForPolicy(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreatePolicy", map[string]any{
+		"policyName": "target-pol", "policyDocument": `{"Version":"2012-10-17","Statement":[]}`,
+	}))
+	require.NoError(t, err)
+
+	certResp, _ := s.HandleRequest(jsonCtx("CreateKeysAndCertificate", map[string]any{"setAsActive": true}))
+	certArn := respBody(t, certResp)["certificateArn"].(string)
+
+	_, err = s.HandleRequest(jsonCtx("AttachPolicy", map[string]any{"policyName": "target-pol", "target": certArn}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("ListTargetsForPolicy", map[string]any{"policyName": "target-pol"}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	targets := body["targets"].([]any)
+	assert.Len(t, targets, 1)
+	assert.Equal(t, certArn, targets[0])
+}
+
+func TestIoT_ListTargetsForPolicyNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("ListTargetsForPolicy", map[string]any{"policyName": "nope"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+// ---- Test: Jobs ----
+
+func TestIoT_CreateAndDescribeJob(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateThing", map[string]any{"thingName": "job-thing"}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+		"jobId":          "job-001",
+		"targets":        []any{"arn:aws:iot:us-east-1:123456789012:thing/job-thing"},
+		"description":    "Test job",
+		"documentSource": "s3://bucket/doc.json",
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.Equal(t, "job-001", body["jobId"])
+
+	descResp, err := s.HandleRequest(jsonCtx("DescribeJob", map[string]any{"jobId": "job-001"}))
+	require.NoError(t, err)
+	job := respBody(t, descResp)["job"].(map[string]any)
+	assert.Equal(t, "IN_PROGRESS", job["status"])
+	assert.Equal(t, "Test job", job["description"])
+}
+
+func TestIoT_ListJobs(t *testing.T) {
+	s := newService()
+	for _, id := range []string{"job-a", "job-b", "job-c"} {
+		_, err := s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+			"jobId": id, "targets": []any{"arn:aws:iot:us-east-1:123456789012:thing/x"},
+		}))
+		require.NoError(t, err)
+	}
+	resp, err := s.HandleRequest(jsonCtx("ListJobs", map[string]any{}))
+	require.NoError(t, err)
+	jobs := respBody(t, resp)["jobs"].([]any)
+	assert.Len(t, jobs, 3)
+}
+
+func TestIoT_CancelJob(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+		"jobId": "cancel-job", "targets": []any{"arn:aws:iot:us-east-1:123456789012:thing/x"},
+	}))
+	require.NoError(t, err)
+
+	_, err = s.HandleRequest(jsonCtx("CancelJob", map[string]any{"jobId": "cancel-job"}))
+	require.NoError(t, err)
+
+	descResp, err := s.HandleRequest(jsonCtx("DescribeJob", map[string]any{"jobId": "cancel-job"}))
+	require.NoError(t, err)
+	job := respBody(t, descResp)["job"].(map[string]any)
+	assert.Equal(t, "CANCELLED", job["status"])
+}
+
+func TestIoT_CancelJobAlreadyCancelled(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+		"jobId": "dbl-cancel", "targets": []any{"arn:aws:iot:us-east-1:123456789012:thing/x"},
+	}))
+	_, _ = s.HandleRequest(jsonCtx("CancelJob", map[string]any{"jobId": "dbl-cancel"}))
+	_, err := s.HandleRequest(jsonCtx("CancelJob", map[string]any{"jobId": "dbl-cancel"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "InvalidRequestException", awsErr.Code)
+}
+
+func TestIoT_DuplicateJob(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+		"jobId": "dup-job", "targets": []any{},
+	}))
+	require.NoError(t, err)
+	_, err = s.HandleRequest(jsonCtx("CreateJob", map[string]any{
+		"jobId": "dup-job", "targets": []any{},
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceAlreadyExistsException", awsErr.Code)
+}
+
+func TestIoT_JobNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DescribeJob", map[string]any{"jobId": "ghost-job"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}

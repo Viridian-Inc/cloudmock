@@ -54,6 +54,25 @@ func (s *CloudFrontService) Actions() []service.Action {
 		{Name: "CreateInvalidation", Method: http.MethodPost, IAMAction: "cloudfront:CreateInvalidation"},
 		{Name: "GetInvalidation", Method: http.MethodGet, IAMAction: "cloudfront:GetInvalidation"},
 		{Name: "ListInvalidations", Method: http.MethodGet, IAMAction: "cloudfront:ListInvalidations"},
+		// Cache Policies
+		{Name: "CreateCachePolicy", Method: http.MethodPost, IAMAction: "cloudfront:CreateCachePolicy"},
+		{Name: "GetCachePolicy", Method: http.MethodGet, IAMAction: "cloudfront:GetCachePolicy"},
+		{Name: "ListCachePolicies", Method: http.MethodGet, IAMAction: "cloudfront:ListCachePolicies"},
+		{Name: "UpdateCachePolicy", Method: http.MethodPut, IAMAction: "cloudfront:UpdateCachePolicy"},
+		{Name: "DeleteCachePolicy", Method: http.MethodDelete, IAMAction: "cloudfront:DeleteCachePolicy"},
+		// Origin Request Policies
+		{Name: "CreateOriginRequestPolicy", Method: http.MethodPost, IAMAction: "cloudfront:CreateOriginRequestPolicy"},
+		{Name: "GetOriginRequestPolicy", Method: http.MethodGet, IAMAction: "cloudfront:GetOriginRequestPolicy"},
+		{Name: "ListOriginRequestPolicies", Method: http.MethodGet, IAMAction: "cloudfront:ListOriginRequestPolicies"},
+		{Name: "DeleteOriginRequestPolicy", Method: http.MethodDelete, IAMAction: "cloudfront:DeleteOriginRequestPolicy"},
+		// Functions
+		{Name: "CreateFunction", Method: http.MethodPost, IAMAction: "cloudfront:CreateFunction"},
+		{Name: "GetFunction", Method: http.MethodGet, IAMAction: "cloudfront:GetFunction"},
+		{Name: "ListFunctions", Method: http.MethodGet, IAMAction: "cloudfront:ListFunctions"},
+		{Name: "UpdateFunction", Method: http.MethodPut, IAMAction: "cloudfront:UpdateFunction"},
+		{Name: "DeleteFunction", Method: http.MethodDelete, IAMAction: "cloudfront:DeleteFunction"},
+		{Name: "PublishFunction", Method: http.MethodPost, IAMAction: "cloudfront:PublishFunction"},
+		{Name: "TestFunction", Method: http.MethodPost, IAMAction: "cloudfront:TestFunction"},
 		// Tags
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "cloudfront:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "cloudfront:UntagResource"},

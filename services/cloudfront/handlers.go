@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/pagination"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -18,15 +19,15 @@ import (
 // ---- XML request/response types ----
 
 type xmlDistributionConfig struct {
-	XMLName           xml.Name              `xml:"DistributionConfig"`
-	CallerReference   string                `xml:"CallerReference"`
-	Comment           string                `xml:"Comment"`
-	DefaultRootObject string                `xml:"DefaultRootObject"`
-	Enabled           bool                  `xml:"Enabled"`
-	PriceClass        string                `xml:"PriceClass"`
-	Origins           xmlOrigins            `xml:"Origins"`
-	DefaultCacheBehavior *xmlCacheBehavior  `xml:"DefaultCacheBehavior"`
-	CacheBehaviors    *xmlCacheBehaviorList `xml:"CacheBehaviors"`
+	XMLName              xml.Name              `xml:"DistributionConfig"`
+	CallerReference      string                `xml:"CallerReference"`
+	Comment              string                `xml:"Comment"`
+	DefaultRootObject    string                `xml:"DefaultRootObject"`
+	Enabled              bool                  `xml:"Enabled"`
+	PriceClass           string                `xml:"PriceClass"`
+	Origins              xmlOrigins            `xml:"Origins"`
+	DefaultCacheBehavior *xmlCacheBehavior     `xml:"DefaultCacheBehavior"`
+	CacheBehaviors       *xmlCacheBehaviorList `xml:"CacheBehaviors"`
 }
 
 type xmlOrigins struct {
@@ -35,10 +36,10 @@ type xmlOrigins struct {
 }
 
 type xmlOrigin struct {
-	Id         string              `xml:"Id"`
-	DomainName string              `xml:"DomainName"`
-	OriginPath string              `xml:"OriginPath"`
-	S3Config   *xmlS3OriginConfig  `xml:"S3OriginConfig"`
+	Id           string                 `xml:"Id"`
+	DomainName   string                 `xml:"DomainName"`
+	OriginPath   string                 `xml:"OriginPath"`
+	S3Config     *xmlS3OriginConfig     `xml:"S3OriginConfig"`
 	CustomConfig *xmlCustomOriginConfig `xml:"CustomOriginConfig"`
 }
 
@@ -53,19 +54,19 @@ type xmlCustomOriginConfig struct {
 }
 
 type xmlCacheBehavior struct {
-	PathPattern          string            `xml:"PathPattern,omitempty"`
-	TargetOriginId       string            `xml:"TargetOriginId"`
-	ViewerProtocolPolicy string            `xml:"ViewerProtocolPolicy"`
-	Compress             bool              `xml:"Compress"`
-	MinTTL               int64             `xml:"MinTTL"`
-	MaxTTL               int64             `xml:"MaxTTL"`
-	DefaultTTL           int64             `xml:"DefaultTTL"`
+	PathPattern          string              `xml:"PathPattern,omitempty"`
+	TargetOriginId       string              `xml:"TargetOriginId"`
+	ViewerProtocolPolicy string              `xml:"ViewerProtocolPolicy"`
+	Compress             bool                `xml:"Compress"`
+	MinTTL               int64               `xml:"MinTTL"`
+	MaxTTL               int64               `xml:"MaxTTL"`
+	DefaultTTL           int64               `xml:"DefaultTTL"`
 	ForwardedValues      *xmlForwardedValues `xml:"ForwardedValues"`
 }
 
 type xmlForwardedValues struct {
-	QueryString bool     `xml:"QueryString"`
-	Cookies     xmlCookies `xml:"Cookies"`
+	QueryString bool        `xml:"QueryString"`
+	Cookies     xmlCookies  `xml:"Cookies"`
 	Headers     *xmlHeaders `xml:"Headers"`
 }
 
@@ -101,20 +102,21 @@ type xmlCreateDistributionResponse struct {
 }
 
 type xmlDistributionList struct {
-	XMLName  xml.Name          `xml:"DistributionList"`
-	Quantity int               `xml:"Quantity"`
+	XMLName   xml.Name         `xml:"DistributionList"`
+	Quantity  int              `xml:"Quantity"`
+	NextMarker string          `xml:"NextMarker,omitempty"`
 	Items    []xmlDistSummary  `xml:"Items>DistributionSummary"`
 }
 
 type xmlDistSummary struct {
-	Id                 string `xml:"Id"`
-	ARN                string `xml:"ARN"`
-	Status             string `xml:"Status"`
-	DomainName         string `xml:"DomainName"`
-	Comment            string `xml:"Comment"`
-	Enabled            bool   `xml:"Enabled"`
-	PriceClass         string `xml:"PriceClass"`
-	LastModifiedTime   string `xml:"LastModifiedTime"`
+	Id               string `xml:"Id"`
+	ARN              string `xml:"ARN"`
+	Status           string `xml:"Status"`
+	DomainName       string `xml:"DomainName"`
+	Comment          string `xml:"Comment"`
+	Enabled          bool   `xml:"Enabled"`
+	PriceClass       string `xml:"PriceClass"`
+	LastModifiedTime string `xml:"LastModifiedTime"`
 }
 
 type xmlGetDistributionResponse struct {
@@ -123,10 +125,10 @@ type xmlGetDistributionResponse struct {
 }
 
 type xmlInvalidation struct {
-	XMLName         xml.Name         `xml:"Invalidation"`
-	Id              string           `xml:"Id"`
-	Status          string           `xml:"Status"`
-	CreateTime      string           `xml:"CreateTime"`
+	XMLName           xml.Name             `xml:"Invalidation"`
+	Id                string               `xml:"Id"`
+	Status            string               `xml:"Status"`
+	CreateTime        string               `xml:"CreateTime"`
 	InvalidationBatch xmlInvalidationBatch `xml:"InvalidationBatch"`
 }
 
@@ -141,9 +143,10 @@ type xmlPaths struct {
 }
 
 type xmlInvalidationList struct {
-	XMLName  xml.Name               `xml:"InvalidationList"`
-	Quantity int                    `xml:"Quantity"`
-	Items    []xmlInvalidationSummary `xml:"Items>InvalidationSummary"`
+	XMLName   xml.Name                 `xml:"InvalidationList"`
+	Quantity  int                      `xml:"Quantity"`
+	NextMarker string                  `xml:"NextMarker,omitempty"`
+	Items    []xmlInvalidationSummary  `xml:"Items>InvalidationSummary"`
 }
 
 type xmlInvalidationSummary struct {
@@ -170,6 +173,92 @@ type xmlTagKeysPayload struct {
 type xmlTagListResponse struct {
 	XMLName xml.Name `xml:"Tags"`
 	Items   []xmlTag `xml:"Items>Tag"`
+}
+
+// ---- Cache Policy XML types ----
+
+type xmlCachePolicyConfig struct {
+	XMLName        xml.Name `xml:"CachePolicyConfig"`
+	Name           string   `xml:"Name"`
+	Comment        string   `xml:"Comment"`
+	DefaultTTL     int64    `xml:"DefaultTTL"`
+	MaxTTL         int64    `xml:"MaxTTL"`
+	MinTTL         int64    `xml:"MinTTL"`
+}
+
+type xmlCachePolicy struct {
+	XMLName          xml.Name             `xml:"CachePolicy"`
+	Id               string               `xml:"Id"`
+	LastModifiedTime string               `xml:"LastModifiedTime"`
+	CachePolicyConfig xmlCachePolicyConfig `xml:"CachePolicyConfig"`
+}
+
+type xmlCachePolicyList struct {
+	XMLName  xml.Name         `xml:"CachePolicyList"`
+	Quantity int              `xml:"Quantity"`
+	Items    []xmlCachePolicy `xml:"Items>CachePolicySummary>CachePolicy"`
+}
+
+// ---- Origin Request Policy XML types ----
+
+type xmlOriginRequestPolicyConfig struct {
+	XMLName    xml.Name `xml:"OriginRequestPolicyConfig"`
+	Name       string   `xml:"Name"`
+	Comment    string   `xml:"Comment"`
+}
+
+type xmlOriginRequestPolicy struct {
+	XMLName                    xml.Name                     `xml:"OriginRequestPolicy"`
+	Id                         string                       `xml:"Id"`
+	LastModifiedTime           string                       `xml:"LastModifiedTime"`
+	OriginRequestPolicyConfig  xmlOriginRequestPolicyConfig `xml:"OriginRequestPolicyConfig"`
+}
+
+type xmlOriginRequestPolicyList struct {
+	XMLName  xml.Name                 `xml:"OriginRequestPolicyList"`
+	Quantity int                      `xml:"Quantity"`
+	Items    []xmlOriginRequestPolicy `xml:"Items>OriginRequestPolicySummary>OriginRequestPolicy"`
+}
+
+// ---- Function XML types ----
+
+type xmlFunctionConfig struct {
+	XMLName xml.Name `xml:"FunctionConfig"`
+	Comment string   `xml:"Comment"`
+	Runtime string   `xml:"Runtime"`
+}
+
+type xmlFunctionSummary struct {
+	XMLName        xml.Name          `xml:"FunctionSummary"`
+	Name           string            `xml:"Name"`
+	Status         string            `xml:"Status"`
+	Stage          string            `xml:"Stage"`
+	FunctionConfig xmlFunctionConfig `xml:"FunctionConfig"`
+}
+
+type xmlFunctionList struct {
+	XMLName  xml.Name             `xml:"FunctionList"`
+	Quantity int                  `xml:"Quantity"`
+	Items    []xmlFunctionSummary `xml:"Items>FunctionSummary"`
+}
+
+type xmlTestFunctionRequest struct {
+	XMLName     xml.Name `xml:"TestFunctionRequest"`
+	IfMatch     string   `xml:"IfMatch"`
+	Stage       string   `xml:"Stage"`
+	EventObject []byte   `xml:"EventObject"`
+}
+
+type xmlTestFunctionResult struct {
+	XMLName       xml.Name          `xml:"TestFunctionResult"`
+	TestResult    xmlTestResult     `xml:"TestResult"`
+}
+
+type xmlTestResult struct {
+	FunctionExecutionLogs []string `xml:"FunctionExecutionLogs>Log"`
+	FunctionErrorMessage  string   `xml:"FunctionErrorMessage"`
+	FunctionOutput        string   `xml:"FunctionOutput"`
+	ComputeUtilization    string   `xml:"ComputeUtilization"`
 }
 
 // ---- Conversion helpers ----
@@ -325,6 +414,9 @@ func HandleRESTRequest(ctx *service.RequestContext, store *Store, locator Servic
 	// Distribution routes
 	const distPrefix = "/2020-05-31/distribution"
 	const tagPrefix = "/2020-05-31/tagging"
+	const cachePolicyPrefix = "/2020-05-31/cache-policy"
+	const originRequestPolicyPrefix = "/2020-05-31/origin-request-policy"
+	const functionPrefix = "/2020-05-31/function"
 
 	// Tagging
 	if strings.HasPrefix(path, tagPrefix) {
@@ -338,6 +430,86 @@ func HandleRESTRequest(ctx *service.RequestContext, store *Store, locator Servic
 			return handleTagResource(ctx, store, resource)
 		case http.MethodGet:
 			return handleListTagsForResource(ctx, store, resource)
+		}
+		return cfNotImplemented()
+	}
+
+	// Cache Policy routes
+	if strings.HasPrefix(path, cachePolicyPrefix) {
+		rest := path[len(cachePolicyPrefix):]
+		if rest == "" {
+			switch method {
+			case http.MethodPost:
+				return handleCreateCachePolicy(ctx, store)
+			case http.MethodGet:
+				return handleListCachePolicies(ctx, store)
+			}
+		} else {
+			id := strings.TrimPrefix(rest, "/")
+			switch method {
+			case http.MethodGet:
+				return handleGetCachePolicy(ctx, store, id)
+			case http.MethodPut:
+				return handleUpdateCachePolicy(ctx, store, id)
+			case http.MethodDelete:
+				return handleDeleteCachePolicy(ctx, store, id)
+			}
+		}
+		return cfNotImplemented()
+	}
+
+	// Origin Request Policy routes
+	if strings.HasPrefix(path, originRequestPolicyPrefix) {
+		rest := path[len(originRequestPolicyPrefix):]
+		if rest == "" {
+			switch method {
+			case http.MethodPost:
+				return handleCreateOriginRequestPolicy(ctx, store)
+			case http.MethodGet:
+				return handleListOriginRequestPolicies(ctx, store)
+			}
+		} else {
+			id := strings.TrimPrefix(rest, "/")
+			switch method {
+			case http.MethodGet:
+				return handleGetOriginRequestPolicy(ctx, store, id)
+			case http.MethodDelete:
+				return handleDeleteOriginRequestPolicy(ctx, store, id)
+			}
+		}
+		return cfNotImplemented()
+	}
+
+	// Function routes
+	if strings.HasPrefix(path, functionPrefix) {
+		rest := path[len(functionPrefix):]
+		if rest == "" {
+			switch method {
+			case http.MethodPost:
+				return handleCreateFunction(ctx, store)
+			case http.MethodGet:
+				return handleListFunctions(ctx, store)
+			}
+		} else {
+			parts := strings.SplitN(strings.TrimPrefix(rest, "/"), "/", 2)
+			name := parts[0]
+			var subPath string
+			if len(parts) == 2 {
+				subPath = parts[1]
+			}
+
+			switch {
+			case subPath == "" && method == http.MethodGet:
+				return handleGetFunction(ctx, store, name)
+			case subPath == "" && method == http.MethodPut:
+				return handleUpdateFunction(ctx, store, name)
+			case subPath == "" && method == http.MethodDelete:
+				return handleDeleteFunction(ctx, store, name)
+			case subPath == "publish" && method == http.MethodPost:
+				return handlePublishFunction(ctx, store, name)
+			case subPath == "test" && method == http.MethodPost:
+				return handleTestFunction(ctx, store, name)
+			}
 		}
 		return cfNotImplemented()
 	}
@@ -413,6 +585,19 @@ func handleCreateDistribution(ctx *service.RequestContext, store *Store, locator
 		return xmlErr(service.ErrValidation("Invalid XML request body."))
 	}
 
+	// CallerReference deduplication
+	if cfg.CallerReference != "" {
+		if existing, ok := store.FindByCallerReference(cfg.CallerReference); ok {
+			resp := distToXML(existing)
+			return &service.Response{
+				StatusCode: http.StatusCreated,
+				Body:       resp,
+				Format:     service.FormatXML,
+				Headers:    map[string]string{"ETag": existing.ETag, "Location": fmt.Sprintf("/2020-05-31/distribution/%s", existing.ID)},
+			}, nil
+		}
+	}
+
 	origins := originsFromXML(cfg.Origins.Items)
 
 	// Validate origins via locator if available.
@@ -457,6 +642,8 @@ func handleGetDistribution(ctx *service.RequestContext, store *Store, id string)
 
 func handleListDistributions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	dists := store.ListDistributions()
+	marker := ctx.RawRequest.URL.Query().Get("Marker")
+	maxItems := 0 // use default
 
 	summaries := make([]xmlDistSummary, 0, len(dists))
 	for _, d := range dists {
@@ -472,10 +659,19 @@ func handleListDistributions(ctx *service.RequestContext, store *Store) (*servic
 		})
 	}
 
-	return xmlOK(&xmlDistributionList{Quantity: len(summaries), Items: summaries})
+	page := pagination.Paginate(summaries, marker, maxItems, 100)
+
+	resp := &xmlDistributionList{
+		Quantity:   len(page.Items),
+		Items:      page.Items,
+		NextMarker: page.NextToken,
+	}
+	return xmlOK(resp)
 }
 
 func handleUpdateDistribution(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+
 	var cfg xmlDistributionConfig
 	if err := xml.Unmarshal(ctx.Body, &cfg); err != nil {
 		return xmlErr(service.ErrValidation("Invalid XML request body."))
@@ -486,9 +682,17 @@ func handleUpdateDistribution(ctx *service.RequestContext, store *Store, id stri
 	behaviors := cacheBehaviorsFromXML(cfg.CacheBehaviors)
 	enabled := &cfg.Enabled
 
-	dist, ok := store.UpdateDistribution(id, cfg.Comment, cfg.DefaultRootObject, cfg.PriceClass,
+	dist, found, err := store.UpdateDistribution(id, ifMatch, cfg.Comment, cfg.DefaultRootObject, cfg.PriceClass,
 		enabled, origins, defaultBehavior, behaviors)
-	if !ok {
+	if err != nil {
+		switch err.Error() {
+		case "InvalidIfMatchVersion":
+			return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+				"The If-Match version is missing or not current for the resource.", http.StatusPreconditionFailed))
+		}
+		return xmlErr(service.ErrValidation(err.Error()))
+	}
+	if !found {
 		return xmlErr(service.NewAWSError("NoSuchDistribution",
 			"The specified distribution does not exist.", http.StatusNotFound))
 	}
@@ -503,7 +707,21 @@ func handleUpdateDistribution(ctx *service.RequestContext, store *Store, id stri
 }
 
 func handleDeleteDistribution(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
-	if !store.DeleteDistribution(id) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+
+	found, err := store.DeleteDistribution(id, ifMatch)
+	if err != nil {
+		switch err.Error() {
+		case "InvalidIfMatchVersion":
+			return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+				"The If-Match version is missing or not current for the resource.", http.StatusPreconditionFailed))
+		case "DistributionNotDisabled":
+			return xmlErr(service.NewAWSError("DistributionNotDisabled",
+				"The distribution you are trying to delete has not been disabled.", http.StatusConflict))
+		}
+		return xmlErr(service.ErrValidation(err.Error()))
+	}
+	if !found {
 		return xmlErr(service.NewAWSError("NoSuchDistribution",
 			"The specified distribution does not exist.", http.StatusNotFound))
 	}
@@ -573,6 +791,7 @@ func handleListInvalidations(ctx *service.RequestContext, store *Store, distID s
 			"The specified distribution does not exist.", http.StatusNotFound))
 	}
 
+	marker := ctx.RawRequest.URL.Query().Get("Marker")
 	summaries := make([]xmlInvalidationSummary, 0, len(invs))
 	for _, inv := range invs {
 		summaries = append(summaries, xmlInvalidationSummary{
@@ -582,7 +801,385 @@ func handleListInvalidations(ctx *service.RequestContext, store *Store, distID s
 		})
 	}
 
-	return xmlOK(&xmlInvalidationList{Quantity: len(summaries), Items: summaries})
+	page := pagination.Paginate(summaries, marker, 0, 100)
+	return xmlOK(&xmlInvalidationList{Quantity: len(page.Items), Items: page.Items, NextMarker: page.NextToken})
+}
+
+// ---- Cache Policy handlers ----
+
+func handleCreateCachePolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var cfg xmlCachePolicyConfig
+	if err := xml.Unmarshal(ctx.Body, &cfg); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	cp, ok := store.CreateCachePolicy(cfg.Name, cfg.Comment, cfg.DefaultTTL, cfg.MaxTTL, cfg.MinTTL, nil)
+	if !ok {
+		return xmlErr(service.NewAWSError("CachePolicyAlreadyExists",
+			"A cache policy with this name already exists.", http.StatusConflict))
+	}
+
+	xcp := xmlCachePolicy{
+		Id:               cp.ID,
+		LastModifiedTime: cp.LastModified.Format("2006-01-02T15:04:05Z"),
+		CachePolicyConfig: xmlCachePolicyConfig{
+			Name: cp.Name, Comment: cp.Comment,
+			DefaultTTL: cp.DefaultTTL, MaxTTL: cp.MaxTTL, MinTTL: cp.MinTTL,
+		},
+	}
+	return &service.Response{
+		StatusCode: http.StatusCreated,
+		Body:       xcp,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": cp.ETag, "Location": fmt.Sprintf("/2020-05-31/cache-policy/%s", cp.ID)},
+	}, nil
+}
+
+func handleGetCachePolicy(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	cp, ok := store.GetCachePolicy(id)
+	if !ok {
+		return xmlErr(service.NewAWSError("NoSuchCachePolicy",
+			"The specified cache policy does not exist.", http.StatusNotFound))
+	}
+	xcp := xmlCachePolicy{
+		Id:               cp.ID,
+		LastModifiedTime: cp.LastModified.Format("2006-01-02T15:04:05Z"),
+		CachePolicyConfig: xmlCachePolicyConfig{
+			Name: cp.Name, Comment: cp.Comment,
+			DefaultTTL: cp.DefaultTTL, MaxTTL: cp.MaxTTL, MinTTL: cp.MinTTL,
+		},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xcp,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": cp.ETag},
+	}, nil
+}
+
+func handleListCachePolicies(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	cps := store.ListCachePolicies()
+	marker := ctx.RawRequest.URL.Query().Get("Marker")
+
+	items := make([]xmlCachePolicy, 0, len(cps))
+	for _, cp := range cps {
+		items = append(items, xmlCachePolicy{
+			Id:               cp.ID,
+			LastModifiedTime: cp.LastModified.Format("2006-01-02T15:04:05Z"),
+			CachePolicyConfig: xmlCachePolicyConfig{Name: cp.Name, Comment: cp.Comment},
+		})
+	}
+	page := pagination.Paginate(items, marker, 0, 100)
+	return xmlOK(&xmlCachePolicyList{Quantity: len(page.Items), Items: page.Items})
+}
+
+func handleUpdateCachePolicy(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+	var cfg xmlCachePolicyConfig
+	if err := xml.Unmarshal(ctx.Body, &cfg); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	cp, found, err := store.UpdateCachePolicy(id, ifMatch, cfg.Name, cfg.Comment, cfg.DefaultTTL, cfg.MaxTTL, cfg.MinTTL, nil)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchCachePolicy",
+			"The specified cache policy does not exist.", http.StatusNotFound))
+	}
+
+	xcp := xmlCachePolicy{
+		Id:               cp.ID,
+		LastModifiedTime: cp.LastModified.Format("2006-01-02T15:04:05Z"),
+		CachePolicyConfig: xmlCachePolicyConfig{Name: cp.Name, Comment: cp.Comment},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xcp,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": cp.ETag},
+	}, nil
+}
+
+func handleDeleteCachePolicy(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+	found, err := store.DeleteCachePolicy(id, ifMatch)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchCachePolicy",
+			"The specified cache policy does not exist.", http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatXML}, nil
+}
+
+// ---- Origin Request Policy handlers ----
+
+func handleCreateOriginRequestPolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var cfg xmlOriginRequestPolicyConfig
+	if err := xml.Unmarshal(ctx.Body, &cfg); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	orp, ok := store.CreateOriginRequestPolicy(cfg.Name, cfg.Comment, nil, nil, nil)
+	if !ok {
+		return xmlErr(service.NewAWSError("OriginRequestPolicyAlreadyExists",
+			"An origin request policy with this name already exists.", http.StatusConflict))
+	}
+
+	xorp := xmlOriginRequestPolicy{
+		Id:               orp.ID,
+		LastModifiedTime: orp.LastModified.Format("2006-01-02T15:04:05Z"),
+		OriginRequestPolicyConfig: xmlOriginRequestPolicyConfig{Name: orp.Name, Comment: orp.Comment},
+	}
+	return &service.Response{
+		StatusCode: http.StatusCreated,
+		Body:       xorp,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": orp.ETag, "Location": fmt.Sprintf("/2020-05-31/origin-request-policy/%s", orp.ID)},
+	}, nil
+}
+
+func handleGetOriginRequestPolicy(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	orp, ok := store.GetOriginRequestPolicy(id)
+	if !ok {
+		return xmlErr(service.NewAWSError("NoSuchOriginRequestPolicy",
+			"The specified origin request policy does not exist.", http.StatusNotFound))
+	}
+	xorp := xmlOriginRequestPolicy{
+		Id:               orp.ID,
+		LastModifiedTime: orp.LastModified.Format("2006-01-02T15:04:05Z"),
+		OriginRequestPolicyConfig: xmlOriginRequestPolicyConfig{Name: orp.Name, Comment: orp.Comment},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xorp,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": orp.ETag},
+	}, nil
+}
+
+func handleListOriginRequestPolicies(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	orps := store.ListOriginRequestPolicies()
+	marker := ctx.RawRequest.URL.Query().Get("Marker")
+
+	items := make([]xmlOriginRequestPolicy, 0, len(orps))
+	for _, orp := range orps {
+		items = append(items, xmlOriginRequestPolicy{
+			Id:               orp.ID,
+			LastModifiedTime: orp.LastModified.Format("2006-01-02T15:04:05Z"),
+			OriginRequestPolicyConfig: xmlOriginRequestPolicyConfig{Name: orp.Name, Comment: orp.Comment},
+		})
+	}
+	page := pagination.Paginate(items, marker, 0, 100)
+	return xmlOK(&xmlOriginRequestPolicyList{Quantity: len(page.Items), Items: page.Items})
+}
+
+func handleDeleteOriginRequestPolicy(ctx *service.RequestContext, store *Store, id string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+	found, err := store.DeleteOriginRequestPolicy(id, ifMatch)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchOriginRequestPolicy",
+			"The specified origin request policy does not exist.", http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatXML}, nil
+}
+
+// ---- Function handlers ----
+
+func handleCreateFunction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	// Function create is a JSON body with Name, FunctionConfig{Comment,Runtime}, FunctionCode (base64)
+	// But since it can also be XML, parse from body as XML first
+	type xmlCreateFunctionRequest struct {
+		XMLName        xml.Name          `xml:"CreateFunctionRequest"`
+		Name           string            `xml:"Name"`
+		FunctionConfig xmlFunctionConfig `xml:"FunctionConfig"`
+		FunctionCode   []byte            `xml:"FunctionCode"`
+	}
+	var req xmlCreateFunctionRequest
+	if err := xml.Unmarshal(ctx.Body, &req); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	fn, ok := store.CreateFunction(req.Name, req.FunctionConfig.Comment, req.FunctionConfig.Runtime, req.FunctionCode)
+	if !ok {
+		return xmlErr(service.NewAWSError("FunctionAlreadyExists",
+			"A function with this name already exists.", http.StatusConflict))
+	}
+
+	xfs := xmlFunctionSummary{
+		Name:   fn.Name,
+		Status: fn.Status,
+		Stage:  fn.Stage,
+		FunctionConfig: xmlFunctionConfig{Comment: fn.Comment, Runtime: fn.Runtime},
+	}
+	return &service.Response{
+		StatusCode: http.StatusCreated,
+		Body:       xfs,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": fn.ETag, "Location": fmt.Sprintf("/2020-05-31/function/%s", fn.Name)},
+	}, nil
+}
+
+func handleGetFunction(ctx *service.RequestContext, store *Store, name string) (*service.Response, error) {
+	stage := ctx.RawRequest.URL.Query().Get("Stage")
+	fn, ok := store.GetFunction(name, stage)
+	if !ok {
+		return xmlErr(service.NewAWSError("NoSuchFunctionExists",
+			"The specified function does not exist.", http.StatusNotFound))
+	}
+
+	xfs := xmlFunctionSummary{
+		Name:   fn.Name,
+		Status: fn.Status,
+		Stage:  fn.Stage,
+		FunctionConfig: xmlFunctionConfig{Comment: fn.Comment, Runtime: fn.Runtime},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xfs,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": fn.ETag},
+	}, nil
+}
+
+func handleListFunctions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	stage := ctx.RawRequest.URL.Query().Get("Stage")
+	fns := store.ListFunctions(stage)
+	marker := ctx.RawRequest.URL.Query().Get("Marker")
+
+	items := make([]xmlFunctionSummary, 0, len(fns))
+	for _, fn := range fns {
+		items = append(items, xmlFunctionSummary{
+			Name:   fn.Name,
+			Status: fn.Status,
+			Stage:  fn.Stage,
+			FunctionConfig: xmlFunctionConfig{Comment: fn.Comment, Runtime: fn.Runtime},
+		})
+	}
+	page := pagination.Paginate(items, marker, 0, 100)
+	return xmlOK(&xmlFunctionList{Quantity: len(page.Items), Items: page.Items})
+}
+
+func handleUpdateFunction(ctx *service.RequestContext, store *Store, name string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+
+	type xmlUpdateFunctionRequest struct {
+		XMLName        xml.Name          `xml:"UpdateFunctionRequest"`
+		FunctionConfig xmlFunctionConfig `xml:"FunctionConfig"`
+		FunctionCode   []byte            `xml:"FunctionCode"`
+	}
+	var req xmlUpdateFunctionRequest
+	if err := xml.Unmarshal(ctx.Body, &req); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	fn, found, err := store.UpdateFunction(name, ifMatch, req.FunctionConfig.Comment, req.FunctionConfig.Runtime, req.FunctionCode)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchFunctionExists",
+			"The specified function does not exist.", http.StatusNotFound))
+	}
+
+	xfs := xmlFunctionSummary{
+		Name:   fn.Name,
+		Status: fn.Status,
+		Stage:  fn.Stage,
+		FunctionConfig: xmlFunctionConfig{Comment: fn.Comment, Runtime: fn.Runtime},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xfs,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": fn.ETag},
+	}, nil
+}
+
+func handleDeleteFunction(ctx *service.RequestContext, store *Store, name string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+	found, err := store.DeleteFunction(name, ifMatch)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchFunctionExists",
+			"The specified function does not exist.", http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatXML}, nil
+}
+
+func handlePublishFunction(ctx *service.RequestContext, store *Store, name string) (*service.Response, error) {
+	ifMatch := ctx.RawRequest.Header.Get("If-Match")
+	fn, found, err := store.PublishFunction(name, ifMatch)
+	if err != nil {
+		return xmlErr(service.NewAWSError("InvalidIfMatchVersion",
+			"The If-Match version is missing or not current.", http.StatusPreconditionFailed))
+	}
+	if !found {
+		return xmlErr(service.NewAWSError("NoSuchFunctionExists",
+			"The specified function does not exist.", http.StatusNotFound))
+	}
+
+	xfs := xmlFunctionSummary{
+		Name:   fn.Name,
+		Status: fn.Status,
+		Stage:  fn.Stage,
+		FunctionConfig: xmlFunctionConfig{Comment: fn.Comment, Runtime: fn.Runtime},
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       xfs,
+		Format:     service.FormatXML,
+		Headers:    map[string]string{"ETag": fn.ETag},
+	}, nil
+}
+
+func handleTestFunction(ctx *service.RequestContext, store *Store, name string) (*service.Response, error) {
+	var req xmlTestFunctionRequest
+	if err := xml.Unmarshal(ctx.Body, &req); err != nil {
+		return xmlErr(service.ErrValidation("Invalid XML request body."))
+	}
+
+	stage := req.Stage
+	if stage == "" {
+		stage = "DEVELOPMENT"
+	}
+
+	result, ok := store.TestFunction(name, stage, req.EventObject)
+	if !ok {
+		return xmlErr(service.NewAWSError("NoSuchFunctionExists",
+			"The specified function does not exist.", http.StatusNotFound))
+	}
+
+	var logs []string
+	if logList, ok := result["TestResult"].(map[string]any)["FunctionExecutionLogs"].([]string); ok {
+		logs = logList
+	}
+	output := ""
+	if o, ok := result["TestResult"].(map[string]any)["FunctionOutput"].(string); ok {
+		output = o
+	}
+
+	xtr := xmlTestFunctionResult{
+		TestResult: xmlTestResult{
+			FunctionExecutionLogs: logs,
+			FunctionOutput:        output,
+			ComputeUtilization:    "10",
+		},
+	}
+	return xmlOK(&xtr)
 }
 
 // ---- Tag handlers ----

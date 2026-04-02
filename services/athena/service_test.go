@@ -468,6 +468,132 @@ func TestGetQueryResults_FailedQuery(t *testing.T) {
 	assert.Equal(t, "InvalidRequestException", awsErr.Code)
 }
 
+func TestBatchGetNamedQuery(t *testing.T) {
+	s := newService()
+	r1, _ := s.HandleRequest(jsonCtx("CreateNamedQuery", map[string]any{"Name": "bq1", "Database": "db", "QueryString": "SELECT 1"}))
+	r2, _ := s.HandleRequest(jsonCtx("CreateNamedQuery", map[string]any{"Name": "bq2", "Database": "db", "QueryString": "SELECT 2"}))
+	m1 := respJSON(t, r1)
+	m2 := respJSON(t, r2)
+	id1 := m1["NamedQueryId"].(string)
+	id2 := m2["NamedQueryId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("BatchGetNamedQuery", map[string]any{
+		"NamedQueryIds": []string{id1, id2, "nonexistent-id"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	queries := m["NamedQueries"].([]any)
+	assert.Len(t, queries, 2)
+	notFound := m["UnprocessedNamedQueryIds"].([]any)
+	assert.Len(t, notFound, 1)
+}
+
+func TestBatchGetQueryExecution(t *testing.T) {
+	s := newService()
+	r1, _ := s.HandleRequest(jsonCtx("StartQueryExecution", map[string]any{"QueryString": "SELECT 1"}))
+	r2, _ := s.HandleRequest(jsonCtx("StartQueryExecution", map[string]any{"QueryString": "SELECT 2"}))
+	m1 := respJSON(t, r1)
+	m2 := respJSON(t, r2)
+	id1 := m1["QueryExecutionId"].(string)
+	id2 := m2["QueryExecutionId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("BatchGetQueryExecution", map[string]any{
+		"QueryExecutionIds": []string{id1, id2, "nonexistent-id"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	executions := m["QueryExecutions"].([]any)
+	assert.Len(t, executions, 2)
+	notFound := m["UnprocessedQueryExecutionIds"].([]any)
+	assert.Len(t, notFound, 1)
+}
+
+func TestCreateDataCatalog(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{
+		"Name": "myglue", "Type": "GLUE", "Description": "Glue catalog",
+		"Tags": []map[string]string{{"Key": "env", "Value": "test"}},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestCreateDataCatalogDuplicate(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "dup-cat", "Type": "GLUE"}))
+	_, err := s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "dup-cat", "Type": "GLUE"}))
+	require.Error(t, err)
+}
+
+func TestGetDataCatalog(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "get-cat", "Type": "LAMBDA", "Description": "test"}))
+	resp, err := s.HandleRequest(jsonCtx("GetDataCatalog", map[string]any{"Name": "get-cat"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	dc := m["DataCatalog"].(map[string]any)
+	assert.Equal(t, "get-cat", dc["Name"])
+	assert.Equal(t, "LAMBDA", dc["Type"])
+}
+
+func TestGetDataCatalogNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetDataCatalog", map[string]any{"Name": "nope"}))
+	require.Error(t, err)
+}
+
+func TestListDataCatalogs(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "cat1", "Type": "GLUE"}))
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "cat2", "Type": "HIVE"}))
+	resp, err := s.HandleRequest(jsonCtx("ListDataCatalogs", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	summaries := m["DataCatalogsSummary"].([]any)
+	assert.Len(t, summaries, 2)
+}
+
+func TestUpdateDataCatalog(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "upd-cat", "Type": "GLUE"}))
+	resp, err := s.HandleRequest(jsonCtx("UpdateDataCatalog", map[string]any{
+		"Name": "upd-cat", "Description": "updated",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	getResp, _ := s.HandleRequest(jsonCtx("GetDataCatalog", map[string]any{"Name": "upd-cat"}))
+	m := respJSON(t, getResp)
+	dc := m["DataCatalog"].(map[string]any)
+	assert.Equal(t, "updated", dc["Description"])
+}
+
+func TestDeleteDataCatalog(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDataCatalog", map[string]any{"Name": "del-cat", "Type": "GLUE"}))
+	resp, err := s.HandleRequest(jsonCtx("DeleteDataCatalog", map[string]any{"Name": "del-cat"}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	_, err = s.HandleRequest(jsonCtx("GetDataCatalog", map[string]any{"Name": "del-cat"}))
+	require.Error(t, err)
+}
+
+func TestListTagsForResource(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateWorkGroup", map[string]any{
+		"Name": "tlist-wg",
+		"Tags": []map[string]string{{"Key": "k1", "Value": "v1"}, {"Key": "k2", "Value": "v2"}},
+	}))
+	arn := "arn:aws:athena:us-east-1:123456789012:workgroup/tlist-wg"
+
+	resp, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"ResourceARN": arn}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	tags := m["Tags"].([]any)
+	assert.Len(t, tags, 2)
+}
+
 func TestStartQueryExecution_DataScannedInBytes(t *testing.T) {
 	s := newService()
 

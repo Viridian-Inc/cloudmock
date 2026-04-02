@@ -516,3 +516,195 @@ func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Re
 	}
 	return jsonOK(struct{}{})
 }
+
+// ---- ListTagsForResource ----
+
+type listTagsForResourceRequest struct {
+	ResourceARN string `json:"ResourceARN"`
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listTagsForResourceRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ResourceARN == "" {
+		return jsonErr(service.ErrValidation("ResourceARN is required."))
+	}
+	tags, ok := store.ListTagsForResource(req.ResourceARN)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Resource", req.ResourceARN))
+	}
+	tagList := make([]tag, 0, len(tags))
+	for k, v := range tags {
+		tagList = append(tagList, tag{Key: k, Value: v})
+	}
+	return jsonOK(map[string]any{"Tags": tagList})
+}
+
+// ---- BatchGetNamedQuery ----
+
+type batchGetNamedQueryRequest struct {
+	NamedQueryIds []string `json:"NamedQueryIds"`
+}
+
+func handleBatchGetNamedQuery(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req batchGetNamedQueryRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	found, notFound := store.BatchGetNamedQuery(req.NamedQueryIds)
+	queries := make([]namedQueryJSON, 0, len(found))
+	for _, nq := range found {
+		queries = append(queries, namedQueryJSON{
+			NamedQueryId: nq.ID, Name: nq.Name, Description: nq.Description,
+			Database: nq.Database, QueryString: nq.QueryString, WorkGroup: nq.WorkGroup,
+		})
+	}
+	return jsonOK(map[string]any{
+		"NamedQueries":    queries,
+		"UnprocessedNamedQueryIds": notFound,
+	})
+}
+
+// ---- BatchGetQueryExecution ----
+
+type batchGetQueryExecutionRequest struct {
+	QueryExecutionIds []string `json:"QueryExecutionIds"`
+}
+
+func handleBatchGetQueryExecution(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req batchGetQueryExecutionRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	found, notFound := store.BatchGetQueryExecution(req.QueryExecutionIds)
+	executions := make([]queryExecutionJSON, 0, len(found))
+	for _, qe := range found {
+		executions = append(executions, toQueryExecutionJSON(qe))
+	}
+	return jsonOK(map[string]any{
+		"QueryExecutions":            executions,
+		"UnprocessedQueryExecutionIds": notFound,
+	})
+}
+
+// ---- CreateDataCatalog ----
+
+type dataCatalogJSON struct {
+	Name        string            `json:"Name"`
+	Type        string            `json:"Type"`
+	Description string            `json:"Description,omitempty"`
+	Parameters  map[string]string `json:"Parameters,omitempty"`
+}
+
+type createDataCatalogRequest struct {
+	Name        string            `json:"Name"`
+	Type        string            `json:"Type"`
+	Description string            `json:"Description"`
+	Parameters  map[string]string `json:"Parameters"`
+	Tags        []tag             `json:"Tags"`
+}
+
+func handleCreateDataCatalog(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createDataCatalogRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	if req.Type == "" {
+		req.Type = "GLUE"
+	}
+	tags := make(map[string]string)
+	for _, t := range req.Tags {
+		tags[t.Key] = t.Value
+	}
+	params := req.Parameters
+	if params == nil {
+		params = make(map[string]string)
+	}
+	_, ok := store.CreateDataCatalog(req.Name, req.Type, req.Description, params, tags)
+	if !ok {
+		return jsonErr(service.ErrAlreadyExists("DataCatalog", req.Name))
+	}
+	return jsonOK(struct{}{})
+}
+
+// ---- GetDataCatalog ----
+
+type getDataCatalogRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleGetDataCatalog(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getDataCatalogRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	dc, ok := store.GetDataCatalog(req.Name)
+	if !ok {
+		return jsonErr(service.ErrNotFound("DataCatalog", req.Name))
+	}
+	return jsonOK(map[string]any{
+		"DataCatalog": dataCatalogJSON{Name: dc.Name, Type: dc.Type, Description: dc.Description, Parameters: dc.Parameters},
+	})
+}
+
+// ---- ListDataCatalogs ----
+
+func handleListDataCatalogs(_ *service.RequestContext, store *Store) (*service.Response, error) {
+	catalogs := store.ListDataCatalogs()
+	summaries := make([]dataCatalogJSON, 0, len(catalogs))
+	for _, dc := range catalogs {
+		summaries = append(summaries, dataCatalogJSON{Name: dc.Name, Type: dc.Type, Description: dc.Description})
+	}
+	return jsonOK(map[string]any{"DataCatalogsSummary": summaries})
+}
+
+// ---- UpdateDataCatalog ----
+
+type updateDataCatalogRequest struct {
+	Name        string            `json:"Name"`
+	Type        string            `json:"Type"`
+	Description string            `json:"Description"`
+	Parameters  map[string]string `json:"Parameters"`
+}
+
+func handleUpdateDataCatalog(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateDataCatalogRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	if !store.UpdateDataCatalog(req.Name, req.Description, req.Parameters) {
+		return jsonErr(service.ErrNotFound("DataCatalog", req.Name))
+	}
+	return jsonOK(struct{}{})
+}
+
+// ---- DeleteDataCatalog ----
+
+type deleteDataCatalogRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleDeleteDataCatalog(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteDataCatalogRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	if !store.DeleteDataCatalog(req.Name) {
+		return jsonErr(service.ErrNotFound("DataCatalog", req.Name))
+	}
+	return jsonOK(struct{}{})
+}

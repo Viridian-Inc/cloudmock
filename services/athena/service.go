@@ -52,8 +52,16 @@ func (s *AthenaService) Actions() []service.Action {
 		{Name: "ListQueryExecutions", Method: http.MethodPost, IAMAction: "athena:ListQueryExecutions"},
 		{Name: "StopQueryExecution", Method: http.MethodPost, IAMAction: "athena:StopQueryExecution"},
 		{Name: "GetQueryResults", Method: http.MethodPost, IAMAction: "athena:GetQueryResults"},
+		{Name: "BatchGetNamedQuery", Method: http.MethodPost, IAMAction: "athena:BatchGetNamedQuery"},
+		{Name: "BatchGetQueryExecution", Method: http.MethodPost, IAMAction: "athena:BatchGetQueryExecution"},
+		{Name: "CreateDataCatalog", Method: http.MethodPost, IAMAction: "athena:CreateDataCatalog"},
+		{Name: "GetDataCatalog", Method: http.MethodPost, IAMAction: "athena:GetDataCatalog"},
+		{Name: "ListDataCatalogs", Method: http.MethodPost, IAMAction: "athena:ListDataCatalogs"},
+		{Name: "UpdateDataCatalog", Method: http.MethodPost, IAMAction: "athena:UpdateDataCatalog"},
+		{Name: "DeleteDataCatalog", Method: http.MethodPost, IAMAction: "athena:DeleteDataCatalog"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "athena:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "athena:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "athena:ListTagsForResource"},
 	}
 }
 
@@ -91,10 +99,26 @@ func (s *AthenaService) HandleRequest(ctx *service.RequestContext) (*service.Res
 		return handleStopQueryExecution(ctx, s.store)
 	case "GetQueryResults":
 		return handleGetQueryResults(ctx, s.store)
+	case "BatchGetNamedQuery":
+		return handleBatchGetNamedQuery(ctx, s.store)
+	case "BatchGetQueryExecution":
+		return handleBatchGetQueryExecution(ctx, s.store)
+	case "CreateDataCatalog":
+		return handleCreateDataCatalog(ctx, s.store)
+	case "GetDataCatalog":
+		return handleGetDataCatalog(ctx, s.store)
+	case "ListDataCatalogs":
+		return handleListDataCatalogs(ctx, s.store)
+	case "UpdateDataCatalog":
+		return handleUpdateDataCatalog(ctx, s.store)
+	case "DeleteDataCatalog":
+		return handleDeleteDataCatalog(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":
 		return handleUntagResource(ctx, s.store)
+	case "ListTagsForResource":
+		return handleListTagsForResource(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

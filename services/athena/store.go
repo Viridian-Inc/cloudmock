@@ -86,6 +86,15 @@ type ColumnInfo struct {
 	Type string
 }
 
+// DataCatalog represents an Athena data catalog.
+type DataCatalog struct {
+	Name        string
+	Type        string // LAMBDA, GLUE, HIVE
+	Description string
+	Parameters  map[string]string
+	Tags        map[string]string
+}
+
 // Store manages all Athena resources in memory.
 type Store struct {
 	mu              sync.RWMutex
@@ -93,6 +102,7 @@ type Store struct {
 	namedQueries    map[string]*NamedQuery
 	queryExecutions map[string]*QueryExecution
 	queryResults    map[string]*QueryResultSet // executionID -> results
+	dataCatalogs    map[string]*DataCatalog
 	schemaRegistry  *sqlparse.SchemaRegistry
 	accountID       string
 	region          string
@@ -111,6 +121,7 @@ func NewStore(accountID, region string) *Store {
 		namedQueries:    make(map[string]*NamedQuery),
 		queryExecutions: make(map[string]*QueryExecution),
 		queryResults:    make(map[string]*QueryResultSet),
+		dataCatalogs:    make(map[string]*DataCatalog),
 		schemaRegistry:  sqlparse.NewSchemaRegistry(),
 		accountID:       accountID,
 		region:          region,
@@ -500,4 +511,137 @@ func (s *Store) UntagResource(arn string, keys []string) bool {
 		}
 	}
 	return false
+}
+
+// ListTagsForResource returns tags for the given resource ARN.
+func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, wg := range s.workGroups {
+		if s.workGroupARN(wg.Name) == arn {
+			result := make(map[string]string, len(wg.Tags))
+			for k, v := range wg.Tags {
+				result[k] = v
+			}
+			return result, true
+		}
+	}
+	// Check data catalogs
+	for _, dc := range s.dataCatalogs {
+		if s.dataCatalogARN(dc.Name) == arn {
+			result := make(map[string]string, len(dc.Tags))
+			for k, v := range dc.Tags {
+				result[k] = v
+			}
+			return result, true
+		}
+	}
+	return nil, false
+}
+
+// BatchGetNamedQuery returns multiple named queries by ID.
+func (s *Store) BatchGetNamedQuery(ids []string) ([]*NamedQuery, []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	found := make([]*NamedQuery, 0)
+	notFound := make([]string, 0)
+	for _, id := range ids {
+		nq, ok := s.namedQueries[id]
+		if ok {
+			found = append(found, nq)
+		} else {
+			notFound = append(notFound, id)
+		}
+	}
+	return found, notFound
+}
+
+// BatchGetQueryExecution returns multiple query executions by ID.
+func (s *Store) BatchGetQueryExecution(ids []string) ([]*QueryExecution, []string) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	found := make([]*QueryExecution, 0)
+	notFound := make([]string, 0)
+	for _, id := range ids {
+		qe, ok := s.queryExecutions[id]
+		if ok {
+			found = append(found, qe)
+		} else {
+			notFound = append(notFound, id)
+		}
+	}
+	return found, notFound
+}
+
+// ---- DataCatalog operations ----
+
+func (s *Store) dataCatalogARN(name string) string {
+	return fmt.Sprintf("arn:aws:athena:%s:%s:datacatalog/%s", s.region, s.accountID, name)
+}
+
+// CreateDataCatalog creates a new data catalog. Returns false if already exists.
+func (s *Store) CreateDataCatalog(name, catalogType, description string, params, tags map[string]string) (*DataCatalog, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.dataCatalogs[name]; ok {
+		return nil, false
+	}
+	dc := &DataCatalog{
+		Name:        name,
+		Type:        catalogType,
+		Description: description,
+		Parameters:  params,
+		Tags:        tags,
+	}
+	s.dataCatalogs[name] = dc
+	return dc, true
+}
+
+// GetDataCatalog returns a data catalog by name.
+func (s *Store) GetDataCatalog(name string) (*DataCatalog, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	dc, ok := s.dataCatalogs[name]
+	return dc, ok
+}
+
+// ListDataCatalogs returns all data catalogs.
+func (s *Store) ListDataCatalogs() []*DataCatalog {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*DataCatalog, 0, len(s.dataCatalogs))
+	for _, dc := range s.dataCatalogs {
+		result = append(result, dc)
+	}
+	return result
+}
+
+// UpdateDataCatalog updates a data catalog's description and parameters.
+func (s *Store) UpdateDataCatalog(name, description string, params map[string]string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	dc, ok := s.dataCatalogs[name]
+	if !ok {
+		return false
+	}
+	if description != "" {
+		dc.Description = description
+	}
+	if params != nil {
+		for k, v := range params {
+			dc.Parameters[k] = v
+		}
+	}
+	return true
+}
+
+// DeleteDataCatalog deletes a data catalog. Returns false if not found.
+func (s *Store) DeleteDataCatalog(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.dataCatalogs[name]; !ok {
+		return false
+	}
+	delete(s.dataCatalogs, name)
+	return true
 }

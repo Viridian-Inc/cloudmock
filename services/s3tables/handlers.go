@@ -164,3 +164,82 @@ func handleDeleteTablePolicy(tableARN string, store *Store) (*service.Response, 
 	}
 	return jsonNoContent()
 }
+
+// ---- UpdateTableMetadataLocation ----
+
+func handleUpdateTableMetadataLocation(params map[string]any, bucketARN, namespace, name string, store *Store) (*service.Response, error) {
+	metadataLocation := str(params, "metadataLocation")
+	if metadataLocation == "" {
+		return jsonErr(service.ErrValidation("metadataLocation is required"))
+	}
+	table, ok := store.UpdateTableMetadataLocation(bucketARN, namespace, name, metadataLocation)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Table", namespace+"/"+name))
+	}
+	return jsonOK(map[string]any{
+		"name":             table.Name,
+		"namespace":        table.Namespace,
+		"tableBucketARN":   table.TableBucketARN,
+		"tableARN":         table.TableARN,
+		"metadataLocation": metadataLocation,
+		"versionToken":     table.ModifiedAt.Format(time.RFC3339),
+	})
+}
+
+// ---- Namespaces ----
+
+func handleCreateNamespace(params map[string]any, bucketARN, namespaceName string, store *Store) (*service.Response, error) {
+	if bucketARN == "" || namespaceName == "" {
+		return jsonErr(service.ErrValidation("tableBucketARN and namespace are required"))
+	}
+	namespaceParts := strings.Split(namespaceName, "/")
+	ns, err := store.CreateNamespace(bucketARN, namespaceParts)
+	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			return jsonErr(service.NewAWSError("ConflictException", err.Error(), http.StatusConflict))
+		}
+		return jsonErr(service.ErrNotFound("TableBucket", bucketARN))
+	}
+	return jsonOK(map[string]any{
+		"namespace":      ns.Namespace,
+		"tableBucketARN": ns.TableBucketARN,
+		"createdAt":      ns.CreatedAt.Format(time.RFC3339),
+		"ownerAccountId": ns.OwnerAccountID,
+	})
+}
+
+func handleGetNamespace(bucketARN, namespaceName string, store *Store) (*service.Response, error) {
+	ns, ok := store.GetNamespace(bucketARN, namespaceName)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Namespace", namespaceName))
+	}
+	return jsonOK(map[string]any{
+		"namespace":      ns.Namespace,
+		"tableBucketARN": ns.TableBucketARN,
+		"createdAt":      ns.CreatedAt.Format(time.RFC3339),
+		"ownerAccountId": ns.OwnerAccountID,
+	})
+}
+
+func handleListNamespaces(bucketARN string, store *Store) (*service.Response, error) {
+	if bucketARN == "" {
+		return jsonErr(service.ErrValidation("tableBucketARN is required"))
+	}
+	namespaces := store.ListNamespaces(bucketARN)
+	items := make([]map[string]any, 0, len(namespaces))
+	for _, ns := range namespaces {
+		items = append(items, map[string]any{
+			"namespace":      ns.Namespace,
+			"tableBucketARN": ns.TableBucketARN,
+			"createdAt":      ns.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return jsonOK(map[string]any{"namespaces": items})
+}
+
+func handleDeleteNamespace(bucketARN, namespaceName string, store *Store) (*service.Response, error) {
+	if !store.DeleteNamespace(bucketARN, namespaceName) {
+		return jsonErr(service.ErrNotFound("Namespace", namespaceName))
+	}
+	return jsonNoContent()
+}

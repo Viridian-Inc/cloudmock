@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strings"
 	"sync"
 	"time"
 )
@@ -36,12 +37,21 @@ type TablePolicy struct {
 	ResourcePolicy string
 }
 
+// Namespace represents a namespace within a table bucket.
+type Namespace struct {
+	TableBucketARN string
+	Namespace      []string // namespace path segments
+	CreatedAt      time.Time
+	OwnerAccountID string
+}
+
 // Store manages S3 Tables resources in memory.
 type Store struct {
 	mu            sync.RWMutex
-	tableBuckets  map[string]*TableBucket // name -> bucket
-	tables        map[string]map[string]*Table // bucketARN -> tableName -> table
-	policies      map[string]*TablePolicy // tableARN -> policy
+	tableBuckets  map[string]*TableBucket            // name -> bucket
+	tables        map[string]map[string]*Table       // bucketARN -> tableName -> table
+	namespaces    map[string]map[string]*Namespace   // bucketARN -> namespaceName -> Namespace
+	policies      map[string]*TablePolicy            // tableARN -> policy
 	accountID     string
 	region        string
 }
@@ -51,6 +61,7 @@ func NewStore(accountID, region string) *Store {
 	return &Store{
 		tableBuckets: make(map[string]*TableBucket),
 		tables:       make(map[string]map[string]*Table),
+		namespaces:   make(map[string]map[string]*Namespace),
 		policies:     make(map[string]*TablePolicy),
 		accountID:    accountID,
 		region:       region,
@@ -79,6 +90,7 @@ func (s *Store) CreateTableBucket(name string) (*TableBucket, error) {
 	}
 	s.tableBuckets[name] = bucket
 	s.tables[arn] = make(map[string]*Table)
+	s.namespaces[arn] = make(map[string]*Namespace)
 	return bucket, nil
 }
 
@@ -233,5 +245,86 @@ func (s *Store) DeleteTablePolicy(tableARN string) bool {
 		return false
 	}
 	delete(s.policies, tableARN)
+	return true
+}
+
+// UpdateTableMetadataLocation updates the metadata location for a table.
+func (s *Store) UpdateTableMetadataLocation(bucketARN, namespace, name, metadataLocation string) (*Table, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tableMap, ok := s.tables[bucketARN]
+	if !ok {
+		return nil, false
+	}
+	key := namespace + "/" + name
+	table, ok := tableMap[key]
+	if !ok {
+		return nil, false
+	}
+	// In a real implementation, this would update the Iceberg metadata location.
+	// We store it as a custom field in Format for mock purposes.
+	table.Format = metadataLocation
+	table.ModifiedAt = time.Now().UTC()
+	return table, true
+}
+
+// CreateNamespace creates a new namespace in a bucket.
+func (s *Store) CreateNamespace(bucketARN string, namespaceParts []string) (*Namespace, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	nsMap, ok := s.namespaces[bucketARN]
+	if !ok {
+		return nil, fmt.Errorf("table bucket not found: %s", bucketARN)
+	}
+	nsName := strings.Join(namespaceParts, "/")
+	if _, exists := nsMap[nsName]; exists {
+		return nil, fmt.Errorf("namespace already exists: %s", nsName)
+	}
+	ns := &Namespace{
+		TableBucketARN: bucketARN,
+		Namespace:      namespaceParts,
+		CreatedAt:      time.Now().UTC(),
+		OwnerAccountID: s.accountID,
+	}
+	nsMap[nsName] = ns
+	return ns, nil
+}
+
+// GetNamespace retrieves a namespace from a bucket.
+func (s *Store) GetNamespace(bucketARN, namespaceName string) (*Namespace, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	nsMap, ok := s.namespaces[bucketARN]
+	if !ok {
+		return nil, false
+	}
+	ns, ok := nsMap[namespaceName]
+	return ns, ok
+}
+
+// ListNamespaces returns all namespaces for a bucket.
+func (s *Store) ListNamespaces(bucketARN string) []*Namespace {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	nsMap := s.namespaces[bucketARN]
+	out := make([]*Namespace, 0, len(nsMap))
+	for _, ns := range nsMap {
+		out = append(out, ns)
+	}
+	return out
+}
+
+// DeleteNamespace removes a namespace from a bucket.
+func (s *Store) DeleteNamespace(bucketARN, namespaceName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	nsMap, ok := s.namespaces[bucketARN]
+	if !ok {
+		return false
+	}
+	if _, ok := nsMap[namespaceName]; !ok {
+		return false
+	}
+	delete(nsMap, namespaceName)
 	return true
 }

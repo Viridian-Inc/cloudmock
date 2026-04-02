@@ -1,54 +1,43 @@
 ---
 title: S3 Tables
-description: Amazon S3 Tables emulation in CloudMock
+description: AWS S3 Tables emulation in CloudMock
 ---
 
 ## Overview
 
-CloudMock emulates Amazon S3 Tables, supporting table bucket management, table CRUD operations, and table policy management.
+CloudMock emulates AWS S3 Tables, supporting the full TableBucket → Namespace → Table hierarchy with table policies and metadata location updates. S3 Tables is designed for Apache Iceberg table management.
 
 ## Supported Operations
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| CreateTableBucket | Supported | Creates a table bucket |
-| GetTableBucket | Supported | Returns table bucket details |
+| CreateTableBucket | Supported | Validates bucket name (lowercase, no underscores) |
+| GetTableBucket | Supported | Returns bucket details |
 | ListTableBuckets | Supported | Lists all table buckets |
-| DeleteTableBucket | Supported | Deletes a table bucket |
-| CreateTable | Supported | Creates a table in a bucket |
+| DeleteTableBucket | Supported | Deletes bucket and its tables |
+| CreateNamespace | Supported | Creates namespace within a bucket |
+| GetNamespace | Supported | Returns namespace details |
+| ListNamespaces | Supported | Lists namespaces for a bucket |
+| DeleteNamespace | Supported | Deletes a namespace |
+| CreateTable | Supported | Creates table in bucket/namespace |
 | GetTable | Supported | Returns table details |
-| ListTables | Supported | Lists tables in a bucket |
+| ListTables | Supported | Lists tables for a bucket |
+| UpdateTableMetadataLocation | Supported | Updates Iceberg metadata location |
 | DeleteTable | Supported | Deletes a table |
-| PutTablePolicy | Supported | Sets a table policy |
-| GetTablePolicy | Supported | Returns table policy |
-| DeleteTablePolicy | Supported | Removes a table policy |
+| GetTablePolicy | Supported | Returns table resource policy |
+| PutTablePolicy | Supported | Sets table policy (validates JSON) |
+| DeleteTablePolicy | Supported | Deletes table policy |
 
-## Quick Start
+## Resource Hierarchy
 
-### Node.js
-
-```typescript
-import { S3TablesClient, CreateTableBucketCommand, CreateTableCommand } from '@aws-sdk/client-s3tables';
-
-const client = new S3TablesClient({
-  endpoint: 'http://localhost:4566',
-  region: 'us-east-1',
-  credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
-});
-
-const { arn } = await client.send(new CreateTableBucketCommand({
-  name: 'my-table-bucket',
-}));
-
-await client.send(new CreateTableCommand({
-  tableBucketARN: arn,
-  namespace: 'default',
-  name: 'my-table',
-  format: 'ICEBERG',
-}));
+```
+TableBucket (arn:aws:s3tables:{region}:{account}:bucket/{name})
+  └── Namespace (analytics, ml, etc.)
+       └── Table (orders, customers, etc.)
+            └── TablePolicy (IAM resource policy)
 ```
 
-### Python
+## Quick Start
 
 ```python
 import boto3
@@ -59,20 +48,37 @@ client = boto3.client('s3tables',
     aws_access_key_id='test',
     aws_secret_access_key='test')
 
-response = client.create_table_bucket(name='my-table-bucket')
-arn = response['arn']
+# Create table bucket
+bucket = client.create_table_bucket(name='my-lakehouse')
+bucket_arn = bucket['arn']
 
+# Create namespace
+client.create_namespace(
+    tableBucketARN=bucket_arn,
+    namespace=['analytics'],
+)
+
+# Create Iceberg table
 client.create_table(
-    tableBucketARN=arn,
-    namespace='default',
-    name='my-table',
-    format='ICEBERG')
+    tableBucketARN=bucket_arn,
+    namespace='analytics',
+    name='events',
+    format='ICEBERG',
+)
+
+# Update metadata location after Iceberg write
+client.update_table_metadata_location(
+    tableBucketARN=bucket_arn,
+    namespace='analytics',
+    name='events',
+    metadataLocation='s3://bucket/warehouse/analytics/events/metadata/v1.metadata.json',
+    versionToken='old-token',
+)
 ```
 
 ## Configuration
 
 ```yaml
-# cloudmock.yml
 services:
   s3tables:
     enabled: true
@@ -80,6 +86,6 @@ services:
 
 ## Known Differences from AWS
 
-- Tables do not store actual Iceberg data
-- Table policies are stored but not enforced
-- No integration with analytics engines
+- No actual Iceberg table files are created or managed
+- MetadataLocation updates store the value but do not validate S3 paths
+- Namespace and table ARNs are derived from bucket ARN

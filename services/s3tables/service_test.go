@@ -162,3 +162,135 @@ func TestS3Tables_ValidBucketNames(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, respJSON(t, resp)["arn"])
 }
+
+// ---- Test: Namespace CRUD ----
+
+func TestS3Tables_NamespaceCRUD(t *testing.T) {
+	s := newService()
+	// Create bucket
+	bucketResp, _ := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "ns-bucket"}))
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	// Create namespace
+	createResp, err := s.HandleRequest(restCtx(http.MethodPut, "/namespaces/"+bucketARN+"/analytics", nil))
+	require.NoError(t, err)
+	nsBody := respJSON(t, createResp)
+	assert.NotNil(t, nsBody["namespace"])
+
+	// Get namespace
+	getResp, err := s.HandleRequest(restCtx(http.MethodGet, "/namespaces/"+bucketARN+"/analytics", nil))
+	require.NoError(t, err)
+	nsGet := respJSON(t, getResp)
+	assert.NotNil(t, nsGet["namespace"])
+
+	// List namespaces
+	listResp, err := s.HandleRequest(restCtx(http.MethodGet, "/namespaces?tableBucketARN="+bucketARN, nil))
+	require.NoError(t, err)
+	listBody := respJSON(t, listResp)
+	namespaces := listBody["namespaces"].([]any)
+	assert.Len(t, namespaces, 1)
+
+	// Delete namespace
+	_, err = s.HandleRequest(restCtx(http.MethodDelete, "/namespaces/"+bucketARN+"/analytics", nil))
+	require.NoError(t, err)
+
+	listResp2, _ := s.HandleRequest(restCtx(http.MethodGet, "/namespaces?tableBucketARN="+bucketARN, nil))
+	namespaces2 := respJSON(t, listResp2)["namespaces"].([]any)
+	assert.Len(t, namespaces2, 0)
+}
+
+func TestS3Tables_NamespaceDuplicate(t *testing.T) {
+	s := newService()
+	bucketResp, _ := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "dup-ns-bucket"}))
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	_, _ = s.HandleRequest(restCtx(http.MethodPut, "/namespaces/"+bucketARN+"/myns", nil))
+	_, err := s.HandleRequest(restCtx(http.MethodPut, "/namespaces/"+bucketARN+"/myns", nil))
+	require.Error(t, err)
+}
+
+func TestS3Tables_NamespaceNotFound(t *testing.T) {
+	s := newService()
+	bucketResp, _ := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "nfns-bucket"}))
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/namespaces/"+bucketARN+"/ghost", nil))
+	require.Error(t, err)
+}
+
+// ---- Test: UpdateTableMetadataLocation ----
+
+func TestS3Tables_UpdateTableMetadataLocation(t *testing.T) {
+	s := newService()
+	// Create bucket
+	bucketResp, _ := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "meta-bucket"}))
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	// Create table
+	_, err := s.HandleRequest(restCtx(http.MethodPut, "/tables/"+bucketARN+"/ns1/my-table",
+		map[string]any{"format": "ICEBERG"}))
+	require.NoError(t, err)
+
+	// Update metadata location
+	updateResp, err := s.HandleRequest(restCtx(http.MethodPut,
+		"/tables/"+bucketARN+"/ns1/my-table/metadata-location",
+		map[string]any{"metadataLocation": "s3://bucket/metadata/v1.metadata.json"}))
+	require.NoError(t, err)
+	updateBody := respJSON(t, updateResp)
+	assert.Equal(t, "s3://bucket/metadata/v1.metadata.json", updateBody["metadataLocation"])
+}
+
+func TestS3Tables_UpdateTableMetadataLocationNotFound(t *testing.T) {
+	s := newService()
+	bucketResp, _ := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "meta2-bucket"}))
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	_, err := s.HandleRequest(restCtx(http.MethodPut,
+		"/tables/"+bucketARN+"/ns1/ghost-table/metadata-location",
+		map[string]any{"metadataLocation": "s3://bucket/meta.json"}))
+	require.Error(t, err)
+}
+
+// ---- Test: ServiceName and HealthCheck ----
+
+func TestS3Tables_ServiceNameAndHealthCheck(t *testing.T) {
+	s := newService()
+	assert.Equal(t, "s3tables", s.Name())
+	assert.NoError(t, s.HealthCheck())
+}
+
+// ---- Test: TableBucket -> Namespace -> Table hierarchy ----
+
+func TestS3Tables_FullHierarchy(t *testing.T) {
+	s := newService()
+
+	// Create bucket
+	bucketResp, err := s.HandleRequest(restCtx(http.MethodPut, "/buckets", map[string]any{"name": "hier-bucket"}))
+	require.NoError(t, err)
+	bucketARN := respJSON(t, bucketResp)["arn"].(string)
+
+	// Create namespace
+	_, err = s.HandleRequest(restCtx(http.MethodPut, "/namespaces/"+bucketARN+"/data", nil))
+	require.NoError(t, err)
+
+	// Create tables in the namespace
+	for _, tableName := range []string{"orders", "customers", "products"} {
+		_, err = s.HandleRequest(restCtx(http.MethodPut, "/tables/"+bucketARN+"/data/"+tableName,
+			map[string]any{"format": "ICEBERG"}))
+		require.NoError(t, err)
+	}
+
+	// List tables
+	listResp, err := s.HandleRequest(restCtx(http.MethodGet, "/tables?tableBucketARN="+bucketARN, nil))
+	require.NoError(t, err)
+	tables := respJSON(t, listResp)["tables"].([]any)
+	assert.Len(t, tables, 3)
+
+	// Delete a table
+	_, err = s.HandleRequest(restCtx(http.MethodDelete, "/tables/"+bucketARN+"/data/orders", nil))
+	require.NoError(t, err)
+
+	listResp2, _ := s.HandleRequest(restCtx(http.MethodGet, "/tables?tableBucketARN="+bucketARN, nil))
+	tables2 := respJSON(t, listResp2)["tables"].([]any)
+	assert.Len(t, tables2, 2)
+}

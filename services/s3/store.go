@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"crypto/md5" //nolint:gosec // MD5 is used for ETags per the S3 specification, not security
 	"fmt"
 	"net/http"
 	"sync"
@@ -239,8 +238,7 @@ func (s *Store) UploadPart(uploadId string, partNumber int, body []byte) (*Part,
 			"The specified multipart upload does not exist.", http.StatusNotFound)
 	}
 
-	sum := md5.Sum(body) //nolint:gosec
-	etag := fmt.Sprintf(`"%x"`, sum)
+	etag := computeETag(body)
 
 	part := &Part{
 		PartNumber: partNumber,

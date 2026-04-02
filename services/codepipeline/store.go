@@ -112,6 +112,26 @@ type ApprovalResult struct {
 	Status  string // Approved | Rejected
 }
 
+// Webhook represents a CodePipeline webhook.
+type Webhook struct {
+	Name           string
+	ARN            string
+	PipelineName   string
+	TargetAction   string
+	TargetPipeline string
+	Authentication string
+	Filters        []WebhookFilter
+	URL            string
+	Tags           map[string]string
+	CreatedAt      time.Time
+}
+
+// WebhookFilter defines a filter condition for a webhook.
+type WebhookFilter struct {
+	JSONPath    string
+	MatchEquals string
+}
+
 // Store is the in-memory store for all CodePipeline resources.
 type Store struct {
 	mu         sync.RWMutex
@@ -119,6 +139,7 @@ type Store struct {
 	region     string
 	pipelines  map[string]*Pipeline
 	executions map[string][]*PipelineExecution // pipelineName -> executions
+	webhooks   map[string]*Webhook             // webhookName -> webhook
 	tags       map[string]map[string]string
 	lcConfig   *lifecycle.Config
 }
@@ -130,6 +151,7 @@ func NewStore(accountID, region string) *Store {
 		region:     region,
 		pipelines:  make(map[string]*Pipeline),
 		executions: make(map[string][]*PipelineExecution),
+		webhooks:   make(map[string]*Webhook),
 		tags:       make(map[string]map[string]string),
 		lcConfig:   lifecycle.DefaultConfig(),
 	}
@@ -439,6 +461,78 @@ func (s *Store) RetryStageExecution(pipelineName, stageName, executionID string)
 	}
 	return nil, service.NewAWSError("PipelineExecutionNotFoundException",
 		fmt.Sprintf("Execution not found: %s", executionID), http.StatusNotFound)
+}
+
+// ---- Webhook operations ----
+
+func (s *Store) webhookARN(name string) string {
+	return fmt.Sprintf("arn:aws:codepipeline:%s:%s:webhook:%s", s.region, s.accountID, name)
+}
+
+func (s *Store) PutWebhook(name, pipelineName, targetAction, authentication string, filters []WebhookFilter, tags map[string]string) (*Webhook, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if name == "" {
+		return nil, service.ErrValidation("Webhook name is required.")
+	}
+	if pipelineName == "" {
+		return nil, service.ErrValidation("Target pipeline name is required.")
+	}
+
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
+	wh := s.webhooks[name]
+	if wh == nil {
+		wh = &Webhook{
+			Name:           name,
+			ARN:            s.webhookARN(name),
+			PipelineName:   pipelineName,
+			TargetAction:   targetAction,
+			TargetPipeline: pipelineName,
+			Authentication: authentication,
+			Filters:        filters,
+			URL:            fmt.Sprintf("https://webhooks.codepipeline.%s.amazonaws.com/webhooks/%s/%s", s.region, s.accountID, name),
+			Tags:           tags,
+			CreatedAt:      time.Now().UTC(),
+		}
+	} else {
+		wh.PipelineName = pipelineName
+		wh.TargetAction = targetAction
+		wh.Authentication = authentication
+		wh.Filters = filters
+		for k, v := range tags {
+			wh.Tags[k] = v
+		}
+	}
+
+	s.webhooks[name] = wh
+	return wh, nil
+}
+
+func (s *Store) ListWebhooks() []*Webhook {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]*Webhook, 0, len(s.webhooks))
+	for _, wh := range s.webhooks {
+		result = append(result, wh)
+	}
+	return result
+}
+
+func (s *Store) DeleteWebhook(name string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.webhooks[name]; !ok {
+		return service.NewAWSError("WebhookNotFoundException",
+			fmt.Sprintf("Webhook not found: %s", name), http.StatusNotFound)
+	}
+	delete(s.webhooks, name)
+	return nil
 }
 
 // ---- Tag operations ----

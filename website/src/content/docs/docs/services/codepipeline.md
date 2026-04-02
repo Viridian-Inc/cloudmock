@@ -23,6 +23,9 @@ CloudMock emulates AWS CodePipeline, supporting pipeline CRUD, execution managem
 | StopPipelineExecution | Supported | Stops a pipeline execution |
 | PutApprovalResult | Supported | Approves or rejects a manual approval |
 | RetryStageExecution | Supported | Retries a failed stage |
+| PutWebhook | Supported | Creates or updates a pipeline webhook |
+| ListWebhooks | Supported | Lists all webhooks |
+| DeleteWebhook | Supported | Deletes a webhook |
 | TagResource | Supported | Adds tags to a pipeline |
 | UntagResource | Supported | Removes tags from a pipeline |
 | ListTagsForResource | Supported | Lists tags for a pipeline |

@@ -470,6 +470,123 @@ func TestPutApprovalResult_ApproveAction(t *testing.T) {
 	}
 }
 
+// --- Webhook Tests ---
+
+func TestPutWebhook(t *testing.T) {
+	s := newService()
+	createPipeline(t, s, "webhook-pipe")
+
+	ctx := jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{
+			"name":           "my-webhook",
+			"targetPipeline": "webhook-pipe",
+			"targetAction":   "SourceAction",
+			"authentication": "GITHUB_HMAC",
+			"filters": []any{
+				map[string]any{
+					"jsonPath":    "$.ref",
+					"matchEquals": "refs/heads/main",
+				},
+			},
+		},
+		"tags": []any{map[string]any{"key": "env", "value": "prod"}},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	wh := body["webhook"].(map[string]any)
+	assert.Equal(t, "my-webhook", wh["name"])
+	assert.Equal(t, "webhook-pipe", wh["targetPipeline"])
+	assert.Contains(t, wh["url"], "my-webhook")
+	assert.NotEmpty(t, wh["arn"])
+}
+
+func TestPutWebhookMissingName(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{
+			"targetPipeline": "some-pipe",
+		},
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+func TestPutWebhookMissingPipeline(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{
+			"name": "no-pipe-wh",
+		},
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+func TestListWebhooks(t *testing.T) {
+	s := newService()
+	createPipeline(t, s, "list-wh-pipe")
+
+	s.HandleRequest(jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{"name": "wh-1", "targetPipeline": "list-wh-pipe"},
+	}))
+	s.HandleRequest(jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{"name": "wh-2", "targetPipeline": "list-wh-pipe"},
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListWebhooks", map[string]any{}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	webhooks := body["webhooks"].([]any)
+	assert.Len(t, webhooks, 2)
+}
+
+func TestDeleteWebhook(t *testing.T) {
+	s := newService()
+	createPipeline(t, s, "del-wh-pipe")
+
+	s.HandleRequest(jsonCtx("PutWebhook", map[string]any{
+		"webhook": map[string]any{"name": "del-wh", "targetPipeline": "del-wh-pipe"},
+	}))
+
+	ctx := jsonCtx("DeleteWebhook", map[string]any{"name": "del-wh"})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	resp2, _ := s.HandleRequest(jsonCtx("ListWebhooks", map[string]any{}))
+	body := respBody(t, resp2)
+	assert.Len(t, body["webhooks"].([]any), 0)
+}
+
+func TestDeleteWebhookNotFound(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("DeleteWebhook", map[string]any{"name": "nope"})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "WebhookNotFoundException")
+}
+
+func TestPutWebhookIdempotent(t *testing.T) {
+	s := newService()
+	createPipeline(t, s, "idem-wh-pipe")
+
+	putCtx := map[string]any{
+		"webhook": map[string]any{"name": "idem-wh", "targetPipeline": "idem-wh-pipe"},
+	}
+	s.HandleRequest(jsonCtx("PutWebhook", putCtx))
+	resp, err := s.HandleRequest(jsonCtx("PutWebhook", putCtx))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Should still only be one webhook
+	resp2, _ := s.HandleRequest(jsonCtx("ListWebhooks", map[string]any{}))
+	body := respBody(t, resp2)
+	assert.Len(t, body["webhooks"].([]any), 1)
+}
+
 // --- Invalid Action ---
 
 func TestInvalidAction(t *testing.T) {

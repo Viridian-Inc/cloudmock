@@ -56,6 +56,10 @@ func (s *CodePipelineService) Actions() []service.Action {
 		// Approval & Retry
 		{Name: "PutApprovalResult", Method: http.MethodPost, IAMAction: "codepipeline:PutApprovalResult"},
 		{Name: "RetryStageExecution", Method: http.MethodPost, IAMAction: "codepipeline:RetryStageExecution"},
+		// Webhooks
+		{Name: "PutWebhook", Method: http.MethodPost, IAMAction: "codepipeline:PutWebhook"},
+		{Name: "ListWebhooks", Method: http.MethodPost, IAMAction: "codepipeline:ListWebhooks"},
+		{Name: "DeleteWebhook", Method: http.MethodPost, IAMAction: "codepipeline:DeleteWebhook"},
 		// Tags
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "codepipeline:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "codepipeline:UntagResource"},
@@ -93,6 +97,13 @@ func (s *CodePipelineService) HandleRequest(ctx *service.RequestContext) (*servi
 		return handlePutApprovalResult(ctx, s.store)
 	case "RetryStageExecution":
 		return handleRetryStageExecution(ctx, s.store)
+	// Webhooks
+	case "PutWebhook":
+		return handlePutWebhook(ctx, s.store)
+	case "ListWebhooks":
+		return handleListWebhooks(ctx, s.store)
+	case "DeleteWebhook":
+		return handleDeleteWebhook(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

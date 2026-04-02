@@ -483,6 +483,96 @@ func handleRetryStageExecution(ctx *service.RequestContext, store *Store) (*serv
 	return jsonOK(map[string]any{"pipelineExecutionId": exec.ID})
 }
 
+// ---- Webhook handlers ----
+
+func handlePutWebhook(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	whMap, ok := req["webhook"].(map[string]any)
+	if !ok {
+		return jsonErr(service.ErrValidation("webhook is required."))
+	}
+
+	name := getStr(whMap, "name")
+	targetPipeline := getStr(whMap, "targetPipeline")
+	targetAction := getStr(whMap, "targetAction")
+	authentication := getStr(whMap, "authentication")
+
+	var filters []WebhookFilter
+	if filterList, ok := whMap["filters"].([]any); ok {
+		for _, f := range filterList {
+			if fm, ok := f.(map[string]any); ok {
+				filters = append(filters, WebhookFilter{
+					JSONPath:    getStr(fm, "jsonPath"),
+					MatchEquals: getStr(fm, "matchEquals"),
+				})
+			}
+		}
+	}
+
+	var tags map[string]string
+	if tagList, ok := req["tags"].([]any); ok {
+		tags = parseTagsList(tagList)
+	}
+
+	wh, awsErr := store.PutWebhook(name, targetPipeline, targetAction, authentication, filters, tags)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"webhook": webhookToMap(wh)})
+}
+
+func handleListWebhooks(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	webhooks := store.ListWebhooks()
+	result := make([]map[string]any, len(webhooks))
+	for i, wh := range webhooks {
+		result[i] = map[string]any{
+			"definition": webhookToMap(wh),
+			"url":        wh.URL,
+		}
+	}
+	return jsonOK(map[string]any{"webhooks": result})
+}
+
+func handleDeleteWebhook(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Webhook name is required."))
+	}
+
+	if awsErr := store.DeleteWebhook(name); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func webhookToMap(wh *Webhook) map[string]any {
+	filters := make([]map[string]any, len(wh.Filters))
+	for i, f := range wh.Filters {
+		filters[i] = map[string]any{
+			"jsonPath":    f.JSONPath,
+			"matchEquals": f.MatchEquals,
+		}
+	}
+	return map[string]any{
+		"name":           wh.Name,
+		"targetPipeline": wh.TargetPipeline,
+		"targetAction":   wh.TargetAction,
+		"authentication": wh.Authentication,
+		"filters":        filters,
+		"url":            wh.URL,
+		"arn":            wh.ARN,
+	}
+}
+
 // ---- Tag handlers ----
 
 func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {

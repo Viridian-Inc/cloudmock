@@ -1,6 +1,9 @@
 package dynamodb
 
-import "fmt"
+import (
+	"fmt"
+	"sync/atomic"
+)
 
 // AttributeValue is the DynamoDB typed value format.
 // We store it as map[string]any matching the JSON wire format.
@@ -31,16 +34,16 @@ type ProvisionedThroughput struct {
 // GSI represents a Global Secondary Index definition.
 type GSI struct {
 	IndexName             string                 `json:"IndexName"`
-	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	Projection            map[string]any `json:"Projection"`
+	KeySchema             []KeySchemaElement     `json:"KeySchema"`
+	Projection            map[string]any         `json:"Projection"`
 	ProvisionedThroughput *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
 }
 
 // LSI represents a Local Secondary Index definition.
 type LSI struct {
-	IndexName  string                 `json:"IndexName"`
-	KeySchema  []KeySchemaElement      `json:"KeySchema"`
-	Projection map[string]any `json:"Projection"`
+	IndexName  string             `json:"IndexName"`
+	KeySchema  []KeySchemaElement `json:"KeySchema"`
+	Projection map[string]any     `json:"Projection"`
 }
 
 // Table is the in-memory representation of a DynamoDB table.
@@ -48,18 +51,43 @@ type Table struct {
 	Name                  string
 	KeySchema             []KeySchemaElement
 	AttributeDefinitions  []AttributeDefinition
-	Items                 []Item
 	Status                string  // ACTIVE, CREATING, DELETING
 	CreationDateTime      float64 // Unix timestamp
-	ItemCount             int64
 	BillingMode           string
 	ProvisionedThroughput *ProvisionedThroughput
 	GSIs                  []GSI
 	LSIs                  []LSI
-	GSIItems              map[string][]Item // indexName → items
-	LSIItems              map[string][]Item // indexName → items
 	Stream                *Stream           // nil if streams not enabled
 	TTL                   *TTLSpecification // nil if TTL not configured
+
+	// --- New partition-based storage ---
+	partitions map[string]*Partition  // pkValue → partition
+	gsiStores  map[string]*IndexStore // indexName → index store
+	lsiStores  map[string]*IndexStore // indexName → index store
+	count      atomic.Int64
+
+	// --- Backward-compat shims for store.go / handlers.go (Task 4 removes these) ---
+	Items    []Item            // Deprecated: kept for store.go compatibility
+	ItemCount int64            // Deprecated: kept for handlers.go compatibility
+	GSIItems map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
+	LSIItems map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
+}
+
+// initPartitions initializes the partition-based storage for a table.
+// Must be called after KeySchema, GSIs, and LSIs are set.
+func (t *Table) initPartitions() {
+	t.partitions = make(map[string]*Partition)
+	t.gsiStores = make(map[string]*IndexStore)
+	t.lsiStores = make(map[string]*IndexStore)
+
+	for _, gsi := range t.GSIs {
+		sk := gsiRangeKeyName(gsi.KeySchema)
+		t.gsiStores[gsi.IndexName] = newIndexStore(sk)
+	}
+	for _, lsi := range t.LSIs {
+		sk := gsiRangeKeyName(lsi.KeySchema)
+		t.lsiStores[lsi.IndexName] = newIndexStore(sk)
+	}
 }
 
 // hashKeyName returns the attribute name of the HASH key.
@@ -133,7 +161,12 @@ func (t *Table) indexItem(item Item) {
 				continue // item doesn't have the GSI's range key
 			}
 		}
-		// Remove any existing item with same GSI key
+		// Remove any existing item with same GSI key, then add.
+		if store, ok := t.gsiStores[gsi.IndexName]; ok {
+			store.remove(item, hk)
+			store.put(item, hk)
+		}
+		// Also maintain legacy GSIItems for backward compat.
 		t.removeFromIndex(t.GSIItems, gsi.IndexName, gsi.KeySchema, item)
 		t.GSIItems[gsi.IndexName] = append(t.GSIItems[gsi.IndexName], item)
 	}
@@ -151,6 +184,10 @@ func (t *Table) indexItem(item Item) {
 				continue
 			}
 		}
+		if store, ok := t.lsiStores[lsi.IndexName]; ok {
+			store.remove(item, hk)
+			store.put(item, hk)
+		}
 		t.removeFromIndex(t.LSIItems, lsi.IndexName, lsi.KeySchema, item)
 		t.LSIItems[lsi.IndexName] = append(t.LSIItems[lsi.IndexName], item)
 	}
@@ -159,14 +196,22 @@ func (t *Table) indexItem(item Item) {
 // deindexItem removes an item from all GSI and LSI indexes.
 func (t *Table) deindexItem(item Item) {
 	for _, gsi := range t.GSIs {
+		hk := gsiHashKeyName(gsi.KeySchema)
+		if store, ok := t.gsiStores[gsi.IndexName]; ok {
+			store.remove(item, hk)
+		}
 		t.removeFromIndex(t.GSIItems, gsi.IndexName, gsi.KeySchema, item)
 	}
 	for _, lsi := range t.LSIs {
+		hk := gsiHashKeyName(lsi.KeySchema)
+		if store, ok := t.lsiStores[lsi.IndexName]; ok {
+			store.remove(item, hk)
+		}
 		t.removeFromIndex(t.LSIItems, lsi.IndexName, lsi.KeySchema, item)
 	}
 }
 
-// removeFromIndex removes an item from a specific index by matching key schema.
+// removeFromIndex removes an item from a specific legacy index by matching key schema.
 func (t *Table) removeFromIndex(indexItems map[string][]Item, indexName string, ks []KeySchemaElement, item Item) {
 	items := indexItems[indexName]
 	hk := gsiHashKeyName(ks)
@@ -202,4 +247,91 @@ func avEqual(a, b AttributeValue) bool {
 		}
 	}
 	return false
+}
+
+// --- New partition-based methods ---
+
+// putItem inserts or replaces an item. Returns the previous item (nil if new).
+func (t *Table) putItem(item Item) Item {
+	hk := t.hashKeyName()
+	rk := t.rangeKeyName()
+	pkVal := attrString(item[hk])
+
+	part, ok := t.partitions[pkVal]
+	if !ok {
+		part = newPartition(rk)
+		t.partitions[pkVal] = part
+	}
+
+	old, replaced := part.put(item)
+	if !replaced {
+		t.count.Add(1)
+	}
+	return old
+}
+
+// getItem retrieves an item by its key. Returns (item, true) if found.
+func (t *Table) getItem(key Item) (Item, bool) {
+	hk := t.hashKeyName()
+	pkVal := attrString(key[hk])
+
+	part, ok := t.partitions[pkVal]
+	if !ok {
+		return nil, false
+	}
+	return part.get(key)
+}
+
+// deleteItem removes an item by key. Returns the old item (nil if not found).
+func (t *Table) deleteItem(key Item) Item {
+	hk := t.hashKeyName()
+	pkVal := attrString(key[hk])
+
+	part, ok := t.partitions[pkVal]
+	if !ok {
+		return nil
+	}
+
+	old, deleted := part.delete(key)
+	if deleted {
+		t.count.Add(-1)
+		if part.len() == 0 {
+			delete(t.partitions, pkVal)
+		}
+	}
+	return old
+}
+
+// queryPartition returns items from a single partition, sorted by sort key.
+// If startKey is nil, returns from the beginning (or end if descending).
+func (t *Table) queryPartition(pkValue string, startKey Item, ascending bool, limit int) []Item {
+	part, ok := t.partitions[pkValue]
+	if !ok {
+		return nil
+	}
+	return part.scan(ascending, limit)
+}
+
+// scanAll returns all items across all partitions.
+// If limit > 0, at most limit items are returned.
+func (t *Table) scanAll(limit int) []Item {
+	var result []Item
+	for _, part := range t.partitions {
+		items := part.scan(true, 0)
+		result = append(result, items...)
+		if limit > 0 && len(result) >= limit {
+			return result[:limit]
+		}
+	}
+	return result
+}
+
+// allItems returns all items (convenience for TTL reaper and other legacy code).
+func (t *Table) allItems() []Item {
+	return t.scanAll(0)
+}
+
+// itemCount returns the total number of items in the table.
+func (t *Table) itemCount() int64 {
+	return t.count.Load()
 }

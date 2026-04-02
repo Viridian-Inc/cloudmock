@@ -32,6 +32,7 @@ func main() {
 		flagQuick       = flag.Bool("quick", false, "quick mode: 1 iteration, no load phase")
 		flagOutput      = flag.String("output", "benchmarks/results", "output directory for reports")
 		flagAPIKey      = flag.String("localstack-api-key", "", "LocalStack Pro API key")
+		flagEndpoint    = flag.String("endpoint", "", "use existing endpoint (skip container management)")
 	)
 	flag.Parse()
 
@@ -98,24 +99,34 @@ func main() {
 
 			fmt.Printf("=== Target: %s (mode: %s) ===\n", targetName, mode)
 
-			tgt, err := createTarget(targetName, mode, *flagAPIKey)
-			if err != nil {
-				log.Printf("ERROR creating target %s: %v\n", targetName, err)
-				continue
+			var endpoint string
+			var tgt target.Target
+
+			if *flagEndpoint != "" {
+				// Use existing endpoint — skip container management.
+				endpoint = *flagEndpoint
+				fmt.Printf("  Using existing endpoint: %s\n", endpoint)
+			} else {
+				var err error
+				tgt, err = createTarget(targetName, mode, *flagAPIKey)
+				if err != nil {
+					log.Printf("ERROR creating target %s: %v\n", targetName, err)
+					continue
+				}
+
+				// Measure startup time (5 runs, take median).
+				startupResult := measureStartup(ctx, tgt, 5)
+				results.Startup[targetKey] = startupResult
+				fmt.Printf("  Startup: median=%.0fms\n", startupResult.MedianMs)
+
+				// Start target for benchmarking.
+				if err := tgt.Start(ctx); err != nil {
+					log.Printf("ERROR starting target %s: %v\n", targetName, err)
+					continue
+				}
+
+				endpoint = tgt.Endpoint()
 			}
-
-			// Measure startup time (5 runs, take median).
-			startupResult := measureStartup(ctx, tgt, 5)
-			results.Startup[targetKey] = startupResult
-			fmt.Printf("  Startup: median=%.0fms\n", startupResult.MedianMs)
-
-			// Start target for benchmarking.
-			if err := tgt.Start(ctx); err != nil {
-				log.Printf("ERROR starting target %s: %v\n", targetName, err)
-				continue
-			}
-
-			endpoint := tgt.Endpoint()
 
 			targetResults := &harness.TargetResults{
 				Target:   targetName,
@@ -153,17 +164,19 @@ func main() {
 			results.Targets[targetKey] = targetResults
 
 			// Collect resource stats before stopping.
-			if stats, err := tgt.ResourceStats(ctx); err == nil {
-				results.Resources[targetKey] = &harness.ResourceStats{
-					PeakMemoryMB: stats.MemoryMB,
-					AvgMemoryMB:  stats.MemoryMB,
-					PeakCPUPct:   stats.CPUPct,
-					AvgCPUPct:    stats.CPUPct,
+			if tgt != nil {
+				if stats, err := tgt.ResourceStats(ctx); err == nil {
+					results.Resources[targetKey] = &harness.ResourceStats{
+						PeakMemoryMB: stats.MemoryMB,
+						AvgMemoryMB:  stats.MemoryMB,
+						PeakCPUPct:   stats.CPUPct,
+						AvgCPUPct:    stats.CPUPct,
+					}
 				}
-			}
 
-			if err := tgt.Stop(ctx); err != nil {
-				log.Printf("WARN: stopping target %s: %v\n", targetName, err)
+				if err := tgt.Stop(ctx); err != nil {
+					log.Printf("WARN: stopping target %s: %v\n", targetName, err)
+				}
 			}
 
 			fmt.Println()

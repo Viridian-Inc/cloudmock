@@ -331,3 +331,168 @@ func TestDMS_TaskTableCounters(t *testing.T) {
 	tasks := respJSON(t, descResp)["ReplicationTasks"].([]any)
 	assert.GreaterOrEqual(t, len(tasks), 1)
 }
+
+// ---- ModifyReplicationInstance ----
+
+func TestDMS_ModifyReplicationInstance(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateReplicationInstance", map[string]any{
+		"ReplicationInstanceIdentifier": "mod-ri",
+		"ReplicationInstanceClass":      "dms.t2.micro",
+	}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("ModifyReplicationInstance", map[string]any{
+		"ReplicationInstanceIdentifier": "mod-ri",
+		"ReplicationInstanceClass":      "dms.t3.medium",
+		"MultiAZ":                       true,
+	}))
+	require.NoError(t, err)
+	body := respJSON(t, resp)["ReplicationInstance"].(map[string]any)
+	assert.Equal(t, "dms.t3.medium", body["ReplicationInstanceClass"])
+	assert.Equal(t, true, body["MultiAZ"])
+}
+
+func TestDMS_ModifyReplicationInstanceNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("ModifyReplicationInstance", map[string]any{
+		"ReplicationInstanceIdentifier": "ghost-ri",
+	}))
+	require.Error(t, err)
+}
+
+// ---- ModifyEndpoint ----
+
+func TestDMS_ModifyEndpoint(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateEndpoint", map[string]any{
+		"EndpointIdentifier": "mod-ep", "EndpointType": "source",
+		"EngineName": "postgres", "ServerName": "orig.example.com", "Port": 5432,
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("ModifyEndpoint", map[string]any{
+		"EndpointIdentifier": "mod-ep",
+		"ServerName":         "updated.example.com",
+	}))
+	require.NoError(t, err)
+	ep := respJSON(t, resp)["Endpoint"].(map[string]any)
+	assert.Equal(t, "updated.example.com", ep["ServerName"])
+}
+
+func TestDMS_ModifyEndpointNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("ModifyEndpoint", map[string]any{
+		"EndpointIdentifier": "ghost-ep",
+	}))
+	require.Error(t, err)
+}
+
+// ---- Subnet Groups ----
+
+func TestDMS_SubnetGroupCRUD(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateReplicationSubnetGroup", map[string]any{
+		"ReplicationSubnetGroupIdentifier":   "test-sg",
+		"ReplicationSubnetGroupDescription":  "Test subnet group",
+		"SubnetIds":                          []any{"subnet-aaa", "subnet-bbb"},
+	}))
+	require.NoError(t, err)
+	sg := respJSON(t, resp)["ReplicationSubnetGroup"].(map[string]any)
+	assert.Equal(t, "test-sg", sg["ReplicationSubnetGroupIdentifier"])
+
+	// Describe
+	descResp, err := s.HandleRequest(jsonCtx("DescribeReplicationSubnetGroups", nil))
+	require.NoError(t, err)
+	groups := respJSON(t, descResp)["ReplicationSubnetGroups"].([]any)
+	assert.Len(t, groups, 1)
+
+	// Modify
+	_, err = s.HandleRequest(jsonCtx("ModifyReplicationSubnetGroup", map[string]any{
+		"ReplicationSubnetGroupIdentifier":  "test-sg",
+		"ReplicationSubnetGroupDescription": "Updated desc",
+	}))
+	require.NoError(t, err)
+
+	// Delete
+	_, err = s.HandleRequest(jsonCtx("DeleteReplicationSubnetGroup", map[string]any{
+		"ReplicationSubnetGroupIdentifier": "test-sg",
+	}))
+	require.NoError(t, err)
+}
+
+func TestDMS_SubnetGroupDuplicate(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateReplicationSubnetGroup", map[string]any{
+		"ReplicationSubnetGroupIdentifier": "dup-sg",
+		"SubnetIds":                        []any{"subnet-x"},
+	}))
+	_, err := s.HandleRequest(jsonCtx("CreateReplicationSubnetGroup", map[string]any{
+		"ReplicationSubnetGroupIdentifier": "dup-sg",
+		"SubnetIds":                        []any{"subnet-y"},
+	}))
+	require.Error(t, err)
+}
+
+// ---- Certificates ----
+
+func TestDMS_CertificateCRUD(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateCertificate", map[string]any{
+		"CertificateIdentifier": "test-cert",
+		"CertificatePem":        "-----BEGIN CERTIFICATE-----\nMOCK\n-----END CERTIFICATE-----",
+	}))
+	require.NoError(t, err)
+	cert := respJSON(t, resp)["Certificate"].(map[string]any)
+	assert.Equal(t, "test-cert", cert["CertificateIdentifier"])
+
+	// Describe
+	descResp, err := s.HandleRequest(jsonCtx("DescribeCertificates", nil))
+	require.NoError(t, err)
+	certs := respJSON(t, descResp)["Certificates"].([]any)
+	assert.Len(t, certs, 1)
+
+	// Delete
+	_, err = s.HandleRequest(jsonCtx("DeleteCertificate", map[string]any{
+		"CertificateIdentifier": "test-cert",
+	}))
+	require.NoError(t, err)
+
+	descResp2, _ := s.HandleRequest(jsonCtx("DescribeCertificates", nil))
+	certs2 := respJSON(t, descResp2)["Certificates"].([]any)
+	assert.Len(t, certs2, 0)
+}
+
+// ---- Tags ----
+
+func TestDMS_TaggingCertificate(t *testing.T) {
+	s := newService()
+	createResp, _ := s.HandleRequest(jsonCtx("CreateCertificate", map[string]any{
+		"CertificateIdentifier": "tag-cert",
+	}))
+	certArn := respJSON(t, createResp)["Certificate"].(map[string]any)["CertificateArn"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("AddTagsToResource", map[string]any{
+		"ResourceArn": certArn,
+		"Tags":        []any{map[string]any{"Key": "env", "Value": "prod"}},
+	}))
+	require.NoError(t, err)
+
+	listResp, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{
+		"ResourceArn": certArn,
+	}))
+	require.NoError(t, err)
+	tags := respJSON(t, listResp)["TagList"].([]any)
+	assert.Len(t, tags, 1)
+
+	_, err = s.HandleRequest(jsonCtx("RemoveTagsFromResource", map[string]any{
+		"ResourceArn": certArn,
+		"TagKeys":     []any{"env"},
+	}))
+	require.NoError(t, err)
+
+	listResp2, _ := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{
+		"ResourceArn": certArn,
+	}))
+	tags2 := respJSON(t, listResp2)["TagList"].([]any)
+	assert.Len(t, tags2, 0)
+}

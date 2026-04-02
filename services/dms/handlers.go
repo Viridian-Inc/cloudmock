@@ -351,3 +351,228 @@ func handleDescribeConnections(store *Store) (*service.Response, error) {
 	}
 	return jsonOK(map[string]any{"Connections": items})
 }
+
+// ---- ModifyReplicationInstance ----
+
+func handleModifyReplicationInstance(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ReplicationInstanceIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ReplicationInstanceIdentifier is required"))
+	}
+	newClass := str(params, "ReplicationInstanceClass")
+	var multiAZ *bool
+	if v, ok := params["MultiAZ"].(bool); ok {
+		multiAZ = &v
+	}
+	inst, ok := store.ModifyReplicationInstance(id, newClass, multiAZ)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"Replication instance not found: "+id, 404))
+	}
+	return jsonOK(map[string]any{
+		"ReplicationInstance": map[string]any{
+			"ReplicationInstanceIdentifier": inst.ReplicationInstanceIdentifier,
+			"ReplicationInstanceClass":      inst.ReplicationInstanceClass,
+			"ReplicationInstanceStatus":     inst.ReplicationInstanceStatus,
+			"MultiAZ":                       inst.MultiAZ,
+		},
+	})
+}
+
+// ---- ModifyEndpoint ----
+
+func handleModifyEndpoint(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "EndpointIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("EndpointIdentifier is required"))
+	}
+	ep, ok := store.ModifyEndpoint(id, str(params, "ServerName"), str(params, "DatabaseName"),
+		str(params, "Username"), num(params, "Port", 0))
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Endpoint not found: "+id, 404))
+	}
+	return jsonOK(map[string]any{
+		"Endpoint": map[string]any{
+			"EndpointIdentifier": ep.EndpointIdentifier,
+			"EndpointArn":        ep.EndpointArn,
+			"EndpointType":       ep.EndpointType,
+			"EngineName":         ep.EngineName,
+			"ServerName":         ep.ServerName,
+			"Port":               ep.Port,
+			"DatabaseName":       ep.DatabaseName,
+			"Status":             ep.Status,
+		},
+	})
+}
+
+// ---- Subnet groups ----
+
+func handleCreateReplicationSubnetGroup(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ReplicationSubnetGroupIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ReplicationSubnetGroupIdentifier is required"))
+	}
+	subnetIds := strSlice(params, "SubnetIds")
+	tags := parseTags(params, "Tags")
+	sg, err := store.CreateReplicationSubnetGroup(id, str(params, "ReplicationSubnetGroupDescription"), subnetIds, tags)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceAlreadyExistsFault", err.Error(), 409))
+	}
+	return jsonOK(map[string]any{
+		"ReplicationSubnetGroup": map[string]any{
+			"ReplicationSubnetGroupIdentifier":   sg.ReplicationSubnetGroupIdentifier,
+			"ReplicationSubnetGroupArn":          sg.ReplicationSubnetGroupArn,
+			"ReplicationSubnetGroupDescription":  sg.ReplicationSubnetGroupDescription,
+			"SubnetIds":                          sg.SubnetIds,
+			"VpcId":                              sg.VpcID,
+		},
+	})
+}
+
+func handleDescribeReplicationSubnetGroups(store *Store) (*service.Response, error) {
+	groups := store.DescribeReplicationSubnetGroups()
+	items := make([]map[string]any, 0, len(groups))
+	for _, sg := range groups {
+		items = append(items, map[string]any{
+			"ReplicationSubnetGroupIdentifier":  sg.ReplicationSubnetGroupIdentifier,
+			"ReplicationSubnetGroupDescription": sg.ReplicationSubnetGroupDescription,
+			"SubnetIds":                         sg.SubnetIds,
+			"VpcId":                             sg.VpcID,
+		})
+	}
+	return jsonOK(map[string]any{"ReplicationSubnetGroups": items})
+}
+
+func handleModifyReplicationSubnetGroup(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ReplicationSubnetGroupIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ReplicationSubnetGroupIdentifier is required"))
+	}
+	sg, ok := store.ModifyReplicationSubnetGroup(id, str(params, "ReplicationSubnetGroupDescription"), strSlice(params, "SubnetIds"))
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Subnet group not found: "+id, 404))
+	}
+	return jsonOK(map[string]any{
+		"ReplicationSubnetGroup": map[string]any{
+			"ReplicationSubnetGroupIdentifier":  sg.ReplicationSubnetGroupIdentifier,
+			"ReplicationSubnetGroupDescription": sg.ReplicationSubnetGroupDescription,
+			"SubnetIds":                         sg.SubnetIds,
+		},
+	})
+}
+
+func handleDeleteReplicationSubnetGroup(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ReplicationSubnetGroupIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ReplicationSubnetGroupIdentifier is required"))
+	}
+	if !store.DeleteReplicationSubnetGroup(id) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Subnet group not found: "+id, 404))
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ---- Certificates ----
+
+func handleCreateCertificate(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "CertificateIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("CertificateIdentifier is required"))
+	}
+	tags := parseTags(params, "Tags")
+	cert, err := store.CreateCertificate(id, str(params, "CertificatePem"), tags)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceAlreadyExistsFault", err.Error(), 409))
+	}
+	return jsonOK(map[string]any{
+		"Certificate": map[string]any{
+			"CertificateIdentifier": cert.CertificateIdentifier,
+			"CertificateArn":        cert.CertificateArn,
+			"ValidFromDate":         cert.ValidFromDate.Format("2006-01-02T15:04:05Z"),
+			"ValidToDate":           cert.ValidToDate.Format("2006-01-02T15:04:05Z"),
+		},
+	})
+}
+
+func handleDescribeCertificates(store *Store) (*service.Response, error) {
+	certs := store.DescribeCertificates()
+	items := make([]map[string]any, 0, len(certs))
+	for _, cert := range certs {
+		items = append(items, map[string]any{
+			"CertificateIdentifier": cert.CertificateIdentifier,
+			"CertificateArn":        cert.CertificateArn,
+			"ValidFromDate":         cert.ValidFromDate.Format("2006-01-02T15:04:05Z"),
+			"ValidToDate":           cert.ValidToDate.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	return jsonOK(map[string]any{"Certificates": items})
+}
+
+func handleDeleteCertificate(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "CertificateIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("CertificateIdentifier is required"))
+	}
+	if !store.DeleteCertificate(id) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Certificate not found: "+id, 404))
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ---- Tags ----
+
+func parseTags(params map[string]any, key string) map[string]string {
+	result := make(map[string]string)
+	if v, ok := params[key].([]any); ok {
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				k, _ := m["Key"].(string)
+				val, _ := m["Value"].(string)
+				if k != "" {
+					result[k] = val
+				}
+			}
+		}
+	}
+	return result
+}
+
+func handleAddTagsToResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	tags := parseTags(params, "Tags")
+	if !store.AddTagsToResource(arn, tags) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Resource not found: "+arn, 404))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleRemoveTagsFromResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	keys := strSlice(params, "TagKeys")
+	if !store.RemoveTagsFromResource(arn, keys) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Resource not found: "+arn, 404))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	tags, ok := store.ListTagsForResource(arn)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundFault", "Resource not found: "+arn, 404))
+	}
+	items := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		items = append(items, map[string]any{"Key": k, "Value": v})
+	}
+	return jsonOK(map[string]any{"TagList": items})
+}

@@ -78,6 +78,28 @@ type EventSubscription struct {
 	CreatedAt          time.Time
 }
 
+// ReplicationSubnetGroup represents a DMS replication subnet group.
+type ReplicationSubnetGroup struct {
+	ReplicationSubnetGroupIdentifier string
+	ReplicationSubnetGroupArn        string
+	ReplicationSubnetGroupDescription string
+	SubnetIds                        []string
+	VpcID                            string
+	CreatedAt                        time.Time
+	Tags                             map[string]string
+}
+
+// DMSCertificate represents a DMS SSL certificate.
+type DMSCertificate struct {
+	CertificateIdentifier string
+	CertificateArn        string
+	CertificatePem        string
+	ValidFromDate         time.Time
+	ValidToDate           time.Time
+	CreatedAt             time.Time
+	Tags                  map[string]string
+}
+
 // Store manages DMS resources in memory.
 type Store struct {
 	mu              sync.RWMutex
@@ -86,6 +108,9 @@ type Store struct {
 	tasks           map[string]*ReplicationTask
 	subscriptions   map[string]*EventSubscription
 	connections     []ConnectionTest
+	subnetGroups    map[string]*ReplicationSubnetGroup
+	certificates    map[string]*DMSCertificate
+	tagsByArn       map[string]map[string]string
 	accountID       string
 	region          string
 	lcConfig        *lifecycle.Config
@@ -94,13 +119,16 @@ type Store struct {
 // NewStore returns a new empty DMS Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		instances:     make(map[string]*ReplicationInstance),
-		endpoints:     make(map[string]*Endpoint),
-		tasks:         make(map[string]*ReplicationTask),
+		instances:    make(map[string]*ReplicationInstance),
+		endpoints:    make(map[string]*Endpoint),
+		tasks:        make(map[string]*ReplicationTask),
 		subscriptions: make(map[string]*EventSubscription),
-		accountID:     accountID,
-		region:        region,
-		lcConfig:      lifecycle.DefaultConfig(),
+		subnetGroups: make(map[string]*ReplicationSubnetGroup),
+		certificates: make(map[string]*DMSCertificate),
+		tagsByArn:    make(map[string]map[string]string),
+		accountID:    accountID,
+		region:       region,
+		lcConfig:     lifecycle.DefaultConfig(),
 	}
 }
 
@@ -469,4 +497,203 @@ func (s *Store) GetReplicationTaskStats(arn string) (loaded, loading, errored in
 		}
 	}
 	return 0, 0, 0, false
+}
+
+// ModifyReplicationInstance updates a replication instance.
+func (s *Store) ModifyReplicationInstance(id, newClass string, multiAZ *bool) (*ReplicationInstance, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	inst, ok := s.instances[id]
+	if !ok {
+		return nil, false
+	}
+	if newClass != "" {
+		inst.ReplicationInstanceClass = newClass
+	}
+	if multiAZ != nil {
+		inst.MultiAZ = *multiAZ
+	}
+	return inst, true
+}
+
+// ModifyEndpoint updates an endpoint.
+func (s *Store) ModifyEndpoint(id, server, db, username string, port int) (*Endpoint, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ep, ok := s.endpoints[id]
+	if !ok {
+		return nil, false
+	}
+	if server != "" {
+		ep.ServerName = server
+	}
+	if db != "" {
+		ep.DatabaseName = db
+	}
+	if username != "" {
+		ep.Username = username
+	}
+	if port > 0 {
+		ep.Port = port
+	}
+	return ep, true
+}
+
+// CreateReplicationSubnetGroup creates a subnet group.
+func (s *Store) CreateReplicationSubnetGroup(id, description string, subnetIds []string, tags map[string]string) (*ReplicationSubnetGroup, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.subnetGroups[id]; ok {
+		return nil, fmt.Errorf("subnet group already exists: %s", id)
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	arn := s.arnPrefix() + "subgrp:" + id
+	sg := &ReplicationSubnetGroup{
+		ReplicationSubnetGroupIdentifier:   id,
+		ReplicationSubnetGroupArn:          arn,
+		ReplicationSubnetGroupDescription:  description,
+		SubnetIds:                          subnetIds,
+		VpcID:                              "vpc-mock",
+		CreatedAt:                          time.Now().UTC(),
+		Tags:                               tags,
+	}
+	s.subnetGroups[id] = sg
+	s.tagsByArn[arn] = tags
+	return sg, nil
+}
+
+// DescribeReplicationSubnetGroups returns all subnet groups.
+func (s *Store) DescribeReplicationSubnetGroups() []*ReplicationSubnetGroup {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*ReplicationSubnetGroup, 0, len(s.subnetGroups))
+	for _, sg := range s.subnetGroups {
+		out = append(out, sg)
+	}
+	return out
+}
+
+// ModifyReplicationSubnetGroup updates a subnet group.
+func (s *Store) ModifyReplicationSubnetGroup(id, description string, subnetIds []string) (*ReplicationSubnetGroup, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sg, ok := s.subnetGroups[id]
+	if !ok {
+		return nil, false
+	}
+	if description != "" {
+		sg.ReplicationSubnetGroupDescription = description
+	}
+	if len(subnetIds) > 0 {
+		sg.SubnetIds = subnetIds
+	}
+	return sg, true
+}
+
+// DeleteReplicationSubnetGroup removes a subnet group.
+func (s *Store) DeleteReplicationSubnetGroup(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sg, ok := s.subnetGroups[id]
+	if !ok {
+		return false
+	}
+	delete(s.tagsByArn, sg.ReplicationSubnetGroupArn)
+	delete(s.subnetGroups, id)
+	return true
+}
+
+// CreateCertificate creates a DMS certificate.
+func (s *Store) CreateCertificate(id, pem string, tags map[string]string) (*DMSCertificate, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.certificates[id]; ok {
+		return nil, fmt.Errorf("certificate already exists: %s", id)
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	now := time.Now().UTC()
+	arn := s.arnPrefix() + "cert:" + id
+	cert := &DMSCertificate{
+		CertificateIdentifier: id,
+		CertificateArn:        arn,
+		CertificatePem:        pem,
+		ValidFromDate:         now,
+		ValidToDate:           now.AddDate(1, 0, 0),
+		CreatedAt:             now,
+		Tags:                  tags,
+	}
+	s.certificates[id] = cert
+	s.tagsByArn[arn] = tags
+	return cert, nil
+}
+
+// DescribeCertificates returns all DMS certificates.
+func (s *Store) DescribeCertificates() []*DMSCertificate {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*DMSCertificate, 0, len(s.certificates))
+	for _, cert := range s.certificates {
+		out = append(out, cert)
+	}
+	return out
+}
+
+// DeleteCertificate removes a DMS certificate.
+func (s *Store) DeleteCertificate(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	cert, ok := s.certificates[id]
+	if !ok {
+		return false
+	}
+	delete(s.tagsByArn, cert.CertificateArn)
+	delete(s.certificates, id)
+	return true
+}
+
+// AddTagsToResource adds tags to a DMS resource.
+func (s *Store) AddTagsToResource(arn string, tags map[string]string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return false
+	}
+	for k, v := range tags {
+		existing[k] = v
+	}
+	return true
+}
+
+// RemoveTagsFromResource removes tags from a DMS resource.
+func (s *Store) RemoveTagsFromResource(arn string, keys []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return false
+	}
+	for _, k := range keys {
+		delete(existing, k)
+	}
+	return true
+}
+
+// ListTagsForResource returns tags for a DMS resource.
+func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tags, ok := s.tagsByArn[arn]
+	if !ok {
+		return nil, false
+	}
+	cp := make(map[string]string, len(tags))
+	for k, v := range tags {
+		cp[k] = v
+	}
+	return cp, true
 }

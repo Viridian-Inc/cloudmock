@@ -1,0 +1,58 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: 'Services to benchmark (comma-separated or * for all)'
+        default: '*'
+      mode:
+        description: 'docker, native, or all'
+        default: 'docker'
+      quick:
+        description: 'Quick mode (1 iteration, no load)'
+        type: boolean
+        default: false
+  push:
+    tags: ['v*']
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      - name: Run benchmark
+        env:
+          LOCALSTACK_API_KEY: ${{ secrets.LOCALSTACK_API_KEY }}
+        run: |
+          QUICK_FLAG=""
+          if [ "${{ inputs.quick }}" = "true" ]; then
+            QUICK_FLAG="--quick"
+          fi
+          go run ./benchmarks/cmd/bench \
+            --target=all \
+            --mode=${{ inputs.mode || 'docker' }} \
+            --services="${{ inputs.services || '*' }}" \
+            $QUICK_FLAG
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}
+          path: benchmarks/results/
+
+      - name: Commit results on tag
+        if: github.ref_type == 'tag'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add benchmarks/results/
+          git commit -m "benchmark: ${{ github.ref_name }} results" || true
+          git push || true

@@ -11,8 +11,10 @@ jobs:
         with: { go-version: '1.26' }
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
-      - name: Build dashboard
-        run: cd dashboard && npm ci && npm run build && cp -r dist/ ../pkg/dashboard/dist/
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - name: Install devtools dependencies
+        run: cd devtools && pnpm install --frozen-lockfile
       - name: Build binaries
         run: make release
       - name: Package release archives
@@ -35,8 +37,8 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/neureaux/cloudmock:${{ github.ref_name }}
-            ghcr.io/neureaux/cloudmock:latest
+            ghcr.io/Viridian-Inc/cloudmock:${{ github.ref_name }}
+            ghcr.io/Viridian-Inc/cloudmock:latest
       - name: Publish npm package
         run: |
           cd npm/cloudmock

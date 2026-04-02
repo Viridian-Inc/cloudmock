@@ -244,7 +244,8 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	resp, svcErr := svc.HandleRequest(ctx)
 
 	// 7b. Publish API call event for CloudTrail / Config subscribers.
-	if g.bus != nil {
+	// Skip event construction entirely when nobody is listening.
+	if g.bus != nil && g.bus.HasSubscribers() {
 		detail := map[string]any{
 			"eventSource":    svcName + ".amazonaws.com",
 			"eventName":      action,

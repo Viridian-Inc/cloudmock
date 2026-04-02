@@ -20,6 +20,26 @@ import (
 	"go.opentelemetry.io/otel/codes"
 )
 
+// memStatsCache caches runtime.MemStats to avoid calling ReadMemStats on every request.
+// ReadMemStats is expensive (~1ms) and triggers a STW pause; sampling every N seconds is sufficient.
+var (
+	memStatsMu        sync.Mutex
+	memStatsCache     runtime.MemStats
+	memStatsLastRead  time.Time
+	memStatsInterval  = 5 * time.Second
+)
+
+func cachedMemAllocKB() int64 {
+	memStatsMu.Lock()
+	if time.Since(memStatsLastRead) > memStatsInterval {
+		runtime.ReadMemStats(&memStatsCache)
+		memStatsLastRead = time.Now()
+	}
+	alloc := int64(memStatsCache.Alloc / 1024)
+	memStatsMu.Unlock()
+	return alloc
+}
+
 // maxBodyCapture is the maximum number of bytes captured for request/response bodies.
 const maxBodyCapture = 10 * 1024
 
@@ -286,7 +306,29 @@ func firstBroadcaster(bb []RequestBroadcaster) RequestBroadcaster {
 
 // LoggingMiddlewareWithOpts wraps a gateway handler and records request data with full options.
 func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *RequestStats, opts LoggingMiddlewareOpts) http.Handler {
+	productionMode := opts.DataPlane != nil && opts.DataPlane.Mode == "production"
+	hasTraceStore := opts.TraceStore != nil
+	hasSLO := opts.SLOEngine != nil
+	hasBroadcaster := opts.Broadcaster != nil
+	hasOnRequest := opts.OnRequest != nil
+
+	// Lightweight mode: when there is no log, stats, trace store, SLO, broadcaster,
+	// or OnRequest handler, skip all observability overhead.
+	lightweight := log == nil && stats == nil && !hasTraceStore && !hasSLO && !hasBroadcaster && !hasOnRequest && !productionMode
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Fast path for health checks — no observability overhead.
+		if r.URL.Path == "/_cloudmock/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
+
+		// Lightweight mode skips all observability.
+		if lightweight {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		start := time.Now()
 
 		// Extract or generate trace ID.
@@ -304,15 +346,19 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		w.Header().Set("X-Cloudmock-Trace-Id", traceID)
 		w.Header().Set("X-Cloudmock-Span-Id", spanID)
 
-		// Capture request headers.
-		reqHeaders := make(map[string]string, len(r.Header))
-		for k := range r.Header {
-			reqHeaders[k] = r.Header.Get(k)
+		// Capture request headers — only when we have subscribers that need them.
+		var reqHeaders map[string]string
+		if hasBroadcaster || productionMode {
+			reqHeaders = make(map[string]string, len(r.Header))
+			for k := range r.Header {
+				reqHeaders[k] = r.Header.Get(k)
+			}
 		}
 
 		// Capture request body (first maxBodyCapture bytes), then restore it.
+		// Only capture when we have subscribers that display body content.
 		var reqBody string
-		if r.Body != nil {
+		if (hasBroadcaster || productionMode) && r.Body != nil {
 			bodyBytes, err := io.ReadAll(io.LimitReader(r.Body, int64(maxBodyCapture)+1))
 			if err == nil {
 				if len(bodyBytes) > maxBodyCapture {
@@ -340,20 +386,8 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 
 		var errMsg string
 		if rec.statusCode >= 400 {
-			// Try to extract error from response body (first 200 chars)
-			body := rec.body.String()
-			if len(body) > 200 {
-				body = body[:200]
-			}
-			if rec.statusCode >= 400 {
-				errMsg = fmt.Sprintf("HTTP %d", rec.statusCode)
-			}
-			_ = body
+			errMsg = fmt.Sprintf("HTTP %d", rec.statusCode)
 		}
-
-		// Capture runtime profiling stats
-		var memStats runtime.MemStats
-		runtime.ReadMemStats(&memStats)
 
 		entry := RequestEntry{
 			ID:             fmt.Sprintf("%d-%d", id, counter),
@@ -370,14 +404,12 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			CallerID:       extractCallerID(r),
 			Error:          errMsg,
 			Level:          "infra", // AWS SDK calls to cloudmock gateway
-			MemAllocKB:     int64(memStats.Alloc / 1024),
+			MemAllocKB:     cachedMemAllocKB(),
 			Goroutines:     runtime.NumGoroutine(),
 			RequestHeaders: reqHeaders,
 			RequestBody:    reqBody,
 			ResponseBody:   rec.body.String(),
 		}
-
-		productionMode := opts.DataPlane != nil && opts.DataPlane.Mode == "production"
 
 		if productionMode {
 			// Production mode: write request via DataPlane, skip local stores.
@@ -426,13 +458,15 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			span.End()
 		} else {
 			// Local mode: write directly to in-memory stores.
-			log.Add(entry)
-			if svcName != "" {
+			if log != nil {
+				log.Add(entry)
+			}
+			if stats != nil && svcName != "" {
 				stats.Increment(svcName)
 			}
 
 			// Store trace context.
-			if opts.TraceStore != nil {
+			if hasTraceStore {
 				endTime := time.Now()
 				// Capture distributed context from headers
 				metadata := extractTraceMetadata(r)
@@ -465,18 +499,18 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			}
 
 			// Record SLO metrics.
-			if opts.SLOEngine != nil {
+			if hasSLO {
 				opts.SLOEngine.Record(svcName, action, latencyMs, rec.statusCode)
 			}
 		}
 
 		// Broadcast request event for SSE clients — always runs regardless of mode.
-		if opts.Broadcaster != nil {
+		if hasBroadcaster {
 			opts.Broadcaster.Broadcast("request", entry)
 		}
 
 		// Feed request metrics to anomaly detector or similar consumers.
-		if opts.OnRequest != nil && svcName != "" {
+		if hasOnRequest && svcName != "" {
 			opts.OnRequest(svcName, latencyMs, rec.statusCode)
 		}
 	})

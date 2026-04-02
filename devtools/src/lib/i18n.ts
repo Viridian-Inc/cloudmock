@@ -1,0 +1,65 @@
+const strings: Record<string, Record<string, string>> = {
+  en: {
+    'nav.activity': 'Activity',
+    'nav.topology': 'Topology',
+    'nav.services': 'Services',
+    'nav.traces': 'Traces',
+    'nav.metrics': 'Metrics',
+    'nav.dashboards': 'Dashboards',
+    'nav.s3_browser': 'S3',
+    'nav.dynamodb': 'DynamoDB',
+    'nav.sqs_browser': 'SQS',
+    'nav.cognito': 'Cognito',
+    'nav.lambda': 'Lambda',
+    'nav.iam': 'IAM',
+    'nav.mail': 'Mail',
+    'nav.slos': 'SLOs',
+    'nav.incidents': 'Incidents',
+    'nav.monitors': 'Monitors',
+    'nav.chaos': 'Chaos',
+    'nav.regressions': 'Regressions',
+    'nav.profiler': 'Profiler',
+    'nav.ai_debug': 'AI Debug',
+    'nav.routing': 'Routing',
+    'nav.traffic': 'Traffic',
+    'nav.rum': 'RUM',
+    'nav.settings': 'Settings',
+    'status.connected': 'Connected',
+    'status.disconnected': 'Disconnected',
+    'status.offline_cached': 'Offline (cached)',
+    'activity.live_sse': 'Live (SSE)',
+    'activity.live_polling': 'Live (polling)',
+    'activity.connecting': 'Connecting...',
+    'activity.no_events': 'No events to display',
+    'activity.copy_curl': 'Copy as curl',
+    'activity.copied': 'Copied!',
+    'activity.replay': 'Replay',
+    'activity.export_har': 'Export HAR',
+    'topology.services': 'Services',
+    'topology.collapse': 'Collapse',
+    'topology.expand': 'Expand',
+    'topology.reset': 'Reset',
+    'topology.live': 'Live',
+    'topology.paused': 'Paused',
+    'settings.connections': 'Connections',
+    'settings.routing': 'Routing',
+    'settings.domains': 'Domains',
+    'settings.config': 'Config',
+    'settings.appearance': 'Appearance',
+    'settings.theme_dark': 'Dark',
+    'settings.theme_light': 'Light',
+    'common.no_data': 'No data available',
+    'common.loading': 'Loading...',
+    'common.error': 'Something went wrong',
+    'common.try_again': 'Try Again',
+  },
+};
+
+let _locale = 'en';
+
+export function setLocale(locale: string): void { _locale = locale; }
+export function getLocale(): string { return _locale; }
+
+export function t(key: string, fallback?: string): string {
+  return strings[_locale]?.[key] ?? fallback ?? key;
+}

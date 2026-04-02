@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Operational Service Map — Design</title>
+<style>
+  :root { --bg: #0f1117; --surface: #1a1d27; --surface2: #242836; --border: rgba(255,255,255,0.08); --text: #e2e4e9; --muted: rgba(255,255,255,0.45); --green: #22c55e; --yellow: #fbbf24; --red: #ef4444; --blue: #3b82f6; --teal: #4AE5F8; --purple: #a78bfa; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, system-ui, sans-serif; }
+  .header { background: linear-gradient(135deg, rgba(239,68,68,0.12), rgba(99,102,241,0.08)); border-bottom: 1px solid var(--border); padding: 36px 48px; }
+  .header h1 { font-size: 26px; margin-bottom: 4px; }
+  .header .sub { color: var(--muted); font-size: 14px; }
+  .content { max-width: 1100px; margin: 0 auto; padding: 28px 48px; }
+  .section { margin-bottom: 32px; }
+  .section h2 { font-size: 17px; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+  /* Mockup */
+  .mockup { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .mockup-bar { display: flex; align-items: center; gap: 12px; padding: 8px 14px; background: rgba(0,0,0,0.3); border-bottom: 1px solid var(--border); font-size: 11px; }
+  .mockup-body { padding: 16px; }
+
+  /* Service map mockup */
+  .map-container { display: flex; gap: 0; height: 420px; }
+  .map-center { flex: 1; padding: 16px; position: relative; overflow: hidden; }
+  .map-right { width: 280px; border-left: 1px solid var(--border); overflow-y: auto; }
+  .map-bottom { border-top: 1px solid var(--border); padding: 10px 16px; height: 60px; font-size: 10px; }
+
+  /* Nodes */
+  .svc-node { display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 20px; border: 2px solid; font-size: 12px; background: var(--surface); position: absolute; white-space: nowrap; cursor: default; }
+  .svc-node .dot { width: 8px; height: 8px; border-radius: 50%; }
+  .svc-node .label { font-weight: 600; }
+  .svc-node .metric { font-size: 9px; color: var(--muted); margin-left: 4px; }
+  .svc-node.green { border-color: var(--green); }
+  .svc-node.green .dot { background: var(--green); }
+  .svc-node.yellow { border-color: var(--yellow); }
+  .svc-node.yellow .dot { background: var(--yellow); box-shadow: 0 0 8px rgba(251,191,36,0.4); }
+  .svc-node.red { border-color: var(--red); animation: pulse-red 2s infinite; }
+  .svc-node.red .dot { background: var(--red); box-shadow: 0 0 8px rgba(239,68,68,0.5); }
+  @keyframes pulse-red { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.3); } 50% { box-shadow: 0 0 12px 4px rgba(239,68,68,0.2); } }
+
+  .badge { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--red); color: white; font-size: 10px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+  .deploy-dot { position: absolute; top: -4px; left: 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); border: 2px solid var(--surface); }
+
+  .user-impact { background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3); border-radius: 6px; padding: 6px 12px; font-size: 11px; color: var(--red); position: absolute; bottom: 12px; left: 16px; }
+
+  /* Edge */
+  .edge-label { font-size: 9px; color: var(--muted); position: absolute; }
+
+  /* Inspector */
+  .insp-header { padding: 12px 14px; border-bottom: 1px solid var(--border); background: rgba(0,0,0,0.2); }
+  .insp-title { font-size: 14px; font-weight: 600; }
+  .insp-sub { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .insp-tabs { display: flex; border-bottom: 1px solid var(--border); }
+  .insp-tab { padding: 6px 12px; font-size: 10px; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; }
+  .insp-tab.active { color: var(--teal); border-color: var(--teal); }
+  .insp-body { padding: 12px 14px; }
+  .sparkline { height: 36px; background: linear-gradient(to right, rgba(74,229,248,0.05), rgba(74,229,248,0.15)); border-radius: 4px; margin-bottom: 8px; position: relative; overflow: hidden; }
+  .sparkline-line { position: absolute; bottom: 0; left: 0; right: 0; height: 100%; background: linear-gradient(to top, rgba(74,229,248,0.3), transparent); clip-path: polygon(0% 80%, 10% 70%, 20% 60%, 30% 55%, 40% 40%, 50% 30%, 55% 45%, 60% 50%, 70% 35%, 80% 25%, 90% 30%, 100% 20%, 100% 100%, 0% 100%); }
+  .sparkline-label { position: absolute; top: 4px; left: 6px; font-size: 9px; color: var(--muted); }
+  .sparkline-value { position: absolute; top: 4px; right: 6px; font-size: 11px; font-weight: 600; color: var(--teal); }
+
+  .stat-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 11px; border-bottom: 1px solid var(--border); }
+  .stat-label { color: var(--muted); }
+
+  /* Timeline */
+  .timeline { display: flex; align-items: center; gap: 0; position: relative; height: 30px; }
+  .timeline-line { flex: 1; height: 2px; background: rgba(255,255,255,0.08); position: relative; }
+  .timeline-event { position: absolute; width: 12px; height: 12px; border-radius: 50%; top: -5px; cursor: pointer; }
+  .timeline-event.deploy { background: var(--blue); }
+  .timeline-event.incident { background: var(--red); }
+  .timeline-event.alert { background: var(--yellow); }
+  .timeline-now { font-size: 9px; color: var(--muted); margin-left: 8px; }
+
+  /* Domain groups */
+  .domain { margin-bottom: 12px; }
+  .domain-header { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); padding: 4px 0; margin-bottom: 4px; }
+  .domain-svc { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: 6px; font-size: 12px; cursor: pointer; }
+  .domain-svc:hover { background: var(--surface2); }
+  .domain-svc .health { width: 6px; height: 6px; border-radius: 50%; }
+  .domain-svc .name { flex: 1; }
+  .domain-svc .routes { font-size: 9px; color: var(--muted); }
+
+  /* Routing toggle */
+  .routing { display: flex; align-items: center; gap: 8px; padding: 8px 0; font-size: 11px; }
+  .routing-toggle { display: flex; background: var(--surface2); border-radius: 12px; overflow: hidden; }
+  .routing-opt { padding: 3px 10px; font-size: 10px; cursor: pointer; }
+  .routing-opt.active { background: var(--teal); color: #000; font-weight: 600; border-radius: 12px; }
+
+  /* Phase cards */
+  .phase { border-radius: 8px; padding: 14px; border-left: 4px solid; }
+  .phase h4 { font-size: 13px; margin-bottom: 4px; }
+  .phase p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .phase ul { font-size: 12px; color: var(--muted); padding-left: 16px; line-height: 1.7; }
+
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Operational Service Map</h1>
+  <div class="sub">Live health, metrics, incidents, deploys — the first screen after getting paged</div>
+</div>
+
+<div class="content">
+
+  <!-- Full mockup -->
+  <div class="section">
+    <h2>Layout</h2>
+    <div class="mockup">
+      <div class="mockup-bar">
+        <span style="font-weight:600">🗺️ Topology</span>
+        <span style="background:rgba(255,255,255,0.08);padding:2px 8px;border-radius:4px">Time: <strong>Live</strong> ▾</span>
+        <span style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px">15m</span>
+        <span style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px">1h</span>
+        <span style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px">6h</span>
+        <span style="background:rgba(255,255,255,0.06);padding:2px 8px;border-radius:4px">24h</span>
+        <span style="flex:1"></span>
+        <span style="color:var(--red)">🔴 2 active incidents</span>
+        <span style="color:var(--blue)">🔵 Deploy 3m ago</span>
+      </div>
+      <div class="map-container">
+        <div class="map-center" style="background: #080d17;">
+          <!-- Clients -->
+          <div class="svc-node green" style="top:20px;left:40px"><span class="dot"></span><span class="label">📱 Expo App</span></div>
+          <div class="svc-node green" style="top:20px;left:220px"><span class="dot"></span><span class="label">💼 Admin Portal</span></div>
+          <div class="svc-node green" style="top:20px;left:420px"><span class="dot"></span><span class="label">🌐 Client Portal</span></div>
+
+          <!-- API -->
+          <div class="svc-node yellow" style="top:100px;left:140px;z-index:2">
+            <span class="dot"></span><span class="label">🔀 BFF Service</span><span class="metric">42 req/s · p99: 380ms</span>
+            <span class="deploy-dot"></span>
+            <span class="badge">1</span>
+          </div>
+          <div class="svc-node green" style="top:100px;left:420px"><span class="dot"></span><span class="label">📡 GraphQL</span><span class="metric">12 req/s</span></div>
+
+          <!-- Compute -->
+          <div class="svc-node green" style="top:185px;left:30px"><span class="dot"></span><span class="label">📋 Attendance</span></div>
+          <div class="svc-node red" style="top:185px;left:190px"><span class="dot"></span><span class="label">💳 Billing</span><span class="badge">1</span></div>
+          <div class="svc-node green" style="top:185px;left:340px"><span class="dot"></span><span class="label">🔔 Notifications</span></div>
+          <div class="svc-node green" style="top:185px;left:510px"><span class="dot"></span><span class="label">🏢 Orgs</span></div>
+
+          <!-- Data -->
+          <div class="svc-node green" style="top:270px;left:80px"><span class="dot"></span><span class="label">📊 DynamoDB</span><span class="metric">42 tables</span></div>
+          <div class="svc-node green" style="top:270px;left:270px"><span class="dot"></span><span class="label">👤 Cognito</span></div>
+          <div class="svc-node green" style="top:270px;left:410px"><span class="dot"></span><span class="label">📬 SQS</span></div>
+          <div class="svc-node green" style="top:270px;left:520px"><span class="dot"></span><span class="label">📢 SNS</span></div>
+
+          <!-- User impact banner -->
+          <div class="user-impact">⚠️ User-Facing Impact: BFF p99 elevated (380ms &gt; 200ms SLO) — Billing service 5xx errors propagating to checkout</div>
+
+          <!-- Edge labels -->
+          <div class="edge-label" style="top:65px;left:160px;color:var(--teal)">42 req/s · 12ms</div>
+          <div class="edge-label" style="top:148px;left:100px;color:var(--muted)">8 req/s</div>
+          <div class="edge-label" style="top:148px;left:260px;color:var(--red)">3 req/s · 1.2s ⚠</div>
+        </div>
+
+        <!-- Inspector -->
+        <div class="map-right">
+          <div class="insp-header">
+            <div class="insp-title">🔀 BFF Service</div>
+            <div class="insp-sub">API · server · 🟡 Degraded</div>
+          </div>
+          <div class="insp-tabs">
+            <div class="insp-tab active">Metrics</div>
+            <div class="insp-tab">Endpoints</div>
+            <div class="insp-tab">Deploys</div>
+            <div class="insp-tab">Incidents</div>
+            <div class="insp-tab">Conns</div>
+          </div>
+          <div class="insp-body">
+            <div class="sparkline">
+              <div class="sparkline-line"></div>
+              <div class="sparkline-label">req/s</div>
+              <div class="sparkline-value">42</div>
+            </div>
+            <div class="sparkline" style="background:linear-gradient(to right,rgba(251,191,36,0.05),rgba(251,191,36,0.2))">
+              <div class="sparkline-line" style="background:linear-gradient(to top,rgba(251,191,36,0.4),transparent);clip-path:polygon(0% 60%,20% 55%,40% 50%,50% 30%,55% 20%,60% 15%,70% 12%,80% 10%,90% 15%,100% 12%,100% 100%,0% 100%)"></div>
+              <div class="sparkline-label">p99 latency</div>
+              <div class="sparkline-value" style="color:var(--yellow)">380ms</div>
+            </div>
+            <div class="sparkline" style="background:linear-gradient(to right,rgba(239,68,68,0.03),rgba(239,68,68,0.1))">
+              <div class="sparkline-line" style="background:linear-gradient(to top,rgba(239,68,68,0.3),transparent);clip-path:polygon(0% 90%,20% 88%,40% 85%,50% 70%,55% 50%,60% 40%,70% 45%,80% 42%,90% 40%,100% 38%,100% 100%,0% 100%)"></div>
+              <div class="sparkline-label">error rate</div>
+              <div class="sparkline-value" style="color:var(--red)">3.2%</div>
+            </div>
+
+            <div style="margin-top:12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">SLO</div>
+            <div class="stat-row"><span class="stat-label">p99 budget</span><span style="color:var(--yellow)">12% remaining</span></div>
+            <div class="stat-row"><span class="stat-label">Error budget</span><span style="color:var(--red)">-2% (breaching)</span></div>
+
+            <div style="margin-top:12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Routing</div>
+            <div class="routing">
+              <div class="routing-toggle">
+                <span class="routing-opt active">Local</span>
+                <span class="routing-opt">Cloud (dev)</span>
+              </div>
+              <span style="font-size:10px;color:var(--muted)">:3202</span>
+            </div>
+
+            <div style="margin-top:12px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">Recent Deploy</div>
+            <div style="font-size:11px">
+              <div style="color:var(--blue)">3m ago</div>
+              <div>fix: auth token refresh</div>
+              <div style="color:var(--muted);font-size:10px">@megan · main · #142</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Timeline -->
+      <div class="map-bottom">
+        <div style="font-size:9px;color:var(--muted);margin-bottom:4px">TIMELINE</div>
+        <div class="timeline">
+          <div class="timeline-line">
+            <div class="timeline-event deploy" style="left:15%" title="Deploy: billing v2.1"></div>
+            <div class="timeline-event incident" style="left:35%" title="Incident: 5xx spike"></div>
+            <div class="timeline-event deploy" style="left:60%" title="Deploy: fix auth"></div>
+            <div class="timeline-event alert" style="left:85%" title="Alert: p99 > SLO"></div>
+          </div>
+          <span class="timeline-now">now</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Node health states -->
+  <div class="section">
+    <h2>Health States</h2>
+    <div class="grid-3">
+      <div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:14px">
+        <div style="font-weight:600;color:var(--green);margin-bottom:4px">🟢 Healthy</div>
+        <div style="font-size:12px;color:var(--muted)">error rate &lt; 1%<br>p99 &lt; SLO threshold<br>No active incidents</div>
+      </div>
+      <div style="background:rgba(251,191,36,0.08);border:1px solid rgba(251,191,36,0.2);border-radius:8px;padding:14px">
+        <div style="font-weight:600;color:var(--yellow);margin-bottom:4px">🟡 Degraded</div>
+        <div style="font-size:12px;color:var(--muted)">error rate 1-5%<br>OR p99 within 80% of SLO<br>Warrants attention</div>
+      </div>
+      <div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:14px">
+        <div style="font-weight:600;color:var(--red);margin-bottom:4px">🔴 Critical</div>
+        <div style="font-size:12px;color:var(--muted)">error rate &gt; 5%<br>OR p99 &gt; SLO threshold<br>OR active incident</div>
+      </div>
+    </div>
+    <div style="margin-top:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:12px;font-size:12px">
+      <strong style="color:var(--red)">User-Facing Impact</strong>: Auto-detected via path analysis (Client → BFF → failing service). Pulsing red border + banner. Manual override per service in domain config.
+    </div>
+  </div>
+
+  <!-- Service browser by domain -->
+  <div class="section">
+    <h2>Service Browser (by Domain)</h2>
+    <div class="grid-2">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="domain">
+          <div class="domain-header">Core Platform</div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🔐 Identity</span><span class="routes">19 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🏢 Organizations</span><span class="routes">105 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">👥 Membership</span><span class="routes">12 routes</span></div>
+        </div>
+        <div class="domain">
+          <div class="domain-header">Scheduling</div>
+          <div class="domain-svc"><span class="health" style="background:var(--yellow)"></span><span class="name">📋 Attendance</span><span class="routes">30 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">📅 Calendar</span><span class="routes">78 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🛡️ Compliance</span><span class="routes">51 routes</span></div>
+        </div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:14px">
+        <div class="domain">
+          <div class="domain-header">Commerce</div>
+          <div class="domain-svc"><span class="health" style="background:var(--red)"></span><span class="name">💳 Billing</span><span class="routes">36 routes · <span style="color:var(--red)">1 incident</span></span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🛒 Orders</span><span class="routes">11 routes</span></div>
+        </div>
+        <div class="domain">
+          <div class="domain-header">Engagement</div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🔔 Notifications</span><span class="routes">24 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">🔌 Integrations</span><span class="routes">30 routes</span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">✉️ Invitation</span><span class="routes">8 routes</span></div>
+        </div>
+        <div class="domain">
+          <div class="domain-header">Platform Services</div>
+          <div class="domain-svc"><span class="health" style="background:var(--yellow)"></span><span class="name">🔀 BFF</span><span class="routes">220 routes · <span style="color:var(--yellow)">degraded</span></span></div>
+          <div class="domain-svc"><span class="health" style="background:var(--green)"></span><span class="name">📡 GraphQL</span><span class="routes"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Implementation phases -->
+  <div class="section">
+    <h2>Implementation Phases</h2>
+    <div style="display:grid;gap:10px">
+      <div class="phase" style="background:rgba(34,197,94,0.06);border-color:var(--green)">
+        <h4>Phase A: Live Service Map <span class="tag" style="background:rgba(34,197,94,0.2);color:var(--green)">First</span></h4>
+        <ul>
+          <li>Health state computation (green/yellow/red from /api/metrics)</li>
+          <li>Node coloring + user-facing impact detection (path BFS)</li>
+          <li>Edge metrics (req/s, p99) from topology callCount/avgLatencyMs</li>
+          <li>Incident badges + deploy markers on nodes</li>
+          <li>Polling hooks (metrics every 10s, topology/deploys/incidents every 30s)</li>
+        </ul>
+      </div>
+      <div class="phase" style="background:rgba(99,102,241,0.06);border-color:var(--purple)">
+        <h4>Phase B: Inspector Tabs</h4>
+        <ul>
+          <li>Metrics tab with sparkline charts (req/s, p99, error rate)</li>
+          <li>Endpoints tab from service-manifest.json + OpenAPI scan</li>
+          <li>Deploys tab from /api/deploys</li>
+          <li>Incidents tab with acknowledge/resolve</li>
+          <li>Connections tab with blast radius count</li>
+        </ul>
+      </div>
+      <div class="phase" style="background:rgba(251,191,36,0.06);border-color:var(--yellow)">
+        <h4>Phase C: Timeline + Time Travel</h4>
+        <ul>
+          <li>Timeline bar (deploys, incidents, alerts)</li>
+          <li>Time range selector (Live, 15m, 1h, 6h, 24h, 3d, 7d)</li>
+          <li>Historical scrubbing — map shows past health states</li>
+          <li>SQLite persistence layer in Rust (7-day retention)</li>
+        </ul>
+      </div>
+      <div class="phase" style="background:rgba(236,72,153,0.06);border-color:#f472b6">
+        <h4>Phase D: Service Browser + Routing</h4>
+        <ul>
+          <li>Domain-grouped service list (explicit config)</li>
+          <li>Local/cloud routing toggle per service</li>
+          <li>OpenAPI spec file scanning</li>
+          <li>Domain config file (service-domains.json)</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <div style="text-align:center;font-size:11px;color:var(--muted);padding:20px 0;border-top:1px solid var(--border)">
+    Spec: <code>docs/superpowers/specs/2026-03-30-operational-service-map-design.md</code>
+  </div>
+</div>
+</body>
+</html>

@@ -1,7 +1,7 @@
 .PHONY: build build-gateway build-cli build-cmk build-tools build-plugins build-plugin-example build-dashboard dev restart test test-all lint clean proto docker docker-push docker-up docker-down release help
 
 VERSION ?= 1.0.0
-DEVTOOLS_DIR ?= ../neureaux-devtools
+DEVTOOLS_DIR ?= devtools
 
 help:
 	@echo "Available targets:"

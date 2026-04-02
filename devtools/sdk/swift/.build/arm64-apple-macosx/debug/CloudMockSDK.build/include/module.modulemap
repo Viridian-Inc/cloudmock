@@ -1,0 +1,3 @@
+module CloudMockSDK {
+    header "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/include/CloudMockSDK-Swift.h"
+}

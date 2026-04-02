@@ -1,0 +1,253 @@
+/* Environment Selector — dropdown in the status bar */
+
+.env-selector {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.env-selector-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.env-selector-trigger:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--border-default);
+}
+
+.env-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.env-name {
+  font-weight: 500;
+}
+
+.env-chevron {
+  opacity: 0.5;
+  transition: transform 0.15s;
+}
+
+/* Dropdown */
+
+.env-dropdown {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 240px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  z-index: 1000;
+}
+
+.env-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.env-option:hover {
+  background: var(--bg-tertiary);
+}
+
+.env-option.active {
+  background: var(--bg-secondary);
+}
+
+.env-option.unconfigured {
+  opacity: 0.6;
+}
+
+.env-option-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.env-option-name {
+  display: block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.env-option-endpoint {
+  display: block;
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.env-active-badge {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--success);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.env-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-tertiary);
+  cursor: pointer;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+}
+
+.env-option:hover .env-edit-btn {
+  opacity: 1;
+}
+
+.env-edit-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+/* Modals */
+
+.env-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.env-modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: 12px;
+  padding: 24px;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.env-modal-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--error-subtle);
+  color: var(--error);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 16px;
+}
+
+.env-modal-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.env-modal-body {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 20px;
+}
+
+.env-modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.env-modal-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid var(--border-default);
+  transition: background 0.15s;
+}
+
+.env-modal-btn.cancel {
+  background: transparent;
+  color: var(--text-secondary);
+}
+
+.env-modal-btn.cancel:hover {
+  background: var(--bg-tertiary);
+}
+
+.env-modal-btn.confirm {
+  background: var(--error);
+  color: #fff;
+  border-color: var(--error);
+}
+
+.env-modal-btn.confirm:hover {
+  opacity: 0.9;
+}
+
+/* Edit endpoint input */
+
+.env-edit-label {
+  display: block;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+}
+
+.env-edit-input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  margin-top: 6px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.env-edit-input:focus {
+  border-color: var(--info);
+}
+
+.env-edit-input::placeholder {
+  color: var(--text-tertiary);
+}

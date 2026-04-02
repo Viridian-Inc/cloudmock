@@ -1,10 +1,10 @@
-# Stage 1: Build devtools UI from neureaux-devtools
-FROM node:20-alpine AS dashboard
+# Stage 1: Build devtools UI
+FROM node:22-alpine AS dashboard
 RUN corepack enable && corepack prepare pnpm@latest --activate
 WORKDIR /devtools
-COPY neureaux-devtools/package.json neureaux-devtools/pnpm-lock.yaml ./
+COPY devtools/package.json devtools/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
-COPY neureaux-devtools/ ./
+COPY devtools/ ./
 RUN pnpm build
 
 # Stage 2: Build Go binary

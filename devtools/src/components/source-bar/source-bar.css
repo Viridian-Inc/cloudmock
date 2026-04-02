@@ -1,0 +1,63 @@
+.source-bar {
+  height: var(--source-bar-height);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  gap: 8px;
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  font-size: 12px;
+  color: var(--text-primary);
+  cursor: default;
+}
+
+.source-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.source-chip-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 6px rgba(54, 217, 130, 0.4);
+}
+
+.source-chip-dot.disconnected {
+  background: var(--text-tertiary);
+}
+
+.source-chip-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+.source-chip-name {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.source-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px dashed var(--border-default);
+  font-size: 12px;
+  color: var(--text-tertiary);
+  cursor: not-allowed;
+  font-family: var(--font-sans);
+  opacity: 0.6;
+}

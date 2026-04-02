@@ -1,0 +1,157 @@
+.connection-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.connection-picker {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  width: 480px;
+  max-width: 90vw;
+  box-shadow: var(--shadow-lg);
+}
+
+.connection-picker-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.connection-picker-subtitle {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-bottom: 24px;
+}
+
+.connection-picker-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.connection-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+  font-family: var(--font-sans);
+  color: var(--text-primary);
+  width: 100%;
+}
+
+.connection-option:hover:not(:disabled) {
+  border-color: var(--border-strong);
+  background: var(--bg-elevated);
+}
+
+.connection-option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.connection-option-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+  width: 40px;
+  text-align: center;
+}
+
+.connection-option-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.connection-option-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.connection-option-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.connection-option-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg-primary);
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+.connection-custom-input {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+}
+
+.connection-custom-input .input {
+  flex: 1;
+}
+
+.connection-option-tags {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.connection-tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  color: var(--text-tertiary);
+}
+
+.connection-tag.green {
+  background: rgba(34,197,94,0.15);
+  color: var(--success);
+}
+
+.connection-hosted-panel {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+  background: var(--bg-tertiary);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.connection-hosted-desc {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.connection-hosted-signin {
+  align-self: flex-start;
+}
+
+.connection-picker-version {
+  text-align: center;
+  margin-top: 20px;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  opacity: 0.4;
+}

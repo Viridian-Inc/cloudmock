@@ -1,0 +1,40 @@
+{
+  "": {
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/master.swiftdeps"
+  },
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/CloudMock.swift": {
+    "dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.d",
+    "object": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.swift.o",
+    "swiftmodule": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock~partial.swiftmodule",
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.swiftdeps",
+    "diagnostics": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.dia"
+  },
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/Connection.swift": {
+    "dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.d",
+    "object": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.swift.o",
+    "swiftmodule": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection~partial.swiftmodule",
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.swiftdeps",
+    "diagnostics": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.dia"
+  },
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/ErrorInterceptor.swift": {
+    "dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.d",
+    "object": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.swift.o",
+    "swiftmodule": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor~partial.swiftmodule",
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.swiftdeps",
+    "diagnostics": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.dia"
+  },
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/LogInterceptor.swift": {
+    "dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.d",
+    "object": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.swift.o",
+    "swiftmodule": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor~partial.swiftmodule",
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.swiftdeps",
+    "diagnostics": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.dia"
+  },
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/URLSessionInterceptor.swift": {
+    "dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.d",
+    "object": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.swift.o",
+    "swiftmodule": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor~partial.swiftmodule",
+    "swift-dependencies": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.swiftdeps",
+    "diagnostics": "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.dia"
+  }
+}

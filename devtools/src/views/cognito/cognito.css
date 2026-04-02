@@ -1,0 +1,320 @@
+/* Cognito Browser View */
+.cognito-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Sidebar */
+.cognito-sidebar {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  border-right: 1px solid var(--border-subtle);
+  background: var(--bg-secondary);
+  overflow: hidden;
+}
+
+.cognito-sidebar-header {
+  padding: 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.cognito-sidebar-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.cognito-pool-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background 0.1s;
+  font-size: 12px;
+}
+
+.cognito-pool-item:hover {
+  background: var(--bg-tertiary);
+}
+
+.cognito-pool-item.active {
+  background: var(--bg-elevated);
+  border-left: 2px solid var(--brand-teal);
+  padding-left: 10px;
+}
+
+.cognito-pool-item .pool-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.cognito-pool-item .pool-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.cognito-pool-item .pool-id {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cognito-pool-item .count {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  min-width: 20px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: rgba(74, 229, 248, 0.1);
+  color: var(--text-accent);
+  margin-left: 8px;
+}
+
+/* Main content */
+.cognito-main {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.cognito-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.cognito-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-tertiary);
+}
+
+/* User table */
+.cognito-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.cognito-table th {
+  position: sticky;
+  top: 0;
+  background: var(--bg-tertiary);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.cognito-table td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.cognito-table tbody tr:hover {
+  background: var(--bg-tertiary);
+}
+
+/* Status badge */
+.cognito-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.cognito-status-badge.confirmed {
+  background: var(--success, #10b981);
+}
+
+.cognito-status-badge.unconfirmed {
+  background: var(--warning, #f59e0b);
+}
+
+.cognito-status-badge.force-change {
+  background: var(--brand-blue, #097ff5);
+}
+
+.cognito-status-badge.compromised {
+  background: var(--error, #ff4e5e);
+}
+
+.cognito-status-badge.reset-required {
+  background: var(--warning, #f59e0b);
+}
+
+.cognito-status-badge.default {
+  background: var(--text-tertiary);
+}
+
+/* User detail card */
+.cognito-detail-card {
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-secondary);
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+
+.cognito-detail-card-header {
+  padding: 12px 16px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-subtle);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.cognito-detail-card-body {
+  padding: 12px 16px;
+}
+
+.cognito-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  font-size: 13px;
+}
+
+/* Modal */
+.cognito-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.cognito-modal {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  min-width: 360px;
+  max-width: 480px;
+}
+
+.cognito-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.cognito-modal-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cognito-modal-body {
+  padding: 16px 20px;
+}
+
+.cognito-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Scoped utilities */
+.cognito-layout .btn-danger {
+  background: var(--error);
+  border-color: var(--error);
+  color: #fff;
+}
+
+.cognito-layout .btn-danger:hover {
+  opacity: 0.9;
+}
+
+.cognito-layout .btn-sm {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.cognito-layout .btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+}
+
+.cognito-layout .btn-icon:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.cognito-layout .search-wrap {
+  position: relative;
+}
+
+.cognito-layout .search-icon-pos {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--text-tertiary);
+  pointer-events: none;
+}
+
+.cognito-layout .search-input {
+  padding-left: 30px !important;
+  font-size: 13px;
+}
+
+.cognito-layout .flex { display: flex; }
+.cognito-layout .items-center { align-items: center; }
+.cognito-layout .justify-between { justify-content: space-between; }
+.cognito-layout .gap-2 { gap: 8px; }
+.cognito-layout .mb-4 { margin-bottom: 16px; }
+.cognito-layout .w-full { width: 100%; }
+
+.cognito-layout .label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  color: var(--text-tertiary);
+  margin-bottom: 6px;
+}

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<body style="background:#111;color:#fff;font-family:monospace">
+<h2>SSE Test</h2>
+<div id="status">Connecting...</div>
+<div id="events"></div>
+<script>
+const es = new EventSource('/api/stream');
+es.onopen = () => document.getElementById('status').textContent = 'Connected!';
+es.onmessage = (e) => {
+  const div = document.createElement('div');
+  try {
+    const d = JSON.parse(e.data);
+    if (d.type === 'request' && d.data) {
+      div.textContent = `${d.data.service} ${d.data.action} ${d.data.status_code} ${d.data.latency_ms}ms`;
+    } else {
+      div.textContent = d.type || 'event';
+    }
+  } catch { div.textContent = e.data; }
+  document.getElementById('events').prepend(div);
+};
+es.onerror = () => document.getElementById('status').textContent = 'Error - retrying...';
+</script>
+</body>
+</html>

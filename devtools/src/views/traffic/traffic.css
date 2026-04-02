@@ -1,0 +1,112 @@
+.traffic-view { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.traffic-tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border-subtle); padding: 0 16px; flex-shrink: 0; }
+.traffic-tab { padding: 10px 16px; background: none; border: none; color: var(--text-tertiary); cursor: pointer; font-size: 12px; border-bottom: 2px solid transparent; display: flex; align-items: center; gap: 6px; }
+.traffic-tab.active { color: var(--text-primary); border-bottom-color: var(--brand-teal); }
+.traffic-tab-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--error); animation: pulse 1s ease-in-out infinite; }
+.traffic-tab-count { background: var(--bg-elevated); padding: 1px 6px; border-radius: 8px; font-size: 10px; }
+.traffic-content { flex: 1; overflow-y: auto; padding: 20px; }
+
+/* Section titles */
+.traffic-section-title { font-size: 13px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.traffic-section-count { background: var(--bg-elevated); padding: 1px 6px; border-radius: 8px; font-size: 10px; color: var(--text-secondary); }
+
+/* Record card */
+.traffic-record-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; }
+.traffic-record-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.traffic-record-label { font-size: 12px; color: var(--text-secondary); width: 70px; flex-shrink: 0; }
+.traffic-record-btn { width: 100%; justify-content: center; padding: 10px; font-size: 13px; }
+.traffic-record-hint { font-size: 11px; color: var(--text-tertiary); margin-top: 8px; text-align: center; }
+
+/* Duration selector */
+.traffic-duration-selector { display: flex; gap: 4px; }
+.traffic-duration-btn { padding: 5px 14px; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); font-size: 12px; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.15s; }
+.traffic-duration-btn.active { background: var(--brand-teal); color: #000; border-color: var(--brand-teal); font-weight: 600; }
+
+/* Recording active state */
+.traffic-recording-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.traffic-recording-pulse { width: 10px; height: 10px; border-radius: 50%; background: var(--error); animation: pulse 1s ease-in-out infinite; }
+.traffic-recording-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+.traffic-recording-timer { margin-left: auto; font-family: var(--font-mono); font-size: 13px; color: var(--text-accent); }
+
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+/* Progress bar */
+.traffic-progress-bar { height: 4px; background: var(--bg-elevated); border-radius: 2px; overflow: hidden; }
+.traffic-progress-fill { height: 100%; background: var(--brand-teal); transition: width 0.3s; border-radius: 2px; }
+.traffic-progress-recording { background: var(--error); }
+
+/* Recording cards list */
+.traffic-recordings-list { display: flex; flex-direction: column; gap: 8px; }
+.traffic-recording-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 14px 16px; }
+.traffic-recording-card-header { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; }
+.traffic-recording-name { font-weight: 500; color: var(--text-primary); font-size: 13px; flex: 1; }
+.traffic-recording-card-stats { display: flex; gap: 16px; font-size: 11px; color: var(--text-tertiary); margin-bottom: 10px; }
+.traffic-recording-card-actions { display: flex; gap: 6px; }
+
+/* Replay card */
+.traffic-replay-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); padding: 20px; margin-bottom: 24px; }
+.traffic-replay-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.traffic-replay-live { margin-top: 20px; }
+
+/* Speed selector */
+.traffic-speed-selector { display: flex; gap: 4px; }
+.traffic-speed-btn { padding: 5px 14px; border: 1px solid var(--border-subtle); background: var(--bg-elevated); color: var(--text-secondary); font-size: 12px; cursor: pointer; border-radius: var(--radius-sm); transition: all 0.15s; }
+.traffic-speed-btn.active { background: var(--brand-teal); color: #000; border-color: var(--brand-teal); font-weight: 600; }
+
+/* Stats grid */
+.traffic-replay-stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin-top: 12px; }
+.traffic-stat { background: var(--bg-elevated); border-radius: var(--radius-md); padding: 10px; text-align: center; }
+.traffic-stat-value { font-size: 16px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); }
+.traffic-stat-label { font-size: 10px; color: var(--text-tertiary); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Results table */
+.traffic-results-table-wrap { margin-top: 16px; max-height: 300px; overflow-y: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); }
+.traffic-results-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.traffic-results-table th { text-align: left; padding: 6px 10px; color: var(--text-tertiary); border-bottom: 1px solid var(--border-subtle); font-weight: 500; font-size: 10px; position: sticky; top: 0; background: var(--bg-secondary); }
+.traffic-results-table td { padding: 5px 10px; color: var(--text-primary); border-bottom: 1px solid var(--border-subtle); }
+.traffic-result-path { font-family: var(--font-mono); font-size: 10px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mono { font-family: var(--font-mono); }
+
+/* Run cards */
+.traffic-runs-list { display: flex; flex-direction: column; gap: 6px; }
+.traffic-run-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px 16px; cursor: pointer; transition: border-color 0.15s; }
+.traffic-run-card:hover { border-color: var(--border-hover); }
+.traffic-run-header { display: flex; align-items: center; gap: 10px; margin-bottom: 4px; }
+.traffic-run-name { font-weight: 500; color: var(--text-primary); font-size: 13px; flex: 1; }
+.traffic-run-speed { font-size: 11px; color: var(--text-accent); font-family: var(--font-mono); }
+.traffic-run-stats { display: flex; gap: 14px; font-size: 11px; color: var(--text-tertiary); }
+.traffic-run-detail { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border-subtle); }
+
+/* Status badges */
+.traffic-status { padding: 2px 8px; border-radius: var(--radius-full, 9999px); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+.traffic-status-active, .traffic-status-running { background: rgba(74, 229, 248, 0.12); color: var(--brand-teal); }
+.traffic-status-completed { background: rgba(2, 150, 98, 0.12); color: var(--success-bright, #42FF8B); }
+.traffic-status-cancelled, .traffic-status-failed { background: rgba(255, 78, 94, 0.12); color: var(--error); }
+.traffic-error { color: var(--error); font-weight: 600; }
+
+/* Empty state */
+.traffic-empty { color: var(--text-tertiary); font-size: 13px; padding: 32px 0; text-align: center; }
+
+/* Selects */
+.traffic-select { background: var(--bg-elevated); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 7px 10px; border-radius: var(--radius-sm); font-size: 12px; min-width: 200px; }
+
+/* Compare */
+.traffic-compare-selectors { display: flex; align-items: flex-end; gap: 12px; margin-bottom: 20px; }
+.traffic-compare-selector { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+.traffic-compare-label { font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.5px; }
+.traffic-compare-vs { font-size: 12px; color: var(--text-tertiary); padding-bottom: 8px; }
+.traffic-compare-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--bg-secondary); border-radius: var(--radius-md); overflow: hidden; }
+.traffic-compare-table th { text-align: left; padding: 8px 12px; color: var(--text-tertiary); border-bottom: 1px solid var(--border-subtle); font-weight: 500; font-size: 11px; }
+.traffic-compare-table td { padding: 10px 12px; color: var(--text-primary); border-bottom: 1px solid var(--border-subtle); }
+.traffic-compare-metric { font-weight: 500; }
+.traffic-compare-value { font-family: var(--font-mono); }
+.traffic-compare-delta { font-family: var(--font-mono); font-weight: 600; }
+.traffic-compare-improved { color: var(--success-bright, #42FF8B); }
+.traffic-compare-regressed { color: var(--error); }
+.traffic-compare-pct { font-size: 10px; opacity: 0.7; }
+
+/* Button sizes */
+.btn-sm { padding: 4px 10px; font-size: 11px; }
+.btn-primary { background: var(--brand-blue); border-color: var(--brand-blue); color: #fff; }
+.btn-primary:hover { background: var(--brand-blue-hover); }
+.btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }

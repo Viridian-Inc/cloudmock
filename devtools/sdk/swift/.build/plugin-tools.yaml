@@ -1,0 +1,47 @@
+client:
+  name: basic
+  file-system: device-agnostic
+tools: {}
+targets:
+  "CloudMockSDK-arm64-apple-macosx26.0-debug.module": ["<CloudMockSDK-arm64-apple-macosx26.0-debug.module>"]
+  "PackageStructure": ["<PackageStructure>"]
+  "main": ["<CloudMockSDK-arm64-apple-macosx26.0-debug.module>"]
+  "test": ["<CloudMockSDK-arm64-apple-macosx26.0-debug.module>"]
+default: "main"
+nodes:
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/":
+    is-directory-structure: true
+    content-exclusion-patterns: [".git",".build"]
+commands:
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/sources":
+    tool: write-auxiliary-file
+    inputs: ["<sources-file-list>","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/CloudMock.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/Connection.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/ErrorInterceptor.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/LogInterceptor.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/URLSessionInterceptor.swift"]
+    outputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/sources"]
+    description: "Write auxiliary file /Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/sources"
+
+  "/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt":
+    tool: write-auxiliary-file
+    inputs: ["<swift-get-version>","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc"]
+    outputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"]
+    always-out-of-date: "true"
+    description: "Write auxiliary file /Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt"
+
+  "<CloudMockSDK-arm64-apple-macosx26.0-debug.module>":
+    tool: phony
+    inputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/Modules/CloudMockSDK.swiftmodule"]
+    outputs: ["<CloudMockSDK-arm64-apple-macosx26.0-debug.module>"]
+
+  "C.CloudMockSDK-arm64-apple-macosx26.0-debug.module":
+    tool: shell
+    inputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/CloudMock.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/Connection.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/ErrorInterceptor.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/LogInterceptor.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/URLSessionInterceptor.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/swift-version--58304C5D6DBC2206.txt","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/sources"]
+    outputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/CloudMock.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/Connection.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/ErrorInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/LogInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/URLSessionInterceptor.swift.o","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/Modules/CloudMockSDK.swiftmodule"]
+    description: "Compiling Swift Module 'CloudMockSDK' (5 sources)"
+    args: ["/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc","-module-name","CloudMockSDK","-emit-dependencies","-emit-module","-emit-module-path","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/Modules/CloudMockSDK.swiftmodule","-output-file-map","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/output-file-map.json","-parse-as-library","-incremental","-c","@/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/sources","-I","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/Modules","-target","arm64-apple-macosx13.0","-incremental","-enable-batch-mode","-serialize-diagnostics","-index-store-path","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/index/store","-Onone","-enable-testing","-j12","-DSWIFT_PACKAGE","-DDEBUG","-DSWIFT_MODULE_RESOURCE_BUNDLE_UNAVAILABLE","-module-cache-path","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/ModuleCache","-parseable-output","-parse-as-library","-emit-objc-header","-emit-objc-header-path","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/.build/arm64-apple-macosx/debug/CloudMockSDK.build/include/CloudMockSDK-Swift.h","-swift-version","5","-plugin-path","/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/host/plugins/testing","-sdk","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-F","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-I","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-L","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/usr/lib","-g","-Xcc","-isysroot","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX26.1.sdk","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/Frameworks","-Xcc","-F","-Xcc","/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/Library/PrivateFrameworks","-Xcc","-fPIC","-Xcc","-g","-package-name","swift"]
+
+  "PackageStructure":
+    tool: package-structure-tool
+    inputs: ["/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Sources/CloudMockSDK/","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Package.swift","/Users/megan/work/neureaux/neureaux-devtools/sdk/swift/Package.resolved"]
+    outputs: ["<PackageStructure>"]
+    description: "Planning build"
+    allow-missing-inputs: true
+

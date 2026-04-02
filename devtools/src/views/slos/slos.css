@@ -1,0 +1,407 @@
+/* SLOs View */
+.slos-view {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.slos-view-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.slos-placeholder {
+  color: var(--text-tertiary);
+  font-size: 14px;
+}
+
+.slos-placeholder-error {
+  color: var(--error);
+}
+
+/* Header */
+.slos-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.slos-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.slos-health-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.slos-healthy {
+  background: rgba(54, 217, 130, 0.12);
+  color: var(--success);
+}
+
+.slos-unhealthy {
+  background: rgba(255, 78, 94, 0.12);
+  color: var(--error);
+}
+
+.slos-health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.slos-healthy .slos-health-dot {
+  background: var(--success);
+}
+
+.slos-unhealthy .slos-health-dot {
+  background: var(--error);
+  animation: slos-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes slos-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* Alerts */
+.slos-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.slos-alert {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  font-size: 12px;
+}
+
+.slos-alert-warning {
+  background: rgba(250, 208, 101, 0.1);
+  border: 1px solid rgba(250, 208, 101, 0.25);
+  color: var(--warning);
+}
+
+.slos-alert-critical {
+  background: rgba(255, 78, 94, 0.1);
+  border: 1px solid rgba(255, 78, 94, 0.25);
+  color: var(--error);
+}
+
+.slos-alert-message {
+  flex: 1;
+}
+
+.slos-alert-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  opacity: 0.7;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+/* Sections */
+.slos-section {
+  margin-bottom: 24px;
+}
+
+.slos-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+/* Tables */
+.slos-table-wrap {
+  overflow-x: auto;
+}
+
+.slos-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.slos-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  white-space: nowrap;
+}
+
+.slos-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.slos-table tr:hover td {
+  background: var(--bg-tertiary);
+}
+
+.slos-row-violation td {
+  background: rgba(255, 78, 94, 0.04);
+}
+
+.slos-row-violation:hover td {
+  background: rgba(255, 78, 94, 0.08);
+}
+
+.slos-service-name {
+  font-weight: 500;
+  color: var(--text-accent);
+}
+
+.slos-action {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.slos-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.slos-text-error {
+  color: var(--error);
+}
+
+.slos-text-muted {
+  color: var(--text-tertiary);
+}
+
+/* Status dots */
+.slos-status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.slos-status-healthy {
+  background: var(--success);
+}
+
+.slos-status-violation {
+  background: var(--error);
+}
+
+/* Violation tags */
+.slos-violations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.slos-violation-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 500;
+  background: rgba(255, 78, 94, 0.12);
+  color: var(--error);
+  white-space: nowrap;
+}
+
+/* Delete button in rules table */
+.slos-delete-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-tertiary);
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.15s;
+  line-height: 1;
+}
+
+.slos-delete-btn:hover {
+  background: rgba(255, 78, 94, 0.12);
+  color: var(--error);
+}
+
+/* Add Rule Form */
+.slos-add-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.slos-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 100px;
+}
+
+.slos-form-field-action {
+  flex: 0 0 auto;
+  min-width: auto;
+}
+
+.slos-form-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.slos-form-select {
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b95a5' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  padding-right: 24px;
+}
+
+.slos-form-input {
+  width: 100%;
+}
+
+.slos-add-btn {
+  white-space: nowrap;
+}
+
+/* Form feedback */
+.slos-form-feedback {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.slos-form-error {
+  background: rgba(255, 78, 94, 0.08);
+  border: 1px solid rgba(255, 78, 94, 0.15);
+  color: var(--error);
+}
+
+.slos-form-success {
+  background: rgba(34, 197, 94, 0.08);
+  border: 1px solid rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.slos-form-feedback-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.slos-form-error .slos-form-feedback-icon {
+  background: rgba(255, 78, 94, 0.15);
+}
+
+.slos-form-success .slos-form-feedback-icon {
+  background: rgba(34, 197, 94, 0.15);
+}
+
+/* Current Error Budget */
+.slos-budget-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.slos-budget-chart-item {
+  position: relative;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 12px;
+}
+
+.slos-budget-gauge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.slos-budget-gauge-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+  min-width: 120px;
+}
+
+.slos-budget-gauge-bar-track {
+  flex: 1;
+  height: 10px;
+  border-radius: 5px;
+  background: var(--bg-tertiary);
+  overflow: hidden;
+}
+
+.slos-budget-gauge-bar-fill {
+  height: 100%;
+  border-radius: 5px;
+  transition: width 0.3s ease;
+}
+
+.slos-budget-gauge-value {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+  min-width: 50px;
+  text-align: right;
+}
+
+.slos-budget-exhausted {
+  margin-top: 6px;
+  padding: 4px 14px;
+  border-radius: 12px;
+  background: rgba(255, 78, 94, 0.15);
+  color: var(--error);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  text-align: center;
+}

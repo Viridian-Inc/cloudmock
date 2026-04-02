@@ -1,0 +1,242 @@
+/* Regressions View */
+.regressions-view {
+  height: 100%;
+  width: 100%;
+  overflow-y: auto;
+  padding: 20px 24px;
+}
+
+.regressions-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.regressions-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.regressions-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: 2px;
+}
+
+.regressions-refresh-btn {
+  padding: 6px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.regressions-refresh-btn:hover {
+  border-color: var(--text-tertiary);
+  color: var(--text-primary);
+}
+
+/* Summary cards */
+.regressions-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.regressions-stat {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.regressions-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--text-primary);
+}
+
+.regressions-stat-label {
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+}
+
+/* Filter bar */
+.regressions-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.regressions-select {
+  padding: 6px 10px;
+  font-size: 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.regressions-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+}
+
+/* Table */
+.regressions-table-wrap {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.regressions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.regressions-table th {
+  text-align: left;
+  padding: 8px 12px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.regressions-table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+}
+
+.regressions-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.regressions-row:hover td {
+  background: var(--bg-tertiary);
+}
+
+.regressions-row-expanded td {
+  background: var(--bg-tertiary);
+}
+
+/* Badges */
+.regressions-badge {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.regressions-sev-critical {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--error);
+}
+
+.regressions-sev-warning {
+  background: rgba(251, 191, 36, 0.15);
+  color: var(--warning);
+}
+
+.regressions-sev-info {
+  background: rgba(96, 165, 250, 0.12);
+  color: var(--brand-blue, #60a5fa);
+}
+
+.regressions-algo-latency  { background: rgba(239,68,68,0.1);   color: var(--error); }
+.regressions-algo-error    { background: rgba(251,191,36,0.15); color: var(--warning); }
+.regressions-algo-tenant   { background: rgba(167,139,250,0.12); color: #a78bfa; }
+.regressions-algo-cache    { background: rgba(96,165,250,0.12);  color: var(--brand-blue, #60a5fa); }
+.regressions-algo-fanout   { background: rgba(16,185,129,0.12);  color: var(--success); }
+.regressions-algo-payload  { background: rgba(254,195,7,0.15);   color: #B8860B; }
+
+.regressions-mono {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.regressions-service {
+  font-weight: 600;
+}
+
+.regressions-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+/* Expanded detail row */
+.regressions-detail-cell {
+  padding: 0 !important;
+  border-bottom: 1px solid var(--border-default) !important;
+}
+
+.regressions-detail {
+  padding: 16px 24px;
+  background: var(--bg-primary);
+}
+
+.regressions-detail-table {
+  border-collapse: collapse;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.regressions-detail-table td {
+  padding: 4px 16px 4px 0;
+  border: none;
+}
+
+.regressions-detail-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  width: 120px;
+}
+
+.regressions-dismiss-btn {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  background: none;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.regressions-dismiss-btn:hover {
+  border-color: var(--error);
+  color: var(--error);
+}

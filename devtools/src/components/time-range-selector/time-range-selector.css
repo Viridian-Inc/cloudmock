@@ -1,0 +1,149 @@
+.trs-container {
+  position: relative;
+  width: 100%;
+  user-select: none;
+  border-top: 1px solid var(--border-subtle, rgba(74, 229, 248, 0.06));
+  background: var(--bg-secondary, #0f1219);
+  flex-shrink: 0;
+}
+
+.trs-svg {
+  display: block;
+}
+
+.trs-dim {
+  fill: rgba(0, 0, 0, 0.45);
+}
+
+.trs-area {
+  fill: var(--brand-teal, #4AE5F8);
+  opacity: 0.08;
+}
+
+.trs-line {
+  fill: none;
+  stroke: var(--brand-teal, #4AE5F8);
+  stroke-width: 1px;
+  opacity: 0.35;
+}
+
+.trs-selected-region {
+  fill: none;
+  stroke: var(--brand-teal, #4AE5F8);
+  stroke-width: 1px;
+  opacity: 0.4;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Handles */
+.trs-handle {
+  position: absolute;
+  top: 0;
+  width: 8px;
+  height: calc(100% - 20px);
+  cursor: ew-resize;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateX(-50%);
+}
+
+.trs-handle::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--brand-teal, #4AE5F8);
+  border-radius: 1px;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.trs-handle:hover::before {
+  opacity: 1;
+}
+
+.trs-handle-grip {
+  width: 4px;
+  height: 14px;
+  background: var(--brand-teal, #4AE5F8);
+  border-radius: 2px;
+  opacity: 0.6;
+  z-index: 1;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.trs-handle:hover .trs-handle-grip {
+  opacity: 1;
+  transform: scaleY(1.2);
+}
+
+/* Pan region */
+.trs-pan-region {
+  position: absolute;
+  top: 0;
+  height: calc(100% - 20px);
+  cursor: grab;
+  z-index: 1;
+}
+
+.trs-pan-region:active {
+  cursor: grabbing;
+}
+
+/* Live badge */
+.trs-live-badge {
+  position: absolute;
+  top: 3px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: #22c55e;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.trs-live-dot {
+  width: 5px;
+  height: 5px;
+  background: #22c55e;
+  border-radius: 50%;
+  animation: trs-live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes trs-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* Time axis */
+.trs-axis {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.trs-axis-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 9px;
+  font-family: var(--font-mono, monospace);
+  color: var(--text-tertiary, #5a6577);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.trs-axis-label:first-child {
+  transform: translateX(0);
+}
+
+.trs-axis-label:last-child {
+  transform: translateX(-100%);
+}

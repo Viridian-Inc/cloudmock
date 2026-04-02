@@ -28,8 +28,10 @@ func (s *SSOAdminService) Name() string { return "sso-admin" }
 // Actions returns the list of SSO Admin API actions supported by this service.
 func (s *SSOAdminService) Actions() []service.Action {
 	return []service.Action{
+		{Name: "CreateInstance", Method: http.MethodPost, IAMAction: "sso:CreateInstance"},
 		{Name: "ListInstances", Method: http.MethodPost, IAMAction: "sso:ListInstances"},
 		{Name: "DescribeInstance", Method: http.MethodPost, IAMAction: "sso:DescribeInstance"},
+		{Name: "ProvisionPermissionSet", Method: http.MethodPost, IAMAction: "sso:ProvisionPermissionSet"},
 		{Name: "CreatePermissionSet", Method: http.MethodPost, IAMAction: "sso:CreatePermissionSet"},
 		{Name: "DescribePermissionSet", Method: http.MethodPost, IAMAction: "sso:DescribePermissionSet"},
 		{Name: "ListPermissionSets", Method: http.MethodPost, IAMAction: "sso:ListPermissionSets"},
@@ -56,10 +58,14 @@ func (s *SSOAdminService) HealthCheck() error { return nil }
 // HandleRequest routes an incoming SSO Admin request to the appropriate handler.
 func (s *SSOAdminService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
 	switch ctx.Action {
+	case "CreateInstance":
+		return handleCreateInstance(ctx, s.store)
 	case "ListInstances":
 		return handleListInstances(ctx, s.store)
 	case "DescribeInstance":
 		return handleDescribeInstance(ctx, s.store)
+	case "ProvisionPermissionSet":
+		return handleProvisionPermissionSet(ctx, s.store)
 	case "CreatePermissionSet":
 		return handleCreatePermissionSet(ctx, s.store)
 	case "DescribePermissionSet":

@@ -111,6 +111,46 @@ func (s *Store) buildPermissionSetArn(instanceArn, psID string) string {
 	return fmt.Sprintf("%s/ps-%s", instanceArn, psID)
 }
 
+// CreateInstance creates a new SSO instance.
+func (s *Store) CreateInstance(name string) (*Instance, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	instanceArn := fmt.Sprintf("arn:aws:sso:::%s:instance/ssoins-%s", s.accountID, newShortID())
+	inst := &Instance{
+		InstanceArn:     instanceArn,
+		IdentityStoreId: fmt.Sprintf("d-%s", newShortID()),
+		Name:            name,
+		CreatedDate:     time.Now().UTC(),
+		Status:          "ACTIVE",
+	}
+	s.instances[instanceArn] = inst
+	return inst, nil
+}
+
+// ProvisionPermissionSet triggers provisioning (no-op in mock; returns a status object).
+func (s *Store) ProvisionPermissionSet(instanceArn, permissionSetArn, targetType, targetID string) (map[string]any, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.instances[instanceArn]; !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			"Instance not found.", http.StatusNotFound)
+	}
+	ps, ok := s.permissionSets[permissionSetArn]
+	if !ok || ps.InstanceArn != instanceArn {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			"Permission set not found.", http.StatusNotFound)
+	}
+	return map[string]any{
+		"PermissionSetProvisioningStatus": map[string]any{
+			"Status":           "IN_PROGRESS",
+			"RequestId":        newShortID(),
+			"AccountId":        targetID,
+			"PermissionSetArn": permissionSetArn,
+			"CreatedDate":      float64(time.Now().UTC().Unix()),
+		},
+	}, nil
+}
+
 // ListInstances returns all SSO instances.
 func (s *Store) ListInstances() []*Instance {
 	s.mu.RLock()

@@ -11,8 +11,10 @@ CloudMock emulates AWS IAM Identity Center (SSO) Admin, supporting instances, pe
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
+| CreateInstance | Supported | Creates a new SSO instance |
 | ListInstances | Supported | Lists SSO instances |
 | DescribeInstance | Supported | Returns instance details |
+| ProvisionPermissionSet | Supported | Triggers permission set provisioning (async no-op in mock) |
 | CreatePermissionSet | Supported | Creates a permission set |
 | DescribePermissionSet | Supported | Returns permission set details |
 | ListPermissionSets | Supported | Lists permission sets |

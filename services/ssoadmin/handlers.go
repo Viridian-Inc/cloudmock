@@ -78,6 +78,38 @@ func psToMap(ps *PermissionSet) map[string]any {
 	}
 }
 
+func handleCreateInstance(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name, _ := params["Name"].(string)
+	inst, awsErr := store.CreateInstance(name)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"InstanceArn": inst.InstanceArn})
+}
+
+func handleProvisionPermissionSet(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	instanceArn, _ := params["InstanceArn"].(string)
+	permissionSetArn, _ := params["PermissionSetArn"].(string)
+	targetType, _ := params["TargetType"].(string)
+	targetID, _ := params["TargetId"].(string)
+	if instanceArn == "" || permissionSetArn == "" {
+		return jsonErr(service.ErrValidation("InstanceArn and PermissionSetArn are required."))
+	}
+	result, awsErr := store.ProvisionPermissionSet(instanceArn, permissionSetArn, targetType, targetID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(result)
+}
+
 func handleListInstances(_ *service.RequestContext, store *Store) (*service.Response, error) {
 	instances := store.ListInstances()
 	items := make([]map[string]any, 0, len(instances))

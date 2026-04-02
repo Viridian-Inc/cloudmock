@@ -567,3 +567,211 @@ func TestDecisionCompletesWorkflowHistory(t *testing.T) {
 	lastEvent := events[len(events)-1].(map[string]any)
 	assert.Equal(t, "WorkflowExecutionCompleted", lastEvent["eventType"])
 }
+
+// ---- Activity task full lifecycle ----
+
+func mustRegisterActivityType(t *testing.T, s *svc.SWFService, domain, name, version string) {
+	t.Helper()
+	_, err := s.HandleRequest(jsonCtx("RegisterActivityType", map[string]any{
+		"domain": domain, "name": name, "version": version,
+	}))
+	require.NoError(t, err)
+}
+
+func TestActivityTaskLifecycle(t *testing.T) {
+	s := newService()
+	mustRegisterDomain(t, s, "act-domain")
+	mustRegisterWorkflowType(t, s, "act-domain", "act-wf", "1.0")
+	mustRegisterActivityType(t, s, "act-domain", "do-work", "1.0")
+
+	// Start workflow
+	startResp, err := s.HandleRequest(jsonCtx("StartWorkflowExecution", map[string]any{
+		"domain":     "act-domain",
+		"workflowId": "act-exec",
+		"workflowType": map[string]any{"name": "act-wf", "version": "1.0"},
+		"taskList":   map[string]any{"name": "act-tasks"},
+	}))
+	require.NoError(t, err)
+	runID := decode(t, startResp)["runId"].(string)
+
+	// Poll decision task
+	pollResp, err := s.HandleRequest(jsonCtx("PollForDecisionTask", map[string]any{
+		"domain": "act-domain", "taskList": map[string]any{"name": "act-tasks"},
+	}))
+	require.NoError(t, err)
+	taskToken := decode(t, pollResp)["taskToken"].(string)
+
+	// Schedule an activity via decision
+	_, err = s.HandleRequest(jsonCtx("RespondDecisionTaskCompleted", map[string]any{
+		"taskToken": taskToken,
+		"decisions": []any{
+			map[string]any{
+				"decisionType": "ScheduleActivityTask",
+				"scheduleActivityTaskDecisionAttributes": map[string]any{
+					"activityId":   "work-1",
+					"activityType": map[string]any{"name": "do-work", "version": "1.0"},
+					"input":        "test-input",
+				},
+			},
+		},
+	}))
+	require.NoError(t, err)
+
+	// Poll activity task
+	actPollResp, err := s.HandleRequest(jsonCtx("PollForActivityTask", map[string]any{
+		"domain": "act-domain", "taskList": map[string]any{"name": "act-tasks"},
+	}))
+	require.NoError(t, err)
+	actData := decode(t, actPollResp)
+	actToken := actData["taskToken"].(string)
+	assert.NotEmpty(t, actToken)
+
+	// Complete activity task
+	_, err = s.HandleRequest(jsonCtx("RespondActivityTaskCompleted", map[string]any{
+		"taskToken": actToken,
+		"result":    "done",
+	}))
+	require.NoError(t, err)
+
+	// A new decision task should be scheduled; poll it and complete the workflow
+	pollResp2, err := s.HandleRequest(jsonCtx("PollForDecisionTask", map[string]any{
+		"domain": "act-domain", "taskList": map[string]any{"name": "act-tasks"},
+	}))
+	require.NoError(t, err)
+	taskToken2 := decode(t, pollResp2)["taskToken"].(string)
+	_, err = s.HandleRequest(jsonCtx("RespondDecisionTaskCompleted", map[string]any{
+		"taskToken": taskToken2,
+		"decisions": []any{map[string]any{"decisionType": "CompleteWorkflowExecution"}},
+	}))
+	require.NoError(t, err)
+
+	// Verify workflow completed
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeWorkflowExecution", map[string]any{
+		"domain":    "act-domain",
+		"execution": map[string]any{"workflowId": "act-exec", "runId": runID},
+	}))
+	info := decode(t, descResp)["executionInfo"].(map[string]any)
+	assert.Equal(t, "COMPLETED", info["executionStatus"])
+}
+
+func TestRespondActivityTaskFailed(t *testing.T) {
+	s := newService()
+	mustRegisterDomain(t, s, "fail-domain")
+	mustRegisterWorkflowType(t, s, "fail-domain", "fail-wf", "1.0")
+
+	s.HandleRequest(jsonCtx("StartWorkflowExecution", map[string]any{
+		"domain":     "fail-domain",
+		"workflowId": "fail-exec",
+		"workflowType": map[string]any{"name": "fail-wf", "version": "1.0"},
+		"taskList":   map[string]any{"name": "fail-tasks"},
+	}))
+
+	// Poll and schedule activity via decision
+	pollResp, _ := s.HandleRequest(jsonCtx("PollForDecisionTask", map[string]any{
+		"domain": "fail-domain", "taskList": map[string]any{"name": "fail-tasks"},
+	}))
+	taskToken := decode(t, pollResp)["taskToken"].(string)
+
+	s.HandleRequest(jsonCtx("RespondDecisionTaskCompleted", map[string]any{
+		"taskToken": taskToken,
+		"decisions": []any{
+			map[string]any{
+				"decisionType": "ScheduleActivityTask",
+				"scheduleActivityTaskDecisionAttributes": map[string]any{
+					"activityId":   "fail-work",
+					"activityType": map[string]any{"name": "fail-act", "version": "1.0"},
+				},
+			},
+		},
+	}))
+
+	// Poll activity
+	actPoll, _ := s.HandleRequest(jsonCtx("PollForActivityTask", map[string]any{
+		"domain": "fail-domain", "taskList": map[string]any{"name": "fail-tasks"},
+	}))
+	actToken := decode(t, actPoll)["taskToken"].(string)
+
+	// Fail activity
+	_, err := s.HandleRequest(jsonCtx("RespondActivityTaskFailed", map[string]any{
+		"taskToken": actToken,
+		"reason":    "task failed",
+		"details":   "something went wrong",
+	}))
+	require.NoError(t, err)
+}
+
+func TestRequestCancelWorkflowExecution(t *testing.T) {
+	s := newService()
+	mustRegisterDomain(t, s, "cancel-domain")
+	mustRegisterWorkflowType(t, s, "cancel-domain", "cancel-wf", "1.0")
+
+	startResp, _ := s.HandleRequest(jsonCtx("StartWorkflowExecution", map[string]any{
+		"domain":     "cancel-domain",
+		"workflowId": "cancel-exec",
+		"workflowType": map[string]any{"name": "cancel-wf", "version": "1.0"},
+	}))
+	runID := decode(t, startResp)["runId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("RequestCancelWorkflowExecution", map[string]any{
+		"domain":     "cancel-domain",
+		"workflowId": "cancel-exec",
+		"runId":      runID,
+	}))
+	require.NoError(t, err)
+}
+
+func TestDeprecateActivityType(t *testing.T) {
+	s := newService()
+	mustRegisterDomain(t, s, "dep-act-domain")
+	mustRegisterActivityType(t, s, "dep-act-domain", "my-activity", "1.0")
+
+	_, err := s.HandleRequest(jsonCtx("DeprecateActivityType", map[string]any{
+		"domain":       "dep-act-domain",
+		"activityType": map[string]any{"name": "my-activity", "version": "1.0"},
+	}))
+	require.NoError(t, err)
+
+	resp, _ := s.HandleRequest(jsonCtx("DescribeActivityType", map[string]any{
+		"domain":       "dep-act-domain",
+		"activityType": map[string]any{"name": "my-activity", "version": "1.0"},
+	}))
+	typeInfo := decode(t, resp)["typeInfo"].(map[string]any)
+	assert.Equal(t, "DEPRECATED", typeInfo["status"])
+}
+
+func TestDecisionFailWorkflow(t *testing.T) {
+	s := newService()
+	mustRegisterDomain(t, s, "decfail-domain")
+	mustRegisterWorkflowType(t, s, "decfail-domain", "decfail-wf", "1.0")
+
+	startResp, _ := s.HandleRequest(jsonCtx("StartWorkflowExecution", map[string]any{
+		"domain":     "decfail-domain",
+		"workflowId": "decfail-exec",
+		"workflowType": map[string]any{"name": "decfail-wf", "version": "1.0"},
+		"taskList":   map[string]any{"name": "decfail-tasks"},
+	}))
+	runID := decode(t, startResp)["runId"].(string)
+
+	pollResp, _ := s.HandleRequest(jsonCtx("PollForDecisionTask", map[string]any{
+		"domain": "decfail-domain", "taskList": map[string]any{"name": "decfail-tasks"},
+	}))
+	taskToken := decode(t, pollResp)["taskToken"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("RespondDecisionTaskCompleted", map[string]any{
+		"taskToken": taskToken,
+		"decisions": []any{
+			map[string]any{
+				"decisionType": "FailWorkflowExecution",
+				"reason":       "intentional failure",
+			},
+		},
+	}))
+	require.NoError(t, err)
+
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeWorkflowExecution", map[string]any{
+		"domain":    "decfail-domain",
+		"execution": map[string]any{"workflowId": "decfail-exec", "runId": runID},
+	}))
+	info := decode(t, descResp)["executionInfo"].(map[string]any)
+	assert.Equal(t, "FAILED", info["executionStatus"])
+}

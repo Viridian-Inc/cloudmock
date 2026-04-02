@@ -105,5 +105,5 @@ jobs:
         with:
           push: true
           tags: |
-            ghcr.io/Viridian-Inc/cloudmock:${{ github.ref_name }}
-            ghcr.io/Viridian-Inc/cloudmock:latest
+            ghcr.io/viridian-inc/cloudmock:${{ github.ref_name }}
+            ghcr.io/viridian-inc/cloudmock:latest

@@ -5,7 +5,7 @@ description: Amazon Neptune emulation in CloudMock
 
 ## Overview
 
-CloudMock emulates Amazon Neptune, supporting cluster and instance lifecycle, snapshots, subnet groups, parameter groups, and tagging.
+CloudMock emulates Amazon Neptune, supporting cluster and instance lifecycle, snapshots, subnet groups, parameter groups, and tagging. Clusters and instances follow the `creating -> available` state lifecycle. The first instance added to a cluster is designated as the writer; subsequent instances are readers.
 
 ## Supported Operations
 

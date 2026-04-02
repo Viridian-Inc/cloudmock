@@ -28,9 +28,11 @@ func (s *BatchService) Actions() []service.Action {
 	return []service.Action{
 		{Name: "CreateComputeEnvironment", Method: http.MethodPost, IAMAction: "batch:CreateComputeEnvironment"},
 		{Name: "DescribeComputeEnvironments", Method: http.MethodPost, IAMAction: "batch:DescribeComputeEnvironments"},
+		{Name: "UpdateComputeEnvironment", Method: http.MethodPost, IAMAction: "batch:UpdateComputeEnvironment"},
 		{Name: "DeleteComputeEnvironment", Method: http.MethodPost, IAMAction: "batch:DeleteComputeEnvironment"},
 		{Name: "CreateJobQueue", Method: http.MethodPost, IAMAction: "batch:CreateJobQueue"},
 		{Name: "DescribeJobQueues", Method: http.MethodPost, IAMAction: "batch:DescribeJobQueues"},
+		{Name: "UpdateJobQueue", Method: http.MethodPost, IAMAction: "batch:UpdateJobQueue"},
 		{Name: "DeleteJobQueue", Method: http.MethodPost, IAMAction: "batch:DeleteJobQueue"},
 		{Name: "RegisterJobDefinition", Method: http.MethodPost, IAMAction: "batch:RegisterJobDefinition"},
 		{Name: "DescribeJobDefinitions", Method: http.MethodPost, IAMAction: "batch:DescribeJobDefinitions"},
@@ -40,6 +42,13 @@ func (s *BatchService) Actions() []service.Action {
 		{Name: "ListJobs", Method: http.MethodPost, IAMAction: "batch:ListJobs"},
 		{Name: "CancelJob", Method: http.MethodPost, IAMAction: "batch:CancelJob"},
 		{Name: "TerminateJob", Method: http.MethodPost, IAMAction: "batch:TerminateJob"},
+		{Name: "CreateSchedulingPolicy", Method: http.MethodPost, IAMAction: "batch:CreateSchedulingPolicy"},
+		{Name: "DescribeSchedulingPolicies", Method: http.MethodPost, IAMAction: "batch:DescribeSchedulingPolicies"},
+		{Name: "UpdateSchedulingPolicy", Method: http.MethodPost, IAMAction: "batch:UpdateSchedulingPolicy"},
+		{Name: "DeleteSchedulingPolicy", Method: http.MethodPost, IAMAction: "batch:DeleteSchedulingPolicy"},
+		{Name: "TagResource", Method: http.MethodPost, IAMAction: "batch:TagResource"},
+		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "batch:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "batch:ListTagsForResource"},
 	}
 }
 
@@ -64,12 +73,16 @@ func (s *BatchService) HandleRequest(ctx *service.RequestContext) (*service.Resp
 		return handleCreateComputeEnvironment(params, s.store)
 	case path == "/v1/describecomputeenvironments" && method == http.MethodPost:
 		return handleDescribeComputeEnvironments(params, s.store)
+	case path == "/v1/updatecomputeenvironment" && method == http.MethodPost:
+		return handleUpdateComputeEnvironment(params, s.store)
 	case path == "/v1/deletecomputeenvironment" && method == http.MethodPost:
 		return handleDeleteComputeEnvironment(params, s.store)
 	case path == "/v1/createjobqueue" && method == http.MethodPost:
 		return handleCreateJobQueue(params, s.store)
 	case path == "/v1/describejobqueues" && method == http.MethodPost:
 		return handleDescribeJobQueues(params, s.store)
+	case path == "/v1/updatejobqueue" && method == http.MethodPost:
+		return handleUpdateJobQueue(params, s.store)
 	case path == "/v1/deletejobqueue" && method == http.MethodPost:
 		return handleDeleteJobQueue(params, s.store)
 	case path == "/v1/registerjobdefinition" && method == http.MethodPost:
@@ -88,6 +101,21 @@ func (s *BatchService) HandleRequest(ctx *service.RequestContext) (*service.Resp
 		return handleCancelJob(params, s.store)
 	case path == "/v1/terminatejob" && method == http.MethodPost:
 		return handleTerminateJob(params, s.store)
+	case path == "/v1/createschedulingpolicy" && method == http.MethodPost:
+		return handleCreateSchedulingPolicy(params, s.store)
+	case path == "/v1/describeschedulingpolicies" && method == http.MethodPost:
+		return handleDescribeSchedulingPolicies(params, s.store)
+	case path == "/v1/updateschedulingpolicy" && method == http.MethodPost:
+		return handleUpdateSchedulingPolicy(params, s.store)
+	case path == "/v1/deleteschedulingpolicy" && method == http.MethodPost:
+		return handleDeleteSchedulingPolicy(params, s.store)
+	// Tag operations use path params: /v1/tags/{resourceArn}
+	case strings.HasPrefix(path, "/v1/tags/") && method == http.MethodGet:
+		return handleListTagsForResource(path, s.store)
+	case strings.HasPrefix(path, "/v1/tags/") && method == http.MethodPost:
+		return handleTagResource(path, params, s.store)
+	case strings.HasPrefix(path, "/v1/tags/") && method == http.MethodDelete:
+		return handleUntagResource(path, params, s.store)
 	}
 
 	return jsonErr(service.NewAWSError("NotImplemented", "Route not implemented", http.StatusNotImplemented))

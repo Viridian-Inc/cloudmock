@@ -2,6 +2,7 @@ package batch
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -385,6 +386,165 @@ func handleTerminateJob(params map[string]any, store *Store) (*service.Response,
 		return jsonErr(service.NewAWSError("ClientException", err.Error(), http.StatusBadRequest))
 	}
 	return jsonOK(map[string]any{})
+}
+
+func handleUpdateComputeEnvironment(params map[string]any, store *Store) (*service.Response, error) {
+	name := str(params, "computeEnvironment")
+	if name == "" {
+		return jsonErr(service.ErrValidation("computeEnvironment is required"))
+	}
+	ce, ok := store.UpdateComputeEnvironment(name, str(params, "state"), str(params, "serviceRole"))
+	if !ok {
+		return jsonErr(service.ErrNotFound("ComputeEnvironment", name))
+	}
+	return jsonOK(map[string]any{
+		"computeEnvironmentName": ce.ComputeEnvironmentName,
+		"computeEnvironmentArn":  ce.ComputeEnvironmentArn,
+	})
+}
+
+func handleUpdateJobQueue(params map[string]any, store *Store) (*service.Response, error) {
+	name := str(params, "jobQueue")
+	if name == "" {
+		return jsonErr(service.ErrValidation("jobQueue is required"))
+	}
+	var ceOrder []ComputeEnvironmentOrder
+	if ceos, ok := params["computeEnvironmentOrder"].([]any); ok {
+		for _, ceo := range ceos {
+			if cm, ok := ceo.(map[string]any); ok {
+				ceOrder = append(ceOrder, ComputeEnvironmentOrder{
+					ComputeEnvironment: str(cm, "computeEnvironment"),
+					Order:              num(cm, "order", 0),
+				})
+			}
+		}
+	}
+	jq, ok := store.UpdateJobQueue(name, str(params, "state"), num(params, "priority", 0), ceOrder)
+	if !ok {
+		return jsonErr(service.ErrNotFound("JobQueue", name))
+	}
+	return jsonOK(map[string]any{
+		"jobQueueName": jq.JobQueueName,
+		"jobQueueArn":  jq.JobQueueArn,
+	})
+}
+
+func handleCreateSchedulingPolicy(params map[string]any, store *Store) (*service.Response, error) {
+	name := str(params, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required"))
+	}
+	var fsp *FairsharePolicy
+	if fp, ok := params["fairsharePolicy"].(map[string]any); ok {
+		fsp = &FairsharePolicy{
+			ComputeReservation: num(fp, "computeReservation", 0),
+			ShareDecaySeconds:  num(fp, "shareDecaySeconds", 0),
+		}
+		if sds, ok := fp["shareDistributions"].([]any); ok {
+			for _, sd := range sds {
+				if sdm, ok := sd.(map[string]any); ok {
+					wf := 0.0
+					if v, ok := sdm["weightFactor"].(float64); ok {
+						wf = v
+					}
+					fsp.ShareDistributions = append(fsp.ShareDistributions, ShareDistribution{
+						ShareIdentifier: str(sdm, "shareIdentifier"),
+						WeightFactor:    wf,
+					})
+				}
+			}
+		}
+	}
+	var tags map[string]string
+	if t, ok := params["tags"].(map[string]any); ok {
+		tags = make(map[string]string)
+		for k, v := range t {
+			if sv, ok := v.(string); ok {
+				tags[k] = sv
+			}
+		}
+	}
+	sp, err := store.CreateSchedulingPolicy(name, fsp, tags)
+	if err != nil {
+		return jsonErr(service.ErrAlreadyExists("SchedulingPolicy", name))
+	}
+	return jsonOK(map[string]any{"arn": sp.Arn})
+}
+
+func handleDescribeSchedulingPolicies(params map[string]any, store *Store) (*service.Response, error) {
+	arns := strSlice(params, "arns")
+	policies := store.DescribeSchedulingPolicies(arns)
+	out := make([]map[string]any, 0, len(policies))
+	for _, sp := range policies {
+		out = append(out, map[string]any{"arn": sp.Arn, "name": sp.Name})
+	}
+	return jsonOK(map[string]any{"schedulingPolicies": out})
+}
+
+func handleUpdateSchedulingPolicy(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("arn is required"))
+	}
+	var fsp *FairsharePolicy
+	if fp, ok := params["fairsharePolicy"].(map[string]any); ok {
+		fsp = &FairsharePolicy{
+			ComputeReservation: num(fp, "computeReservation", 0),
+			ShareDecaySeconds:  num(fp, "shareDecaySeconds", 0),
+		}
+	}
+	if !store.UpdateSchedulingPolicy(arn, fsp) {
+		return jsonErr(service.ErrNotFound("SchedulingPolicy", arn))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDeleteSchedulingPolicy(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("arn is required"))
+	}
+	if !store.DeleteSchedulingPolicy(arn) {
+		return jsonErr(service.ErrNotFound("SchedulingPolicy", arn))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleTagResource(path string, params map[string]any, store *Store) (*service.Response, error) {
+	// path: /v1/tags/{resourceArn}
+	resourceARN := strings.TrimPrefix(path, "/v1/tags/")
+	if resourceARN == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required"))
+	}
+	tags := make(map[string]string)
+	if t, ok := params["tags"].(map[string]any); ok {
+		for k, v := range t {
+			if sv, ok := v.(string); ok {
+				tags[k] = sv
+			}
+		}
+	}
+	store.TagResource(resourceARN, tags)
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(path string, params map[string]any, store *Store) (*service.Response, error) {
+	resourceARN := strings.TrimPrefix(path, "/v1/tags/")
+	if resourceARN == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required"))
+	}
+	tagKeys := strSlice(params, "tagKeys")
+	store.UntagResource(resourceARN, tagKeys)
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(path string, store *Store) (*service.Response, error) {
+	resourceARN := strings.TrimPrefix(path, "/v1/tags/")
+	if resourceARN == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required"))
+	}
+	tags := store.ListTagsForResource(resourceARN)
+	return jsonOK(map[string]any{"tags": tags})
 }
 
 // unused but required to satisfy the import for time package in build

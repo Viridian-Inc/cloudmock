@@ -277,3 +277,114 @@ func decodeBody(t *testing.T, resp *service.Response) map[string]any {
 	require.NoError(t, json.Unmarshal(data, &m))
 	return m
 }
+
+func TestBatch_UpdateComputeEnvironment(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx("/v1/createcomputeenvironment", map[string]any{
+		"computeEnvironmentName": "update-ce", "type": "MANAGED",
+	}))
+	resp, err := s.HandleRequest(restCtx("/v1/updatecomputeenvironment", map[string]any{
+		"computeEnvironment": "update-ce", "state": "DISABLED",
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "update-ce", m["computeEnvironmentName"])
+}
+
+func TestBatch_UpdateComputeEnvironment_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx("/v1/updatecomputeenvironment", map[string]any{
+		"computeEnvironment": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestBatch_UpdateJobQueue(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx("/v1/createjobqueue", map[string]any{
+		"jobQueueName": "update-q", "priority": 1, "state": "ENABLED",
+	}))
+	resp, err := s.HandleRequest(restCtx("/v1/updatejobqueue", map[string]any{
+		"jobQueue": "update-q", "state": "DISABLED", "priority": 5,
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, "update-q", respJSON(t, resp)["jobQueueName"])
+}
+
+func TestBatch_SchedulingPolicyCRUD(t *testing.T) {
+	s := newService()
+	// Create
+	resp, err := s.HandleRequest(restCtx("/v1/createschedulingpolicy", map[string]any{
+		"name": "my-policy",
+		"fairsharePolicy": map[string]any{
+			"computeReservation": 10,
+			"shareDecaySeconds":  300,
+		},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	arn := m["arn"].(string)
+	assert.Contains(t, arn, "scheduling-policy")
+
+	// Describe
+	descResp, err := s.HandleRequest(restCtx("/v1/describeschedulingpolicies", map[string]any{
+		"arns": []string{arn},
+	}))
+	require.NoError(t, err)
+	policies := respJSON(t, descResp)["schedulingPolicies"].([]any)
+	assert.Len(t, policies, 1)
+
+	// Update
+	_, err = s.HandleRequest(restCtx("/v1/updateschedulingpolicy", map[string]any{
+		"arn": arn,
+		"fairsharePolicy": map[string]any{"computeReservation": 20},
+	}))
+	require.NoError(t, err)
+
+	// Delete
+	_, err = s.HandleRequest(restCtx("/v1/deleteschedulingpolicy", map[string]any{"arn": arn}))
+	require.NoError(t, err)
+
+	// After delete, should not be in list
+	listResp, _ := s.HandleRequest(restCtx("/v1/describeschedulingpolicies", map[string]any{
+		"arns": []string{arn},
+	}))
+	assert.Len(t, respJSON(t, listResp)["schedulingPolicies"].([]any), 0)
+}
+
+func TestBatch_TaggingOperations(t *testing.T) {
+	s := newService()
+	// Create a CE and get its ARN
+	cr, _ := s.HandleRequest(restCtx("/v1/createcomputeenvironment", map[string]any{
+		"computeEnvironmentName": "tag-ce",
+	}))
+	arn := respJSON(t, cr)["computeEnvironmentArn"].(string)
+
+	// POST tags
+	r := httptest.NewRequest(http.MethodPost, "/v1/tags/"+arn, nil)
+	tagCtx := &service.RequestContext{
+		Region: "us-east-1", AccountID: "123456789012",
+		Body:       mustMarshal(map[string]any{"tags": map[string]any{"env": "prod"}}),
+		RawRequest: r,
+		Identity:   &service.CallerIdentity{AccountID: "123456789012", ARN: "arn:aws:iam::123456789012:root"},
+	}
+	_, err := s.HandleRequest(tagCtx)
+	require.NoError(t, err)
+
+	// GET tags
+	getR := httptest.NewRequest(http.MethodGet, "/v1/tags/"+arn, nil)
+	getCtx := &service.RequestContext{
+		Region: "us-east-1", AccountID: "123456789012",
+		RawRequest: getR,
+		Identity:   &service.CallerIdentity{AccountID: "123456789012", ARN: "arn:aws:iam::123456789012:root"},
+	}
+	listResp, err := s.HandleRequest(getCtx)
+	require.NoError(t, err)
+	tags := respJSON(t, listResp)["tags"].(map[string]any)
+	assert.Equal(t, "prod", tags["env"])
+}
+
+func mustMarshal(v any) []byte {
+	b, _ := json.Marshal(v)
+	return b
+}

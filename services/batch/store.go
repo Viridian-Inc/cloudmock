@@ -125,31 +125,57 @@ type ServiceLocator interface {
 	Lookup(name string) (interface{ HandleRequest(ctx interface{}) (interface{}, error) }, error)
 }
 
+// SchedulingPolicy represents a Batch fair-share scheduling policy.
+type SchedulingPolicy struct {
+	Arn         string
+	Name        string
+	FairsharePolicy *FairsharePolicy
+	Tags        map[string]string
+	CreatedAt   time.Time
+}
+
+// FairsharePolicy defines fair-share parameters for a scheduling policy.
+type FairsharePolicy struct {
+	ComputeReservation int
+	ShareDecaySeconds  int
+	ShareDistributions []ShareDistribution
+}
+
+// ShareDistribution defines a share for a single compute identifier.
+type ShareDistribution struct {
+	ShareIdentifier string
+	WeightFactor    float64
+}
+
 // Store manages Batch resources in memory.
 type Store struct {
-	mu           sync.RWMutex
-	computeEnvs  map[string]*ComputeEnvironment
-	jobQueues    map[string]*JobQueue
-	jobDefs      map[string]*JobDefinition
-	jobs         map[string]*Job
-	accountID    string
-	region       string
-	lcConfig     *lifecycle.Config
-	jobSeq       int
-	defRevision  map[string]int // jobDefName -> latest revision
+	mu                sync.RWMutex
+	computeEnvs       map[string]*ComputeEnvironment
+	jobQueues         map[string]*JobQueue
+	jobDefs           map[string]*JobDefinition
+	jobs              map[string]*Job
+	schedulingPolicies map[string]*SchedulingPolicy // arn -> policy
+	tags              map[string]map[string]string   // arn -> tags
+	accountID         string
+	region            string
+	lcConfig          *lifecycle.Config
+	jobSeq            int
+	defRevision       map[string]int // jobDefName -> latest revision
 }
 
 // NewStore returns a new empty Batch Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		computeEnvs: make(map[string]*ComputeEnvironment),
-		jobQueues:   make(map[string]*JobQueue),
-		jobDefs:     make(map[string]*JobDefinition),
-		jobs:        make(map[string]*Job),
-		accountID:   accountID,
-		region:      region,
-		lcConfig:    lifecycle.DefaultConfig(),
-		defRevision: make(map[string]int),
+		computeEnvs:        make(map[string]*ComputeEnvironment),
+		jobQueues:          make(map[string]*JobQueue),
+		jobDefs:            make(map[string]*JobDefinition),
+		jobs:               make(map[string]*Job),
+		schedulingPolicies: make(map[string]*SchedulingPolicy),
+		tags:               make(map[string]map[string]string),
+		accountID:          accountID,
+		region:             region,
+		lcConfig:           lifecycle.DefaultConfig(),
+		defRevision:        make(map[string]int),
 	}
 }
 
@@ -491,4 +517,144 @@ func (s *Store) GetJobDefRevisions(name string) []*JobDefinition {
 		}
 	}
 	return revisions
+}
+
+// UpdateComputeEnvironment updates a compute environment's state or service role.
+func (s *Store) UpdateComputeEnvironment(name, state, serviceRole string) (*ComputeEnvironment, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ce, ok := s.computeEnvs[name]
+	if !ok {
+		return nil, false
+	}
+	if state != "" {
+		ce.State = state
+	}
+	if serviceRole != "" {
+		ce.ServiceRole = serviceRole
+	}
+	return ce, true
+}
+
+// UpdateJobQueue updates a job queue's state, priority, or compute environment order.
+func (s *Store) UpdateJobQueue(name, state string, priority int, ceOrder []ComputeEnvironmentOrder) (*JobQueue, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	jq, ok := s.jobQueues[name]
+	if !ok {
+		return nil, false
+	}
+	if state != "" {
+		jq.State = state
+	}
+	if priority > 0 {
+		jq.Priority = priority
+	}
+	if len(ceOrder) > 0 {
+		jq.ComputeEnvironmentOrder = ceOrder
+	}
+	return jq, true
+}
+
+// CreateSchedulingPolicy creates a new scheduling policy.
+func (s *Store) CreateSchedulingPolicy(name string, fsp *FairsharePolicy, tags map[string]string) (*SchedulingPolicy, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	arn := fmt.Sprintf("arn:aws:batch:%s:%s:scheduling-policy/%s", s.region, s.accountID, name)
+	if _, ok := s.schedulingPolicies[arn]; ok {
+		return nil, fmt.Errorf("scheduling policy already exists: %s", name)
+	}
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	sp := &SchedulingPolicy{
+		Arn:             arn,
+		Name:            name,
+		FairsharePolicy: fsp,
+		Tags:            tags,
+		CreatedAt:       time.Now().UTC(),
+	}
+	s.schedulingPolicies[arn] = sp
+	s.tags[arn] = tags
+	return sp, nil
+}
+
+// DescribeSchedulingPolicies returns scheduling policies by ARN.
+func (s *Store) DescribeSchedulingPolicies(arns []string) []*SchedulingPolicy {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(arns) == 0 {
+		out := make([]*SchedulingPolicy, 0, len(s.schedulingPolicies))
+		for _, sp := range s.schedulingPolicies {
+			out = append(out, sp)
+		}
+		return out
+	}
+	out := make([]*SchedulingPolicy, 0)
+	for _, arn := range arns {
+		if sp, ok := s.schedulingPolicies[arn]; ok {
+			out = append(out, sp)
+		}
+	}
+	return out
+}
+
+// UpdateSchedulingPolicy updates a scheduling policy's fair-share config.
+func (s *Store) UpdateSchedulingPolicy(arn string, fsp *FairsharePolicy) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sp, ok := s.schedulingPolicies[arn]
+	if !ok {
+		return false
+	}
+	if fsp != nil {
+		sp.FairsharePolicy = fsp
+	}
+	return true
+}
+
+// DeleteSchedulingPolicy removes a scheduling policy.
+func (s *Store) DeleteSchedulingPolicy(arn string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.schedulingPolicies[arn]; !ok {
+		return false
+	}
+	delete(s.schedulingPolicies, arn)
+	delete(s.tags, arn)
+	return true
+}
+
+// TagResource applies tags to any resource by ARN.
+func (s *Store) TagResource(resourceARN string, tags map[string]string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.tags[resourceARN]; !ok {
+		s.tags[resourceARN] = make(map[string]string)
+	}
+	for k, v := range tags {
+		s.tags[resourceARN][k] = v
+	}
+}
+
+// UntagResource removes tags from a resource by ARN.
+func (s *Store) UntagResource(resourceARN string, keys []string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if t, ok := s.tags[resourceARN]; ok {
+		for _, k := range keys {
+			delete(t, k)
+		}
+	}
+}
+
+// ListTagsForResource returns all tags for a resource by ARN.
+func (s *Store) ListTagsForResource(resourceARN string) map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make(map[string]string)
+	for k, v := range s.tags[resourceARN] {
+		result[k] = v
+	}
+	return result
 }

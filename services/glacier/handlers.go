@@ -254,3 +254,94 @@ func jobResponse(j *Job, store *Store) map[string]any {
 	}
 	return resp
 }
+
+// ---- GetJobOutput ----
+
+func handleGetJobOutput(vaultName, jobID string, store *Store) (*service.Response, error) {
+	output, contentType, err := store.GetJobOutput(vaultName, jobID)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return &service.Response{
+		StatusCode: http.StatusOK,
+		Body:       string(output),
+		Headers:    map[string]string{"Content-Type": contentType},
+		Format:     service.FormatJSON,
+	}, nil
+}
+
+// ---- AbortVaultLock ----
+
+func handleAbortVaultLock(vaultName string, store *Store) (*service.Response, error) {
+	if err := store.AbortVaultLock(vaultName); err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatJSON}, nil
+}
+
+// ---- GetVaultLock ----
+
+func handleGetVaultLock(vaultName string, store *Store) (*service.Response, error) {
+	lock, err := store.GetVaultLock(vaultName)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"Policy":       lock.Policy,
+		"State":        lock.State,
+		"LockId":       lock.LockID,
+		"CreationDate": lock.CreatedAt.Format(time.RFC3339),
+	})
+}
+
+// ---- Tags ----
+
+func handleAddTagsToVault(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
+	var body map[string]any
+	if len(ctx.Body) > 0 {
+		_ = json.Unmarshal(ctx.Body, &body)
+	}
+	tags := make(map[string]string)
+	if body != nil {
+		if t, ok := body["Tags"].(map[string]any); ok {
+			for k, v := range t {
+				if s, ok := v.(string); ok {
+					tags[k] = s
+				}
+			}
+		}
+	}
+	if err := store.AddTagsToVault(vaultName, tags); err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatJSON}, nil
+}
+
+func handleRemoveTagsFromVault(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
+	var body map[string]any
+	if len(ctx.Body) > 0 {
+		_ = json.Unmarshal(ctx.Body, &body)
+	}
+	keys := make([]string, 0)
+	if body != nil {
+		if tagKeys, ok := body["TagKeys"].([]any); ok {
+			for _, k := range tagKeys {
+				if s, ok := k.(string); ok {
+					keys = append(keys, s)
+				}
+			}
+		}
+	}
+	if err := store.RemoveTagsFromVault(vaultName, keys); err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return &service.Response{StatusCode: http.StatusNoContent, Format: service.FormatJSON}, nil
+}
+
+func handleListTagsForVault(vaultName string, store *Store) (*service.Response, error) {
+	tags, err := store.ListTagsForVault(vaultName)
+	if err != nil {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", err.Error(), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"Tags": tags})
+}

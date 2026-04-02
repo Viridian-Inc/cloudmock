@@ -34,6 +34,14 @@ func (s *GlacierService) Actions() []service.Action {
 		{Name: "InitiateJob", Method: http.MethodPost, IAMAction: "glacier:InitiateJob"},
 		{Name: "DescribeJob", Method: http.MethodGet, IAMAction: "glacier:DescribeJob"},
 		{Name: "ListJobs", Method: http.MethodGet, IAMAction: "glacier:ListJobs"},
+		{Name: "GetJobOutput", Method: http.MethodGet, IAMAction: "glacier:GetJobOutput"},
+		{Name: "InitiateVaultLock", Method: http.MethodPost, IAMAction: "glacier:InitiateVaultLock"},
+		{Name: "CompleteVaultLock", Method: http.MethodPost, IAMAction: "glacier:CompleteVaultLock"},
+		{Name: "AbortVaultLock", Method: http.MethodDelete, IAMAction: "glacier:AbortVaultLock"},
+		{Name: "GetVaultLock", Method: http.MethodGet, IAMAction: "glacier:GetVaultLock"},
+		{Name: "AddTagsToVault", Method: http.MethodPost, IAMAction: "glacier:AddTagsToVault"},
+		{Name: "RemoveTagsFromVault", Method: http.MethodPost, IAMAction: "glacier:RemoveTagsFromVault"},
+		{Name: "ListTagsForVault", Method: http.MethodGet, IAMAction: "glacier:ListTagsForVault"},
 	}
 }
 
@@ -95,16 +103,42 @@ func (s *GlacierService) HandleRequest(ctx *service.RequestContext) (*service.Re
 				return handleListJobs(vaultName, s.store)
 			}
 		}
-		if len(parts) == 5 && method == http.MethodGet {
-			return handleDescribeJob(vaultName, parts[4], s.store)
+		if len(parts) == 5 {
+			switch method {
+			case http.MethodGet:
+				return handleDescribeJob(vaultName, parts[4], s.store)
+			}
+		}
+		if len(parts) == 6 && parts[5] == "output" && method == http.MethodGet {
+			return handleGetJobOutput(vaultName, parts[4], s.store)
 		}
 	case "lock-policy":
-		if len(parts) == 4 && method == http.MethodPost {
-			return handleInitiateVaultLock(ctx, vaultName, s.store)
+		if len(parts) == 4 {
+			switch method {
+			case http.MethodPost:
+				return handleInitiateVaultLock(ctx, vaultName, s.store)
+			case http.MethodGet:
+				return handleGetVaultLock(vaultName, s.store)
+			case http.MethodDelete:
+				return handleAbortVaultLock(vaultName, s.store)
+			}
 		}
 		if len(parts) == 5 && method == http.MethodPost {
 			// Complete vault lock: POST /-/vaults/{name}/lock-policy/{lockId}
 			return handleCompleteVaultLock(vaultName, parts[4], s.store)
+		}
+	case "tags":
+		// GET /-/vaults/{name}/tags -> ListTagsForVault
+		// POST /-/vaults/{name}/tags -> AddTagsToVault
+		switch method {
+		case http.MethodGet:
+			return handleListTagsForVault(vaultName, s.store)
+		case http.MethodPost:
+			return handleAddTagsToVault(ctx, vaultName, s.store)
+		}
+		// DELETE tags handled with query param "operation=remove"
+		if method == http.MethodPost && r.URL.Query().Get("operation") == "remove" {
+			return handleRemoveTagsFromVault(ctx, vaultName, s.store)
 		}
 	case "notification-configuration":
 		if method == http.MethodPut {

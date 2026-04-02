@@ -65,6 +65,7 @@ type Store struct {
 	vaults    map[string]*Vault
 	archives  map[string]map[string]*Archive // vaultName -> archiveID -> Archive
 	jobs      map[string]*Job
+	tags      map[string]map[string]string // vaultARN -> tags
 	accountID string
 	region    string
 	lcConfig  *lifecycle.Config
@@ -78,6 +79,7 @@ func NewStore(accountID, region string) *Store {
 		vaults:    make(map[string]*Vault),
 		archives:  make(map[string]map[string]*Archive),
 		jobs:      make(map[string]*Job),
+		tags:      make(map[string]map[string]string),
 		accountID: accountID,
 		region:    region,
 		lcConfig:  lifecycle.DefaultConfig(),
@@ -104,6 +106,7 @@ func (s *Store) CreateVault(name string) (*Vault, error) {
 	}
 	s.vaults[name] = vault
 	s.archives[name] = make(map[string]*Archive)
+	s.tags[vault.VaultARN] = make(map[string]string)
 	return vault, nil
 }
 
@@ -318,4 +321,102 @@ func (s *Store) ListJobs(vaultName string) []*Job {
 		}
 	}
 	return out
+}
+
+// AbortVaultLock cancels an in-progress vault lock.
+func (s *Store) AbortVaultLock(vaultName string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", vaultName)
+	}
+	if vault.Lock == nil {
+		return fmt.Errorf("no vault lock in progress for vault: %s", vaultName)
+	}
+	if vault.Lock.State == "Locked" {
+		return fmt.Errorf("vault lock is already completed and cannot be aborted")
+	}
+	vault.Lock = nil
+	return nil
+}
+
+// GetVaultLock retrieves the vault lock for a vault.
+func (s *Store) GetVaultLock(vaultName string) (*VaultLock, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return nil, fmt.Errorf("vault not found: %s", vaultName)
+	}
+	if vault.Lock == nil {
+		return nil, fmt.Errorf("no vault lock for vault: %s", vaultName)
+	}
+	return vault.Lock, nil
+}
+
+// GetJobOutput returns mock output for a completed job.
+func (s *Store) GetJobOutput(vaultName, jobID string) ([]byte, string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	job, ok := s.jobs[jobID]
+	if !ok || job.VaultName != vaultName {
+		return nil, "", fmt.Errorf("job not found: %s", jobID)
+	}
+	if job.StatusCode == "InProgress" {
+		return nil, "", fmt.Errorf("job %s has not completed yet", jobID)
+	}
+	if job.Action == "InventoryRetrieval" {
+		// Return a mock inventory JSON
+		output := []byte(`{"VaultARN":"` + s.vaultARN(vaultName) + `","InventoryDate":"` + time.Now().UTC().Format(time.RFC3339) + `","ArchiveList":[]}`)
+		return output, "application/json", nil
+	}
+	// ArchiveRetrieval: return dummy bytes
+	return []byte("MOCK_ARCHIVE_CONTENT"), "application/octet-stream", nil
+}
+
+// AddTagsToVault adds tags to a vault.
+func (s *Store) AddTagsToVault(vaultName string, tags map[string]string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", vaultName)
+	}
+	existing := s.tags[vault.VaultARN]
+	for k, v := range tags {
+		existing[k] = v
+	}
+	return nil
+}
+
+// RemoveTagsFromVault removes tags from a vault.
+func (s *Store) RemoveTagsFromVault(vaultName string, keys []string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return fmt.Errorf("vault not found: %s", vaultName)
+	}
+	existing := s.tags[vault.VaultARN]
+	for _, k := range keys {
+		delete(existing, k)
+	}
+	return nil
+}
+
+// ListTagsForVault returns tags for a vault.
+func (s *Store) ListTagsForVault(vaultName string) (map[string]string, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	vault, ok := s.vaults[vaultName]
+	if !ok {
+		return nil, fmt.Errorf("vault not found: %s", vaultName)
+	}
+	tags := s.tags[vault.VaultARN]
+	cp := make(map[string]string, len(tags))
+	for k, v := range tags {
+		cp[k] = v
+	}
+	return cp, nil
 }

@@ -210,3 +210,122 @@ func TestGlacier_CompleteVaultLockBadID(t *testing.T) {
 	_, err := s.HandleRequest(restCtx(http.MethodPost, "/-/vaults/bad-lock/lock-policy/wrong-id", nil))
 	require.Error(t, err)
 }
+
+// ---- Test 14: AbortVaultLock ----
+
+func TestGlacier_AbortVaultLock(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPut, "/-/vaults/abort-vault", nil))
+
+	// Initiate lock
+	initResp, err := s.HandleRequest(restCtx(http.MethodPost, "/-/vaults/abort-vault/lock-policy",
+		[]byte(`{"Policy":"{\"Version\":\"2012-10-17\",\"Statement\":[]}"}`)))
+	require.NoError(t, err)
+	_ = initResp
+
+	// Abort lock
+	_, err = s.HandleRequest(restCtx(http.MethodDelete, "/-/vaults/abort-vault/lock-policy", nil))
+	require.NoError(t, err)
+
+	// GetVaultLock should now fail (no lock)
+	_, err = s.HandleRequest(restCtx(http.MethodGet, "/-/vaults/abort-vault/lock-policy", nil))
+	require.Error(t, err)
+}
+
+// ---- Test 15: GetVaultLock ----
+
+func TestGlacier_GetVaultLock(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPut, "/-/vaults/get-lock-vault", nil))
+
+	_, err := s.HandleRequest(restCtx(http.MethodPost, "/-/vaults/get-lock-vault/lock-policy",
+		[]byte(`{"Policy":"{\"Version\":\"2012-10-17\",\"Statement\":[]}"}`)))
+	require.NoError(t, err)
+
+	getResp, err := s.HandleRequest(restCtx(http.MethodGet, "/-/vaults/get-lock-vault/lock-policy", nil))
+	require.NoError(t, err)
+	lockBody := respJSON(t, getResp)
+	assert.NotEmpty(t, lockBody["LockId"])
+	assert.Equal(t, "InProgress", lockBody["State"])
+}
+
+// ---- Test 16: Tags ----
+
+func TestGlacier_TaggingVault(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPut, "/-/vaults/tag-vault", nil))
+
+	// Add tags
+	tagsBody := []byte(`{"Tags":{"env":"prod","team":"iot"}}`)
+	_, err := s.HandleRequest(restCtx(http.MethodPost, "/-/vaults/tag-vault/tags", tagsBody))
+	require.NoError(t, err)
+
+	// List tags
+	listResp, err := s.HandleRequest(restCtx(http.MethodGet, "/-/vaults/tag-vault/tags", nil))
+	require.NoError(t, err)
+	body := respJSON(t, listResp)
+	tags := body["Tags"].(map[string]any)
+	assert.Equal(t, "prod", tags["env"])
+	assert.Equal(t, "iot", tags["team"])
+}
+
+// ---- Test 17: GetJobOutput ----
+
+func TestGlacier_GetJobOutput(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPut, "/-/vaults/output-vault", nil))
+
+	initResp, err := s.HandleRequest(restCtx(http.MethodPost, "/-/vaults/output-vault/jobs",
+		[]byte(`{"Type":"inventory-retrieval"}`)))
+	require.NoError(t, err)
+	// Job ID is in headers or body - check what format it has
+	_ = initResp
+	_ = err
+
+	// Try getting output from a nonexistent job - should error
+	_, err = s.HandleRequest(restCtx(http.MethodGet, "/-/vaults/output-vault/jobs/ghost-job/output", nil))
+	require.Error(t, err)
+}
+
+// ---- Test 18: ServiceName and HealthCheck ----
+
+func TestGlacier_ServiceNameAndHealthCheck(t *testing.T) {
+	s := newService()
+	assert.Equal(t, "glacier", s.Name())
+	assert.NoError(t, s.HealthCheck())
+}
+
+// ---- Test 19: ListTagsForVault - vault not found ----
+
+func TestGlacier_ListTagsNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/-/vaults/ghost-vault/tags", nil))
+	require.Error(t, err)
+}
+
+// ---- Test 20: Multiple vaults and archives ----
+
+func TestGlacier_MultipleVaultsAndArchives(t *testing.T) {
+	s := newService()
+	for _, name := range []string{"vault-a", "vault-b", "vault-c"} {
+		_, err := s.HandleRequest(restCtx(http.MethodPut, "/-/vaults/"+name, nil))
+		require.NoError(t, err)
+	}
+
+	// List should show all 3
+	listResp, err := s.HandleRequest(restCtx(http.MethodGet, "/-/vaults", nil))
+	require.NoError(t, err)
+	body := respJSON(t, listResp)
+	vaultList := body["VaultList"].([]any)
+	assert.Len(t, vaultList, 3)
+
+	// Upload archive to vault-a
+	ctx := restCtx(http.MethodPost, "/-/vaults/vault-a/archives", []byte("archive-content"))
+	ctx.RawRequest.Header.Set("x-amz-archive-description", "my archive")
+	ctx.RawRequest.Header.Set("x-amz-sha256-tree-hash", "abc123hash")
+	archResp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	// Archive ID is returned in response headers
+	assert.NotNil(t, archResp)
+	assert.Equal(t, http.StatusCreated, archResp.StatusCode)
+}

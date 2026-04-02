@@ -1,6 +1,6 @@
 name: cloudmock
 base: core24
-version: '1.0.3'
+version: '1.0.4'
 summary: Local AWS emulation — 98 services, one binary, built-in devtools
 description: |
   CloudMock emulates 98 AWS services on your local machine. Point your AWS SDK
@@ -15,20 +15,21 @@ grade: stable
 confinement: strict
 license: BSL-1.1
 
-architectures:
-  - build-on: [amd64]
+platforms:
+  amd64:
+    build-on: [amd64]
     build-for: [amd64]
-  - build-on: [arm64]
+  arm64:
+    build-on: [arm64]
     build-for: [arm64]
 
 parts:
   devtools:
-    plugin: npm
+    plugin: nil
     source: devtools/
-    npm-include-node: true
-    npm-node-version: "20"
     build-packages:
       - nodejs
+      - npm
     override-build: |
       corepack enable
       corepack prepare pnpm@latest --activate
@@ -47,6 +48,7 @@ parts:
       - gcc
       - libc6-dev
     override-build: |
+      mkdir -p pkg/dashboard/dist
       cp -r $SNAPCRAFT_STAGE/devtools-dist/* pkg/dashboard/dist/ 2>/dev/null || true
       CGO_ENABLED=1 go build -ldflags="-s -w" -o $SNAPCRAFT_PART_INSTALL/bin/cloudmock ./cmd/gateway
 

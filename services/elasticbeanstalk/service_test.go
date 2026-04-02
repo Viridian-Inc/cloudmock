@@ -199,3 +199,116 @@ func TestEB_EnvironmentRequiresApp(t *testing.T) {
 	}))
 	require.Error(t, err)
 }
+
+func xmlBody(t *testing.T, resp *service.Response) string {
+	t.Helper()
+	b, err := xml.Marshal(resp.Body)
+	require.NoError(t, err)
+	return string(b)
+}
+
+func TestEB_UpdateApplication(t *testing.T) {
+	s := newService()
+	s.HandleRequest(queryCtx("CreateApplication", map[string]string{"ApplicationName": "upd-app"}))
+	resp, err := s.HandleRequest(queryCtx("UpdateApplication", map[string]string{
+		"ApplicationName": "upd-app", "Description": "Updated description",
+	}))
+	require.NoError(t, err)
+	body := xmlBody(t, resp)
+	assert.Contains(t, body, "upd-app")
+}
+
+func TestEB_UpdateApplication_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(queryCtx("UpdateApplication", map[string]string{
+		"ApplicationName": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestEB_UpdateEnvironment(t *testing.T) {
+	s := newService()
+	s.HandleRequest(queryCtx("CreateApplication", map[string]string{"ApplicationName": "env-upd-app"}))
+	s.HandleRequest(queryCtx("CreateEnvironment", map[string]string{
+		"ApplicationName": "env-upd-app", "EnvironmentName": "env-upd",
+	}))
+	resp, err := s.HandleRequest(queryCtx("UpdateEnvironment", map[string]string{
+		"EnvironmentName": "env-upd", "Description": "new desc",
+	}))
+	require.NoError(t, err)
+	body := xmlBody(t, resp)
+	assert.Contains(t, body, "env-upd")
+}
+
+func TestEB_DeleteApplicationVersion(t *testing.T) {
+	s := newService()
+	s.HandleRequest(queryCtx("CreateApplication", map[string]string{"ApplicationName": "ver-del-app"}))
+	s.HandleRequest(queryCtx("CreateApplicationVersion", map[string]string{
+		"ApplicationName": "ver-del-app", "VersionLabel": "v1.0",
+	}))
+
+	descResp, _ := s.HandleRequest(queryCtx("DescribeApplicationVersions", map[string]string{
+		"ApplicationName": "ver-del-app",
+	}))
+	assert.Contains(t, xmlBody(t, descResp), "v1.0")
+
+	_, err := s.HandleRequest(queryCtx("DeleteApplicationVersion", map[string]string{
+		"ApplicationName": "ver-del-app", "VersionLabel": "v1.0",
+	}))
+	require.NoError(t, err)
+}
+
+func TestEB_ValidateConfigurationSettings(t *testing.T) {
+	s := newService()
+	s.HandleRequest(queryCtx("CreateApplication", map[string]string{"ApplicationName": "val-app"}))
+	resp, err := s.HandleRequest(queryCtx("ValidateConfigurationSettings", map[string]string{
+		"ApplicationName": "val-app",
+	}))
+	require.NoError(t, err)
+	// Returns empty messages (all settings valid in mock)
+	assert.NotNil(t, resp)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestEB_ListPlatformVersions(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(queryCtx("ListPlatformVersions", nil))
+	require.NoError(t, err)
+	body := xmlBody(t, resp)
+	assert.Contains(t, body, "PlatformArn")
+}
+
+func TestEB_FullApplicationLifecycle(t *testing.T) {
+	s := newService()
+	// Create app
+	s.HandleRequest(queryCtx("CreateApplication", map[string]string{
+		"ApplicationName": "full-lifecycle", "Description": "test",
+	}))
+	// Create version
+	s.HandleRequest(queryCtx("CreateApplicationVersion", map[string]string{
+		"ApplicationName": "full-lifecycle", "VersionLabel": "v1",
+	}))
+	// Create env
+	s.HandleRequest(queryCtx("CreateEnvironment", map[string]string{
+		"ApplicationName": "full-lifecycle", "EnvironmentName": "prod",
+	}))
+	// Update app
+	s.HandleRequest(queryCtx("UpdateApplication", map[string]string{
+		"ApplicationName": "full-lifecycle", "Description": "updated",
+	}))
+	// Terminate env
+	_, err := s.HandleRequest(queryCtx("TerminateEnvironment", map[string]string{
+		"EnvironmentName": "prod",
+	}))
+	require.NoError(t, err)
+	// Delete version
+	_, err = s.HandleRequest(queryCtx("DeleteApplicationVersion", map[string]string{
+		"ApplicationName": "full-lifecycle", "VersionLabel": "v1",
+	}))
+	require.NoError(t, err)
+	// Delete app
+	_, err = s.HandleRequest(queryCtx("DeleteApplication", map[string]string{
+		"ApplicationName": "full-lifecycle",
+	}))
+	require.NoError(t, err)
+}

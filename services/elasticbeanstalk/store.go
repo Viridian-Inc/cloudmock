@@ -365,3 +365,69 @@ func (s *Store) DeleteConfigurationTemplate(appName, templateName string) bool {
 	delete(tmplMap, templateName)
 	return true
 }
+
+// UpdateApplication updates an application's description.
+func (s *Store) UpdateApplication(name, description string) (*Application, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	app, ok := s.apps[name]
+	if !ok {
+		return nil, false
+	}
+	app.Description = description
+	app.DateUpdated = time.Now().UTC()
+	return app, true
+}
+
+// UpdateEnvironment updates an environment's version or description.
+func (s *Store) UpdateEnvironment(envName, versionLabel, description string) (*Environment, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	env, ok := s.envs[envName]
+	if !ok {
+		return nil, false
+	}
+	if versionLabel != "" {
+		env.VersionLabel = versionLabel
+	}
+	if description != "" {
+		env.Description = description
+	}
+	env.DateUpdated = time.Now().UTC()
+	return env, true
+}
+
+// DeleteApplicationVersion removes an application version.
+func (s *Store) DeleteApplicationVersion(appName, versionLabel string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	verMap, ok := s.versions[appName]
+	if !ok {
+		return false
+	}
+	if _, ok := verMap[versionLabel]; !ok {
+		return false
+	}
+	delete(verMap, versionLabel)
+	// Remove from app's Versions list.
+	if app, ok := s.apps[appName]; ok {
+		newVersions := make([]string, 0)
+		for _, v := range app.Versions {
+			if v != versionLabel {
+				newVersions = append(newVersions, v)
+			}
+		}
+		app.Versions = newVersions
+	}
+	return true
+}
+
+// ListPlatformVersions returns a mock list of supported platform versions.
+func (s *Store) ListPlatformVersions() []map[string]string {
+	return []map[string]string{
+		{"PlatformArn": fmt.Sprintf("arn:aws:elasticbeanstalk:%s::platform/Docker running on 64bit Amazon Linux 2023/4.0.0", s.region), "PlatformStatus": "Ready", "PlatformCategory": "Docker", "OperatingSystemName": "Amazon Linux 2023"},
+		{"PlatformArn": fmt.Sprintf("arn:aws:elasticbeanstalk:%s::platform/Node.js 18 running on 64bit Amazon Linux 2023/6.0.0", s.region), "PlatformStatus": "Ready", "PlatformCategory": "Node.js", "OperatingSystemName": "Amazon Linux 2023"},
+		{"PlatformArn": fmt.Sprintf("arn:aws:elasticbeanstalk:%s::platform/Python 3.11 running on 64bit Amazon Linux 2023/4.0.0", s.region), "PlatformStatus": "Ready", "PlatformCategory": "Python", "OperatingSystemName": "Amazon Linux 2023"},
+		{"PlatformArn": fmt.Sprintf("arn:aws:elasticbeanstalk:%s::platform/Java 17 running on 64bit Amazon Linux 2023/4.0.0", s.region), "PlatformStatus": "Ready", "PlatformCategory": "Java", "OperatingSystemName": "Amazon Linux 2023"},
+	}
+}

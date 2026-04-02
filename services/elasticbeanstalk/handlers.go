@@ -463,3 +463,149 @@ func handleDeleteConfigurationTemplate(ctx *service.RequestContext, store *Store
 	store.DeleteConfigurationTemplate(appName, templateName)
 	return xmlOK(&xmlDeleteConfigTemplateResponse{Meta: xmlResponseMetadata{RequestID: newUUID()}})
 }
+
+// ---- UpdateApplication ----
+
+type xmlUpdateApplicationResponse struct {
+	XMLName xml.Name            `xml:"UpdateApplicationResponse"`
+	Result  xmlApplicationResult `xml:"UpdateApplicationResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
+}
+
+func handleUpdateApplication(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("ApplicationName")
+	if name == "" {
+		return xmlErr(service.ErrValidation("ApplicationName is required."))
+	}
+	description := form.Get("Description")
+	app, ok := store.UpdateApplication(name, description)
+	if !ok {
+		return xmlErr(service.ErrNotFound("Application", name))
+	}
+	return xmlOK(&xmlUpdateApplicationResponse{
+		Result: xmlApplicationResult{Application: xmlApplication{
+			ApplicationName: app.ApplicationName,
+			ApplicationArn:  app.ApplicationArn,
+			Description:     app.Description,
+			DateCreated:     app.DateCreated.Format(time.RFC3339),
+			DateUpdated:     app.DateUpdated.Format(time.RFC3339),
+		}},
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- UpdateEnvironment ----
+
+type xmlUpdateEnvironmentResponse struct {
+	XMLName         xml.Name            `xml:"UpdateEnvironmentResponse"`
+	EnvironmentName string              `xml:"UpdateEnvironmentResult>EnvironmentName"`
+	ApplicationName string              `xml:"UpdateEnvironmentResult>ApplicationName"`
+	Status          string              `xml:"UpdateEnvironmentResult>Status"`
+	Meta            xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleUpdateEnvironment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	envName := form.Get("EnvironmentName")
+	if envName == "" {
+		return xmlErr(service.ErrValidation("EnvironmentName is required."))
+	}
+	env, ok := store.UpdateEnvironment(envName, form.Get("VersionLabel"), form.Get("Description"))
+	if !ok {
+		return xmlErr(service.ErrNotFound("Environment", envName))
+	}
+	return xmlOK(&xmlUpdateEnvironmentResponse{
+		EnvironmentName: env.EnvironmentName,
+		ApplicationName: env.ApplicationName,
+		Status:          env.Status,
+		Meta:            xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- DeleteApplicationVersion ----
+
+type xmlDeleteAppVersionResponse struct {
+	XMLName xml.Name            `xml:"DeleteApplicationVersionResponse"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDeleteApplicationVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	appName := form.Get("ApplicationName")
+	versionLabel := form.Get("VersionLabel")
+	if appName == "" || versionLabel == "" {
+		return xmlErr(service.ErrValidation("ApplicationName and VersionLabel are required."))
+	}
+	store.DeleteApplicationVersion(appName, versionLabel)
+	return xmlOK(&xmlDeleteAppVersionResponse{Meta: xmlResponseMetadata{RequestID: newUUID()}})
+}
+
+// ---- ValidateConfigurationSettings ----
+
+type xmlValidateConfigSettingsResponse struct {
+	XMLName xml.Name            `xml:"ValidateConfigurationSettingsResponse"`
+	Result  xmlValidateResult   `xml:"ValidateConfigurationSettingsResult"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+type xmlValidateResult struct {
+	Messages xmlValidateMessages `xml:"Messages"`
+}
+
+type xmlValidateMessages struct {
+	Members []xmlValidateMessage `xml:"member"`
+}
+
+type xmlValidateMessage struct {
+	Message   string `xml:"Message"`
+	Severity  string `xml:"Severity"`
+	Namespace string `xml:"Namespace"`
+	OptionName string `xml:"OptionName"`
+}
+
+func handleValidateConfigurationSettings(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	// Return an empty validation result (all settings are valid in mock).
+	return xmlOK(&xmlValidateConfigSettingsResponse{
+		Result: xmlValidateResult{Messages: xmlValidateMessages{Members: []xmlValidateMessage{}}},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- ListPlatformVersions ----
+
+type xmlListPlatformVersionsResponse struct {
+	XMLName          xml.Name                   `xml:"ListPlatformVersionsResponse"`
+	Result           xmlListPlatformVersionsResult `xml:"ListPlatformVersionsResult"`
+	Meta             xmlResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type xmlListPlatformVersionsResult struct {
+	PlatformSummaryList xmlPlatformSummaryList `xml:"PlatformSummaryList"`
+}
+
+type xmlPlatformSummaryList struct {
+	Members []xmlPlatformSummary `xml:"member"`
+}
+
+type xmlPlatformSummary struct {
+	PlatformArn      string `xml:"PlatformArn"`
+	PlatformStatus   string `xml:"PlatformStatus"`
+	PlatformCategory string `xml:"PlatformCategory"`
+}
+
+func handleListPlatformVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	platforms := store.ListPlatformVersions()
+	members := make([]xmlPlatformSummary, 0, len(platforms))
+	for _, p := range platforms {
+		members = append(members, xmlPlatformSummary{
+			PlatformArn:      p["PlatformArn"],
+			PlatformStatus:   p["PlatformStatus"],
+			PlatformCategory: p["PlatformCategory"],
+		})
+	}
+	return xmlOK(&xmlListPlatformVersionsResponse{
+		Result: xmlListPlatformVersionsResult{PlatformSummaryList: xmlPlatformSummaryList{Members: members}},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}

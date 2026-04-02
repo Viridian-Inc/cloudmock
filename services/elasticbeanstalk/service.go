@@ -27,15 +27,20 @@ func (s *ElasticBeanstalkService) Actions() []service.Action {
 	return []service.Action{
 		{Name: "CreateApplication", Method: http.MethodPost, IAMAction: "elasticbeanstalk:CreateApplication"},
 		{Name: "DescribeApplications", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DescribeApplications"},
+		{Name: "UpdateApplication", Method: http.MethodPost, IAMAction: "elasticbeanstalk:UpdateApplication"},
 		{Name: "DeleteApplication", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DeleteApplication"},
 		{Name: "CreateApplicationVersion", Method: http.MethodPost, IAMAction: "elasticbeanstalk:CreateApplicationVersion"},
 		{Name: "DescribeApplicationVersions", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DescribeApplicationVersions"},
+		{Name: "DeleteApplicationVersion", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DeleteApplicationVersion"},
 		{Name: "CreateEnvironment", Method: http.MethodPost, IAMAction: "elasticbeanstalk:CreateEnvironment"},
 		{Name: "DescribeEnvironments", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DescribeEnvironments"},
+		{Name: "UpdateEnvironment", Method: http.MethodPost, IAMAction: "elasticbeanstalk:UpdateEnvironment"},
 		{Name: "TerminateEnvironment", Method: http.MethodPost, IAMAction: "elasticbeanstalk:TerminateEnvironment"},
 		{Name: "CreateConfigurationTemplate", Method: http.MethodPost, IAMAction: "elasticbeanstalk:CreateConfigurationTemplate"},
 		{Name: "DescribeConfigurationSettings", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DescribeConfigurationSettings"},
+		{Name: "ValidateConfigurationSettings", Method: http.MethodPost, IAMAction: "elasticbeanstalk:ValidateConfigurationSettings"},
 		{Name: "DeleteConfigurationTemplate", Method: http.MethodPost, IAMAction: "elasticbeanstalk:DeleteConfigurationTemplate"},
+		{Name: "ListPlatformVersions", Method: http.MethodPost, IAMAction: "elasticbeanstalk:ListPlatformVersions"},
 	}
 }
 
@@ -56,24 +61,34 @@ func (s *ElasticBeanstalkService) HandleRequest(ctx *service.RequestContext) (*s
 		return handleCreateApplication(ctx, s.store)
 	case "DescribeApplications":
 		return handleDescribeApplications(ctx, s.store)
+	case "UpdateApplication":
+		return handleUpdateApplication(ctx, s.store)
 	case "DeleteApplication":
 		return handleDeleteApplication(ctx, s.store)
 	case "CreateApplicationVersion":
 		return handleCreateApplicationVersion(ctx, s.store)
 	case "DescribeApplicationVersions":
 		return handleDescribeApplicationVersions(ctx, s.store)
+	case "DeleteApplicationVersion":
+		return handleDeleteApplicationVersion(ctx, s.store)
 	case "CreateEnvironment":
 		return handleCreateEnvironment(ctx, s.store)
 	case "DescribeEnvironments":
 		return handleDescribeEnvironments(ctx, s.store)
+	case "UpdateEnvironment":
+		return handleUpdateEnvironment(ctx, s.store)
 	case "TerminateEnvironment":
 		return handleTerminateEnvironment(ctx, s.store)
 	case "CreateConfigurationTemplate":
 		return handleCreateConfigurationTemplate(ctx, s.store)
 	case "DescribeConfigurationSettings":
 		return handleDescribeConfigurationSettings(ctx, s.store)
+	case "ValidateConfigurationSettings":
+		return handleValidateConfigurationSettings(ctx, s.store)
 	case "DeleteConfigurationTemplate":
 		return handleDeleteConfigurationTemplate(ctx, s.store)
+	case "ListPlatformVersions":
+		return handleListPlatformVersions(ctx, s.store)
 	default:
 		return xmlErr(service.NewAWSError("InvalidAction",
 			"The action "+action+" is not valid for this web service.",

@@ -37,6 +37,12 @@ func (s *OpenSearchService) Actions() []service.Action {
 		{Name: "AddTags", Method: http.MethodPost, IAMAction: "es:AddTags"},
 		{Name: "RemoveTags", Method: http.MethodPost, IAMAction: "es:RemoveTags"},
 		{Name: "ListTags", Method: http.MethodPost, IAMAction: "es:ListTags"},
+		{Name: "DescribeDomains", Method: http.MethodPost, IAMAction: "es:DescribeDomains"},
+		{Name: "GetCompatibleVersions", Method: http.MethodPost, IAMAction: "es:GetCompatibleVersions"},
+		{Name: "CreateVpcEndpoint", Method: http.MethodPost, IAMAction: "es:CreateVpcEndpoint"},
+		{Name: "DescribeVpcEndpoints", Method: http.MethodPost, IAMAction: "es:DescribeVpcEndpoints"},
+		{Name: "ListVpcEndpoints", Method: http.MethodPost, IAMAction: "es:ListVpcEndpoints"},
+		{Name: "DeleteVpcEndpoint", Method: http.MethodPost, IAMAction: "es:DeleteVpcEndpoint"},
 		{Name: "UpgradeDomain", Method: http.MethodPost, IAMAction: "es:UpgradeDomain"},
 		{Name: "GetUpgradeStatus", Method: http.MethodPost, IAMAction: "es:GetUpgradeStatus"},
 		{Name: "IndexDocument", Method: http.MethodPost, IAMAction: "es:ESHttpPut"},
@@ -69,6 +75,18 @@ func (s *OpenSearchService) HandleRequest(ctx *service.RequestContext) (*service
 		return handleRemoveTags(ctx, s.store)
 	case "ListTags":
 		return handleListTags(ctx, s.store)
+	case "DescribeDomains":
+		return handleDescribeDomains(ctx, s.store)
+	case "GetCompatibleVersions":
+		return handleGetCompatibleVersions(ctx, s.store)
+	case "CreateVpcEndpoint":
+		return handleCreateVpcEndpoint(ctx, s.store)
+	case "DescribeVpcEndpoints":
+		return handleDescribeVpcEndpoints(ctx, s.store)
+	case "ListVpcEndpoints":
+		return handleListVpcEndpoints(ctx, s.store)
+	case "DeleteVpcEndpoint":
+		return handleDeleteVpcEndpoint(ctx, s.store)
 	case "UpgradeDomain":
 		return handleUpgradeDomain(ctx, s.store)
 	case "GetUpgradeStatus":

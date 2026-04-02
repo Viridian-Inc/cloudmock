@@ -394,8 +394,153 @@ func handleClusterHealth(ctx *service.RequestContext, store *Store) (*service.Re
 		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Domain "+req.DomainName+" not found.", http.StatusNotFound))
 	}
 	return jsonOK(map[string]any{
-		"cluster_name":   req.DomainName,
-		"status":         health,
+		"cluster_name":    req.DomainName,
+		"status":          health,
 		"number_of_nodes": 1,
 	})
+}
+
+// ---- DescribeDomains ----
+
+type describeDomainsRequest struct {
+	DomainNames []string `json:"DomainNames"`
+}
+
+func handleDescribeDomains(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeDomainsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	domains := store.DescribeDomains(req.DomainNames)
+	statuses := make([]domainStatusJSON, 0, len(domains))
+	for _, d := range domains {
+		statuses = append(statuses, toDomainStatusJSON(d))
+	}
+	return jsonOK(map[string]any{"DomainStatusList": statuses})
+}
+
+// ---- GetCompatibleVersions ----
+
+type getCompatibleVersionsRequest struct {
+	DomainName string `json:"DomainName"`
+}
+
+func handleGetCompatibleVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getCompatibleVersionsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	versions := store.GetCompatibleVersions(req.DomainName)
+	list := make([]map[string]any, 0, len(versions))
+	for _, v := range versions {
+		list = append(list, map[string]any{
+			"SourceVersion":  v.SourceVersion,
+			"TargetVersions": v.TargetVersions,
+		})
+	}
+	return jsonOK(map[string]any{"CompatibleVersions": list})
+}
+
+// ---- VPC Endpoints ----
+
+type vpcEndpointJSON struct {
+	VpcEndpointId string `json:"VpcEndpointId"`
+	DomainArn     string `json:"DomainArn"`
+	Status        string `json:"Status"`
+	Endpoint      string `json:"Endpoint,omitempty"`
+	VpcOptions    map[string]any `json:"VpcOptions,omitempty"`
+}
+
+func toVpcEndpointJSON(ep *VpcEndpoint) vpcEndpointJSON {
+	return vpcEndpointJSON{
+		VpcEndpointId: ep.VpcEndpointID,
+		DomainArn:     ep.DomainArn,
+		Status:        ep.Status,
+		Endpoint:      ep.Endpoint,
+		VpcOptions: map[string]any{
+			"VPCId":            ep.VpcOptions.VpcID,
+			"SubnetIds":        ep.VpcOptions.SubnetIDs,
+			"SecurityGroupIds": ep.VpcOptions.SecurityGroupIDs,
+		},
+	}
+}
+
+type createVpcEndpointRequest struct {
+	DomainArn  string `json:"DomainArn"`
+	VpcOptions struct {
+		VPCId            string   `json:"VPCId"`
+		SubnetIds        []string `json:"SubnetIds"`
+		SecurityGroupIds []string `json:"SecurityGroupIds"`
+	} `json:"VpcOptions"`
+}
+
+func handleCreateVpcEndpoint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createVpcEndpointRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.DomainArn == "" {
+		return jsonErr(service.ErrValidation("DomainArn is required."))
+	}
+	opts := VpcOptions{
+		VpcID:            req.VpcOptions.VPCId,
+		SubnetIDs:        req.VpcOptions.SubnetIds,
+		SecurityGroupIDs: req.VpcOptions.SecurityGroupIds,
+	}
+	ep, _ := store.CreateVpcEndpoint(req.DomainArn, opts)
+	return jsonOK(map[string]any{"VpcEndpoint": toVpcEndpointJSON(ep)})
+}
+
+type describeVpcEndpointsRequest struct {
+	VpcEndpointIds []string `json:"VpcEndpointIds"`
+}
+
+func handleDescribeVpcEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeVpcEndpointsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	endpoints := store.DescribeVpcEndpoints(req.VpcEndpointIds)
+	list := make([]vpcEndpointJSON, 0, len(endpoints))
+	for _, ep := range endpoints {
+		list = append(list, toVpcEndpointJSON(ep))
+	}
+	return jsonOK(map[string]any{"VpcEndpoints": list})
+}
+
+type listVpcEndpointsRequest struct {
+	DomainArn string `json:"DomainArn"`
+}
+
+func handleListVpcEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listVpcEndpointsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	endpoints := store.ListVpcEndpoints(req.DomainArn)
+	list := make([]vpcEndpointJSON, 0, len(endpoints))
+	for _, ep := range endpoints {
+		list = append(list, toVpcEndpointJSON(ep))
+	}
+	return jsonOK(map[string]any{"VpcEndpoints": list})
+}
+
+type deleteVpcEndpointRequest struct {
+	VpcEndpointId string `json:"VpcEndpointId"`
+}
+
+func handleDeleteVpcEndpoint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteVpcEndpointRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.VpcEndpointId == "" {
+		return jsonErr(service.ErrValidation("VpcEndpointId is required."))
+	}
+	ep, ok := store.DeleteVpcEndpoint(req.VpcEndpointId)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			"VPC endpoint "+req.VpcEndpointId+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"VpcEndpointSummary": toVpcEndpointJSON(ep)})
 }

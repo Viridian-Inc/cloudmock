@@ -56,12 +56,35 @@ type UpgradeStatus struct {
 	UpgradeStep   string
 }
 
+// VpcEndpoint represents an OpenSearch VPC endpoint.
+type VpcEndpoint struct {
+	VpcEndpointID   string
+	DomainArn       string
+	VpcOptions      VpcOptions
+	Status          string
+	Endpoint        string
+}
+
+// VpcOptions holds VPC configuration for a domain or endpoint.
+type VpcOptions struct {
+	VpcID            string
+	SubnetIDs        []string
+	SecurityGroupIDs []string
+}
+
+// CompatibleVersion holds a source engine version and compatible targets.
+type CompatibleVersion struct {
+	SourceVersion   string
+	TargetVersions  []string
+}
+
 // Store manages all OpenSearch resources.
 type Store struct {
 	mu           sync.RWMutex
 	domains      map[string]*Domain
 	upgrades     map[string]*UpgradeStatus
 	documents    map[string]map[string][]Document // domainName -> index -> documents
+	vpcEndpoints map[string]*VpcEndpoint          // vpcEndpointID -> endpoint
 	accountID    string
 	region       string
 	lcConfig     *lifecycle.Config
@@ -70,12 +93,13 @@ type Store struct {
 // NewStore creates a new OpenSearch store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		domains:   make(map[string]*Domain),
-		upgrades:  make(map[string]*UpgradeStatus),
-		documents: make(map[string]map[string][]Document),
-		accountID: accountID,
-		region:    region,
-		lcConfig:  lifecycle.DefaultConfig(),
+		domains:      make(map[string]*Domain),
+		upgrades:     make(map[string]*UpgradeStatus),
+		documents:    make(map[string]map[string][]Document),
+		vpcEndpoints: make(map[string]*VpcEndpoint),
+		accountID:    accountID,
+		region:       region,
+		lcConfig:     lifecycle.DefaultConfig(),
 	}
 }
 
@@ -318,6 +342,124 @@ func (s *Store) SearchDocuments(domainName, index string, query map[string]any) 
 		}
 	}
 	return result, true
+}
+
+// DescribeDomains returns multiple domains by name.
+func (s *Store) DescribeDomains(names []string) []*Domain {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*Domain, 0, len(names))
+	for _, name := range names {
+		if d, ok := s.domains[name]; ok {
+			state := string(d.Lifecycle.State())
+			d.Processing = state == "Processing"
+			result = append(result, d)
+		}
+	}
+	return result
+}
+
+// GetCompatibleVersions returns version compatibility info.
+func (s *Store) GetCompatibleVersions(domainName string) []CompatibleVersion {
+	compatMap := map[string][]string{
+		"OpenSearch_1.0":  {"OpenSearch_1.1", "OpenSearch_1.2", "OpenSearch_1.3"},
+		"OpenSearch_1.1":  {"OpenSearch_1.2", "OpenSearch_1.3"},
+		"OpenSearch_1.2":  {"OpenSearch_1.3", "OpenSearch_2.0"},
+		"OpenSearch_1.3":  {"OpenSearch_2.0", "OpenSearch_2.3"},
+		"OpenSearch_2.0":  {"OpenSearch_2.3", "OpenSearch_2.5"},
+		"OpenSearch_2.3":  {"OpenSearch_2.5", "OpenSearch_2.7"},
+		"OpenSearch_2.5":  {"OpenSearch_2.7", "OpenSearch_2.9"},
+		"OpenSearch_2.7":  {"OpenSearch_2.9", "OpenSearch_2.11"},
+		"OpenSearch_2.9":  {"OpenSearch_2.11"},
+		"OpenSearch_2.11": {},
+		"Elasticsearch_7.1":  {"Elasticsearch_7.4", "Elasticsearch_7.7"},
+		"Elasticsearch_7.4":  {"Elasticsearch_7.7", "Elasticsearch_7.10"},
+		"Elasticsearch_7.7":  {"Elasticsearch_7.10", "OpenSearch_1.0"},
+		"Elasticsearch_7.10": {"OpenSearch_1.0", "OpenSearch_1.1"},
+	}
+
+	if domainName != "" {
+		s.mu.RLock()
+		d, ok := s.domains[domainName]
+		s.mu.RUnlock()
+		if ok {
+			targets := compatMap[d.EngineVersion]
+			if targets == nil {
+				targets = []string{}
+			}
+			return []CompatibleVersion{{SourceVersion: d.EngineVersion, TargetVersions: targets}}
+		}
+	}
+
+	result := make([]CompatibleVersion, 0, len(compatMap))
+	for src, tgts := range compatMap {
+		result = append(result, CompatibleVersion{SourceVersion: src, TargetVersions: tgts})
+	}
+	return result
+}
+
+// ---- VPC Endpoint operations ----
+
+func (s *Store) vpcEndpointARN(id string) string {
+	return fmt.Sprintf("arn:aws:es:%s:%s:vpcendpoint/%s", s.region, s.accountID, id)
+}
+
+func (s *Store) CreateVpcEndpoint(domainArn string, vpcOptions VpcOptions) (*VpcEndpoint, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	id := "aos-endpoint-" + randomHex(8)
+	ep := &VpcEndpoint{
+		VpcEndpointID: id,
+		DomainArn:     domainArn,
+		VpcOptions:    vpcOptions,
+		Status:        "ACTIVE",
+		Endpoint:      fmt.Sprintf("vpc-endpoint-%s.%s.es.amazonaws.com", randomHex(8), s.region),
+	}
+	s.vpcEndpoints[id] = ep
+	return ep, true
+}
+
+func (s *Store) DescribeVpcEndpoints(ids []string) []*VpcEndpoint {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if len(ids) == 0 {
+		result := make([]*VpcEndpoint, 0, len(s.vpcEndpoints))
+		for _, ep := range s.vpcEndpoints {
+			result = append(result, ep)
+		}
+		return result
+	}
+	result := make([]*VpcEndpoint, 0, len(ids))
+	for _, id := range ids {
+		if ep, ok := s.vpcEndpoints[id]; ok {
+			result = append(result, ep)
+		}
+	}
+	return result
+}
+
+func (s *Store) ListVpcEndpoints(domainArn string) []*VpcEndpoint {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*VpcEndpoint, 0)
+	for _, ep := range s.vpcEndpoints {
+		if domainArn == "" || ep.DomainArn == domainArn {
+			result = append(result, ep)
+		}
+	}
+	return result
+}
+
+func (s *Store) DeleteVpcEndpoint(id string) (*VpcEndpoint, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ep, ok := s.vpcEndpoints[id]
+	if !ok {
+		return nil, false
+	}
+	delete(s.vpcEndpoints, id)
+	return ep, true
 }
 
 // ClusterHealth returns health status based on replica configuration.

@@ -5,26 +5,32 @@ description: Amazon OpenSearch Service emulation in CloudMock
 
 ## Overview
 
-CloudMock emulates Amazon OpenSearch Service, supporting domain management, configuration, upgrades, tagging, and basic document indexing and search.
+CloudMock emulates Amazon OpenSearch Service, supporting domain management, configuration, upgrades, version compatibility, VPC endpoints, tagging, and basic document indexing and search. Domain states transition `Processing -> Active`.
 
 ## Supported Operations
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| CreateDomain | Supported | Creates an OpenSearch domain |
+| CreateDomain | Supported | Creates an OpenSearch or Elasticsearch domain |
 | DescribeDomain | Supported | Returns domain details |
+| DescribeDomains | Supported | Returns details for multiple domains by name |
 | ListDomainNames | Supported | Lists all domain names |
 | DeleteDomain | Supported | Deletes a domain |
-| UpdateDomainConfig | Supported | Updates domain configuration |
-| DescribeDomainConfig | Supported | Returns domain configuration |
-| AddTags | Supported | Adds tags to a domain |
+| UpdateDomainConfig | Supported | Updates cluster config or EBS options |
+| DescribeDomainConfig | Supported | Returns full domain configuration |
+| GetCompatibleVersions | Supported | Returns compatible upgrade versions for a domain or all versions |
+| CreateVpcEndpoint | Supported | Creates a VPC endpoint for a domain |
+| DescribeVpcEndpoints | Supported | Returns details for VPC endpoints by ID |
+| ListVpcEndpoints | Supported | Lists VPC endpoints, optionally filtered by domain ARN |
+| DeleteVpcEndpoint | Supported | Deletes a VPC endpoint |
+| AddTags | Supported | Adds tags to a domain by ARN |
 | RemoveTags | Supported | Removes tags from a domain |
 | ListTags | Supported | Lists tags for a domain |
-| UpgradeDomain | Supported | Initiates a domain upgrade |
-| GetUpgradeStatus | Supported | Returns upgrade status |
-| IndexDocument | Supported | Indexes a document |
-| Search | Supported | Performs a basic search |
-| ClusterHealth | Supported | Returns cluster health status |
+| UpgradeDomain | Supported | Initiates a domain engine version upgrade |
+| GetUpgradeStatus | Supported | Returns current upgrade status |
+| IndexDocument | Supported | Indexes a document in an in-memory store |
+| Search | Supported | Performs a basic match query search |
+| ClusterHealth | Supported | Returns cluster health (green/yellow/red) |
 
 ## Quick Start
 

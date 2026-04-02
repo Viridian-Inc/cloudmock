@@ -280,6 +280,163 @@ func TestClusterHealth_MultiNode(t *testing.T) {
 	assert.Equal(t, "green", m["status"])
 }
 
+// ---- DescribeDomains ----
+
+func TestDescribeDomains(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "dd-dom1"}))
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "dd-dom2"}))
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeDomains", map[string]any{
+		"DomainNames": []any{"dd-dom1", "dd-dom2"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	m := respJSON(t, resp)
+	list := m["DomainStatusList"].([]any)
+	assert.Len(t, list, 2)
+}
+
+func TestDescribeDomains_Partial(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "partial-dom1"}))
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeDomains", map[string]any{
+		"DomainNames": []any{"partial-dom1", "nonexistent-dom"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	list := m["DomainStatusList"].([]any)
+	assert.Len(t, list, 1)
+}
+
+// ---- GetCompatibleVersions ----
+
+func TestGetCompatibleVersions_All(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("GetCompatibleVersions", map[string]any{}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	m := respJSON(t, resp)
+	list := m["CompatibleVersions"].([]any)
+	assert.Greater(t, len(list), 0)
+}
+
+func TestGetCompatibleVersions_ForDomain(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{
+		"DomainName": "compat-dom", "EngineVersion": "OpenSearch_2.7",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("GetCompatibleVersions", map[string]any{
+		"DomainName": "compat-dom",
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	list := m["CompatibleVersions"].([]any)
+	require.Len(t, list, 1)
+	cv := list[0].(map[string]any)
+	assert.Equal(t, "OpenSearch_2.7", cv["SourceVersion"])
+}
+
+// ---- VPC Endpoints ----
+
+func TestCreateVpcEndpoint(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "vpc-dom"}))
+	arn := "arn:aws:es:us-east-1:123456789012:domain/vpc-dom"
+
+	resp, err := s.HandleRequest(jsonCtx("CreateVpcEndpoint", map[string]any{
+		"DomainArn": arn,
+		"VpcOptions": map[string]any{
+			"VPCId":            "vpc-12345",
+			"SubnetIds":        []any{"subnet-aaa"},
+			"SecurityGroupIds": []any{"sg-bbb"},
+		},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	m := respJSON(t, resp)
+	ep := m["VpcEndpoint"].(map[string]any)
+	assert.NotEmpty(t, ep["VpcEndpointId"])
+	assert.Equal(t, arn, ep["DomainArn"])
+}
+
+func TestCreateVpcEndpoint_MissingDomainArn(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateVpcEndpoint", map[string]any{}))
+	require.Error(t, err)
+}
+
+func TestDescribeVpcEndpoints(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "dvpc-dom"}))
+	arn := "arn:aws:es:us-east-1:123456789012:domain/dvpc-dom"
+
+	createResp, _ := s.HandleRequest(jsonCtx("CreateVpcEndpoint", map[string]any{
+		"DomainArn":  arn,
+		"VpcOptions": map[string]any{"VPCId": "vpc-abc"},
+	}))
+	cm := respJSON(t, createResp)
+	epID := cm["VpcEndpoint"].(map[string]any)["VpcEndpointId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeVpcEndpoints", map[string]any{
+		"VpcEndpointIds": []any{epID},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	endpoints := m["VpcEndpoints"].([]any)
+	assert.Len(t, endpoints, 1)
+}
+
+func TestListVpcEndpoints(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "lvpc-dom"}))
+	arn := "arn:aws:es:us-east-1:123456789012:domain/lvpc-dom"
+
+	for i := 0; i < 2; i++ {
+		_, _ = s.HandleRequest(jsonCtx("CreateVpcEndpoint", map[string]any{
+			"DomainArn":  arn,
+			"VpcOptions": map[string]any{"VPCId": "vpc-abc"},
+		}))
+	}
+
+	resp, err := s.HandleRequest(jsonCtx("ListVpcEndpoints", map[string]any{
+		"DomainArn": arn,
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	endpoints := m["VpcEndpoints"].([]any)
+	assert.Len(t, endpoints, 2)
+}
+
+func TestDeleteVpcEndpoint(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "delvpc-dom"}))
+	arn := "arn:aws:es:us-east-1:123456789012:domain/delvpc-dom"
+
+	createResp, _ := s.HandleRequest(jsonCtx("CreateVpcEndpoint", map[string]any{
+		"DomainArn":  arn,
+		"VpcOptions": map[string]any{},
+	}))
+	cm := respJSON(t, createResp)
+	epID := cm["VpcEndpoint"].(map[string]any)["VpcEndpointId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("DeleteVpcEndpoint", map[string]any{
+		"VpcEndpointId": epID,
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestDeleteVpcEndpoint_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DeleteVpcEndpoint", map[string]any{
+		"VpcEndpointId": "nonexistent-endpoint",
+	}))
+	require.Error(t, err)
+}
+
 func TestDomainEndpointFormat(t *testing.T) {
 	s := newService()
 	_, _ = s.HandleRequest(jsonCtx("CreateDomain", map[string]any{"DomainName": "ep-dom"}))

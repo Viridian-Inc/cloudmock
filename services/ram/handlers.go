@@ -325,3 +325,57 @@ func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*serv
 	}
 	return jsonOK(map[string]any{"tags": tagsToMaps(tags)})
 }
+
+func handleListResources(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	resourceOwner, _ := params["resourceOwner"].(string)
+	if resourceOwner == "" {
+		resourceOwner = "SELF"
+	}
+	var shareArns []string
+	if raw, ok := params["resourceShareArns"].([]any); ok {
+		shareArns = parseStringSlice(raw)
+	}
+	resources := store.ListResources(resourceOwner, shareArns)
+	items := make([]map[string]any, 0, len(resources))
+	for _, r := range resources {
+		items = append(items, assocToMap(r))
+	}
+	return jsonOK(map[string]any{"resources": items})
+}
+
+func handleListPrincipals(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	resourceOwner, _ := params["resourceOwner"].(string)
+	if resourceOwner == "" {
+		resourceOwner = "SELF"
+	}
+	var shareArns []string
+	if raw, ok := params["resourceShareArns"].([]any); ok {
+		shareArns = parseStringSlice(raw)
+	}
+	principals := store.ListPrincipals(resourceOwner, shareArns)
+	items := make([]map[string]any, 0, len(principals))
+	for _, p := range principals {
+		items = append(items, map[string]any{
+			"resourceShareArn": p.ResourceShareArn,
+			"id":               p.AssociatedEntity,
+			"status":           p.Status,
+			"creationTime":     float64(p.CreationTime.Unix()),
+			"lastUpdatedTime":  float64(p.LastUpdatedTime.Unix()),
+			"external":         p.External,
+		})
+	}
+	return jsonOK(map[string]any{"principals": items})
+}
+
+func handleEnableSharingWithAwsOrganization(_ *service.RequestContext, _ *Store) (*service.Response, error) {
+	// In mock context, this is always a no-op success.
+	return jsonOK(map[string]any{"returnValue": true})
+}

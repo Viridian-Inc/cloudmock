@@ -249,3 +249,50 @@ func TestRAM_InvalidAction(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "InvalidAction")
 }
+
+func TestRAM_ListResources(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResourceShare", map[string]any{
+		"name":         "res-share",
+		"resourceArns": []any{"arn:aws:s3:::my-bucket"},
+		"principals":   []any{"111111111111"},
+	}))
+	shareArn := respBody(t, cr)["resourceShare"].(map[string]any)["resourceShareArn"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("ListResources", map[string]any{
+		"resourceOwner":     "SELF",
+		"resourceShareArns": []any{shareArn},
+	}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	resources := m["resources"].([]any)
+	assert.Len(t, resources, 1)
+	assert.Equal(t, "arn:aws:s3:::my-bucket", resources[0].(map[string]any)["associatedEntity"])
+}
+
+func TestRAM_ListPrincipals(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResourceShare", map[string]any{
+		"name":       "principal-share",
+		"principals": []any{"222222222222"},
+	}))
+	shareArn := respBody(t, cr)["resourceShare"].(map[string]any)["resourceShareArn"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("ListPrincipals", map[string]any{
+		"resourceOwner":     "SELF",
+		"resourceShareArns": []any{shareArn},
+	}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	principals := m["principals"].([]any)
+	assert.Len(t, principals, 1)
+	assert.Equal(t, "222222222222", principals[0].(map[string]any)["id"])
+}
+
+func TestRAM_EnableSharingWithAwsOrganization(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("EnableSharingWithAwsOrganization", map[string]any{}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.True(t, m["returnValue"].(bool))
+}

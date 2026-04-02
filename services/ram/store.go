@@ -400,6 +400,73 @@ func (s *Store) UntagResource(arn string, tagKeys []string) *service.AWSError {
 	return nil
 }
 
+// ListResources returns resources associated with shares owned by this account.
+func (s *Store) ListResources(resourceOwner string, resourceShareArns []string) []ResourceShareAssociation {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	arnSet := make(map[string]bool, len(resourceShareArns))
+	for _, arn := range resourceShareArns {
+		arnSet[arn] = true
+	}
+
+	out := make([]ResourceShareAssociation, 0)
+	for _, a := range s.associations {
+		if a.AssociationType != "RESOURCE" {
+			continue
+		}
+		if len(arnSet) > 0 && !arnSet[a.ResourceShareArn] {
+			continue
+		}
+		// Filter by ownership
+		share, ok := s.shares[a.ResourceShareArn]
+		if !ok {
+			continue
+		}
+		if resourceOwner == "SELF" && share.OwningAccountId != s.accountID {
+			continue
+		}
+		if resourceOwner == "OTHER-ACCOUNTS" && share.OwningAccountId == s.accountID {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
+// ListPrincipals returns principals associated with shares owned by this account.
+func (s *Store) ListPrincipals(resourceOwner string, resourceShareArns []string) []ResourceShareAssociation {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	arnSet := make(map[string]bool, len(resourceShareArns))
+	for _, arn := range resourceShareArns {
+		arnSet[arn] = true
+	}
+
+	out := make([]ResourceShareAssociation, 0)
+	for _, a := range s.associations {
+		if a.AssociationType != "PRINCIPAL" {
+			continue
+		}
+		if len(arnSet) > 0 && !arnSet[a.ResourceShareArn] {
+			continue
+		}
+		share, ok := s.shares[a.ResourceShareArn]
+		if !ok {
+			continue
+		}
+		if resourceOwner == "SELF" && share.OwningAccountId != s.accountID {
+			continue
+		}
+		if resourceOwner == "OTHER-ACCOUNTS" && share.OwningAccountId == s.accountID {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 // ListTagsForResource returns tags for a resource share.
 func (s *Store) ListTagsForResource(arn string) ([]Tag, *service.AWSError) {
 	s.mu.RLock()

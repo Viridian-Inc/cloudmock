@@ -21,6 +21,9 @@ CloudMock emulates AWS Resource Access Manager (RAM), supporting resource share 
 | GetResourceShareInvitations | Supported | Lists pending invitations |
 | AcceptResourceShareInvitation | Supported | Accepts an invitation |
 | RejectResourceShareInvitation | Supported | Rejects an invitation |
+| ListResources | Supported | Lists resources in resource shares |
+| ListPrincipals | Supported | Lists principals in resource shares |
+| EnableSharingWithAwsOrganization | Supported | Enables sharing with the AWS organization |
 | TagResource | Supported | Adds tags to a resource share |
 | UntagResource | Supported | Removes tags from a resource share |
 | ListTagsForResource | Supported | Lists tags for a resource share |

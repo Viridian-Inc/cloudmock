@@ -38,6 +38,9 @@ func (s *RAMService) Actions() []service.Action {
 		{Name: "GetResourceShareInvitations", Method: http.MethodPost, IAMAction: "ram:GetResourceShareInvitations"},
 		{Name: "AcceptResourceShareInvitation", Method: http.MethodPost, IAMAction: "ram:AcceptResourceShareInvitation"},
 		{Name: "RejectResourceShareInvitation", Method: http.MethodPost, IAMAction: "ram:RejectResourceShareInvitation"},
+		{Name: "ListResources", Method: http.MethodPost, IAMAction: "ram:ListResources"},
+		{Name: "ListPrincipals", Method: http.MethodPost, IAMAction: "ram:ListPrincipals"},
+		{Name: "EnableSharingWithAwsOrganization", Method: http.MethodPost, IAMAction: "ram:EnableSharingWithAwsOrganization"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "ram:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "ram:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "ram:ListTagsForResource"},
@@ -70,6 +73,12 @@ func (s *RAMService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAcceptResourceShareInvitation(ctx, s.store)
 	case "RejectResourceShareInvitation":
 		return handleRejectResourceShareInvitation(ctx, s.store)
+	case "ListResources":
+		return handleListResources(ctx, s.store)
+	case "ListPrincipals":
+		return handleListPrincipals(ctx, s.store)
+	case "EnableSharingWithAwsOrganization":
+		return handleEnableSharingWithAwsOrganization(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

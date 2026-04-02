@@ -650,9 +650,11 @@ func main() {
 	// This reads DynamoDB table definitions, API Gateway routes, etc. from the
 	// IaC project directory and creates them in CloudMock — no seed scripts needed.
 	var iacMicroservices []iac.MicroserviceDef
+	var iacResult *iac.IaCImportResult
 	var topologySeedJSON []byte
 	if *iacDir != "" {
-		iacResult, err := iac.ImportPulumiDir(*iacDir, *iacEnv, slog.Default())
+		var err error
+		iacResult, err = iac.ImportPulumiDir(*iacDir, *iacEnv, slog.Default())
 		if err != nil {
 			slog.Error("failed to import IaC", "dir", *iacDir, "error", err)
 		} else {
@@ -921,9 +923,95 @@ func main() {
 			slog.Info("topology config applied from seed file")
 		}
 	}
-	// Set IaC microservices for topology rendering
+	// Set IaC microservices for topology rendering AND build topology from IaC
 	if len(iacMicroservices) > 0 {
 		adminAPI.SetMicroservices(iacMicroservices)
+
+		// Build topology nodes + edges from IaC-discovered resources
+		var topoNodes []admin.TopologyNodeV2
+		var topoEdges []admin.TopologyEdgeV2
+
+		// Lambda microservices → Compute nodes with edges to their DynamoDB tables
+		for _, ms := range iacMicroservices {
+			nodeID := "ms:" + ms.Name
+			topoNodes = append(topoNodes, admin.TopologyNodeV2{
+				ID: nodeID, Label: ms.Name, Type: "lambda", Group: "Compute",
+			})
+			for _, table := range ms.Tables {
+				topoEdges = append(topoEdges, admin.TopologyEdgeV2{
+					Source: nodeID, Target: "svc:dynamodb",
+				})
+				_ = table // edges go to dynamodb service, not individual tables
+				break // one edge per service, not per table
+			}
+		}
+
+		// Standalone Lambda functions (BFF, control-plane, stream-sync, scheduled-tasks)
+		if iacResult != nil {
+			for _, fn := range iacResult.Lambdas {
+				nodeID := "lambda:" + fn.Name
+				// Skip if already added as microservice
+				exists := false
+				for _, n := range topoNodes {
+					if n.ID == nodeID || n.Label == fn.Name {
+						exists = true
+						break
+					}
+				}
+				if !exists {
+					group := "Compute"
+					typ := "lambda"
+					// BFF is an API node
+					if strings.Contains(fn.Name, "bff") {
+						group = "API"
+						typ = "server"
+					}
+					topoNodes = append(topoNodes, admin.TopologyNodeV2{
+						ID: nodeID, Label: fn.Name, Type: typ, Group: group,
+					})
+				}
+			}
+
+			// Cognito pools → nodes
+			for _, pool := range iacResult.CognitoPools {
+				topoNodes = append(topoNodes, admin.TopologyNodeV2{
+					ID: "svc:cognito:" + pool.Name, Label: pool.Name, Type: "aws-service", Group: "Auth",
+				})
+			}
+
+			// SQS queues → edges from microservices
+			for _, q := range iacResult.SQSQueues {
+				topoNodes = append(topoNodes, admin.TopologyNodeV2{
+					ID: "svc:sqs:" + q.Name, Label: q.Name, Type: "aws-service", Group: "Messaging",
+				})
+			}
+
+			// S3 buckets
+			for _, b := range iacResult.S3Buckets {
+				topoNodes = append(topoNodes, admin.TopologyNodeV2{
+					ID: "svc:s3:" + b.Name, Label: b.Name, Type: "aws-service", Group: "Storage",
+				})
+			}
+
+			// API Gateway
+			for _, gw := range iacResult.APIGateways {
+				topoNodes = append(topoNodes, admin.TopologyNodeV2{
+					ID: "svc:apigateway:" + gw.Name, Label: gw.Name, Type: "aws-service", Group: "API",
+				})
+				// API Gateway → all Lambda microservices
+				for _, ms := range iacMicroservices {
+					topoEdges = append(topoEdges, admin.TopologyEdgeV2{
+						Source: "svc:apigateway:" + gw.Name, Target: "ms:" + ms.Name,
+					})
+				}
+			}
+		}
+
+		// Set topology if we built nodes
+		if len(topoNodes) > 0 {
+			adminAPI.SetTopologyFromIaC(topoNodes, topoEdges)
+			slog.Info("topology built from IaC", "nodes", len(topoNodes), "edges", len(topoEdges))
+		}
 	}
 	// Audit logger
 	var auditLog audit.Logger

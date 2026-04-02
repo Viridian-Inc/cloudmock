@@ -441,6 +441,17 @@ func (a *API) SetMicroservices(ms []iac.MicroserviceDef) {
 	a.iacMicroservices = ms
 }
 
+// SetTopologyFromIaC sets the topology config from IaC-discovered nodes and edges.
+func (a *API) SetTopologyFromIaC(nodes []TopologyNodeV2, edges []TopologyEdgeV2) {
+	a.iacTopologyMu.Lock()
+	defer a.iacTopologyMu.Unlock()
+	if a.iacTopology == nil {
+		a.iacTopology = &IaCTopologyConfig{}
+	}
+	a.iacTopology.Nodes = append(a.iacTopology.Nodes, nodes...)
+	a.iacTopology.Edges = append(a.iacTopology.Edges, edges...)
+}
+
 // SetLambdaLogs sets the Lambda log buffer for the admin API to serve.
 func (a *API) SetLambdaLogs(logs *lambda.LogBuffer) {
 	a.lambdaLogs = logs

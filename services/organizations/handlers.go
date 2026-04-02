@@ -110,6 +110,17 @@ func accountToMap(a *Account) map[string]any {
 	}
 }
 
+func policyToSummaryMap(p *Policy) map[string]any {
+	return map[string]any{
+		"Id":          p.PolicySummary.Id,
+		"Arn":         p.PolicySummary.Arn,
+		"Name":        p.PolicySummary.Name,
+		"Description": p.PolicySummary.Description,
+		"Type":        p.PolicySummary.Type,
+		"AwsManaged":  p.PolicySummary.AwsManaged,
+	}
+}
+
 func policyToMap(p *Policy) map[string]any {
 	return map[string]any{
 		"PolicySummary": map[string]any{
@@ -464,6 +475,68 @@ func handleDisablePolicyType(ctx *service.RequestContext, store *Store) (*servic
 		return jsonErr(awsErr)
 	}
 	return jsonOK(map[string]any{"Root": rootToMap(root)})
+}
+
+func handleListChildren(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	parentID, _ := params["ParentId"].(string)
+	childType, _ := params["ChildType"].(string)
+	if parentID == "" {
+		return jsonErr(service.ErrValidation("ParentId is required."))
+	}
+	children, awsErr := store.ListChildren(parentID, childType)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	items := make([]map[string]any, 0, len(children))
+	for _, c := range children {
+		items = append(items, map[string]any{"Id": c["Id"], "Type": c["Type"]})
+	}
+	return jsonOK(map[string]any{"Children": items})
+}
+
+func handleListParents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	childID, _ := params["ChildId"].(string)
+	if childID == "" {
+		return jsonErr(service.ErrValidation("ChildId is required."))
+	}
+	parents, awsErr := store.ListParents(childID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	items := make([]map[string]any, 0, len(parents))
+	for _, p := range parents {
+		items = append(items, map[string]any{"Id": p["Id"], "Type": p["Type"]})
+	}
+	return jsonOK(map[string]any{"Parents": items})
+}
+
+func handleListPoliciesForTarget(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	targetID, _ := params["TargetId"].(string)
+	filter, _ := params["Filter"].(string)
+	if targetID == "" {
+		return jsonErr(service.ErrValidation("TargetId is required."))
+	}
+	policies, awsErr := store.ListPoliciesForTarget(targetID, filter)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	items := make([]map[string]any, 0, len(policies))
+	for _, p := range policies {
+		items = append(items, policyToSummaryMap(p))
+	}
+	return jsonOK(map[string]any{"Policies": items})
 }
 
 func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {

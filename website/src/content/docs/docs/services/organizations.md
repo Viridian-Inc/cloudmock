@@ -30,9 +30,12 @@ CloudMock emulates AWS Organizations, supporting organization management, organi
 | ListPolicies | Supported | Lists policies |
 | UpdatePolicy | Supported | Updates a policy |
 | DeletePolicy | Supported | Deletes a policy |
+| ListChildren | Supported | Lists child OUs and accounts for a parent |
+| ListParents | Supported | Returns the parent of an account or OU |
 | AttachPolicy | Supported | Attaches a policy to a target |
 | DetachPolicy | Supported | Detaches a policy |
 | ListTargetsForPolicy | Supported | Lists targets for a policy |
+| ListPoliciesForTarget | Supported | Lists policies attached to a target |
 | EnablePolicyType | Supported | Enables a policy type on a root |
 | DisablePolicyType | Supported | Disables a policy type |
 | TagResource | Supported | Adds tags to a resource |

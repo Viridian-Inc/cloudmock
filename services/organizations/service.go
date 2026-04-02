@@ -46,9 +46,12 @@ func (s *OrganizationsService) Actions() []service.Action {
 		{Name: "ListPolicies", Method: http.MethodPost, IAMAction: "organizations:ListPolicies"},
 		{Name: "UpdatePolicy", Method: http.MethodPost, IAMAction: "organizations:UpdatePolicy"},
 		{Name: "DeletePolicy", Method: http.MethodPost, IAMAction: "organizations:DeletePolicy"},
+		{Name: "ListChildren", Method: http.MethodPost, IAMAction: "organizations:ListChildren"},
+		{Name: "ListParents", Method: http.MethodPost, IAMAction: "organizations:ListParents"},
 		{Name: "AttachPolicy", Method: http.MethodPost, IAMAction: "organizations:AttachPolicy"},
 		{Name: "DetachPolicy", Method: http.MethodPost, IAMAction: "organizations:DetachPolicy"},
 		{Name: "ListTargetsForPolicy", Method: http.MethodPost, IAMAction: "organizations:ListTargetsForPolicy"},
+		{Name: "ListPoliciesForTarget", Method: http.MethodPost, IAMAction: "organizations:ListPoliciesForTarget"},
 		{Name: "EnablePolicyType", Method: http.MethodPost, IAMAction: "organizations:EnablePolicyType"},
 		{Name: "DisablePolicyType", Method: http.MethodPost, IAMAction: "organizations:DisablePolicyType"},
 		{Name: "DescribeCreateAccountStatus", Method: http.MethodPost, IAMAction: "organizations:DescribeCreateAccountStatus"},
@@ -100,12 +103,18 @@ func (s *OrganizationsService) HandleRequest(ctx *service.RequestContext) (*serv
 		return handleUpdatePolicy(ctx, s.store)
 	case "DeletePolicy":
 		return handleDeletePolicy(ctx, s.store)
+	case "ListChildren":
+		return handleListChildren(ctx, s.store)
+	case "ListParents":
+		return handleListParents(ctx, s.store)
 	case "AttachPolicy":
 		return handleAttachPolicy(ctx, s.store)
 	case "DetachPolicy":
 		return handleDetachPolicy(ctx, s.store)
 	case "ListTargetsForPolicy":
 		return handleListTargetsForPolicy(ctx, s.store)
+	case "ListPoliciesForTarget":
+		return handleListPoliciesForTarget(ctx, s.store)
 	case "EnablePolicyType":
 		return handleEnablePolicyType(ctx, s.store)
 	case "DisablePolicyType":

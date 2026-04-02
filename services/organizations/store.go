@@ -624,6 +624,112 @@ func (s *Store) ListTargetsForPolicy(policyID string) ([]PolicyTarget, *service.
 	return s.policyAttachments[policyID], nil
 }
 
+// ListChildren returns child OUs and accounts for a given parent.
+// childType is either "ACCOUNT" or "ORGANIZATIONAL_UNIT".
+func (s *Store) ListChildren(parentID, childType string) ([]map[string]string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Validate parent exists
+	parentExists := false
+	if _, ok := s.roots[parentID]; ok {
+		parentExists = true
+	}
+	if _, ok := s.ous[parentID]; ok {
+		parentExists = true
+	}
+	if !parentExists {
+		return nil, service.NewAWSError("ParentNotFoundException",
+			fmt.Sprintf("Parent %s not found.", parentID), http.StatusBadRequest)
+	}
+
+	out := make([]map[string]string, 0)
+	if childType == "" || childType == "ACCOUNT" {
+		for _, acc := range s.accounts {
+			if acc.ParentId == parentID {
+				out = append(out, map[string]string{"Id": acc.Id, "Type": "ACCOUNT"})
+			}
+		}
+	}
+	if childType == "" || childType == "ORGANIZATIONAL_UNIT" {
+		for _, ou := range s.ous {
+			if ou.ParentId == parentID {
+				out = append(out, map[string]string{"Id": ou.Id, "Type": "ORGANIZATIONAL_UNIT"})
+			}
+		}
+	}
+	return out, nil
+}
+
+// ListParents returns the parent of a given child (account or OU).
+func (s *Store) ListParents(childID string) ([]map[string]string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Check if it's an account
+	if acc, ok := s.accounts[childID]; ok {
+		parentID := acc.ParentId
+		parentType := "ROOT"
+		if _, isOU := s.ous[parentID]; isOU {
+			parentType = "ORGANIZATIONAL_UNIT"
+		}
+		return []map[string]string{{"Id": parentID, "Type": parentType}}, nil
+	}
+
+	// Check if it's an OU
+	if ou, ok := s.ous[childID]; ok {
+		parentID := ou.ParentId
+		parentType := "ROOT"
+		if _, isOU := s.ous[parentID]; isOU {
+			parentType = "ORGANIZATIONAL_UNIT"
+		}
+		return []map[string]string{{"Id": parentID, "Type": parentType}}, nil
+	}
+
+	return nil, service.NewAWSError("ChildNotFoundException",
+		fmt.Sprintf("Child %s not found.", childID), http.StatusBadRequest)
+}
+
+// ListPoliciesForTarget returns policies attached to a given target (account, OU, or root).
+func (s *Store) ListPoliciesForTarget(targetID, filter string) ([]*Policy, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	// Validate target exists
+	targetExists := false
+	if _, ok := s.roots[targetID]; ok {
+		targetExists = true
+	}
+	if _, ok := s.ous[targetID]; ok {
+		targetExists = true
+	}
+	if _, ok := s.accounts[targetID]; ok {
+		targetExists = true
+	}
+	if !targetExists {
+		return nil, service.NewAWSError("TargetNotFoundException",
+			fmt.Sprintf("Target %s not found.", targetID), http.StatusBadRequest)
+	}
+
+	out := make([]*Policy, 0)
+	for policyID, targets := range s.policyAttachments {
+		for _, t := range targets {
+			if t.TargetId == targetID {
+				policy, ok := s.policies[policyID]
+				if !ok {
+					continue
+				}
+				if filter != "" && policy.PolicySummary.Type != filter {
+					continue
+				}
+				out = append(out, policy)
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
 // EnablePolicyType enables a policy type on a root.
 func (s *Store) EnablePolicyType(rootID, policyType string) (*Root, *service.AWSError) {
 	s.mu.Lock()

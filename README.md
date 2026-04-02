@@ -113,6 +113,50 @@ npx cloudmock  # 65ms startup, <1ms per operation
 
 [Full benchmark details and methodology](https://cloudmock.pages.dev/docs/reference/benchmarks/)
 
+## SDKs
+
+CloudMock provides native SDK adapters for every major language:
+
+| Language | Package | Install |
+|----------|---------|---------|
+| **Go** | `github.com/neureaux/cloudmock/sdk` | `go get` (in-process, 20μs/op) |
+| **Python** | `cloudmock` | `pip install cloudmock` |
+| **Node.js** | `@cloudmock/sdk` | `npm install @cloudmock/sdk` |
+| **Java** | `dev.cloudmock:cloudmock-sdk` | Maven Central |
+| **Kotlin** | `dev.cloudmock:cloudmock-sdk` | Gradle |
+| **Rust** | `cloudmock` | `cargo add cloudmock` |
+| **C/C++** | `libcloudmock` | `make` (static library) |
+| **Ruby** | `cloudmock` | `gem install cloudmock` |
+| **C#/.NET** | `CloudMock` | `dotnet add package CloudMock` |
+| **Swift** | `CloudMock` | Swift Package Manager |
+
+Every SDK auto-starts the CloudMock binary, returns pre-configured AWS clients, and cleans up on exit. One line of code to start testing:
+
+```python
+# Python
+with mock_aws() as cm:
+    s3 = cm.boto3_client("s3")
+```
+
+```typescript
+// Node.js
+const cm = await mockAWS();
+const s3 = new S3Client(cm.clientConfig());
+```
+
+```java
+// Java
+try (var cm = CloudMock.start()) {
+    var s3 = S3Client.builder().endpointOverride(cm.endpoint()).build();
+}
+```
+
+```go
+// Go (in-process — zero network, 20μs/op)
+cm := sdk.New()
+s3Client := s3.NewFromConfig(cm.Config())
+```
+
 ## Comparison
 
 | Feature | CloudMock | LocalStack (Free) | Moto |

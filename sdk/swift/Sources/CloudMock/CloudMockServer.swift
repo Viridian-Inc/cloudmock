@@ -72,7 +72,7 @@ public class CloudMockServer {
         addr.sin_port = 0
         addr.sin_addr.s_addr = inet_addr("127.0.0.1")
 
-        withUnsafePointer(to: &addr) { ptr in
+        _ = withUnsafePointer(to: &addr) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
                 bind(fd, sockPtr, socklen_t(MemoryLayout<sockaddr_in>.size))
             }
@@ -80,7 +80,7 @@ public class CloudMockServer {
 
         var bound = sockaddr_in()
         var len = socklen_t(MemoryLayout<sockaddr_in>.size)
-        withUnsafeMutablePointer(to: &bound) { ptr in
+        _ = withUnsafeMutablePointer(to: &bound) { ptr in
             ptr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockPtr in
                 getsockname(fd, sockPtr, &len)
             }

@@ -441,3 +441,106 @@ func TestDeleteAppNotFound(t *testing.T) {
 	_, err := s.HandleRequest(jsonCtx("DeleteApp", map[string]any{"appId": "nonexistent"}))
 	require.Error(t, err)
 }
+
+// ---- BackendEnvironment tests ----
+
+func TestCreateBackendEnvironment(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+
+	resp, err := s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId":               appID,
+		"environmentName":     "staging",
+		"deploymentArtifacts": "amplify-builds",
+		"stackName":           "amplify-backend-staging",
+	}))
+	require.NoError(t, err)
+	be := decode(t, resp)["backendEnvironment"].(map[string]any)
+	assert.Equal(t, "staging", be["environmentName"])
+	assert.Equal(t, "amplify-builds", be["deploymentArtifacts"])
+	assert.NotEmpty(t, be["backendEnvironmentArn"])
+}
+
+func TestGetBackendEnvironment(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+	s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "prod",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("GetBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "prod",
+	}))
+	require.NoError(t, err)
+	be := decode(t, resp)["backendEnvironment"].(map[string]any)
+	assert.Equal(t, "prod", be["environmentName"])
+}
+
+func TestGetBackendEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+
+	_, err := s.HandleRequest(jsonCtx("GetBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "nonexistent",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "NotFoundException", awsErr.Code)
+}
+
+func TestListBackendEnvironments(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+
+	s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "dev",
+	}))
+	s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "prod",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListBackendEnvironments", map[string]any{"appId": appID}))
+	require.NoError(t, err)
+	backends := decode(t, resp)["backendEnvironments"].([]any)
+	assert.Len(t, backends, 2)
+}
+
+func TestDeleteBackendEnvironment(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+
+	s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "temp",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("DeleteBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "temp",
+	}))
+	require.NoError(t, err)
+	be := decode(t, resp)["backendEnvironment"].(map[string]any)
+	assert.Equal(t, "temp", be["environmentName"])
+
+	_, err = s.HandleRequest(jsonCtx("GetBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "temp",
+	}))
+	require.Error(t, err)
+}
+
+func TestDeleteBackendEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	appID := mustCreateApp(t, s, "my-app")
+
+	_, err := s.HandleRequest(jsonCtx("DeleteBackendEnvironment", map[string]any{
+		"appId": appID, "environmentName": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestCreateBackendEnvironmentAppNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateBackendEnvironment", map[string]any{
+		"appId": "nonexistent", "environmentName": "prod",
+	}))
+	require.Error(t, err)
+}

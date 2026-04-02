@@ -53,6 +53,10 @@ func (s *AmplifyService) Actions() []service.Action {
 		{Name: "GetJob", Method: http.MethodGet, IAMAction: "amplify:GetJob"},
 		{Name: "ListJobs", Method: http.MethodGet, IAMAction: "amplify:ListJobs"},
 		{Name: "StopJob", Method: http.MethodDelete, IAMAction: "amplify:StopJob"},
+		{Name: "CreateBackendEnvironment", Method: http.MethodPost, IAMAction: "amplify:CreateBackendEnvironment"},
+		{Name: "GetBackendEnvironment", Method: http.MethodGet, IAMAction: "amplify:GetBackendEnvironment"},
+		{Name: "ListBackendEnvironments", Method: http.MethodGet, IAMAction: "amplify:ListBackendEnvironments"},
+		{Name: "DeleteBackendEnvironment", Method: http.MethodDelete, IAMAction: "amplify:DeleteBackendEnvironment"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "amplify:TagResource"},
 		{Name: "UntagResource", Method: http.MethodDelete, IAMAction: "amplify:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodGet, IAMAction: "amplify:ListTagsForResource"},
@@ -118,6 +122,14 @@ func (s *AmplifyService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleListJobs(ctx, s.store)
 	case "StopJob":
 		return handleStopJob(ctx, s.store)
+	case "CreateBackendEnvironment":
+		return handleCreateBackendEnvironment(ctx, s.store)
+	case "GetBackendEnvironment":
+		return handleGetBackendEnvironment(ctx, s.store)
+	case "ListBackendEnvironments":
+		return handleListBackendEnvironments(ctx, s.store)
+	case "DeleteBackendEnvironment":
+		return handleDeleteBackendEnvironment(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

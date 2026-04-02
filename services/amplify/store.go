@@ -90,6 +90,17 @@ type Job struct {
 	Tags       map[string]string
 }
 
+// BackendEnvironment represents an Amplify backend environment.
+type BackendEnvironment struct {
+	BackendEnvironmentArn    string
+	EnvironmentName          string
+	AppId                    string
+	DeploymentArtifacts      string
+	StackName                string
+	CreateTime               time.Time
+	UpdateTime               time.Time
+}
+
 // Store manages all Amplify state in memory.
 type Store struct {
 	mu              sync.RWMutex
@@ -98,6 +109,7 @@ type Store struct {
 	domains         map[string]map[string]*DomainAssociation // appID -> domainName -> domain
 	webhooks        map[string]map[string]*Webhook           // appID -> webhookID -> webhook
 	jobs            map[string]map[string][]*Job             // appID -> branchName -> jobs
+	backends        map[string]map[string]*BackendEnvironment // appID -> envName -> backend
 	accountID       string
 	region          string
 	nextJobNum      map[string]int // appID:branchName -> next job number
@@ -112,6 +124,7 @@ func NewStore(accountID, region string) *Store {
 		domains:         make(map[string]map[string]*DomainAssociation),
 		webhooks:        make(map[string]map[string]*Webhook),
 		jobs:            make(map[string]map[string][]*Job),
+		backends:        make(map[string]map[string]*BackendEnvironment),
 		accountID:       accountID,
 		region:          region,
 		nextJobNum:      make(map[string]int),
@@ -175,6 +188,7 @@ func (s *Store) CreateApp(name, description, repository, platform, iamRole strin
 	s.domains[id] = make(map[string]*DomainAssociation)
 	s.webhooks[id] = make(map[string]*Webhook)
 	s.jobs[id] = make(map[string][]*Job)
+	s.backends[id] = make(map[string]*BackendEnvironment)
 	return app
 }
 
@@ -669,6 +683,74 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
 		return cp, true
 	}
 	return nil, false
+}
+
+// CreateBackendEnvironment creates a new backend environment for an app.
+func (s *Store) CreateBackendEnvironment(appID, envName, deploymentArtifacts, stackName string) (*BackendEnvironment, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.apps[appID]; !ok {
+		return nil, false
+	}
+	if s.backends[appID] == nil {
+		s.backends[appID] = make(map[string]*BackendEnvironment)
+	}
+	now := time.Now().UTC()
+	arn := fmt.Sprintf("arn:aws:amplify:%s:%s:apps/%s/backendenvironments/%s", s.region, s.accountID, appID, envName)
+	be := &BackendEnvironment{
+		BackendEnvironmentArn: arn,
+		EnvironmentName:       envName,
+		AppId:                 appID,
+		DeploymentArtifacts:   deploymentArtifacts,
+		StackName:             stackName,
+		CreateTime:            now,
+		UpdateTime:            now,
+	}
+	s.backends[appID][envName] = be
+	return be, true
+}
+
+// GetBackendEnvironment returns a backend environment by app and env name.
+func (s *Store) GetBackendEnvironment(appID, envName string) (*BackendEnvironment, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	backends, ok := s.backends[appID]
+	if !ok {
+		return nil, false
+	}
+	be, ok := backends[envName]
+	return be, ok
+}
+
+// ListBackendEnvironments returns all backend environments for an app.
+func (s *Store) ListBackendEnvironments(appID string) ([]*BackendEnvironment, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	backends, ok := s.backends[appID]
+	if !ok {
+		return nil, false
+	}
+	result := make([]*BackendEnvironment, 0, len(backends))
+	for _, be := range backends {
+		result = append(result, be)
+	}
+	return result, true
+}
+
+// DeleteBackendEnvironment removes a backend environment.
+func (s *Store) DeleteBackendEnvironment(appID, envName string) (*BackendEnvironment, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	backends, ok := s.backends[appID]
+	if !ok {
+		return nil, false
+	}
+	be, ok := backends[envName]
+	if !ok {
+		return nil, false
+	}
+	delete(backends, envName)
+	return be, true
 }
 
 func (s *Store) findTagsByARN(arn string) map[string]string {

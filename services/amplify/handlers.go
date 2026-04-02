@@ -1007,3 +1007,142 @@ func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*serv
 	}
 	return jsonOK(&listTagsResponse{Tags: tags})
 }
+
+// ---- CreateBackendEnvironment ----
+
+type createBackendEnvRequest struct {
+	AppId               string `json:"appId"`
+	EnvironmentName     string `json:"environmentName"`
+	DeploymentArtifacts string `json:"deploymentArtifacts"`
+	StackName           string `json:"stackName"`
+}
+
+type backendEnvJSON struct {
+	BackendEnvironmentArn string `json:"backendEnvironmentArn"`
+	EnvironmentName       string `json:"environmentName"`
+	AppId                 string `json:"appId"`
+	DeploymentArtifacts   string `json:"deploymentArtifacts,omitempty"`
+	StackName             string `json:"stackName,omitempty"`
+	CreateTime            string `json:"createTime"`
+	UpdateTime            string `json:"updateTime"`
+}
+
+func backendEnvToJSON(be *BackendEnvironment) backendEnvJSON {
+	return backendEnvJSON{
+		BackendEnvironmentArn: be.BackendEnvironmentArn,
+		EnvironmentName:       be.EnvironmentName,
+		AppId:                 be.AppId,
+		DeploymentArtifacts:   be.DeploymentArtifacts,
+		StackName:             be.StackName,
+		CreateTime:            be.CreateTime.Format("2006-01-02T15:04:05Z"),
+		UpdateTime:            be.UpdateTime.Format("2006-01-02T15:04:05Z"),
+	}
+}
+
+func handleCreateBackendEnvironment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createBackendEnvRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	appID := req.AppId
+	if appID == "" {
+		appID = ctx.Params["appId"]
+	}
+	if appID == "" || req.EnvironmentName == "" {
+		return jsonErr(service.ErrValidation("appId and environmentName are required."))
+	}
+	be, ok := store.CreateBackendEnvironment(appID, req.EnvironmentName, req.DeploymentArtifacts, req.StackName)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "App "+appID+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"backendEnvironment": backendEnvToJSON(be)})
+}
+
+// ---- GetBackendEnvironment ----
+
+type getBackendEnvRequest struct {
+	AppId           string `json:"appId"`
+	EnvironmentName string `json:"environmentName"`
+}
+
+func handleGetBackendEnvironment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getBackendEnvRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	appID := req.AppId
+	if appID == "" {
+		appID = ctx.Params["appId"]
+	}
+	envName := req.EnvironmentName
+	if envName == "" {
+		envName = ctx.Params["environmentName"]
+	}
+	if appID == "" || envName == "" {
+		return jsonErr(service.ErrValidation("appId and environmentName are required."))
+	}
+	be, ok := store.GetBackendEnvironment(appID, envName)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "Backend environment not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"backendEnvironment": backendEnvToJSON(be)})
+}
+
+// ---- ListBackendEnvironments ----
+
+type listBackendEnvsRequest struct {
+	AppId string `json:"appId"`
+}
+
+func handleListBackendEnvironments(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req listBackendEnvsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	appID := req.AppId
+	if appID == "" {
+		appID = ctx.Params["appId"]
+	}
+	if appID == "" {
+		return jsonErr(service.ErrValidation("appId is required."))
+	}
+	backends, ok := store.ListBackendEnvironments(appID)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "App "+appID+" not found.", http.StatusNotFound))
+	}
+	items := make([]backendEnvJSON, 0, len(backends))
+	for _, be := range backends {
+		items = append(items, backendEnvToJSON(be))
+	}
+	return jsonOK(map[string]any{"backendEnvironments": items})
+}
+
+// ---- DeleteBackendEnvironment ----
+
+type deleteBackendEnvRequest struct {
+	AppId           string `json:"appId"`
+	EnvironmentName string `json:"environmentName"`
+}
+
+func handleDeleteBackendEnvironment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteBackendEnvRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	appID := req.AppId
+	if appID == "" {
+		appID = ctx.Params["appId"]
+	}
+	envName := req.EnvironmentName
+	if envName == "" {
+		envName = ctx.Params["environmentName"]
+	}
+	if appID == "" || envName == "" {
+		return jsonErr(service.ErrValidation("appId and environmentName are required."))
+	}
+	be, ok := store.DeleteBackendEnvironment(appID, envName)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "Backend environment not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"backendEnvironment": backendEnvToJSON(be)})
+}

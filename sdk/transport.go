@@ -5,8 +5,89 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 )
+
+// serviceFromTarget extracts the service name from the X-Amz-Target header.
+// Format: "ServiceName_Version.Action" → lowercase service name.
+var targetToService = map[string]string{
+	"dynamodb":    "dynamodb",
+	"dax":         "dynamodb",
+	"amazonsqs":   "sqs",
+	"amazonse":    "ses",
+	"amazonsns":   "sns",
+	"awskms":      "kms",
+	"amazonkines": "kinesis",
+	"tagging":     "tagging",
+	"logs":        "logs",
+	"awslambda":   "lambda",
+}
+
+func detectServiceFromRequest(req *http.Request, body []byte) string {
+	// X-Amz-Target header: "DynamoDB_20120810.GetItem" → "dynamodb"
+	if target := req.Header.Get("X-Amz-Target"); target != "" {
+		prefix := strings.ToLower(target)
+		if idx := strings.Index(prefix, "_"); idx > 0 {
+			prefix = prefix[:idx]
+		} else if idx := strings.Index(prefix, "."); idx > 0 {
+			prefix = prefix[:idx]
+		}
+		for k, v := range targetToService {
+			if strings.HasPrefix(prefix, k) {
+				return v
+			}
+		}
+		return prefix
+	}
+
+	// JSON protocol with X-Amz-Target in content-type (e.g. SQS JSON mode)
+	if ct := req.Header.Get("Content-Type"); strings.Contains(ct, "amz-json") {
+		// Check body for service hints
+		if len(body) > 0 {
+			b := string(body)
+			if strings.Contains(b, "QueueUrl") || strings.Contains(b, "QueueName") {
+				return "sqs"
+			}
+		}
+	}
+
+	// Query/form protocol: parse Action from body for SQS, SNS, STS, IAM
+	if len(body) > 0 {
+		b := string(body)
+		// Quick check for known action prefixes in form body
+		if strings.Contains(b, "Action=") {
+			if strings.Contains(b, "Queue") || strings.Contains(b, "Message") || strings.Contains(b, "Purge") {
+				return "sqs"
+			}
+			if strings.Contains(b, "Topic") || strings.Contains(b, "Publish") || strings.Contains(b, "Subscri") {
+				return "sns"
+			}
+			if strings.Contains(b, "CallerIdentity") || strings.Contains(b, "AssumeRole") || strings.Contains(b, "SessionToken") {
+				return "sts"
+			}
+			if strings.Contains(b, "User") || strings.Contains(b, "Role") || strings.Contains(b, "Policy") || strings.Contains(b, "Group") || strings.Contains(b, "AccessKey") || strings.Contains(b, "InstanceProfile") {
+				return "iam"
+			}
+			if strings.Contains(b, "LogGroup") || strings.Contains(b, "LogStream") || strings.Contains(b, "LogEvent") {
+				return "logs"
+			}
+		}
+	}
+
+	// S3: path-based detection.
+	// Any non-root path that isn't internal is S3.
+	// Root path (/) with no Action in body is also S3 (ListBuckets).
+	path := req.URL.Path
+	if path != "/" && !strings.HasPrefix(path, "/_") {
+		return "s3"
+	}
+	if path == "/" && len(body) == 0 && req.Header.Get("X-Amz-Target") == "" {
+		return "s3"
+	}
+
+	return ""
+}
 
 // inProcessTransport implements http.RoundTripper by calling ServeHTTP directly,
 // bypassing all TCP/HTTP overhead for maximum performance in tests.
@@ -64,17 +145,25 @@ func (t *inProcessTransport) RoundTrip(req *http.Request) (*http.Response, error
 
 	// Pre-read the request body into a pooled buffer so the handler reads from
 	// a bytes.Reader (no extra allocation inside the gateway).
+	var bodyBytes []byte
 	if req.Body != nil && req.Body != http.NoBody {
 		rbuf := t.reqBufPool.Get().(*bytes.Buffer)
 		rbuf.Reset()
 		rbuf.ReadFrom(req.Body)
 		req.Body.Close()
-		req.Body = &nopReadCloser{Reader: bytes.NewReader(rbuf.Bytes())}
-		// Return the request buffer after ServeHTTP completes (deferred).
+		bodyBytes = rbuf.Bytes()
+		req.Body = &nopReadCloser{Reader: bytes.NewReader(bodyBytes)}
 		defer func() {
 			rbuf.Reset()
 			t.reqBufPool.Put(rbuf)
 		}()
+	}
+
+	// Inject X-Cloudmock-Service header for fast service detection (skips SigV4 parsing).
+	if req.Header.Get("X-Cloudmock-Service") == "" {
+		if svc := detectServiceFromRequest(req, bodyBytes); svc != "" {
+			req.Header.Set("X-Cloudmock-Service", svc)
+		}
 	}
 
 	// Get a pooled recorder and reset it for reuse.

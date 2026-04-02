@@ -12,6 +12,11 @@ import (
 // then checks for presigned URL query parameters (X-Amz-Credential).
 // Returns lowercase service name, or empty string if not detected.
 func DetectService(r *http.Request) string {
+	// Fast path: in-process transport sets this header directly.
+	if svc := r.Header.Get("X-Cloudmock-Service"); svc != "" {
+		return svc
+	}
+
 	// Check Authorization header first.
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if svc := serviceFromAuthorization(auth); svc != "" {

@@ -1,3 +1,0 @@
-module CloudMock {
-    header "/Users/megan/cloudmock/sdk/swift/.build/arm64-apple-macosx/debug/CloudMock.build/include/CloudMock-Swift.h"
-}

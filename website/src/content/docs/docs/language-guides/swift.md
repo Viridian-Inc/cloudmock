@@ -5,6 +5,21 @@ description: Using CloudMock with Swift and the AWS SDK for Swift
 
 CloudMock does not require a custom Swift SDK. Instead, configure the AWS SDK for Swift (or raw URLSession calls) to point at your CloudMock gateway running on localhost. This works for iOS simulators, macOS apps, and server-side Swift.
 
+## CloudMock Swift SDK
+
+The CloudMock Swift SDK auto-manages the server lifecycle:
+
+```swift
+import CloudMock
+
+let cm = try CloudMockServer()
+try cm.start()
+// cm.endpoint contains the URL to configure your AWS SDK
+cm.stop()
+```
+
+Install via Swift Package Manager: `https://github.com/Viridian-Inc/cloudmock` (sdk/swift directory).
+
 ## AWS SDK for Swift configuration
 
 ### Install the AWS SDK for Swift

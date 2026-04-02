@@ -253,6 +253,6 @@ let s3 = aws_sdk_s3::Client::new(&config);
 
 **Same credentials everywhere.** The default root credentials are `test` / `test`. You can change them in `cloudmock.yml` under `iam.root_access_key` and `iam.root_secret_key`, or disable authentication entirely with `iam.mode: none`.
 
-**All 25 Tier 1 services use the same endpoint.** CloudMock routes requests to the correct service based on the AWS service headers. You do not need per-service ports or endpoints.
+**All 98 services use the same endpoint.** CloudMock routes requests to the correct service based on the AWS service headers. You do not need per-service ports or endpoints.
 
 **See it in practice.** The [todo demo project](https://github.com/Viridian-Inc/cloudmock-todo-demo) shows complete working examples of S3, DynamoDB, SQS, and SNS in Node.js, Python, and Go.

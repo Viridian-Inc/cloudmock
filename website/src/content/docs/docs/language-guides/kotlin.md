@@ -5,6 +5,18 @@ description: Using CloudMock with Kotlin, the AWS SDK for Kotlin, and OkHttp
 
 CloudMock does not require a custom Kotlin SDK. Configure the AWS SDK for Kotlin (or OkHttp) to point at your CloudMock gateway. This works for Android apps, server-side Kotlin, and Kotlin Multiplatform projects.
 
+## CloudMock Kotlin SDK
+
+The CloudMock Kotlin SDK auto-manages the server lifecycle:
+
+```kotlin
+CloudMock.start().use { cm ->
+    // cm.endpoint contains the URI to configure your AWS SDK
+}
+```
+
+Add to `build.gradle.kts`: `testImplementation("dev.cloudmock:cloudmock-sdk:1.0.0")`
+
 ## AWS SDK for Kotlin configuration
 
 ### Add dependencies

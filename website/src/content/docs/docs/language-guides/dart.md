@@ -5,6 +5,8 @@ description: Using CloudMock with Dart, Flutter, and the AWS SDK
 
 CloudMock does not require a custom Dart SDK. Configure the AWS SDK for Dart or your HTTP client to point at the CloudMock gateway. This works for Flutter mobile apps, Flutter web, and server-side Dart.
 
+> **Note:** CloudMock does not have a dedicated Dart SDK adapter yet. Use the HTTP mode by starting CloudMock with `npx cloudmock` and pointing your AWS SDK at `http://localhost:4566`.
+
 ## AWS SDK for Dart (aws_common / smithy)
 
 The official AWS SDK for Dart is still in developer preview. For services that have a published Dart package, configure the endpoint:

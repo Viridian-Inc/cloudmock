@@ -122,7 +122,12 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	edges := make([]TopologyEdgeV2, 0, 64)
 	edgeSet := make(map[string]bool)
 
+	nodeIDs := make(map[string]bool)
 	addNode := func(id, label, svc, typ, group string) {
+		if nodeIDs[id] {
+			return
+		}
+		nodeIDs[id] = true
 		nodes = append(nodes, TopologyNodeV2{
 			ID:      id,
 			Label:   label,
@@ -154,6 +159,10 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 
 	if iacCfg != nil {
 		for _, n := range iacCfg.Nodes {
+			if nodeIDs[n.ID] {
+				continue
+			}
+			nodeIDs[n.ID] = true
 			nodes = append(nodes, n) // preserve all fields including requestService
 		}
 		for _, e := range iacCfg.Edges {
@@ -280,16 +289,10 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	addEdge("apigw:apis", "lambda:autotend-bff-dev", "trigger", "BFF route", "config")
 
 	// 4b. IaC-extracted microservices (Lambda endpoints with routes + table dependencies)
-	// Track existing node IDs to avoid duplicates with Lambda-discovered functions
-	existingNodeIDs := make(map[string]bool)
-	for _, n := range nodes {
-		existingNodeIDs[n.ID] = true
-	}
-
 	for _, ms := range a.iacMicroservices {
 		nodeID := "microservice:" + ms.Name
 		// Skip if a Lambda node with the same name already exists
-		if existingNodeIDs["lambda:"+ms.Name] {
+		if nodeIDs["lambda:"+ms.Name] {
 			nodeID = "lambda:" + ms.Name // use existing Lambda node ID
 		} else {
 			addNode(nodeID, ms.Name, "lambda", "function", "Compute")

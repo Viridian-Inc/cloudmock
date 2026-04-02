@@ -1,33 +1,105 @@
 ---
 const title = "CloudMock -- AWS, locally.";
-const description = "Local AWS emulation for developers. 25 services, one binary, built-in devtools. No Docker, no cloud account.";
+const description = "Local AWS emulation for developers. 98 services, one binary, built-in devtools. No Docker, no cloud account.";
 
 const services = [
+  "Account",
+  "ACM",
+  "ACM PCA",
+  "Amplify",
   "API Gateway",
+  "AppConfig",
+  "Application Auto Scaling",
   "AppSync",
+  "Athena",
+  "Auto Scaling",
+  "Backup",
+  "Batch",
+  "Bedrock",
+  "Cloud Control API",
   "CloudFormation",
+  "CloudFront",
+  "CloudTrail",
   "CloudWatch",
   "CloudWatch Logs",
+  "CodeArtifact",
+  "CodeBuild",
+  "CodeCommit",
+  "CodeConnections",
+  "CodeDeploy",
+  "CodePipeline",
   "Cognito",
+  "Config",
+  "Cost Explorer",
+  "Data Firehose",
+  "DMS",
+  "DocumentDB",
   "DynamoDB",
+  "EC2",
   "ECR",
   "ECS",
+  "EKS",
+  "Elastic Beanstalk",
+  "Elastic Load Balancing",
+  "ElastiCache",
+  "Elasticsearch",
+  "EMR",
   "EventBridge",
-  "Firehose",
+  "EventBridge Pipes",
+  "EventBridge Scheduler",
+  "FIS",
+  "Glacier",
+  "Glue",
   "IAM",
+  "Identity Store",
+  "IoT Core",
+  "IoT Data Plane",
+  "IoT Wireless",
+  "Kafka (MSK)",
   "Kinesis",
+  "Kinesis Data Analytics",
   "KMS",
+  "Lake Formation",
   "Lambda",
+  "Managed Blockchain",
+  "MediaConvert",
+  "MemoryDB",
+  "Amazon MQ",
+  "MWAA (Airflow)",
+  "Neptune",
+  "OpenSearch",
+  "Organizations",
+  "Pinpoint",
+  "RAM",
   "RDS",
+  "Redshift",
+  "Resource Groups",
+  "Resource Groups Tagging API",
   "Route 53",
+  "Route 53 Resolver",
   "S3",
+  "S3 Tables",
+  "SageMaker",
   "Secrets Manager",
+  "Serverless Application Repository",
+  "Service Discovery",
   "SES",
+  "Shield",
   "SNS",
   "SQS",
-  "SSM",
+  "SSM Parameter Store",
+  "SSO Admin",
   "Step Functions",
   "STS",
+  "Support",
+  "SWF",
+  "Textract",
+  "Timestream Write",
+  "Transcribe",
+  "Transfer Family",
+  "Verified Permissions",
+  "WAF Regional",
+  "WAFv2",
 ];
 ---
 
@@ -41,7 +113,7 @@ const services = [
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://cloudmock.io" />
+    <meta property="og:url" content="https://cloudmock.dev" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -63,7 +135,7 @@ const services = [
           <li><a href="/pricing">Pricing</a></li>
           <li>
             <a
-              href="https://github.com/neureaux/cloudmock"
+              href="https://github.com/Viridian-Inc/cloudmock"
               target="_blank"
               rel="noopener noreferrer">GitHub</a
             >
@@ -76,7 +148,7 @@ const services = [
     <section class="hero">
       <div class="container">
         <h1 class="hero-headline">AWS, locally.</h1>
-        <p class="hero-sub">25 services. One binary. Built-in devtools.</p>
+        <p class="hero-sub">98 services. One binary. Built-in devtools.</p>
         <div class="hero-install">
           <span class="prompt">$</span>
           <span>npx cloudmock</span>
@@ -86,7 +158,7 @@ const services = [
             >Get Started</a
           >
           <a
-            href="https://github.com/neureaux/cloudmock"
+            href="https://github.com/Viridian-Inc/cloudmock"
             class="btn-secondary"
             target="_blank"
             rel="noopener noreferrer">View on GitHub</a
@@ -140,10 +212,11 @@ const services = [
         </div>
         <div class="feature-grid">
           <div class="feature-card">
-            <h3>25 AWS Services</h3>
+            <h3>98 AWS Services</h3>
             <p>
-              S3, DynamoDB, SQS, Lambda, and 21 more. Full API emulation, not
-              stubs. Test your integrations without an AWS account.
+              25 services with full API emulation -- S3, DynamoDB, SQS, Lambda,
+              and more -- plus 73 CRUD stubs. Test your integrations without an
+              AWS account.
             </p>
           </div>
           <div class="feature-card">
@@ -154,10 +227,24 @@ const services = [
             </p>
           </div>
           <div class="feature-card">
-            <h3>6 Language SDKs</h3>
+            <h3>8 Language SDKs</h3>
             <p>
-              Node, Go, Python, Swift, Kotlin, and Dart. Use your existing AWS
-              SDK -- just change the endpoint.
+              Node, Go, Python, Java, Rust, Swift, Kotlin, and Dart. Use your
+              existing AWS SDK -- just change the endpoint.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>IAM Enforcement</h3>
+            <p>
+              Full policy evaluation, credential verification, or no-auth mode.
+              Test your IAM policies locally before deploying.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Chaos Engineering</h3>
+            <p>
+              Inject failures, latency, and errors to test your application's
+              resilience before it hits production.
             </p>
           </div>
           <div class="feature-card">
@@ -176,10 +263,10 @@ const services = [
       <div class="container">
         <div class="section-header-center">
           <p class="section-label">Services</p>
-          <h2 class="section-title">25 fully emulated AWS services</h2>
+          <h2 class="section-title">98 AWS services</h2>
           <p class="section-desc">
-            Complete API coverage for the services you use most. Each service
-            runs in-process with persistent state.
+            25 services with full API emulation and 73 additional services with
+            CRUD stubs. Every service runs in-process with persistent state.
           </p>
         </div>
         <div class="service-grid">
@@ -188,20 +275,21 @@ const services = [
       </div>
     </section>
 
-    <!-- Open Source -->
+    <!-- Source Available -->
     <section class="oss-section">
       <div class="container">
-        <p class="section-label">Open Source</p>
+        <p class="section-label">Source Available</p>
         <h2 class="section-title">
-          Apache-2.0. Free forever for local development.
+          Free for local dev and internal use. Always.
         </h2>
         <p class="section-desc">
-          CloudMock is open source. Run it locally without limits, inspect the
-          code, and contribute.
+          CloudMock is source-available under the Business Source License.
+          Use it locally, host it internally, run it in CI -- no limits.
+          Converts to Apache 2.0 on April 1, 2030.
         </p>
         <div class="oss-links">
           <a
-            href="https://github.com/neureaux/cloudmock"
+            href="https://github.com/Viridian-Inc/cloudmock"
             class="btn-secondary"
             target="_blank"
             rel="noopener noreferrer">View on GitHub</a
@@ -222,7 +310,7 @@ const services = [
           <li><a href="/pricing">Pricing</a></li>
           <li>
             <a
-              href="https://github.com/neureaux/cloudmock"
+              href="https://github.com/Viridian-Inc/cloudmock"
               target="_blank"
               rel="noopener noreferrer">GitHub</a
             >

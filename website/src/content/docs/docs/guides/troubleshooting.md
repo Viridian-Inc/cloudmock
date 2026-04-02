@@ -288,7 +288,7 @@ The SDK works by monkey-patching HTTP libraries at `init()` time. If you create 
 
 **Does CloudMock support service X?**
 
-Check the [Compatibility Matrix](/docs/reference/compatibility-matrix/). CloudMock supports 25 Tier 1 services with full emulation and 73 Tier 2 services with CRUD stubs.
+Check the [Compatibility Matrix](/docs/reference/compatibility-matrix/). CloudMock supports 98 fully emulated AWS services.
 
 **Can I use CloudMock with Terraform/CDK/Pulumi?**
 
@@ -310,7 +310,7 @@ This prints every incoming request, the service routing decision, and the respon
 
 **How do I report a bug?**
 
-Open an issue at [github.com/neureaux/cloudmock](https://github.com/neureaux/cloudmock/issues) with:
+Open an issue at [github.com/Viridian-Inc/cloudmock](https://github.com/Viridian-Inc/cloudmock/issues) with:
 
 1. CloudMock version (`curl http://localhost:4599/api/version`)
 2. The AWS service and action

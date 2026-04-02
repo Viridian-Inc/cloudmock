@@ -36,7 +36,7 @@ package myservice
 
 import (
     "net/http"
-    "github.com/neureaux/cloudmock/pkg/service"
+    "github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 type MyService struct {
@@ -142,7 +142,7 @@ func (s *Store) Delete(id string) bool {
 Add the registration to `services/register.go`:
 
 ```go
-import "github.com/neureaux/cloudmock/services/myservice"
+import "github.com/Viridian-Inc/cloudmock/services/myservice"
 
 // Inside the registration function:
 registry.Register(myservice.New())

@@ -15,7 +15,7 @@ The most portable option for CI. Add CloudMock as a service in your CI pipeline:
 # GitHub Actions
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - 4566:4566
       - 4599:4599
@@ -24,7 +24,7 @@ services:
 ```yaml
 # GitLab CI
 services:
-  - name: ghcr.io/neureaux/cloudmock:latest
+  - name: ghcr.io/Viridian-Inc/cloudmock:latest
     alias: cloudmock
 ```
 
@@ -45,7 +45,7 @@ For test suites that also need a database or other services:
 ```yaml
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - "4566:4566"
       - "4599:4599"

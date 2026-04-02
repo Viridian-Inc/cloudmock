@@ -22,7 +22,7 @@ Section: devel
 Priority: optional
 Architecture: ${ARCH}
 Maintainer: Viridian Inc <eng@viri.app>
-Homepage: https://cloudmock.io
+Homepage: https://cloudmock.dev
 Description: Local AWS emulation — 98 services, one binary, built-in devtools
  CloudMock emulates 98 AWS services locally. Point your AWS SDK at
  localhost:4566 and develop without a cloud account.

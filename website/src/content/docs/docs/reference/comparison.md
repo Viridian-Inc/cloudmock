@@ -9,7 +9,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 
 | Feature | CloudMock | LocalStack | Moto | SAM Local |
 |---------|-----------|------------|------|-----------|
-| **Service count** | 98 (25 full, 73 CRUD stubs) | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
+| **Service count** | 98 fully emulated services | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
 | **Protocol fidelity** | High -- implements actual AWS wire protocols (Query, JSON, REST-JSON, REST-XML) | High -- aims for API compatibility | Medium -- Python mocks, some protocol gaps | Medium -- focused on SAM/CloudFormation |
 | **Implementation language** | Go | Python | Python | Python / Go (Lambda runtime) |
 | **Startup time** | < 1 second | 5-15 seconds | N/A (library) | 3-10 seconds |

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # CloudMock installer — detects platform and installs the latest release.
-# Usage: curl -fsSL https://cloudmock.io/install.sh | bash
+# Usage: curl -fsSL https://cloudmock.dev/install.sh | bash
 
 REPO="Viridian-Inc/cloudmock"
 INSTALL_DIR="/usr/local/bin"

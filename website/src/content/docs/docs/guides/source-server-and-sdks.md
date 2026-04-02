@@ -148,7 +148,7 @@ The Go SDK wraps `http.RoundTripper` for outbound traffic and `http.Handler` for
 ### Install
 
 ```bash
-go get github.com/neureaux/cloudmock-sdk-go
+go get github.com/Viridian-Inc/cloudmock-sdk-go
 ```
 
 ### Initialize
@@ -158,7 +158,7 @@ package main
 
 import (
     "net/http"
-    cloudmock "github.com/neureaux/cloudmock-sdk-go"
+    cloudmock "github.com/Viridian-Inc/cloudmock-sdk-go"
 )
 
 func main() {

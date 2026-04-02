@@ -60,7 +60,7 @@ Characteristics:
 ```yaml
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - "4566:4566"
       - "4500:4500"
@@ -109,7 +109,7 @@ PostgreSQL is complementary to DuckDB. For a full production deployment, use bot
 ```yaml
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - "4566:4566"
       - "4500:4500"
@@ -167,7 +167,7 @@ CloudMock itself does not write to Prometheus. To get metrics into Prometheus, e
 ```yaml
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - "4566:4566"
       - "4500:4500"
@@ -272,7 +272,7 @@ This example combines all backends into a single deployment:
 ```yaml
 services:
   cloudmock:
-    image: ghcr.io/neureaux/cloudmock:latest
+    image: ghcr.io/Viridian-Inc/cloudmock:latest
     ports:
       - "4566:4566"
       - "4500:4500"

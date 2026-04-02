@@ -278,6 +278,60 @@ func handleUpdateConfiguration(p map[string]any, store *Store) (*service.Respons
 
 // ---- User handlers ----
 
+func handleDescribeConfigurationRevision(p map[string]any, store *Store) (*service.Response, error) {
+	id := getStr(p, "configurationId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("configurationId is required."))
+	}
+	revID := 0
+	if v, ok := p["configurationRevision"]; ok {
+		switch rv := v.(type) {
+		case float64:
+			revID = int(rv)
+		case int:
+			revID = rv
+		}
+	}
+	if revID == 0 {
+		return jsonErr(service.ErrValidation("configurationRevision is required."))
+	}
+	cfg, rev, awsErr := store.DescribeConfigurationRevision(id, revID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"configurationId":       cfg.Id,
+		"configurationRevision": rev.RevisionId,
+		"description":           rev.Description,
+		"data":                  rev.Data,
+		"created":               rev.CreationTime.Format(time.RFC3339),
+	})
+}
+
+func handleListConfigurationRevisions(p map[string]any, store *Store) (*service.Response, error) {
+	id := getStr(p, "configurationId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("configurationId is required."))
+	}
+	cfg, revisions, awsErr := store.ListConfigurationRevisions(id)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	revList := make([]map[string]any, 0, len(revisions))
+	for _, rev := range revisions {
+		revList = append(revList, map[string]any{
+			"revision":    rev.RevisionId,
+			"description": rev.Description,
+			"created":     rev.CreationTime.Format(time.RFC3339),
+		})
+	}
+	return jsonOK(map[string]any{
+		"configurationId": cfg.Id,
+		"maxResults":      len(revList),
+		"revisions":       revList,
+	})
+}
+
 func handleCreateUser(p map[string]any, store *Store) (*service.Response, error) {
 	brokerId := getStr(p, "brokerId")
 	username := getStr(p, "username")

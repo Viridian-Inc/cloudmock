@@ -39,6 +39,8 @@ func (s *MQService) Actions() []service.Action {
 		{Name: "DescribeConfiguration", Method: http.MethodGet, IAMAction: "mq:DescribeConfiguration"},
 		{Name: "ListConfigurations", Method: http.MethodGet, IAMAction: "mq:ListConfigurations"},
 		{Name: "UpdateConfiguration", Method: http.MethodPut, IAMAction: "mq:UpdateConfiguration"},
+		{Name: "DescribeConfigurationRevision", Method: http.MethodGet, IAMAction: "mq:DescribeConfigurationRevision"},
+		{Name: "ListConfigurationRevisions", Method: http.MethodGet, IAMAction: "mq:ListConfigurationRevisions"},
 		{Name: "CreateUser", Method: http.MethodPost, IAMAction: "mq:CreateUser"},
 		{Name: "DescribeUser", Method: http.MethodGet, IAMAction: "mq:DescribeUser"},
 		{Name: "ListUsers", Method: http.MethodGet, IAMAction: "mq:ListUsers"},
@@ -89,6 +91,10 @@ func (s *MQService) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		return handleListConfigurations(s.store)
 	case "UpdateConfiguration":
 		return handleUpdateConfiguration(params, s.store)
+	case "DescribeConfigurationRevision":
+		return handleDescribeConfigurationRevision(params, s.store)
+	case "ListConfigurationRevisions":
+		return handleListConfigurationRevisions(params, s.store)
 	case "CreateUser":
 		return handleCreateUser(params, s.store)
 	case "DescribeUser":

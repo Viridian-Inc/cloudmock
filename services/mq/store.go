@@ -43,16 +43,24 @@ type Broker struct {
 }
 
 type MQConfiguration struct {
-	Id              string
-	Arn             string
-	Name            string
-	Description     string
-	EngineType      string
-	EngineVersion   string
+	Id               string
+	Arn              string
+	Name             string
+	Description      string
+	EngineType       string
+	EngineVersion    string
 	LatestRevisionId int
-	Data            string
-	CreationTime    time.Time
-	Tags            map[string]string
+	Data             string
+	CreationTime     time.Time
+	Tags             map[string]string
+	Revisions        []MQConfigurationRevision
+}
+
+type MQConfigurationRevision struct {
+	RevisionId   int
+	Description  string
+	Data         string
+	CreationTime time.Time
 }
 
 type MQUser struct {
@@ -270,6 +278,7 @@ func (s *Store) CreateConfiguration(name, description, engineType, engineVersion
 		engineType = "ACTIVEMQ"
 	}
 	id := newUUID()
+	now := time.Now().UTC()
 	cfg := &MQConfiguration{
 		Id:               id,
 		Arn:              s.configARN(id),
@@ -279,8 +288,11 @@ func (s *Store) CreateConfiguration(name, description, engineType, engineVersion
 		EngineVersion:    engineVersion,
 		LatestRevisionId: 1,
 		Data:             data,
-		CreationTime:     time.Now().UTC(),
+		CreationTime:     now,
 		Tags:             tags,
+		Revisions: []MQConfigurationRevision{
+			{RevisionId: 1, Description: description, Data: data, CreationTime: now},
+		},
 	}
 	s.configurations[id] = cfg
 	s.tagsByArn[cfg.Arn] = tags
@@ -323,7 +335,45 @@ func (s *Store) UpdateConfiguration(id, description, data string) (*MQConfigurat
 		cfg.Data = data
 	}
 	cfg.LatestRevisionId++
+	cfg.Revisions = append(cfg.Revisions, MQConfigurationRevision{
+		RevisionId:   cfg.LatestRevisionId,
+		Description:  cfg.Description,
+		Data:         cfg.Data,
+		CreationTime: time.Now().UTC(),
+	})
 	return cfg, nil
+}
+
+// DescribeConfigurationRevision returns a specific configuration revision.
+func (s *Store) DescribeConfigurationRevision(id string, revisionID int) (*MQConfiguration, *MQConfigurationRevision, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cfg, ok := s.configurations[id]
+	if !ok {
+		return nil, nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Configuration %s not found", id), http.StatusNotFound)
+	}
+	for i := range cfg.Revisions {
+		if cfg.Revisions[i].RevisionId == revisionID {
+			return cfg, &cfg.Revisions[i], nil
+		}
+	}
+	return nil, nil, service.NewAWSError("NotFoundException",
+		fmt.Sprintf("Revision %d not found for configuration %s", revisionID, id), http.StatusNotFound)
+}
+
+// ListConfigurationRevisions lists all revisions for a configuration.
+func (s *Store) ListConfigurationRevisions(id string) (*MQConfiguration, []MQConfigurationRevision, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cfg, ok := s.configurations[id]
+	if !ok {
+		return nil, nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Configuration %s not found", id), http.StatusNotFound)
+	}
+	revs := make([]MQConfigurationRevision, len(cfg.Revisions))
+	copy(revs, cfg.Revisions)
+	return cfg, revs, nil
 }
 
 // Users.

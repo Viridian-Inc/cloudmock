@@ -53,6 +53,17 @@ func createBroker(t *testing.T, s *svc.MQService, name string) string {
 	return body["brokerId"].(string)
 }
 
+func createConfiguration(t *testing.T, s *svc.MQService, name string) string {
+	t.Helper()
+	resp, err := s.HandleRequest(jsonCtx("CreateConfiguration", map[string]any{
+		"name":          name,
+		"engineType":    "ACTIVEMQ",
+		"engineVersion": "5.17.6",
+	}))
+	require.NoError(t, err)
+	return respBody(t, resp)["id"].(string)
+}
+
 // ---- Test 1: CreateBroker ----
 
 func TestCreateBroker(t *testing.T) {
@@ -313,4 +324,123 @@ func TestServiceNameAndHealthCheck(t *testing.T) {
 	s := newService()
 	assert.Equal(t, "mq", s.Name())
 	assert.NoError(t, s.HealthCheck())
+}
+
+// ---- Test 14: DescribeConfigurationRevision ----
+
+func TestDescribeConfigurationRevision(t *testing.T) {
+	s := newService()
+	configId := createConfiguration(t, s, "rev-config")
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeConfigurationRevision", map[string]any{
+		"configurationId":       configId,
+		"configurationRevision": float64(1),
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.Equal(t, configId, body["configurationId"])
+	assert.Equal(t, float64(1), body["configurationRevision"])
+}
+
+// ---- Test 15: ListConfigurationRevisions ----
+
+func TestListConfigurationRevisions(t *testing.T) {
+	s := newService()
+	configId := createConfiguration(t, s, "list-rev-config")
+
+	// Update to create a second revision
+	_, err := s.HandleRequest(jsonCtx("UpdateConfiguration", map[string]any{
+		"configurationId": configId,
+		"description":     "second revision",
+	}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("ListConfigurationRevisions", map[string]any{
+		"configurationId": configId,
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	revisions := body["revisions"].([]any)
+	assert.Len(t, revisions, 2)
+	assert.Equal(t, float64(2), body["maxResults"])
+}
+
+// ---- Test 16: CreateBroker missing name ----
+
+func TestCreateBrokerMissingName(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateBroker", map[string]any{"engineType": "ACTIVEMQ"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ValidationError", awsErr.Code)
+}
+
+// ---- Test 17: RabbitMQ engine type ----
+
+func TestCreateRabbitMQBroker(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateBroker", map[string]any{
+		"brokerName": "rabbit-broker",
+		"engineType": "RABBITMQ",
+		"deploymentMode": "SINGLE_INSTANCE",
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.NotEmpty(t, body["brokerId"])
+
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeBroker", map[string]any{
+		"brokerId": body["brokerId"],
+	}))
+	descBody := respBody(t, descResp)
+	assert.Equal(t, "RABBITMQ", descBody["engineType"])
+}
+
+// ---- Test 18: Create duplicate user ----
+
+func TestCreateDuplicateUser(t *testing.T) {
+	s := newService()
+	brokerId := createBroker(t, s, "dup-user-broker")
+
+	_, err := s.HandleRequest(jsonCtx("CreateUser", map[string]any{
+		"brokerId": brokerId,
+		"username": "alice",
+	}))
+	require.NoError(t, err)
+
+	_, err = s.HandleRequest(jsonCtx("CreateUser", map[string]any{
+		"brokerId": brokerId,
+		"username": "alice",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ConflictException", awsErr.Code)
+}
+
+// ---- Test 19: Configuration not found ----
+
+func TestConfigurationNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DescribeConfiguration", map[string]any{
+		"configurationId": "nonexistent-config",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "NotFoundException", awsErr.Code)
+}
+
+// ---- Test 20: Broker ARN format ----
+
+func TestBrokerARNFormat(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateBroker", map[string]any{
+		"brokerName": "arn-broker",
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	arn := body["brokerArn"].(string)
+	assert.Contains(t, arn, "arn:aws:mq:")
+	assert.Contains(t, arn, "broker")
 }

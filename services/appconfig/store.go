@@ -344,6 +344,27 @@ func (s *Store) ListConfigurationProfiles(appID string) ([]*ConfigurationProfile
 	return result, true
 }
 
+// UpdateConfigurationProfile updates a configuration profile's name and description.
+func (s *Store) UpdateConfigurationProfile(appID, profileID, name, description string) (*ConfigurationProfile, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	profiles, ok := s.configProfiles[appID]
+	if !ok {
+		return nil, false
+	}
+	profile, ok := profiles[profileID]
+	if !ok {
+		return nil, false
+	}
+	if name != "" {
+		profile.Name = name
+	}
+	if description != "" {
+		profile.Description = description
+	}
+	return profile, true
+}
+
 // DeleteConfigurationProfile removes a configuration profile.
 func (s *Store) DeleteConfigurationProfile(appID, profileID string) bool {
 	s.mu.Lock()
@@ -401,6 +422,35 @@ func (s *Store) ListDeploymentStrategies() []*DeploymentStrategy {
 		result = append(result, ds)
 	}
 	return result
+}
+
+// UpdateDeploymentStrategy updates a deployment strategy.
+func (s *Store) UpdateDeploymentStrategy(id, name, description string, durationMinutes int, growthFactor float64, growthType string, bakeTimeMinutes int) (*DeploymentStrategy, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ds, ok := s.deploymentStrategies[id]
+	if !ok {
+		return nil, false
+	}
+	if name != "" {
+		ds.Name = name
+	}
+	if description != "" {
+		ds.Description = description
+	}
+	if durationMinutes > 0 {
+		ds.DeploymentDurationInMinutes = durationMinutes
+	}
+	if growthFactor > 0 {
+		ds.GrowthFactor = growthFactor
+	}
+	if growthType != "" {
+		ds.GrowthType = growthType
+	}
+	if bakeTimeMinutes > 0 {
+		ds.FinalBakeTimeInMinutes = bakeTimeMinutes
+	}
+	return ds, true
 }
 
 // DeleteDeploymentStrategy removes a deployment strategy.

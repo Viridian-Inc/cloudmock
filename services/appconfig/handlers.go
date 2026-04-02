@@ -354,6 +354,30 @@ func handleListConfigurationProfiles(ctx *service.RequestContext, store *Store) 
 	return jsonOK(&listConfigProfilesResponse{Items: items})
 }
 
+// ---- UpdateConfigurationProfile ----
+
+type updateConfigProfileRequest struct {
+	ApplicationId          string `json:"ApplicationId"`
+	ConfigurationProfileId string `json:"ConfigurationProfileId"`
+	Name                   string `json:"Name"`
+	Description            string `json:"Description"`
+}
+
+func handleUpdateConfigurationProfile(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateConfigProfileRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ApplicationId == "" || req.ConfigurationProfileId == "" {
+		return jsonErr(service.ErrValidation("ApplicationId and ConfigurationProfileId are required."))
+	}
+	profile, ok := store.UpdateConfigurationProfile(req.ApplicationId, req.ConfigurationProfileId, req.Name, req.Description)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Configuration profile not found.", http.StatusNotFound))
+	}
+	return jsonOK(&configProfileResponse{ApplicationId: profile.ApplicationID, ID: profile.ID, Name: profile.Name, Description: profile.Description, LocationUri: profile.LocationURI, Type: profile.Type})
+}
+
 // ---- DeleteConfigurationProfile ----
 
 type deleteConfigProfileRequest struct {
@@ -445,6 +469,33 @@ func handleListDeploymentStrategies(ctx *service.RequestContext, store *Store) (
 		items = append(items, deploymentStrategyResponse{ID: ds.ID, Name: ds.Name, Description: ds.Description, DeploymentDurationInMinutes: ds.DeploymentDurationInMinutes, GrowthFactor: ds.GrowthFactor, GrowthType: ds.GrowthType, FinalBakeTimeInMinutes: ds.FinalBakeTimeInMinutes, ReplicateTo: ds.ReplicateTo})
 	}
 	return jsonOK(&listDeploymentStrategiesResponse{Items: items})
+}
+
+// ---- UpdateDeploymentStrategy ----
+
+type updateDeploymentStrategyRequest struct {
+	DeploymentStrategyId        string  `json:"DeploymentStrategyId"`
+	Name                        string  `json:"Name"`
+	Description                 string  `json:"Description"`
+	DeploymentDurationInMinutes int     `json:"DeploymentDurationInMinutes"`
+	GrowthFactor                float64 `json:"GrowthFactor"`
+	GrowthType                  string  `json:"GrowthType"`
+	FinalBakeTimeInMinutes      int     `json:"FinalBakeTimeInMinutes"`
+}
+
+func handleUpdateDeploymentStrategy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateDeploymentStrategyRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.DeploymentStrategyId == "" {
+		return jsonErr(service.ErrValidation("DeploymentStrategyId is required."))
+	}
+	ds, ok := store.UpdateDeploymentStrategy(req.DeploymentStrategyId, req.Name, req.Description, req.DeploymentDurationInMinutes, req.GrowthFactor, req.GrowthType, req.FinalBakeTimeInMinutes)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException", "Deployment strategy not found.", http.StatusNotFound))
+	}
+	return jsonOK(&deploymentStrategyResponse{ID: ds.ID, Name: ds.Name, Description: ds.Description, DeploymentDurationInMinutes: ds.DeploymentDurationInMinutes, GrowthFactor: ds.GrowthFactor, GrowthType: ds.GrowthType, FinalBakeTimeInMinutes: ds.FinalBakeTimeInMinutes, ReplicateTo: ds.ReplicateTo})
 }
 
 // ---- DeleteDeploymentStrategy ----

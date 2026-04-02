@@ -42,10 +42,12 @@ func (s *AppConfigService) Actions() []service.Action {
 		{Name: "CreateConfigurationProfile", Method: http.MethodPost, IAMAction: "appconfig:CreateConfigurationProfile"},
 		{Name: "GetConfigurationProfile", Method: http.MethodPost, IAMAction: "appconfig:GetConfigurationProfile"},
 		{Name: "ListConfigurationProfiles", Method: http.MethodPost, IAMAction: "appconfig:ListConfigurationProfiles"},
+		{Name: "UpdateConfigurationProfile", Method: http.MethodPost, IAMAction: "appconfig:UpdateConfigurationProfile"},
 		{Name: "DeleteConfigurationProfile", Method: http.MethodPost, IAMAction: "appconfig:DeleteConfigurationProfile"},
 		{Name: "CreateDeploymentStrategy", Method: http.MethodPost, IAMAction: "appconfig:CreateDeploymentStrategy"},
 		{Name: "GetDeploymentStrategy", Method: http.MethodPost, IAMAction: "appconfig:GetDeploymentStrategy"},
 		{Name: "ListDeploymentStrategies", Method: http.MethodPost, IAMAction: "appconfig:ListDeploymentStrategies"},
+		{Name: "UpdateDeploymentStrategy", Method: http.MethodPost, IAMAction: "appconfig:UpdateDeploymentStrategy"},
 		{Name: "DeleteDeploymentStrategy", Method: http.MethodPost, IAMAction: "appconfig:DeleteDeploymentStrategy"},
 		{Name: "StartDeployment", Method: http.MethodPost, IAMAction: "appconfig:StartDeployment"},
 		{Name: "GetDeployment", Method: http.MethodPost, IAMAction: "appconfig:GetDeployment"},
@@ -94,6 +96,8 @@ func (s *AppConfigService) HandleRequest(ctx *service.RequestContext) (*service.
 		return handleGetConfigurationProfile(ctx, s.store)
 	case "ListConfigurationProfiles":
 		return handleListConfigurationProfiles(ctx, s.store)
+	case "UpdateConfigurationProfile":
+		return handleUpdateConfigurationProfile(ctx, s.store)
 	case "DeleteConfigurationProfile":
 		return handleDeleteConfigurationProfile(ctx, s.store)
 	case "CreateDeploymentStrategy":
@@ -102,6 +106,8 @@ func (s *AppConfigService) HandleRequest(ctx *service.RequestContext) (*service.
 		return handleGetDeploymentStrategy(ctx, s.store)
 	case "ListDeploymentStrategies":
 		return handleListDeploymentStrategies(ctx, s.store)
+	case "UpdateDeploymentStrategy":
+		return handleUpdateDeploymentStrategy(ctx, s.store)
 	case "DeleteDeploymentStrategy":
 		return handleDeleteDeploymentStrategy(ctx, s.store)
 	case "StartDeployment":

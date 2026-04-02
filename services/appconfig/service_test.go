@@ -392,6 +392,215 @@ func TestInvalidAction(t *testing.T) {
 	assert.Equal(t, "InvalidAction", awsErr.Code)
 }
 
+// ---- UpdateConfigurationProfile tests ----
+
+func TestUpdateConfigurationProfile(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	profResp, _ := s.HandleRequest(jsonCtx("CreateConfigurationProfile", map[string]any{
+		"ApplicationId": appID, "Name": "original-profile", "LocationUri": "hosted",
+	}))
+	profID := decode(t, profResp)["Id"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateConfigurationProfile", map[string]any{
+		"ApplicationId":          appID,
+		"ConfigurationProfileId": profID,
+		"Name":                   "updated-profile",
+		"Description":            "updated description",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	m := decode(t, resp)
+	assert.Equal(t, "updated-profile", m["Name"])
+	assert.Equal(t, "updated description", m["Description"])
+}
+
+func TestUpdateConfigurationProfileNotFound(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateConfigurationProfile", map[string]any{
+		"ApplicationId":          appID,
+		"ConfigurationProfileId": "nonexistent",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+// ---- UpdateDeploymentStrategy tests ----
+
+func TestUpdateDeploymentStrategy(t *testing.T) {
+	s := newService()
+	stratResp, _ := s.HandleRequest(jsonCtx("CreateDeploymentStrategy", map[string]any{
+		"Name": "original-strat", "GrowthFactor": 10.0, "GrowthType": "LINEAR",
+	}))
+	stratID := decode(t, stratResp)["Id"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateDeploymentStrategy", map[string]any{
+		"DeploymentStrategyId":        stratID,
+		"Name":                        "updated-strat",
+		"Description":                 "updated desc",
+		"DeploymentDurationInMinutes": 30,
+		"GrowthFactor":                20.0,
+		"GrowthType":                  "EXPONENTIAL",
+		"FinalBakeTimeInMinutes":      10,
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	m := decode(t, resp)
+	assert.Equal(t, "updated-strat", m["Name"])
+	assert.Equal(t, "EXPONENTIAL", m["GrowthType"])
+	assert.Equal(t, 20.0, m["GrowthFactor"])
+}
+
+func TestUpdateDeploymentStrategyNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateDeploymentStrategy", map[string]any{
+		"DeploymentStrategyId": "nonexistent",
+		"Name":                 "anything",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestUpdateDeploymentStrategyMissingID(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateDeploymentStrategy", map[string]any{}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ValidationError", awsErr.Code)
+}
+
+// ---- Additional validation tests ----
+
+func TestGetEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("GetEnvironment", map[string]any{
+		"ApplicationId": appID, "EnvironmentId": "nonexistent",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestUpdateEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("UpdateEnvironment", map[string]any{
+		"ApplicationId": appID, "EnvironmentId": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestGetConfigurationProfileNotFound(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("GetConfigurationProfile", map[string]any{
+		"ApplicationId":          appID,
+		"ConfigurationProfileId": "nonexistent",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestDeleteConfigurationProfileNotFound(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("DeleteConfigurationProfile", map[string]any{
+		"ApplicationId":          appID,
+		"ConfigurationProfileId": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestGetDeploymentStrategyNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetDeploymentStrategy", map[string]any{"DeploymentStrategyId": "nonexistent"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestDeleteDeploymentStrategyNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DeleteDeploymentStrategy", map[string]any{"DeploymentStrategyId": "nonexistent"}))
+	require.Error(t, err)
+}
+
+func TestStartDeploymentMissingEnv(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	stratResp, _ := s.HandleRequest(jsonCtx("CreateDeploymentStrategy", map[string]any{"Name": "strat"}))
+	stratID := decode(t, stratResp)["Id"].(string)
+
+	profileResp, _ := s.HandleRequest(jsonCtx("CreateConfigurationProfile", map[string]any{
+		"ApplicationId": appID, "Name": "profile", "LocationUri": "hosted",
+	}))
+	profileID := decode(t, profileResp)["Id"].(string)
+
+	// Try starting with nonexistent environment
+	_, err := s.HandleRequest(jsonCtx("StartDeployment", map[string]any{
+		"ApplicationId":          appID,
+		"EnvironmentId":          "nonexistent",
+		"DeploymentStrategyId":   stratID,
+		"ConfigurationProfileId": profileID,
+		"ConfigurationVersion":   "1",
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestTagResourceNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceArn": "arn:aws:appconfig:us-east-1:123456789012:application/nonexistent",
+		"Tags":        map[string]any{"key": "value"},
+	}))
+	require.Error(t, err)
+}
+
+func TestConfigurationProfileTypes(t *testing.T) {
+	s := newService()
+	appResp, _ := s.HandleRequest(jsonCtx("CreateApplication", map[string]any{"Name": "app"}))
+	appID := decode(t, appResp)["Id"].(string)
+
+	// Test Feature Flag type
+	profResp, err := s.HandleRequest(jsonCtx("CreateConfigurationProfile", map[string]any{
+		"ApplicationId": appID,
+		"Name":          "feature-flags",
+		"LocationUri":   "hosted",
+		"Type":          "AWS.AppConfig.FeatureFlags",
+	}))
+	require.NoError(t, err)
+	m := decode(t, profResp)
+	assert.Equal(t, "AWS.AppConfig.FeatureFlags", m["Type"])
+}
+
 // ---- Behavioral: Deployment strategy execution ----
 
 func TestDeploymentLinearStrategy(t *testing.T) {

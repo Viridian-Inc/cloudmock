@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -388,10 +389,12 @@ func handlePublish(ctx *service.RequestContext, store *Store, locator ServiceLoc
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
-	// Deliver to subscriptions (SNS → SQS fan-out, SNS → Lambda).
+	// Deliver to subscriptions asynchronously (SNS → SQS fan-out, SNS → Lambda).
 	if locator != nil {
-		deliverToSQSSubscriptions(store, locator, topicArn, msgID, message, subject)
-		deliverToLambdaSubscriptions(store, locator, topicArn, msgID, message, subject)
+		go func() {
+			deliverToSQSSubscriptions(store, locator, topicArn, msgID, message, subject)
+			deliverToLambdaSubscriptions(store, locator, topicArn, msgID, message, subject)
+		}()
 	}
 
 	resp := &xmlPublishResponse{
@@ -470,8 +473,21 @@ func indexOf(s string, c byte) int {
 // when delivering to SQS, matching the AWS format.
 func buildSNSNotification(topicArn, messageID, message, subject, subscriptionArn string) string {
 	// Simplified SNS notification envelope matching AWS format.
-	return fmt.Sprintf(`{"Type":"Notification","MessageId":"%s","TopicArn":"%s","Subject":"%s","Message":%s,"SubscribeURL":"","UnsubscribeURL":"","Timestamp":"%s"}`,
-		messageID, topicArn, subject, jsonEscape(message), newUUID())
+	// Use strings.Builder to avoid repeated allocations from fmt.Sprintf.
+	var b strings.Builder
+	b.Grow(256 + len(message) + len(topicArn))
+	b.WriteString(`{"Type":"Notification","MessageId":"`)
+	b.WriteString(messageID)
+	b.WriteString(`","TopicArn":"`)
+	b.WriteString(topicArn)
+	b.WriteString(`","Subject":"`)
+	b.WriteString(subject)
+	b.WriteString(`","Message":`)
+	jsonEscapeTo(&b, message)
+	b.WriteString(`,"SubscribeURL":"","UnsubscribeURL":"","Timestamp":"`)
+	b.WriteString(newUUID())
+	b.WriteString(`"}`)
+	return b.String()
 }
 
 // SQSEnqueuer is an interface for directly enqueuing messages into SQS queues.
@@ -543,8 +559,22 @@ func extractFunctionNameFromARN(arn string) string {
 // buildSNSLambdaEvent creates the SNS event payload for Lambda invocation,
 // matching the AWS format.
 func buildSNSLambdaEvent(topicArn, messageID, message, subject, subscriptionArn string) string {
-	return fmt.Sprintf(`{"Records":[{"EventSource":"aws:sns","EventVersion":"1.0","EventSubscriptionArn":"%s","Sns":{"Type":"Notification","MessageId":"%s","TopicArn":"%s","Subject":"%s","Message":%s,"Timestamp":"%s"}}]}`,
-		subscriptionArn, messageID, topicArn, subject, jsonEscape(message), newUUID())
+	var b strings.Builder
+	b.Grow(256 + len(message) + len(topicArn) + len(subscriptionArn))
+	b.WriteString(`{"Records":[{"EventSource":"aws:sns","EventVersion":"1.0","EventSubscriptionArn":"`)
+	b.WriteString(subscriptionArn)
+	b.WriteString(`","Sns":{"Type":"Notification","MessageId":"`)
+	b.WriteString(messageID)
+	b.WriteString(`","TopicArn":"`)
+	b.WriteString(topicArn)
+	b.WriteString(`","Subject":"`)
+	b.WriteString(subject)
+	b.WriteString(`","Message":`)
+	jsonEscapeTo(&b, message)
+	b.WriteString(`,"Timestamp":"`)
+	b.WriteString(newUUID())
+	b.WriteString(`"}}]}`)
+	return b.String()
 }
 
 // invokeSNSToLambda finds the Lambda service via the locator and invokes the function.
@@ -558,28 +588,34 @@ func invokeSNSToLambda(locator ServiceLocator, functionName string, payload []by
 	}
 }
 
-// jsonEscape wraps a string in JSON quotes, escaping as needed.
-func jsonEscape(s string) string {
-	// Simple JSON string encoding.
-	result := `"`
+// jsonEscapeTo writes a JSON-escaped string (with surrounding quotes) into the builder.
+func jsonEscapeTo(b *strings.Builder, s string) {
+	b.WriteByte('"')
 	for _, c := range s {
 		switch c {
 		case '"':
-			result += `\"`
+			b.WriteString(`\"`)
 		case '\\':
-			result += `\\`
+			b.WriteString(`\\`)
 		case '\n':
-			result += `\n`
+			b.WriteString(`\n`)
 		case '\r':
-			result += `\r`
+			b.WriteString(`\r`)
 		case '\t':
-			result += `\t`
+			b.WriteString(`\t`)
 		default:
-			result += string(c)
+			b.WriteRune(c)
 		}
 	}
-	result += `"`
-	return result
+	b.WriteByte('"')
+}
+
+// jsonEscape wraps a string in JSON quotes, escaping as needed.
+func jsonEscape(s string) string {
+	var b strings.Builder
+	b.Grow(len(s) + 2)
+	jsonEscapeTo(&b, s)
+	return b.String()
 }
 
 // ---- TagResource ----
@@ -741,8 +777,17 @@ func xmlErr(awsErr *service.AWSError) (*service.Response, error) {
 func newUUID() string {
 	b := make([]byte, 16)
 	_, _ = rand.Read(b)
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+	var buf [36]byte
+	hex.Encode(buf[0:8], b[0:4])
+	buf[8] = '-'
+	hex.Encode(buf[9:13], b[4:6])
+	buf[13] = '-'
+	hex.Encode(buf[14:18], b[6:8])
+	buf[18] = '-'
+	hex.Encode(buf[19:23], b[8:10])
+	buf[23] = '-'
+	hex.Encode(buf[24:36], b[10:16])
+	return string(buf[:])
 }
 
 // randomHex returns n random bytes as a hex string.

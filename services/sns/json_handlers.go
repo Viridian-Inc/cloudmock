@@ -394,7 +394,10 @@ func jsonPublish(ctx *service.RequestContext, store *Store, locator ServiceLocat
 	}
 
 	if locator != nil {
-		deliverToSQSSubscriptions(store, locator, topicArn, msgID, input.Message, input.Subject)
+		go func() {
+			deliverToSQSSubscriptions(store, locator, topicArn, msgID, input.Message, input.Subject)
+			deliverToLambdaSubscriptions(store, locator, topicArn, msgID, input.Message, input.Subject)
+		}()
 	}
 
 	return snsJSONOK(&jsonPublishOutput{MessageId: msgID})

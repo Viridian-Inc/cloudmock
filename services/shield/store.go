@@ -10,6 +10,19 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// DRTAccess holds DRT (DDoS Response Team) access information.
+type DRTAccess struct {
+	RoleArn       string
+	LogBucketList []string
+}
+
+// AttackStatistics holds aggregated attack statistics.
+type AttackStatistics struct {
+	FromInclusive time.Time
+	ToExclusive   time.Time
+	DataItems     []map[string]any
+}
+
 // Tag represents a key-value tag.
 type Tag struct {
 	Key   string
@@ -423,4 +436,124 @@ func filterTags(tags []Tag, removeKeys map[string]bool) []Tag {
 		}
 	}
 	return out
+}
+
+// UpdateSubscription updates the subscription auto-renew setting.
+func (s *Store) UpdateSubscription(autoRenew string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.subscription == nil {
+		return service.NewAWSError("ResourceNotFoundException",
+			"No Shield Advanced subscription found.", http.StatusNotFound)
+	}
+	if autoRenew != "" {
+		s.subscription.AutoRenew = autoRenew
+	}
+	return nil
+}
+
+// DescribeAttackStatistics returns attack statistics (mock data).
+func (s *Store) DescribeAttackStatistics() AttackStatistics {
+	now := time.Now().UTC()
+	return AttackStatistics{
+		FromInclusive: now.AddDate(0, 0, -30),
+		ToExclusive:   now,
+		DataItems:     []map[string]any{},
+	}
+}
+
+// DescribeDRTAccess returns the DRT access configuration.
+func (s *Store) DescribeDRTAccess() DRTAccess {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return DRTAccess{
+		RoleArn:       "",
+		LogBucketList: []string{},
+	}
+}
+
+// EnableApplicationLayerAutomaticResponse enables automatic response for a resource.
+func (s *Store) EnableApplicationLayerAutomaticResponse(resourceArn string, action map[string]any) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if resourceArn == "" {
+		return service.ErrValidation("ResourceArn is required.")
+	}
+	for _, p := range s.protections {
+		if p.ResourceArn == resourceArn {
+			p.ApplicationLayerAutoResponseConfiguration = map[string]any{
+				"Action": action,
+				"Status": "ENABLED",
+			}
+			return nil
+		}
+	}
+	return service.NewAWSError("ResourceNotFoundException",
+		fmt.Sprintf("No protection found for resource %s.", resourceArn), http.StatusNotFound)
+}
+
+// DisableApplicationLayerAutomaticResponse disables automatic response for a resource.
+func (s *Store) DisableApplicationLayerAutomaticResponse(resourceArn string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if resourceArn == "" {
+		return service.ErrValidation("ResourceArn is required.")
+	}
+	for _, p := range s.protections {
+		if p.ResourceArn == resourceArn {
+			p.ApplicationLayerAutoResponseConfiguration = map[string]any{
+				"Status": "DISABLED",
+			}
+			return nil
+		}
+	}
+	return service.NewAWSError("ResourceNotFoundException",
+		fmt.Sprintf("No protection found for resource %s.", resourceArn), http.StatusNotFound)
+}
+
+// AssociateHealthCheck associates a Route 53 health check with a protection.
+func (s *Store) AssociateHealthCheck(protectionID, healthCheckArn string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if protectionID == "" {
+		return service.ErrValidation("ProtectionId is required.")
+	}
+	if healthCheckArn == "" {
+		return service.ErrValidation("HealthCheckArn is required.")
+	}
+	p, ok := s.protections[protectionID]
+	if !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Protection %s not found.", protectionID), http.StatusNotFound)
+	}
+	for _, hc := range p.HealthCheckIds {
+		if hc == healthCheckArn {
+			return service.NewAWSError("ResourceAlreadyExistsException",
+				"Health check already associated.", http.StatusConflict)
+		}
+	}
+	p.HealthCheckIds = append(p.HealthCheckIds, healthCheckArn)
+	return nil
+}
+
+// DisassociateHealthCheck removes a Route 53 health check from a protection.
+func (s *Store) DisassociateHealthCheck(protectionID, healthCheckArn string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if protectionID == "" {
+		return service.ErrValidation("ProtectionId is required.")
+	}
+	p, ok := s.protections[protectionID]
+	if !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Protection %s not found.", protectionID), http.StatusNotFound)
+	}
+	for i, hc := range p.HealthCheckIds {
+		if hc == healthCheckArn {
+			p.HealthCheckIds = append(p.HealthCheckIds[:i], p.HealthCheckIds[i+1:]...)
+			return nil
+		}
+	}
+	return service.NewAWSError("ResourceNotFoundException",
+		"Health check not associated.", http.StatusNotFound)
 }

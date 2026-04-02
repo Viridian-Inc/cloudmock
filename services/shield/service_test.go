@@ -277,3 +277,207 @@ func TestShield_InvalidAction(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "InvalidAction")
 }
+
+func TestShield_UpdateSubscription(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateSubscription", map[string]any{}))
+
+	_, err := s.HandleRequest(jsonCtx("UpdateSubscription", map[string]any{
+		"AutoRenew": "DISABLED",
+	}))
+	require.NoError(t, err)
+
+	resp, _ := s.HandleRequest(jsonCtx("DescribeSubscription", map[string]any{}))
+	sub := respBody(t, resp)["Subscription"].(map[string]any)
+	assert.Equal(t, "DISABLED", sub["AutoRenew"])
+}
+
+func TestShield_UpdateSubscription_NoSubscription(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateSubscription", map[string]any{
+		"AutoRenew": "DISABLED",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestShield_DescribeAttackStatistics(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("DescribeAttackStatistics", map[string]any{}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Contains(t, m, "TimeRange")
+	assert.Contains(t, m, "DataItems")
+	tr := m["TimeRange"].(map[string]any)
+	assert.Contains(t, tr, "FromInclusive")
+	assert.Contains(t, tr, "ToExclusive")
+}
+
+func TestShield_DescribeDRTAccess(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("DescribeDRTAccess", map[string]any{}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Contains(t, m, "RoleArn")
+	assert.Contains(t, m, "LogBucketList")
+}
+
+func TestShield_ApplicationLayerAutoResponse(t *testing.T) {
+	s := newService()
+	resourceArn := "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/app/my-alb/abc"
+
+	// Create protection
+	s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "app-prot", "ResourceArn": resourceArn,
+	}))
+
+	// Enable
+	_, err := s.HandleRequest(jsonCtx("EnableApplicationLayerAutomaticResponse", map[string]any{
+		"ResourceArn": resourceArn,
+		"Action":      map[string]any{"Block": map[string]any{}},
+	}))
+	require.NoError(t, err)
+
+	// Disable
+	_, err = s.HandleRequest(jsonCtx("DisableApplicationLayerAutomaticResponse", map[string]any{
+		"ResourceArn": resourceArn,
+	}))
+	require.NoError(t, err)
+}
+
+func TestShield_ApplicationLayerAutoResponse_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("EnableApplicationLayerAutomaticResponse", map[string]any{
+		"ResourceArn": "arn:aws:elasticloadbalancing:us-east-1:123456789012:loadbalancer/no-such",
+		"Action":      map[string]any{"Count": map[string]any{}},
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestShield_EnableApplicationLayerAutoResponse_MissingArn(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("EnableApplicationLayerAutomaticResponse", map[string]any{
+		"Action": map[string]any{"Block": map[string]any{}},
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+func TestShield_AssociateHealthCheck(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "hc-prot", "ResourceArn": "arn:aws:ec2:us-east-1:123456789012:eip/hc1",
+	}))
+	protID := respBody(t, resp)["ProtectionId"].(string)
+	hcArn := "arn:aws:route53:::healthcheck/abc-123"
+
+	_, err := s.HandleRequest(jsonCtx("AssociateHealthCheck", map[string]any{
+		"ProtectionId":   protID,
+		"HealthCheckArn": hcArn,
+	}))
+	require.NoError(t, err)
+
+	// Disassociate
+	_, err = s.HandleRequest(jsonCtx("DisassociateHealthCheck", map[string]any{
+		"ProtectionId":   protID,
+		"HealthCheckArn": hcArn,
+	}))
+	require.NoError(t, err)
+}
+
+func TestShield_AssociateHealthCheck_Duplicate(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "hc-dup", "ResourceArn": "arn:aws:ec2:us-east-1:123456789012:eip/hc2",
+	}))
+	protID := respBody(t, resp)["ProtectionId"].(string)
+	hcArn := "arn:aws:route53:::healthcheck/dup-123"
+
+	s.HandleRequest(jsonCtx("AssociateHealthCheck", map[string]any{
+		"ProtectionId": protID, "HealthCheckArn": hcArn,
+	}))
+	_, err := s.HandleRequest(jsonCtx("AssociateHealthCheck", map[string]any{
+		"ProtectionId": protID, "HealthCheckArn": hcArn,
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceAlreadyExistsException")
+}
+
+func TestShield_AssociateHealthCheck_ProtectionNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("AssociateHealthCheck", map[string]any{
+		"ProtectionId":   "nonexistent",
+		"HealthCheckArn": "arn:aws:route53:::healthcheck/xyz",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestShield_DisassociateHealthCheck_NotAssociated(t *testing.T) {
+	s := newService()
+	resp, _ := s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "hc-noassoc", "ResourceArn": "arn:aws:ec2:us-east-1:123456789012:eip/hc3",
+	}))
+	protID := respBody(t, resp)["ProtectionId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("DisassociateHealthCheck", map[string]any{
+		"ProtectionId":   protID,
+		"HealthCheckArn": "arn:aws:route53:::healthcheck/nope",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestShield_ProtectionGroup_ARBITRARY_Members(t *testing.T) {
+	s := newService()
+	r1, _ := s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "pg-p1", "ResourceArn": "arn:pg:1",
+	}))
+	r2, _ := s.HandleRequest(jsonCtx("CreateProtection", map[string]any{
+		"Name": "pg-p2", "ResourceArn": "arn:pg:2",
+	}))
+	id1 := respBody(t, r1)["ProtectionId"].(string)
+	id2 := respBody(t, r2)["ProtectionId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("CreateProtectionGroup", map[string]any{
+		"ProtectionGroupId": "arb-pg",
+		"Aggregation":       "MAX",
+		"Pattern":           "ARBITRARY",
+		"Members":           []any{id1, id2},
+	}))
+	require.NoError(t, err)
+
+	resp, _ := s.HandleRequest(jsonCtx("DescribeProtectionGroup", map[string]any{
+		"ProtectionGroupId": "arb-pg",
+	}))
+	pg := respBody(t, resp)["ProtectionGroup"].(map[string]any)
+	assert.Equal(t, "ARBITRARY", pg["Pattern"])
+	members := pg["Members"].([]any)
+	assert.Len(t, members, 2)
+}
+
+func TestShield_TagResource_ProtectionGroup(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateProtectionGroup", map[string]any{
+		"ProtectionGroupId": "tag-pg",
+		"Aggregation":       "SUM",
+		"Pattern":           "ALL",
+	}))
+	require.NoError(t, err)
+
+	resp, _ := s.HandleRequest(jsonCtx("DescribeProtectionGroup", map[string]any{
+		"ProtectionGroupId": "tag-pg",
+	}))
+	pgArn := respBody(t, resp)["ProtectionGroup"].(map[string]any)["ProtectionGroupArn"].(string)
+
+	_, err = s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceARN": pgArn,
+		"Tags":        []any{map[string]any{"Key": "project", "Value": "shield-test"}},
+	}))
+	require.NoError(t, err)
+
+	resp, _ = s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"ResourceARN": pgArn}))
+	tags := respBody(t, resp)["Tags"].([]any)
+	assert.Len(t, tags, 1)
+}

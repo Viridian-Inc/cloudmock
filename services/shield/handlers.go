@@ -285,6 +285,91 @@ func handleDeleteProtectionGroup(ctx *service.RequestContext, store *Store) (*se
 	return emptyOK()
 }
 
+func handleUpdateSubscription(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	autoRenew, _ := params["AutoRenew"].(string)
+	if awsErr := store.UpdateSubscription(autoRenew); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
+func handleDescribeAttackStatistics(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	stats := store.DescribeAttackStatistics()
+	return jsonOK(map[string]any{
+		"TimeRange": map[string]any{
+			"FromInclusive": float64(stats.FromInclusive.Unix()),
+			"ToExclusive":   float64(stats.ToExclusive.Unix()),
+		},
+		"DataItems": stats.DataItems,
+	})
+}
+
+func handleDescribeDRTAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	drt := store.DescribeDRTAccess()
+	return jsonOK(map[string]any{
+		"RoleArn":        drt.RoleArn,
+		"LogBucketList":  drt.LogBucketList,
+	})
+}
+
+func handleEnableApplicationLayerAutomaticResponse(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	resourceArn, _ := params["ResourceArn"].(string)
+	action := map[string]any{}
+	if a, ok := params["Action"].(map[string]any); ok {
+		action = a
+	}
+	if awsErr := store.EnableApplicationLayerAutomaticResponse(resourceArn, action); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
+func handleDisableApplicationLayerAutomaticResponse(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	resourceArn, _ := params["ResourceArn"].(string)
+	if awsErr := store.DisableApplicationLayerAutomaticResponse(resourceArn); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
+func handleAssociateHealthCheck(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	protectionID, _ := params["ProtectionId"].(string)
+	healthCheckArn, _ := params["HealthCheckArn"].(string)
+	if awsErr := store.AssociateHealthCheck(protectionID, healthCheckArn); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
+func handleDisassociateHealthCheck(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	protectionID, _ := params["ProtectionId"].(string)
+	healthCheckArn, _ := params["HealthCheckArn"].(string)
+	if awsErr := store.DisassociateHealthCheck(protectionID, healthCheckArn); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return emptyOK()
+}
+
 func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

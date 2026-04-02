@@ -41,6 +41,13 @@ func (s *ShieldService) Actions() []service.Action {
 		{Name: "ListProtectionGroups", Method: http.MethodPost, IAMAction: "shield:ListProtectionGroups"},
 		{Name: "UpdateProtectionGroup", Method: http.MethodPost, IAMAction: "shield:UpdateProtectionGroup"},
 		{Name: "DeleteProtectionGroup", Method: http.MethodPost, IAMAction: "shield:DeleteProtectionGroup"},
+		{Name: "UpdateSubscription", Method: http.MethodPost, IAMAction: "shield:UpdateSubscription"},
+		{Name: "DescribeAttackStatistics", Method: http.MethodPost, IAMAction: "shield:DescribeAttackStatistics"},
+		{Name: "DescribeDRTAccess", Method: http.MethodPost, IAMAction: "shield:DescribeDRTAccess"},
+		{Name: "EnableApplicationLayerAutomaticResponse", Method: http.MethodPost, IAMAction: "shield:EnableApplicationLayerAutomaticResponse"},
+		{Name: "DisableApplicationLayerAutomaticResponse", Method: http.MethodPost, IAMAction: "shield:DisableApplicationLayerAutomaticResponse"},
+		{Name: "AssociateHealthCheck", Method: http.MethodPost, IAMAction: "shield:AssociateHealthCheck"},
+		{Name: "DisassociateHealthCheck", Method: http.MethodPost, IAMAction: "shield:DisassociateHealthCheck"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "shield:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "shield:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "shield:ListTagsForResource"},
@@ -79,6 +86,20 @@ func (s *ShieldService) HandleRequest(ctx *service.RequestContext) (*service.Res
 		return handleUpdateProtectionGroup(ctx, s.store)
 	case "DeleteProtectionGroup":
 		return handleDeleteProtectionGroup(ctx, s.store)
+	case "UpdateSubscription":
+		return handleUpdateSubscription(ctx, s.store)
+	case "DescribeAttackStatistics":
+		return handleDescribeAttackStatistics(ctx, s.store)
+	case "DescribeDRTAccess":
+		return handleDescribeDRTAccess(ctx, s.store)
+	case "EnableApplicationLayerAutomaticResponse":
+		return handleEnableApplicationLayerAutomaticResponse(ctx, s.store)
+	case "DisableApplicationLayerAutomaticResponse":
+		return handleDisableApplicationLayerAutomaticResponse(ctx, s.store)
+	case "AssociateHealthCheck":
+		return handleAssociateHealthCheck(ctx, s.store)
+	case "DisassociateHealthCheck":
+		return handleDisassociateHealthCheck(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

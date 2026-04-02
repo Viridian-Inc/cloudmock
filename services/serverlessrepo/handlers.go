@@ -106,6 +106,25 @@ func handleListApplications(store *Store) (*service.Response, error) {
 	return jsonOK(map[string]any{"Applications": out})
 }
 
+func handleUpdateApplication(appID string, params map[string]any, store *Store) (*service.Response, error) {
+	description := str(params, "Description")
+	author := str(params, "Author")
+	homePageURL := str(params, "HomePageUrl")
+	labels := strSlice(params, "Labels")
+	app, ok := store.UpdateApplication(appID, description, author, homePageURL, labels)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Application", appID))
+	}
+	return jsonOK(map[string]any{
+		"ApplicationId": app.ApplicationID,
+		"Name":          app.Name,
+		"Description":   app.Description,
+		"Author":        app.Author,
+		"HomePageUrl":   app.HomePageURL,
+		"Labels":        app.Labels,
+	})
+}
+
 func handleDeleteApplication(appID string, store *Store) (*service.Response, error) {
 	if !store.DeleteApplication(appID) {
 		return jsonErr(service.ErrNotFound("Application", appID))

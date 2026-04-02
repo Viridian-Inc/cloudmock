@@ -127,6 +127,29 @@ func (s *Store) ListApplications() []*Application {
 	return out
 }
 
+// UpdateApplication updates description and/or author of an application.
+func (s *Store) UpdateApplication(id, description, author, homePageURL string, labels []string) (*Application, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	app, ok := s.apps[id]
+	if !ok {
+		return nil, false
+	}
+	if description != "" {
+		app.Description = description
+	}
+	if author != "" {
+		app.Author = author
+	}
+	if homePageURL != "" {
+		app.HomePageURL = homePageURL
+	}
+	if labels != nil {
+		app.Labels = labels
+	}
+	return app, true
+}
+
 // DeleteApplication removes an application.
 func (s *Store) DeleteApplication(id string) bool {
 	s.mu.Lock()

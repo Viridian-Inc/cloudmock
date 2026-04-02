@@ -148,3 +148,61 @@ func TestSR_DuplicateVersion(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
 }
+
+func TestSR_UpdateApplication(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s)
+
+	resp, err := s.HandleRequest(restCtx(http.MethodPatch, "/applications/"+appID, map[string]any{
+		"Description": "Updated description",
+		"Author":      "Updated Author",
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "Updated description", m["Description"])
+	assert.Equal(t, "Updated Author", m["Author"])
+}
+
+func TestSR_UpdateApplicationNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodPatch, "/applications/nonexistent", map[string]any{
+		"Description": "update",
+	}))
+	require.Error(t, err)
+}
+
+func TestSR_ApplicationHasID(t *testing.T) {
+	s := newService()
+	cr, err := s.HandleRequest(restCtx(http.MethodPost, "/applications", map[string]any{
+		"Name": "arn-app", "Author": "test", "Description": "test", "SemanticVersion": "1.0.0",
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, cr)
+	assert.NotEmpty(t, m["ApplicationId"])
+	// ApplicationId is the short ID (e.g. app-000000000001)
+	assert.Contains(t, m["ApplicationId"].(string), "app-")
+}
+
+func TestSR_DeleteAppNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodDelete, "/applications/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestSR_ListApplicationsEmpty(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/applications", nil))
+	require.NoError(t, err)
+	apps := respJSON(t, resp)["Applications"].([]any)
+	assert.Len(t, apps, 0)
+}
+
+func TestSR_VersionHasTimestamp(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s)
+
+	verResp, err := s.HandleRequest(restCtx(http.MethodPut, "/applications/"+appID+"/versions/3.0.0", nil))
+	require.NoError(t, err)
+	m := respJSON(t, verResp)
+	assert.NotEmpty(t, m["CreationTime"])
+}

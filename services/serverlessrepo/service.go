@@ -29,6 +29,7 @@ func (s *ServerlessRepoService) Actions() []service.Action {
 		{Name: "CreateApplication", Method: http.MethodPost, IAMAction: "serverlessrepo:CreateApplication"},
 		{Name: "GetApplication", Method: http.MethodGet, IAMAction: "serverlessrepo:GetApplication"},
 		{Name: "ListApplications", Method: http.MethodGet, IAMAction: "serverlessrepo:ListApplications"},
+		{Name: "UpdateApplication", Method: http.MethodPatch, IAMAction: "serverlessrepo:UpdateApplication"},
 		{Name: "DeleteApplication", Method: http.MethodDelete, IAMAction: "serverlessrepo:DeleteApplication"},
 		{Name: "CreateApplicationVersion", Method: http.MethodPut, IAMAction: "serverlessrepo:CreateApplicationVersion"},
 		{Name: "ListApplicationVersions", Method: http.MethodGet, IAMAction: "serverlessrepo:ListApplicationVersions"},
@@ -69,6 +70,8 @@ func (s *ServerlessRepoService) HandleRequest(ctx *service.RequestContext) (*ser
 			switch method {
 			case http.MethodGet:
 				return handleGetApplication(appID, s.store)
+			case http.MethodPatch:
+				return handleUpdateApplication(appID, params, s.store)
 			case http.MethodDelete:
 				return handleDeleteApplication(appID, s.store)
 			}

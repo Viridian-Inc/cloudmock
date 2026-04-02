@@ -204,3 +204,28 @@ func TestTagging_SetLocator(t *testing.T) {
 	// Just verify SetLocator doesn't panic with nil
 	s.SetLocator(nil)
 }
+
+func TestTagging_GetTagValuesEmpty(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("GetTagValues", map[string]any{"Key": "nonexistent"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	values := m["TagValues"].([]any)
+	assert.Len(t, values, 0)
+}
+
+func TestTagging_UntagResourcesMultiple(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("TagResources", map[string]any{
+		"ResourceARNList": []string{"arn:aws:s3:::bucket-a", "arn:aws:s3:::bucket-b"},
+		"Tags":            map[string]any{"env": "test"},
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("UntagResources", map[string]any{
+		"ResourceARNList": []string{"arn:aws:s3:::bucket-a"},
+		"TagKeys":         []string{"env"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.NotNil(t, m["FailedResourcesMap"])
+}

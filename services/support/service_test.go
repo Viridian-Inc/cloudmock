@@ -204,3 +204,17 @@ func TestSupport_AllFiveSeverityLevels(t *testing.T) {
 	assert.Contains(t, codes, "urgent")
 	assert.Contains(t, codes, "critical")
 }
+
+func TestSupport_CreateCaseMissingSubject(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateCase", map[string]any{
+		"communicationBody": "body only, no subject",
+	}))
+	require.Error(t, err)
+}
+
+func TestSupport_InvalidAction2(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("NonExistentAction2", map[string]any{}))
+	require.Error(t, err)
+}

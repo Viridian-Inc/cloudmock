@@ -179,3 +179,34 @@ func TestCE_DimensionValuesIncludesUsageType(t *testing.T) {
 	vals := m["DimensionValues"].([]any)
 	assert.Greater(t, len(vals), 0)
 }
+
+func TestCE_GetTagsReturnsCommonTags(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("GetTags", map[string]any{
+		"TimePeriod": map[string]any{"Start": "2024-01-01", "End": "2024-01-31"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	tags := m["Tags"].([]any)
+	assert.Greater(t, len(tags), 0)
+}
+
+func TestCE_GetSavingsPlansUtilizationV2(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("GetSavingsPlansUtilization", map[string]any{
+		"TimePeriod": map[string]any{"Start": "2024-02-01", "End": "2024-02-29"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.NotNil(t, m["Total"])
+	total := m["Total"].(map[string]any)
+	assert.NotNil(t, total["Utilization"])
+}
+
+func TestCE_GetCostAndUsageMissingTimePeriod(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetCostAndUsage", map[string]any{
+		"Granularity": "DAILY",
+	}))
+	require.Error(t, err)
+}

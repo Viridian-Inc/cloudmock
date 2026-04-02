@@ -206,3 +206,17 @@ type noopLocator struct{}
 func (n *noopLocator) Lookup(name string) (service.Service, error) {
 	return nil, fmt.Errorf("service %q not available", name)
 }
+
+func TestCloudControl_ListResourcesMissingTypeName(t *testing.T) {
+	s := newService()
+	s.SetLocator(&noopLocator{})
+	_, err := s.HandleRequest(jsonCtx("ListResources", map[string]any{}))
+	require.Error(t, err)
+}
+
+func TestCloudControl_InvalidAction2(t *testing.T) {
+	s := newService()
+	s.SetLocator(&noopLocator{})
+	_, err := s.HandleRequest(jsonCtx("NonExistentAction2", map[string]any{}))
+	require.Error(t, err)
+}

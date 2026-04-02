@@ -180,3 +180,18 @@ func TestAccount_PutContactInfoValidation(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "PhoneNumber")
 }
+
+func TestAccount_GetAlternateContactNotFound(t *testing.T) {
+	s := newService()
+	// Before any contact is set, GetAlternateContact should return not found
+	_, err := s.HandleRequest(jsonCtx("GetAlternateContact", map[string]any{
+		"AlternateContactType": "BILLING",
+	}))
+	require.Error(t, err)
+}
+
+func TestAccount_InvalidAction(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("NonExistentAction", map[string]any{}))
+	require.Error(t, err)
+}

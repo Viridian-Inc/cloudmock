@@ -395,6 +395,42 @@ func handleDeleteByteMatchSet(ctx *service.RequestContext, store *Store) (*servi
 	return jsonOK(map[string]any{"ChangeToken": newUUID()})
 }
 
+func handleUpdateByteMatchSet(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id, _ := params["ByteMatchSetId"].(string)
+	changeToken, _ := params["ChangeToken"].(string)
+	var updates []map[string]any
+	if raw, ok := params["Updates"].([]any); ok {
+		for _, item := range raw {
+			if m, ok := item.(map[string]any); ok {
+				updates = append(updates, m)
+			}
+		}
+	}
+	if awsErr := store.UpdateByteMatchSet(id, changeToken, updates); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"ChangeToken": newUUID()})
+}
+
+func handleGetChangeToken(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	token := store.GetChangeToken()
+	return jsonOK(map[string]any{"ChangeToken": token})
+}
+
+func handleGetChangeTokenStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	token, _ := params["ChangeToken"].(string)
+	status := store.GetChangeTokenStatus(token)
+	return jsonOK(map[string]any{"ChangeTokenStatus": status})
+}
+
 func handleAssociateWebACL(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

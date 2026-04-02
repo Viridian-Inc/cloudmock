@@ -47,9 +47,12 @@ func (s *WAFRegionalService) Actions() []service.Action {
 		{Name: "GetByteMatchSet", Method: http.MethodPost, IAMAction: "waf-regional:GetByteMatchSet"},
 		{Name: "ListByteMatchSets", Method: http.MethodPost, IAMAction: "waf-regional:ListByteMatchSets"},
 		{Name: "DeleteByteMatchSet", Method: http.MethodPost, IAMAction: "waf-regional:DeleteByteMatchSet"},
+		{Name: "UpdateByteMatchSet", Method: http.MethodPost, IAMAction: "waf-regional:UpdateByteMatchSet"},
 		{Name: "AssociateWebACL", Method: http.MethodPost, IAMAction: "waf-regional:AssociateWebACL"},
 		{Name: "DisassociateWebACL", Method: http.MethodPost, IAMAction: "waf-regional:DisassociateWebACL"},
 		{Name: "GetWebACLForResource", Method: http.MethodPost, IAMAction: "waf-regional:GetWebACLForResource"},
+		{Name: "GetChangeToken", Method: http.MethodPost, IAMAction: "waf-regional:GetChangeToken"},
+		{Name: "GetChangeTokenStatus", Method: http.MethodPost, IAMAction: "waf-regional:GetChangeTokenStatus"},
 	}
 }
 
@@ -97,12 +100,18 @@ func (s *WAFRegionalService) HandleRequest(ctx *service.RequestContext) (*servic
 		return handleListByteMatchSets(ctx, s.store)
 	case "DeleteByteMatchSet":
 		return handleDeleteByteMatchSet(ctx, s.store)
+	case "UpdateByteMatchSet":
+		return handleUpdateByteMatchSet(ctx, s.store)
 	case "AssociateWebACL":
 		return handleAssociateWebACL(ctx, s.store)
 	case "DisassociateWebACL":
 		return handleDisassociateWebACL(ctx, s.store)
 	case "GetWebACLForResource":
 		return handleGetWebACLForResource(ctx, s.store)
+	case "GetChangeToken":
+		return handleGetChangeToken(ctx, s.store)
+	case "GetChangeTokenStatus":
+		return handleGetChangeTokenStatus(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

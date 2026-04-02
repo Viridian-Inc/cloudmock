@@ -468,6 +468,68 @@ func (s *Store) DeleteByteMatchSet(id, changeToken string) *service.AWSError {
 	return nil
 }
 
+// UpdateByteMatchSet updates a byte match set (adding/removing tuples).
+func (s *Store) UpdateByteMatchSet(id, changeToken string, updates []map[string]any) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	bms, ok := s.byteMatchSets[id]
+	if !ok {
+		return service.NewAWSError("WAFNonexistentItemException",
+			"ByteMatchSet not found.", http.StatusBadRequest)
+	}
+	for _, u := range updates {
+		action, _ := u["Action"].(string)
+		tupleMap, _ := u["ByteMatchTuple"].(map[string]any)
+		if tupleMap == nil {
+			continue
+		}
+		ftmMap, _ := tupleMap["FieldToMatch"].(map[string]any)
+		ftm := FieldToMatch{}
+		if ftmMap != nil {
+			ftm.Type, _ = ftmMap["Type"].(string)
+			ftm.Data, _ = ftmMap["Data"].(string)
+		}
+		targetStr, _ := tupleMap["TargetString"].(string)
+		textTransform, _ := tupleMap["TextTransformation"].(string)
+		positional, _ := tupleMap["PositionalConstraint"].(string)
+
+		if action == "INSERT" {
+			bms.ByteMatchTuples = append(bms.ByteMatchTuples, ByteMatchTuple{
+				FieldToMatch:         ftm,
+				TargetString:         targetStr,
+				TextTransformation:   textTransform,
+				PositionalConstraint: positional,
+			})
+		} else if action == "DELETE" {
+			for i, t := range bms.ByteMatchTuples {
+				if t.TargetString == targetStr && t.FieldToMatch.Type == ftm.Type {
+					bms.ByteMatchTuples = append(bms.ByteMatchTuples[:i], bms.ByteMatchTuples[i+1:]...)
+					break
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// GetChangeToken issues a new change token.
+func (s *Store) GetChangeToken() string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.newChangeToken()
+}
+
+// GetChangeTokenStatus returns the status of a change token.
+// In the mock, all known tokens are INSYNC (consumed), unknown tokens are PROVISIONED.
+func (s *Store) GetChangeTokenStatus(token string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if _, ok := s.changeTokens[token]; ok {
+		return "INSYNC"
+	}
+	return "PROVISIONED"
+}
+
 // AssociateWebACL associates a Web ACL with a resource.
 func (s *Store) AssociateWebACL(webACLId, resourceArn string) *service.AWSError {
 	s.mu.Lock()

@@ -1,7 +1,6 @@
 package s3
 
 import (
-	"encoding/xml"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -11,6 +10,9 @@ import (
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+// xmlHeader is the standard XML declaration prepended to all XML responses.
+const xmlHeader = `<?xml version="1.0" encoding="UTF-8"?>`
 
 // extractObjectKey returns the object key portion of the request path — i.e.
 // everything after the first path segment (bucket name).
@@ -48,7 +50,6 @@ func handlePutObject(store *Store, ctx *service.RequestContext) (*service.Respon
 
 	resp := &service.Response{
 		StatusCode: http.StatusOK,
-		Format:     service.FormatXML,
 	}
 
 	if store.IsVersioningEnabled(bucket) {
@@ -117,7 +118,6 @@ func handleDeleteObject(store *Store, ctx *service.RequestContext) (*service.Res
 
 	resp := &service.Response{
 		StatusCode: http.StatusNoContent,
-		Format:     service.FormatXML,
 	}
 
 	if store.IsVersioningEnabled(bucket) {
@@ -150,7 +150,6 @@ func handleHeadObject(store *Store, ctx *service.RequestContext) (*service.Respo
 
 	return &service.Response{
 		StatusCode: http.StatusOK,
-		Format:     service.FormatXML,
 		Headers: map[string]string{
 			"Content-Type":   obj.ContentType,
 			"Content-Length": strconv.FormatInt(obj.Size, 10),
@@ -160,36 +159,8 @@ func handleHeadObject(store *Store, ctx *service.RequestContext) (*service.Respo
 	}, nil
 }
 
-// ---- ListObjectsV2 XML types ----
-
-type xmlContent struct {
-	Key          string `xml:"Key"`
-	Size         int64  `xml:"Size"`
-	ETag         string `xml:"ETag"`
-	LastModified string `xml:"LastModified"`
-	StorageClass string `xml:"StorageClass"`
-}
-
-type xmlCommonPrefix struct {
-	Prefix string `xml:"Prefix"`
-}
-
-type listBucketResult struct {
-	XMLName               xml.Name          `xml:"ListBucketResult"`
-	Xmlns                 string            `xml:"xmlns,attr"`
-	Name                  string            `xml:"Name"`
-	Prefix                string            `xml:"Prefix"`
-	Delimiter             string            `xml:"Delimiter,omitempty"`
-	MaxKeys               int               `xml:"MaxKeys"`
-	KeyCount              int               `xml:"KeyCount"`
-	IsTruncated           bool              `xml:"IsTruncated"`
-	NextContinuationToken string            `xml:"NextContinuationToken,omitempty"`
-	ContinuationToken     string            `xml:"ContinuationToken,omitempty"`
-	Contents              []xmlContent      `xml:"Contents"`
-	CommonPrefixes        []xmlCommonPrefix `xml:"CommonPrefixes"`
-}
-
 // handleListObjectsV2 lists objects in a bucket.
+// Uses direct string building to avoid xml.Marshal reflection overhead.
 func handleListObjectsV2(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	bucket := extractBucketName(ctx)
 
@@ -212,52 +183,68 @@ func handleListObjectsV2(store *Store, ctx *service.RequestContext) (*service.Re
 
 	result := objs.ListObjects(prefix, delimiter, maxKeys, continuationToken)
 
-	contents := make([]xmlContent, 0, len(result.Objects))
+	keyCount := len(result.Objects) + len(result.CommonPrefixes)
+
+	var b strings.Builder
+	b.WriteString(xmlHeader)
+	b.WriteString(`<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`)
+	b.WriteString(`<Name>`)
+	b.WriteString(xmlEscape(bucket))
+	b.WriteString(`</Name><Prefix>`)
+	b.WriteString(xmlEscape(prefix))
+	b.WriteString(`</Prefix>`)
+	if delimiter != "" {
+		b.WriteString(`<Delimiter>`)
+		b.WriteString(xmlEscape(delimiter))
+		b.WriteString(`</Delimiter>`)
+	}
+	b.WriteString(`<MaxKeys>`)
+	b.WriteString(strconv.Itoa(maxKeys))
+	b.WriteString(`</MaxKeys><KeyCount>`)
+	b.WriteString(strconv.Itoa(keyCount))
+	b.WriteString(`</KeyCount><IsTruncated>`)
+	if result.IsTruncated {
+		b.WriteString(`true`)
+	} else {
+		b.WriteString(`false`)
+	}
+	b.WriteString(`</IsTruncated>`)
+	if result.NextContinuationToken != "" {
+		b.WriteString(`<NextContinuationToken>`)
+		b.WriteString(xmlEscape(result.NextContinuationToken))
+		b.WriteString(`</NextContinuationToken>`)
+	}
+	if continuationToken != "" {
+		b.WriteString(`<ContinuationToken>`)
+		b.WriteString(xmlEscape(continuationToken))
+		b.WriteString(`</ContinuationToken>`)
+	}
 	for _, o := range result.Objects {
-		contents = append(contents, xmlContent{
-			Key:          o.Key,
-			Size:         o.Size,
-			ETag:         o.ETag,
-			LastModified: o.LastModified.UTC().Format(time.RFC3339),
-			StorageClass: "STANDARD",
-		})
+		b.WriteString(`<Contents><Key>`)
+		b.WriteString(xmlEscape(o.Key))
+		b.WriteString(`</Key><Size>`)
+		b.WriteString(strconv.FormatInt(o.Size, 10))
+		b.WriteString(`</Size><ETag>`)
+		b.WriteString(xmlEscape(o.ETag))
+		b.WriteString(`</ETag><LastModified>`)
+		b.WriteString(o.LastModified.UTC().Format(time.RFC3339))
+		b.WriteString(`</LastModified><StorageClass>STANDARD</StorageClass></Contents>`)
 	}
-
-	commonPrefixes := make([]xmlCommonPrefix, 0, len(result.CommonPrefixes))
 	for _, cp := range result.CommonPrefixes {
-		commonPrefixes = append(commonPrefixes, xmlCommonPrefix{Prefix: cp})
+		b.WriteString(`<CommonPrefixes><Prefix>`)
+		b.WriteString(xmlEscape(cp))
+		b.WriteString(`</Prefix></CommonPrefixes>`)
 	}
-
-	keyCount := len(contents) + len(commonPrefixes)
-
-	body := &listBucketResult{
-		Xmlns:                 "http://s3.amazonaws.com/doc/2006-03-01/",
-		Name:                  bucket,
-		Prefix:                prefix,
-		Delimiter:             delimiter,
-		MaxKeys:               maxKeys,
-		KeyCount:              keyCount,
-		IsTruncated:           result.IsTruncated,
-		NextContinuationToken: result.NextContinuationToken,
-		ContinuationToken:     continuationToken,
-		Contents:              contents,
-		CommonPrefixes:        commonPrefixes,
-	}
+	b.WriteString(`</ListBucketResult>`)
 
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       body,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(b.String()),
+		RawContentType: "application/xml",
 	}, nil
 }
 
 // ---- CopyObject ----
-
-type copyObjectResult struct {
-	XMLName      xml.Name `xml:"CopyObjectResult"`
-	ETag         string   `xml:"ETag"`
-	LastModified string   `xml:"LastModified"`
-}
 
 // handleCopyObject copies an object from a source bucket/key to a destination.
 func handleCopyObject(store *Store, ctx *service.RequestContext) (*service.Response, error) {
@@ -299,14 +286,17 @@ func handleCopyObject(store *Store, ctx *service.RequestContext) (*service.Respo
 
 	newObj := destObjs.PutObject(destKey, srcObj.Body, srcObj.ContentType, nil)
 
-	body := &copyObjectResult{
-		ETag:         newObj.ETag,
-		LastModified: newObj.LastModified.UTC().Format(time.RFC3339),
-	}
+	var b strings.Builder
+	b.WriteString(xmlHeader)
+	b.WriteString(`<CopyObjectResult><ETag>`)
+	b.WriteString(xmlEscape(newObj.ETag))
+	b.WriteString(`</ETag><LastModified>`)
+	b.WriteString(newObj.LastModified.UTC().Format(time.RFC3339))
+	b.WriteString(`</LastModified></CopyObjectResult>`)
 
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       body,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(b.String()),
+		RawContentType: "application/xml",
 	}, nil
 }

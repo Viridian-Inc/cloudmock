@@ -1,38 +1,36 @@
 package s3
 
 import (
-	"encoding/xml"
 	"net/http"
 	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
-// ---- XML types ----
-
-// xmlBucket is the XML representation of a single bucket entry.
-type xmlBucket struct {
-	Name         string `xml:"Name"`
-	CreationDate string `xml:"CreationDate"`
-}
-
-// xmlOwner is the XML representation of the bucket owner.
-type xmlOwner struct {
-	ID          string `xml:"ID"`
-	DisplayName string `xml:"DisplayName"`
-}
-
-// xmlBuckets wraps the list of bucket entries.
-type xmlBuckets struct {
-	Buckets []xmlBucket `xml:"Bucket"`
-}
-
-// listAllMyBucketsResult is the top-level XML response for ListBuckets.
-type listAllMyBucketsResult struct {
-	XMLName xml.Name   `xml:"ListAllMyBucketsResult"`
-	Xmlns   string     `xml:"xmlns,attr"`
-	Owner   xmlOwner   `xml:"Owner"`
-	Buckets xmlBuckets `xml:"Buckets"`
+// xmlEscape escapes special XML characters in a string.
+func xmlEscape(s string) string {
+	// Fast path: most S3 bucket/key names contain no special chars.
+	if !strings.ContainsAny(s, "<>&\"'") {
+		return s
+	}
+	var b strings.Builder
+	for _, r := range s {
+		switch r {
+		case '<':
+			b.WriteString("&lt;")
+		case '>':
+			b.WriteString("&gt;")
+		case '&':
+			b.WriteString("&amp;")
+		case '"':
+			b.WriteString("&quot;")
+		case '\'':
+			b.WriteString("&apos;")
+		default:
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
 }
 
 // ---- helpers ----
@@ -53,27 +51,25 @@ func extractBucketName(ctx *service.RequestContext) string {
 func handleListBuckets(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	buckets := store.ListBuckets()
 
-	xmlBkts := make([]xmlBucket, 0, len(buckets))
-	for _, b := range buckets {
-		xmlBkts = append(xmlBkts, xmlBucket{
-			Name:         b.Name,
-			CreationDate: b.CreationDate.Format("2006-01-02T15:04:05.000Z"),
-		})
+	var b strings.Builder
+	b.WriteString(`<?xml version="1.0" encoding="UTF-8"?>`)
+	b.WriteString(`<ListAllMyBucketsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`)
+	b.WriteString(`<Owner><ID>`)
+	b.WriteString(xmlEscape(ctx.AccountID))
+	b.WriteString(`</ID><DisplayName>cloudmock</DisplayName></Owner><Buckets>`)
+	for _, bkt := range buckets {
+		b.WriteString(`<Bucket><Name>`)
+		b.WriteString(xmlEscape(bkt.Name))
+		b.WriteString(`</Name><CreationDate>`)
+		b.WriteString(bkt.CreationDate.Format("2006-01-02T15:04:05.000Z"))
+		b.WriteString(`</CreationDate></Bucket>`)
 	}
-
-	result := &listAllMyBucketsResult{
-		Xmlns: "http://s3.amazonaws.com/doc/2006-03-01/",
-		Owner: xmlOwner{
-			ID:          ctx.AccountID,
-			DisplayName: "cloudmock",
-		},
-		Buckets: xmlBuckets{Buckets: xmlBkts},
-	}
+	b.WriteString(`</Buckets></ListAllMyBucketsResult>`)
 
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       result,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(b.String()),
+		RawContentType: "application/xml",
 	}, nil
 }
 
@@ -87,8 +83,6 @@ func handleCreateBucket(store *Store, ctx *service.RequestContext) (*service.Res
 	}
 	return &service.Response{
 		StatusCode: http.StatusOK,
-		Body:       nil,
-		Format:     service.FormatXML,
 	}, nil
 }
 
@@ -102,8 +96,6 @@ func handleDeleteBucket(store *Store, ctx *service.RequestContext) (*service.Res
 	}
 	return &service.Response{
 		StatusCode: http.StatusNoContent,
-		Body:       nil,
-		Format:     service.FormatXML,
 	}, nil
 }
 
@@ -117,7 +109,5 @@ func handleHeadBucket(store *Store, ctx *service.RequestContext) (*service.Respo
 	}
 	return &service.Response{
 		StatusCode: http.StatusOK,
-		Body:       nil,
-		Format:     service.FormatXML,
 	}, nil
 }

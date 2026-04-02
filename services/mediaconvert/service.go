@@ -130,6 +130,8 @@ func (s *MediaConvertService) HandleRequest(ctx *service.RequestContext) (*servi
 			switch method {
 			case http.MethodGet:
 				return handleGetQueue(name, s.store)
+			case http.MethodPut:
+				return handleUpdateQueue(name, params, s.store)
 			case http.MethodDelete:
 				return handleDeleteQueue(name, s.store)
 			}

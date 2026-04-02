@@ -150,3 +150,65 @@ func TestMC_NonexistentQueue(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "Queue not found")
 }
+
+func TestMC_UpdateQueue(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/queues", map[string]any{
+		"name": "updateable-q",
+	}))
+
+	resp, err := s.HandleRequest(restCtx(http.MethodPut, "/2017-08-29/queues/updateable-q", map[string]any{
+		"description": "updated description",
+	}))
+	require.NoError(t, err)
+	q := respJSON(t, resp)["queue"].(map[string]any)
+	assert.Equal(t, "updateable-q", q["name"])
+}
+
+func TestMC_DeleteQueueNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodDelete, "/2017-08-29/queues/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestMC_TemplateNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/2017-08-29/jobTemplates/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestMC_PresetNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/2017-08-29/presets/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestMC_ListPresets(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/presets", map[string]any{"name": "p1"}))
+	s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/presets", map[string]any{"name": "p2"}))
+
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/2017-08-29/presets", nil))
+	require.NoError(t, err)
+	presets := respJSON(t, resp)["presets"].([]any)
+	assert.Len(t, presets, 2)
+}
+
+func TestMC_ListJobTemplates(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/jobTemplates", map[string]any{"name": "tmpl-a"}))
+	s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/jobTemplates", map[string]any{"name": "tmpl-b"}))
+
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/2017-08-29/jobTemplates", nil))
+	require.NoError(t, err)
+	templates := respJSON(t, resp)["jobTemplates"].([]any)
+	assert.Len(t, templates, 2)
+}
+
+func TestMC_JobHasCreatedAt(t *testing.T) {
+	s := newService()
+	cr, err := s.HandleRequest(restCtx(http.MethodPost, "/2017-08-29/jobs", map[string]any{"role": "r"}))
+	require.NoError(t, err)
+	job := respJSON(t, cr)["job"].(map[string]any)
+	assert.NotEmpty(t, job["createdAt"])
+}

@@ -328,6 +328,20 @@ func (s *Store) ListQueues() []*Queue {
 	return out
 }
 
+// UpdateQueue updates queue description.
+func (s *Store) UpdateQueue(name, description string) (*Queue, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	q, ok := s.queues[name]
+	if !ok {
+		return nil, false
+	}
+	if description != "" {
+		q.Description = description
+	}
+	return q, true
+}
+
 // DeleteQueue removes a queue.
 func (s *Store) DeleteQueue(name string) bool {
 	s.mu.Lock()

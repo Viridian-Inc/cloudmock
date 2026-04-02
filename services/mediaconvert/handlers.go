@@ -287,6 +287,23 @@ func handleListQueues(store *Store) (*service.Response, error) {
 	return jsonOK(map[string]any{"queues": out})
 }
 
+func handleUpdateQueue(name string, params map[string]any, store *Store) (*service.Response, error) {
+	description := str(params, "description")
+	q, ok := store.UpdateQueue(name, description)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Queue", name))
+	}
+	return jsonOK(map[string]any{
+		"queue": map[string]any{
+			"name":        q.Name,
+			"arn":         q.Arn,
+			"description": q.Description,
+			"status":      q.Status,
+			"type":        q.Type,
+		},
+	})
+}
+
 func handleDeleteQueue(name string, store *Store) (*service.Response, error) {
 	if !store.DeleteQueue(name) {
 		return jsonErr(service.ErrNotFound("Queue", name))

@@ -149,6 +149,7 @@ import (
 	codedeploysvc "github.com/neureaux/cloudmock/services/codedeploy"
 	codepipelinesvc "github.com/neureaux/cloudmock/services/codepipeline"
 	configsvc "github.com/neureaux/cloudmock/services/config"
+	daxsvc "github.com/neureaux/cloudmock/services/dax"
 	dmssvc "github.com/neureaux/cloudmock/services/dms"
 	docdbsvc "github.com/neureaux/cloudmock/services/docdb"
 	ekssvcsvc "github.com/neureaux/cloudmock/services/eks"
@@ -734,6 +735,7 @@ func main() {
 	_ = registerOrDefer("iot-data", func() service.Service { return iotdatasvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("iot-wireless", func() service.Service { return iotwirelesssvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("dms", func() service.Service { return dmssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("dax", func() service.Service { return daxsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("transfer", func() service.Service { return transfersvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("glacier", func() service.Service { return glaciersvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("s3tables", func() service.Service { return s3tablessvc.New(cfg.AccountID, cfg.Region) })

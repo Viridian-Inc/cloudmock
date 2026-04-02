@@ -11,9 +11,8 @@ import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json");
 
-const REPO = "neureaux/cloudmock";
+const REPO = "Viridian-Inc/cloudmock";
 
-// Map Node.js platform/arch to release binary names.
 const PLATFORM_MAP = {
   darwin: "darwin",
   linux: "linux",
@@ -45,10 +44,13 @@ function getCachePath(binaryName) {
   return join(homedir(), ".cloudmock", "bin", `${binaryName}-${version}`);
 }
 
-async function exists(path) {
+async function isExecutable(path) {
   try {
-    await stat(path);
-    return true;
+    const s = await stat(path);
+    if (platform() !== "win32" && !(s.mode & 0o111)) {
+      await chmod(path, 0o755);
+    }
+    return s.size > 0;
   } catch {
     return false;
   }
@@ -60,7 +62,6 @@ async function download(binaryName, dest) {
   console.log(`CloudMock v${version} not cached. Downloading...`);
   console.log(`  ${url}`);
 
-  // Ensure cache directory exists.
   await mkdir(join(homedir(), ".cloudmock", "bin"), { recursive: true });
 
   let response;
@@ -69,9 +70,9 @@ async function download(binaryName, dest) {
   } catch (err) {
     console.error(`\nDownload failed: ${err.message}\n`);
     console.error("Alternatives:");
-    console.error("  docker run -p 4566:4566 ghcr.io/neureaux/cloudmock");
+    console.error("  docker run -p 4566:4566 ghcr.io/Viridian-Inc/cloudmock");
     console.error(
-      "  go install github.com/neureaux/cloudmock/cmd/gateway@latest"
+      "  go install github.com/Viridian-Inc/cloudmock/cmd/gateway@latest"
     );
     process.exit(1);
   }
@@ -80,9 +81,9 @@ async function download(binaryName, dest) {
     console.error(`\nDownload failed: HTTP ${response.status}`);
     console.error(`  URL: ${url}\n`);
     console.error("Alternatives:");
-    console.error("  docker run -p 4566:4566 ghcr.io/neureaux/cloudmock");
+    console.error("  docker run -p 4566:4566 ghcr.io/Viridian-Inc/cloudmock");
     console.error(
-      "  go install github.com/neureaux/cloudmock/cmd/gateway@latest"
+      "  go install github.com/Viridian-Inc/cloudmock/cmd/gateway@latest"
     );
     process.exit(1);
   }
@@ -90,7 +91,6 @@ async function download(binaryName, dest) {
   const fileStream = createWriteStream(dest);
   await pipeline(response.body, fileStream);
 
-  // Make executable (no-op on Windows).
   if (platform() !== "win32") {
     await chmod(dest, 0o755);
   }
@@ -102,7 +102,7 @@ async function main() {
   const binaryName = getBinaryName();
   const cached = getCachePath(binaryName);
 
-  if (!(await exists(cached))) {
+  if (!(await isExecutable(cached))) {
     await download(binaryName, cached);
   }
 

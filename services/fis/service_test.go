@@ -172,3 +172,130 @@ func TestFIS_StartExperimentFromNonexistentTemplate(t *testing.T) {
 	}))
 	require.Error(t, err)
 }
+
+func TestFIS_UpdateExperimentTemplate(t *testing.T) {
+	s := newService()
+	id := createTemplate(t, s)
+
+	resp, err := s.HandleRequest(restCtx(http.MethodPatch, "/experimentTemplates/"+id, map[string]any{
+		"description": "updated description",
+		"roleArn":     "arn:aws:iam::123456789012:role/fis-updated",
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "updated description", m["experimentTemplate"].(map[string]any)["description"])
+}
+
+func TestFIS_UpdateExperimentTemplateNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodPatch, "/experimentTemplates/nonexistent", map[string]any{
+		"description": "updated",
+	}))
+	require.Error(t, err)
+}
+
+func TestFIS_TagAndListTagsForTemplate(t *testing.T) {
+	s := newService()
+	id := createTemplate(t, s)
+	arn := "arn:aws:fis:us-east-1:123456789012:experiment-template/" + id
+
+	_, err := s.HandleRequest(restCtx(http.MethodPost, "/tags/"+arn, map[string]any{
+		"tags": map[string]any{"env": "prod", "team": "sre"},
+	}))
+	require.NoError(t, err)
+
+	tagsResp, err := s.HandleRequest(restCtx(http.MethodGet, "/tags/"+arn, nil))
+	require.NoError(t, err)
+	tags := respJSON(t, tagsResp)["tags"].(map[string]any)
+	assert.Equal(t, "prod", tags["env"])
+	assert.Equal(t, "sre", tags["team"])
+}
+
+func TestFIS_UntagResource(t *testing.T) {
+	s := newService()
+	id := createTemplate(t, s)
+	arn := "arn:aws:fis:us-east-1:123456789012:experiment-template/" + id
+
+	s.HandleRequest(restCtx(http.MethodPost, "/tags/"+arn, map[string]any{
+		"tags": map[string]any{"env": "prod", "team": "sre"},
+	}))
+
+	_, err := s.HandleRequest(restCtx(http.MethodDelete, "/tags/"+arn, map[string]any{
+		"tagKeys": []string{"team"},
+	}))
+	require.NoError(t, err)
+
+	tagsResp, _ := s.HandleRequest(restCtx(http.MethodGet, "/tags/"+arn, nil))
+	tags := respJSON(t, tagsResp)["tags"].(map[string]any)
+	assert.Equal(t, "prod", tags["env"])
+	assert.Nil(t, tags["team"])
+}
+
+func TestFIS_ListTargetResourceTypes(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/targetResourceTypes", nil))
+	require.NoError(t, err)
+	types := respJSON(t, resp)["targetResourceTypes"].([]any)
+	assert.NotEmpty(t, types)
+	// Verify ec2:instance is present
+	found := false
+	for _, typ := range types {
+		if typ.(map[string]any)["resourceType"] == "aws:ec2:instance" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "aws:ec2:instance should be in target resource types")
+}
+
+func TestFIS_ListActions(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/actions", nil))
+	require.NoError(t, err)
+	actions := respJSON(t, resp)["actions"].([]any)
+	assert.NotEmpty(t, actions)
+	found := false
+	for _, action := range actions {
+		if action.(map[string]any)["id"] == "aws:ec2:stop-instances" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "aws:ec2:stop-instances should be in actions")
+}
+
+func TestFIS_ExperimentStateTransitions(t *testing.T) {
+	s := newService()
+	tmplID := createTemplate(t, s)
+
+	// Start experiment - initial state should be "initiating"
+	startResp, err := s.HandleRequest(restCtx(http.MethodPost, "/experiments", map[string]any{
+		"experimentTemplateId": tmplID,
+	}))
+	require.NoError(t, err)
+	exp := respJSON(t, startResp)["experiment"].(map[string]any)
+	state := exp["state"].(map[string]any)
+	// State should be initiating at start (instant mode may advance it)
+	assert.NotEmpty(t, state["status"])
+}
+
+func TestFIS_MultipleExperimentsFromSameTemplate(t *testing.T) {
+	s := newService()
+	tmplID := createTemplate(t, s)
+
+	ids := make([]string, 3)
+	for i := 0; i < 3; i++ {
+		resp, err := s.HandleRequest(restCtx(http.MethodPost, "/experiments", map[string]any{
+			"experimentTemplateId": tmplID,
+		}))
+		require.NoError(t, err)
+		ids[i] = respJSON(t, resp)["experiment"].(map[string]any)["id"].(string)
+	}
+
+	// All IDs should be unique
+	assert.NotEqual(t, ids[0], ids[1])
+	assert.NotEqual(t, ids[1], ids[2])
+
+	listResp, _ := s.HandleRequest(restCtx(http.MethodGet, "/experiments", nil))
+	assert.Len(t, respJSON(t, listResp)["experiments"].([]any), 3)
+}

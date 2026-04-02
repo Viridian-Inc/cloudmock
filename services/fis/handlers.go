@@ -223,11 +223,73 @@ func handleListExperimentTemplates(store *Store) (*service.Response, error) {
 	return jsonOK(map[string]any{"experimentTemplates": out})
 }
 
+func handleUpdateExperimentTemplate(id string, params map[string]any, store *Store) (*service.Response, error) {
+	description := str(params, "description")
+	roleArn := str(params, "roleArn")
+	tags := tagsMap(params)
+	tmpl, ok := store.UpdateExperimentTemplate(id, description, roleArn, tags)
+	if !ok {
+		return jsonErr(service.ErrNotFound("ExperimentTemplate", id))
+	}
+	return jsonOK(map[string]any{"experimentTemplate": templateResponse(tmpl)})
+}
+
 func handleDeleteExperimentTemplate(id string, store *Store) (*service.Response, error) {
 	if !store.DeleteExperimentTemplate(id) {
 		return jsonErr(service.ErrNotFound("ExperimentTemplate", id))
 	}
 	return jsonNoContent()
+}
+
+func handleTagResource(arn string, params map[string]any, store *Store) (*service.Response, error) {
+	tags := tagsMap(params)
+	if !store.TagResource(arn, tags) {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(arn string, keys []string, store *Store) (*service.Response, error) {
+	if !store.UntagResource(arn, keys) {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	return jsonNoContent()
+}
+
+func handleListTagsForResource(arn string, store *Store) (*service.Response, error) {
+	tags, ok := store.ListTagsForResource(arn)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	return jsonOK(map[string]any{"tags": tags})
+}
+
+func handleListTargetResourceTypes(store *Store) (*service.Response, error) {
+	// Return well-known FIS target resource types.
+	types := []map[string]any{
+		{"resourceType": "aws:ec2:instance", "description": "AWS EC2 instances"},
+		{"resourceType": "aws:ec2:spot-instance", "description": "AWS EC2 Spot instances"},
+		{"resourceType": "aws:ecs:task", "description": "AWS ECS tasks"},
+		{"resourceType": "aws:eks:nodegroup", "description": "AWS EKS node groups"},
+		{"resourceType": "aws:rds:cluster", "description": "AWS RDS clusters"},
+		{"resourceType": "aws:rds:db", "description": "AWS RDS DB instances"},
+		{"resourceType": "aws:ssm:managed-instance", "description": "AWS SSM managed instances"},
+	}
+	return jsonOK(map[string]any{"targetResourceTypes": types})
+}
+
+func handleListActions(store *Store) (*service.Response, error) {
+	// Return well-known FIS actions.
+	actions := []map[string]any{
+		{"id": "aws:ec2:stop-instances", "description": "Stop EC2 instances"},
+		{"id": "aws:ec2:terminate-instances", "description": "Terminate EC2 instances"},
+		{"id": "aws:ec2:reboot-instances", "description": "Reboot EC2 instances"},
+		{"id": "aws:ecs:drain-container-instances", "description": "Drain ECS container instances"},
+		{"id": "aws:eks:terminate-nodegroup-instances", "description": "Terminate EKS nodegroup instances"},
+		{"id": "aws:rds:failover-db-cluster", "description": "Failover RDS cluster"},
+		{"id": "aws:ssm:send-command", "description": "Send SSM command"},
+	}
+	return jsonOK(map[string]any{"actions": actions})
 }
 
 func handleStartExperiment(params map[string]any, store *Store) (*service.Response, error) {

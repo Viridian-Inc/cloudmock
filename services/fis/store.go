@@ -148,6 +148,98 @@ func (s *Store) ListExperimentTemplates() []*ExperimentTemplate {
 	return out
 }
 
+// UpdateExperimentTemplate updates description and/or tags of a template.
+func (s *Store) UpdateExperimentTemplate(id, description, roleArn string, tags map[string]string) (*ExperimentTemplate, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tmpl, ok := s.templates[id]
+	if !ok {
+		return nil, false
+	}
+	if description != "" {
+		tmpl.Description = description
+	}
+	if roleArn != "" {
+		tmpl.RoleArn = roleArn
+	}
+	for k, v := range tags {
+		tmpl.Tags[k] = v
+	}
+	tmpl.LastUpdateTime = time.Now().UTC()
+	return tmpl, true
+}
+
+// TagResource adds tags to a template or experiment.
+func (s *Store) TagResource(arn string, tags map[string]string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, tmpl := range s.templates {
+		if s.arnPrefix()+"experiment-template/"+tmpl.ID == arn {
+			for k, v := range tags {
+				tmpl.Tags[k] = v
+			}
+			return true
+		}
+	}
+	for _, exp := range s.experiments {
+		if s.arnPrefix()+"experiment/"+exp.ID == arn {
+			for k, v := range tags {
+				exp.Tags[k] = v
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// UntagResource removes tags from a template or experiment.
+func (s *Store) UntagResource(arn string, keys []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, tmpl := range s.templates {
+		if s.arnPrefix()+"experiment-template/"+tmpl.ID == arn {
+			for _, k := range keys {
+				delete(tmpl.Tags, k)
+			}
+			return true
+		}
+	}
+	for _, exp := range s.experiments {
+		if s.arnPrefix()+"experiment/"+exp.ID == arn {
+			for _, k := range keys {
+				delete(exp.Tags, k)
+			}
+			return true
+		}
+	}
+	return false
+}
+
+// ListTagsForResource returns tags for a template or experiment by ARN.
+func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, tmpl := range s.templates {
+		if s.arnPrefix()+"experiment-template/"+tmpl.ID == arn {
+			cp := make(map[string]string, len(tmpl.Tags))
+			for k, v := range tmpl.Tags {
+				cp[k] = v
+			}
+			return cp, true
+		}
+	}
+	for _, exp := range s.experiments {
+		if s.arnPrefix()+"experiment/"+exp.ID == arn {
+			cp := make(map[string]string, len(exp.Tags))
+			for k, v := range exp.Tags {
+				cp[k] = v
+			}
+			return cp, true
+		}
+	}
+	return nil, false
+}
+
 // DeleteExperimentTemplate removes a template.
 func (s *Store) DeleteExperimentTemplate(id string) bool {
 	s.mu.Lock()

@@ -3,26 +3,122 @@ title: Go
 description: Using CloudMock with Go, the cloudmock Go SDK, and aws-sdk-go-v2
 ---
 
-Go is a first-class language for CloudMock (CloudMock itself is written in Go). The `cloudmock` Go SDK provides HTTP interceptor middleware and trace propagation. For AWS-only usage, configure `aws-sdk-go-v2` to point at the CloudMock gateway.
+Go is a first-class language for CloudMock (CloudMock itself is written in Go). The `cloudmock` Go SDK provides two integration modes: **in-process** (embeds CloudMock directly in your test binary at ~20 μs/op) and **HTTP interceptor** (captures traces from a running server). For AWS-only usage, configure `aws-sdk-go-v2` to point at the CloudMock gateway.
 
 ## cloudmock Go SDK
 
 ### Install
 
 ```bash
-go get github.com/Viridian-Inc/cloudmock/sdk/go
+go get github.com/neureaux/cloudmock/sdk
 ```
 
-### Initialize
+### In-process mode (tests)
 
-Call `cloudmock.Init()` early in your application startup. This registers an HTTP transport interceptor that captures outgoing AWS API calls and forwards telemetry to the CloudMock admin API.
+The in-process mode is the fastest way to use CloudMock with Go. The CloudMock engine runs embedded in your test binary — no HTTP server, no network round-trip, no startup command. Operations run at ~20 μs each, making it over 110x faster than Moto and the fastest AWS testing option available for Go.
+
+Use `sdk.New()` once in `TestMain` to share a single instance across all tests, and reset between tests to isolate state.
+
+```go
+package myapp_test
+
+import (
+    "context"
+    "os"
+    "strings"
+    "testing"
+
+    "github.com/aws/aws-sdk-go-v2/aws"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb"
+    "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+    "github.com/aws/aws-sdk-go-v2/service/s3"
+    "github.com/neureaux/cloudmock/sdk"
+)
+
+var cm *sdk.CloudMock
+
+func TestMain(m *testing.M) {
+    cm = sdk.New()
+    defer cm.Close()
+    os.Exit(m.Run())
+}
+
+func TestCreateBucketAndUpload(t *testing.T) {
+    cm.Reset()
+    client := s3.NewFromConfig(cm.Config(), func(o *s3.Options) {
+        o.UsePathStyle = true
+    })
+
+    _, err := client.CreateBucket(context.TODO(), &s3.CreateBucketInput{
+        Bucket: aws.String("test-bucket"),
+    })
+    if err != nil {
+        t.Fatal(err)
+    }
+
+    _, err = client.PutObject(context.TODO(), &s3.PutObjectInput{
+        Bucket: aws.String("test-bucket"),
+        Key:    aws.String("hello.txt"),
+        Body:   strings.NewReader("world"),
+    })
+    if err != nil {
+        t.Fatal(err)
+    }
+}
+
+func TestDynamoDBCRUD(t *testing.T) {
+    cm.Reset()
+    client := dynamodb.NewFromConfig(cm.Config())
+    ctx := context.TODO()
+
+    // Create table
+    client.CreateTable(ctx, &dynamodb.CreateTableInput{
+        TableName: aws.String("users"),
+        KeySchema: []types.KeySchemaElement{
+            {AttributeName: aws.String("pk"), KeyType: types.KeyTypeHash},
+        },
+        AttributeDefinitions: []types.AttributeDefinition{
+            {AttributeName: aws.String("pk"), ScalarAttributeType: types.ScalarAttributeTypeS},
+        },
+        BillingMode: types.BillingModePayPerRequest,
+    })
+
+    // Put item
+    client.PutItem(ctx, &dynamodb.PutItemInput{
+        TableName: aws.String("users"),
+        Item: map[string]types.AttributeValue{
+            "pk":   &types.AttributeValueMemberS{Value: "user-1"},
+            "name": &types.AttributeValueMemberS{Value: "Alice"},
+        },
+    })
+
+    // Get item and assert
+    out, _ := client.GetItem(ctx, &dynamodb.GetItemInput{
+        TableName: aws.String("users"),
+        Key: map[string]types.AttributeValue{
+            "pk": &types.AttributeValueMemberS{Value: "user-1"},
+        },
+    })
+
+    name := out.Item["name"].(*types.AttributeValueMemberS).Value
+    if name != "Alice" {
+        t.Fatalf("expected Alice, got %s", name)
+    }
+}
+```
+
+Run with `go test ./...`. No server to start or stop.
+
+### HTTP interceptor mode
+
+For applications (not tests), the SDK wraps Go's `http.DefaultTransport` to intercept outgoing requests to the CloudMock gateway, capturing traces and forwarding telemetry to the admin API.
 
 ```go
 package main
 
 import (
     "log"
-    cloudmock "github.com/Viridian-Inc/cloudmock/sdk/go"
+    cloudmock "github.com/neureaux/cloudmock/sdk"
 )
 
 func main() {
@@ -39,10 +135,6 @@ func main() {
 }
 ```
 
-### HTTP interceptor
-
-The SDK wraps Go's `http.DefaultTransport` to intercept outgoing requests to the CloudMock gateway. All AWS SDK calls that use the default HTTP client are automatically captured.
-
 If you use a custom `http.Client`, wrap its transport:
 
 ```go
@@ -56,7 +148,7 @@ client := &http.Client{
 For HTTP servers, the SDK provides middleware that traces inbound requests:
 
 ```go
-import "github.com/Viridian-Inc/cloudmock/sdk/go"
+import cloudmock "github.com/neureaux/cloudmock/sdk"
 
 mux := http.NewServeMux()
 mux.HandleFunc("/users", handleUsers)

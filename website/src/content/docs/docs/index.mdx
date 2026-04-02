@@ -21,6 +21,14 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
     S3, DynamoDB, SQS, SNS, Lambda, Cognito, and 19 more with complete API
     coverage. 73 additional services with CRUD stubs.
   </Card>
+  <Card title="110x faster than Moto" icon="approve-check-circle">
+    In-process Go mode runs at ~20 μs/op — no HTTP server, no network
+    round-trip. Wins 31/31 benchmark operations. HTTP mode beats LocalStack too.
+  </Card>
+  <Card title="Multi-language SDKs" icon="puzzle">
+    Native SDK adapters for Go, Node.js, Python, Java, Rust, and Ruby with
+    trace propagation and devtools integration. Any language works via HTTP.
+  </Card>
   <Card title="Zero dependencies" icon="seti:config">
     Pure Go binary. No database, no Docker requirement, no JVM. Starts in under
     a second.
@@ -30,8 +38,8 @@ import { Card, CardGrid } from "@astrojs/starlight/components";
     IAM policies locally before deploying.
   </Card>
   <Card title="Built-in dashboard" icon="laptop">
-    Web UI at localhost:4500 for inspecting services, resources, and request
-    logs. No extra tooling needed.
+    12-view desktop app: topology maps, distributed traces, metrics, chaos
+    engineering, and more. No extra tooling needed.
   </Card>
   <Card title="Example project" icon="open-book">
     Try the [todo demo](https://github.com/Viridian-Inc/cloudmock-todo-demo) --

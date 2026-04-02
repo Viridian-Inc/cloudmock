@@ -3,7 +3,7 @@ title: Python
 description: Using CloudMock with Python, the cloudmock Python SDK, and boto3
 ---
 
-Python is a first-class language for CloudMock. The `cloudmock` Python SDK provides automatic request interception and trace propagation. For AWS-only usage, configure `boto3` to point at the CloudMock gateway.
+Python is a first-class language for CloudMock. The `cloudmock` Python SDK provides automatic request interception, trace propagation, and devtools integration — including a `CloudMock` context manager that makes test setup one line. For AWS-only usage, configure `boto3` to point at the CloudMock gateway.
 
 ## cloudmock Python SDK
 
@@ -13,7 +13,64 @@ Python is a first-class language for CloudMock. The `cloudmock` Python SDK provi
 pip install cloudmock
 ```
 
-### Initialize
+### Testing with pytest
+
+The `CloudMock` context manager starts an embedded server and returns pre-configured boto3 client factories. Use `scope="session"` for a shared instance across all tests, then reset between them.
+
+```python
+import pytest
+from cloudmock import CloudMock
+
+@pytest.fixture(scope="session")
+def aws():
+    with CloudMock() as cm:
+        yield cm
+
+@pytest.fixture(autouse=True)
+def reset_state(aws):
+    yield
+    aws.reset()
+
+@pytest.fixture
+def s3_client(aws):
+    return aws.boto3_client("s3")
+
+@pytest.fixture
+def dynamodb(aws):
+    return aws.boto3_client("dynamodb")
+
+def test_s3_upload(s3_client):
+    s3_client.create_bucket(Bucket="test")
+    s3_client.put_object(Bucket="test", Key="hello.txt", Body=b"world")
+    obj = s3_client.get_object(Bucket="test", Key="hello.txt")
+    assert obj["Body"].read() == b"world"
+
+def test_dynamodb_crud(dynamodb):
+    dynamodb.create_table(
+        TableName="users",
+        KeySchema=[{"AttributeName": "pk", "KeyType": "HASH"}],
+        AttributeDefinitions=[{"AttributeName": "pk", "AttributeType": "S"}],
+        BillingMode="PAY_PER_REQUEST",
+    )
+    dynamodb.put_item(TableName="users", Item={"pk": {"S": "user-1"}, "name": {"S": "Alice"}})
+    resp = dynamodb.get_item(TableName="users", Key={"pk": {"S": "user-1"}})
+    assert resp["Item"]["name"]["S"] == "Alice"
+
+def test_sqs_send_receive(aws):
+    sqs = aws.boto3_client("sqs")
+    queue = sqs.create_queue(QueueName="tasks")
+    sqs.send_message(QueueUrl=queue["QueueUrl"], MessageBody="do-something")
+    msgs = sqs.receive_message(QueueUrl=queue["QueueUrl"])
+    assert msgs["Messages"][0]["Body"] == "do-something"
+```
+
+Run with:
+
+```bash
+pytest -v
+```
+
+### Application instrumentation
 
 Call `cloudmock.init()` early in your application startup, before creating boto3 clients or sessions. This patches the `requests` library to intercept outgoing HTTP calls to the CloudMock gateway and forward telemetry to the admin API.
 
@@ -145,9 +202,9 @@ s3 = get_client("s3")
 dynamodb = get_client("dynamodb")
 ```
 
-### pytest fixture
+### pytest fixture (without the SDK)
 
-A common pattern for tests:
+A common pattern for tests when using boto3 directly:
 
 ```python
 import pytest
@@ -174,7 +231,7 @@ def dynamodb_resource(aws_session):
 
 ### endpoint_url must be set per client
 
-Unlike AWS SDK v3 for JavaScript, boto3 does not support a single global endpoint override via the client constructor. You must pass `endpoint_url` to each `client()` or `resource()` call. The `AWS_ENDPOINT_URL` environment variable avoids this, but requires boto3 1.29.0+.
+Unlike AWS SDK v3 for JavaScript, boto3 does not support a single global endpoint override via the client constructor. You must pass `endpoint_url` to each `client()` or `resource()` call. The `AWS_ENDPOINT_URL` environment variable avoids this, but requires boto3 1.29.0+. The `cloudmock` SDK's `CloudMock` context manager handles this automatically.
 
 ### S3 path style
 

@@ -106,6 +106,91 @@ val s3 = S3Client {
 }
 ```
 
+## Testing with JUnit 5 (server-side Kotlin)
+
+For server-side Kotlin or Kotlin Multiplatform, use a JUnit 5 test class with `runBlocking` (or `runTest` from `kotlinx-coroutines-test`):
+
+```kotlin
+import aws.sdk.kotlin.services.dynamodb.DynamoDbClient
+import aws.sdk.kotlin.services.dynamodb.model.*
+import aws.sdk.kotlin.services.s3.S3Client
+import aws.sdk.kotlin.services.s3.model.*
+import aws.smithy.kotlin.runtime.net.url.Url
+import kotlinx.coroutines.runBlocking
+import org.junit.jupiter.api.*
+
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
+class CloudMockKotlinTest {
+
+    private val endpoint = Url.parse("http://localhost:4566")
+    private val credentials = CloudMockCredentials()
+
+    private val s3 = S3Client {
+        region = "us-east-1"
+        endpointUrl = endpoint
+        credentialsProvider = credentials
+        forcePathStyle = true
+    }
+
+    private val ddb = DynamoDbClient {
+        region = "us-east-1"
+        endpointUrl = endpoint
+        credentialsProvider = credentials
+    }
+
+    @AfterAll
+    fun teardown() {
+        s3.close()
+        ddb.close()
+    }
+
+    @Test
+    fun `create and list S3 bucket`() = runBlocking {
+        s3.createBucket(CreateBucketRequest { bucket = "test" })
+        val buckets = s3.listBuckets(ListBucketsRequest {}).buckets ?: emptyList()
+        Assertions.assertTrue(buckets.any { it.name == "test" })
+    }
+
+    @Test
+    fun `DynamoDB put and get item`() = runBlocking {
+        ddb.createTable(CreateTableRequest {
+            tableName = "users"
+            keySchema = listOf(KeySchemaElement {
+                attributeName = "pk"
+                keyType = KeyType.Hash
+            })
+            attributeDefinitions = listOf(AttributeDefinition {
+                attributeName = "pk"
+                attributeType = ScalarAttributeType.S
+            })
+            billingMode = BillingMode.PayPerRequest
+        })
+
+        ddb.putItem(PutItemRequest {
+            tableName = "users"
+            item = mapOf(
+                "pk" to AttributeValue.S("user-1"),
+                "name" to AttributeValue.S("Alice"),
+            )
+        })
+
+        val resp = ddb.getItem(GetItemRequest {
+            tableName = "users"
+            key = mapOf("pk" to AttributeValue.S("user-1"))
+        })
+
+        Assertions.assertEquals("Alice", (resp.item?.get("name") as? AttributeValue.S)?.value)
+    }
+}
+```
+
+Start CloudMock before running tests:
+
+```bash
+npx cloudmock start &
+./gradlew test
+```
+
 ## OkHttp endpoint override
 
 For applications that call AWS APIs directly via HTTP (without the AWS SDK), configure OkHttp to route requests to CloudMock:

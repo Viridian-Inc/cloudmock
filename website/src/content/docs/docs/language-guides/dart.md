@@ -49,25 +49,25 @@ const cloudmockUrl = 'http://localhost:4566';
 
 // Create an S3 bucket
 Future<void> createBucket(String name) async {
-  final response = await http.put(
-    Uri.parse('$cloudmockUrl/$name'),
-    headers: {
-      'Authorization': 'AWS4-HMAC-SHA256 ...',
-      'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
-    },
-  );
-  print('Create bucket: ${response.statusCode}');
+    final response = await http.put(
+        Uri.parse('$cloudmockUrl/$name'),
+        headers: {
+            'Authorization': 'AWS4-HMAC-SHA256 ...',
+            'x-amz-content-sha256': 'UNSIGNED-PAYLOAD',
+        },
+    );
+    print('Create bucket: ${response.statusCode}');
 }
 
 // List S3 buckets
 Future<void> listBuckets() async {
-  final response = await http.get(
-    Uri.parse(cloudmockUrl),
-    headers: {
-      'Authorization': 'AWS4-HMAC-SHA256 ...',
-    },
-  );
-  print('Buckets: ${response.body}');
+    final response = await http.get(
+        Uri.parse(cloudmockUrl),
+        headers: {
+            'Authorization': 'AWS4-HMAC-SHA256 ...',
+        },
+    );
+    print('Buckets: ${response.body}');
 }
 ```
 
@@ -77,33 +77,118 @@ Future<void> listBuckets() async {
 import 'package:dio/dio.dart';
 
 final dio = Dio(BaseOptions(
-  baseUrl: 'http://localhost:4566',
-  headers: {
-    'Authorization': 'AWS4-HMAC-SHA256 ...',
-  },
+    baseUrl: 'http://localhost:4566',
+    headers: {
+        'Authorization': 'AWS4-HMAC-SHA256 ...',
+    },
 ));
 
 // DynamoDB - CreateTable
 Future<void> createTable() async {
-  final response = await dio.post(
-    '/',
-    data: {
-      'TableName': 'Users',
-      'KeySchema': [
-        {'AttributeName': 'UserId', 'KeyType': 'HASH'}
-      ],
-      'AttributeDefinitions': [
-        {'AttributeName': 'UserId', 'AttributeType': 'S'}
-      ],
-      'BillingMode': 'PAY_PER_REQUEST',
-    },
-    options: Options(headers: {
-      'X-Amz-Target': 'DynamoDB_20120810.CreateTable',
-      'Content-Type': 'application/x-amz-json-1.0',
-    }),
-  );
-  print('Table created: ${response.data}');
+    final response = await dio.post(
+        '/',
+        data: {
+            'TableName': 'Users',
+            'KeySchema': [
+                {'AttributeName': 'UserId', 'KeyType': 'HASH'}
+            ],
+            'AttributeDefinitions': [
+                {'AttributeName': 'UserId', 'AttributeType': 'S'}
+            ],
+            'BillingMode': 'PAY_PER_REQUEST',
+        },
+        options: Options(headers: {
+            'X-Amz-Target': 'DynamoDB_20120810.CreateTable',
+            'Content-Type': 'application/x-amz-json-1.0',
+        }),
+    );
+    print('Table created: ${response.data}');
 }
+```
+
+## Testing with dart test
+
+Use the `test` package for Dart tests. Start CloudMock before running the test suite, or use environment variables to configure the endpoint.
+
+```dart
+import 'package:test/test.dart';
+import 'package:aws_s3_api/s3-2006-03-01.dart';
+import 'package:aws_dynamodb_api/dynamodb-2012-08-10.dart';
+import 'package:aws_common/aws_common.dart';
+import 'package:http/http.dart' as http;
+
+const cloudmockEndpoint = 'http://localhost:4566';
+const adminEndpoint = 'http://localhost:4599';
+
+Future<void> resetCloudMock() async {
+    await http.post(Uri.parse('$adminEndpoint/api/reset'));
+}
+
+void main() {
+    late S3 s3;
+    late DynamoDB ddb;
+
+    setUp(() async {
+        await resetCloudMock();
+
+        final credentials = AWSCredentialsProvider(AWSCredentials('test', 'test'));
+
+        s3 = S3(
+            region: 'us-east-1',
+            credentialsProvider: credentials,
+            endpointUrl: Uri.parse(cloudmockEndpoint),
+        );
+
+        ddb = DynamoDB(
+            region: 'us-east-1',
+            credentialsProvider: credentials,
+            endpointUrl: Uri.parse(cloudmockEndpoint),
+        );
+    });
+
+    test('S3 create and list buckets', () async {
+        await s3.createBucket(bucket: 'test');
+        final result = await s3.listBuckets();
+        final names = result.buckets?.map((b) => b.name).toList() ?? [];
+        expect(names, contains('test'));
+    });
+
+    test('DynamoDB create table and put item', () async {
+        await ddb.createTable(
+            tableName: 'users',
+            keySchema: [KeySchemaElement(attributeName: 'pk', keyType: KeyType.hash)],
+            attributeDefinitions: [
+                AttributeDefinition(
+                    attributeName: 'pk',
+                    attributeType: ScalarAttributeType.s,
+                )
+            ],
+            billingMode: BillingMode.payPerRequest,
+        );
+
+        await ddb.putItem(
+            tableName: 'users',
+            item: {
+                'pk': AttributeValue(s: 'user-1'),
+                'name': AttributeValue(s: 'Alice'),
+            },
+        );
+
+        final resp = await ddb.getItem(
+            tableName: 'users',
+            key: {'pk': AttributeValue(s: 'user-1')},
+        );
+
+        expect(resp.item?['name']?.s, equals('Alice'));
+    });
+}
+```
+
+Start CloudMock before running:
+
+```bash
+npx cloudmock start &
+dart test
 ```
 
 ## Community packages
@@ -140,10 +225,10 @@ const cloudmockUrl = 'http://localhost:4566';
 import 'dart:io' show Platform;
 
 String get cloudmockUrl {
-  if (Platform.isAndroid) {
-    return 'http://10.0.2.2:4566';
-  }
-  return 'http://localhost:4566';
+    if (Platform.isAndroid) {
+        return 'http://10.0.2.2:4566';
+    }
+    return 'http://localhost:4566';
 }
 ```
 

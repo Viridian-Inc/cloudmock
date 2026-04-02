@@ -91,6 +91,93 @@ func makeS3Client() async throws -> S3Client {
 }
 ```
 
+## Testing with XCTest
+
+Use `XCTestCase` with `async/await` to test against CloudMock. Start CloudMock on your Mac before running the test suite.
+
+```swift
+import XCTest
+import AWSS3
+import AWSDynamoDB
+import SmithyIdentity
+
+final class CloudMockTests: XCTestCase {
+
+    var s3: S3Client!
+    var ddb: DynamoDBClient!
+
+    override func setUp() async throws {
+        let credentialResolver = try StaticAWSCredentialIdentityResolver(
+            AWSCredentialIdentity(accessKey: "test", secret: "test")
+        )
+
+        let s3Config = try await S3Client.S3ClientConfiguration(
+            awsCredentialIdentityResolver: credentialResolver,
+            region: "us-east-1",
+            endpoint: "http://localhost:4566"
+        )
+        s3Config.forcePathStyle = true
+        s3 = S3Client(config: s3Config)
+
+        let ddbConfig = try await DynamoDBClient.DynamoDBClientConfiguration(
+            awsCredentialIdentityResolver: credentialResolver,
+            region: "us-east-1",
+            endpoint: "http://localhost:4566"
+        )
+        ddb = DynamoDBClient(config: ddbConfig)
+    }
+
+    func testCreateAndListBucket() async throws {
+        try await s3.createBucket(input: CreateBucketInput(bucket: "test"))
+        let output = try await s3.listBuckets(input: ListBucketsInput())
+        let names = output.buckets?.compactMap { $0.name } ?? []
+        XCTAssertTrue(names.contains("test"))
+    }
+
+    func testDynamoDBPutAndGet() async throws {
+        let createInput = CreateTableInput(
+            attributeDefinitions: [
+                AttributeDefinition(attributeName: "pk", attributeType: .s)
+            ],
+            billingMode: .payPerRequest,
+            keySchema: [
+                KeySchemaElement(attributeName: "pk", keyType: .hash)
+            ],
+            tableName: "users"
+        )
+        _ = try await ddb.createTable(input: createInput)
+
+        let putInput = PutItemInput(
+            item: [
+                "pk": AttributeValue.s("user-1"),
+                "name": AttributeValue.s("Alice"),
+            ],
+            tableName: "users"
+        )
+        _ = try await ddb.putItem(input: putInput)
+
+        let getInput = GetItemInput(
+            key: ["pk": AttributeValue.s("user-1")],
+            tableName: "users"
+        )
+        let getOutput = try await ddb.getItem(input: getInput)
+
+        if case .s(let name) = getOutput.item?["name"] {
+            XCTAssertEqual(name, "Alice")
+        } else {
+            XCTFail("Expected name attribute")
+        }
+    }
+}
+```
+
+Start CloudMock before running:
+
+```bash
+npx cloudmock start &
+xcodebuild test -scheme MyApp -destination 'platform=macOS'
+```
+
 ## URLSession configuration
 
 For direct HTTP calls to CloudMock (without the AWS SDK), use a standard URLSession:

@@ -5,6 +5,8 @@ description: Configure AWS SDKs in Node.js, Python, Go, and Java to use CloudMoc
 
 Every official AWS SDK supports custom endpoints. Point it at `http://localhost:4566` and your application code talks to CloudMock instead of AWS.
 
+CloudMock also ships **SDK adapters** for Go, Node.js, Python, Java, Rust, and Ruby that go beyond simple endpoint configuration — they add trace propagation, topology mapping, and devtools integration. For Go, the adapter additionally supports **in-process mode** (~20 μs/op, no HTTP server required).
+
 ## Environment variable (all SDKs)
 
 The simplest approach works across all languages and tools. Set `AWS_ENDPOINT_URL` before running your application:
@@ -21,6 +23,14 @@ AWS CLI v2 and all current AWS SDKs respect `AWS_ENDPOINT_URL`. No code changes 
 This is the recommended approach for local development. Wrap it in a script, add it to your `.env` file, or set it in your IDE's run configuration.
 
 ## Node.js (AWS SDK v3)
+
+Install the CloudMock SDK adapter for trace propagation and devtools integration:
+
+```bash
+npm install @cloudmock/node
+```
+
+Or configure the AWS SDK v3 directly:
 
 ```typescript
 import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
@@ -57,6 +67,14 @@ const dynamo = new DynamoDBClient({
 
 ## Python (boto3)
 
+Install the CloudMock Python SDK for trace propagation and devtools integration:
+
+```bash
+pip install cloudmock
+```
+
+Or configure boto3 directly:
+
 ```python
 import boto3
 
@@ -83,6 +101,28 @@ table = dynamodb.create_table(
 Each client or resource call takes its own `endpoint_url`. If you prefer a single configuration point, set `AWS_ENDPOINT_URL` as an environment variable and omit the parameter.
 
 ## Go (aws-sdk-go-v2)
+
+Go is the highest-performance target for CloudMock. The `github.com/neureaux/cloudmock/sdk` package supports two modes:
+
+**In-process mode (~20 μs/op)** — the CloudMock engine runs embedded in your process. No HTTP server, no network round-trip, no startup time. Ideal for tests.
+
+```bash
+go get github.com/neureaux/cloudmock/sdk
+```
+
+```go
+import "github.com/neureaux/cloudmock/sdk"
+
+cm := sdk.New()
+defer cm.Close()
+
+// cm.Config() returns an aws.Config pre-configured for the embedded engine
+s3Client := s3.NewFromConfig(cm.Config(), func(o *s3.Options) {
+    o.UsePathStyle = true
+})
+```
+
+**HTTP mode** — configure `aws-sdk-go-v2` to point at a running CloudMock server:
 
 ```go
 package main
@@ -127,6 +167,18 @@ func main() {
 
 ## Java (AWS SDK v2)
 
+Install the CloudMock Java SDK:
+
+```xml
+<dependency>
+    <groupId>dev.cloudmock</groupId>
+    <artifactId>cloudmock-sdk</artifactId>
+    <version>1.0.0</version>
+</dependency>
+```
+
+Or configure the AWS SDK v2 directly:
+
 ```java
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
@@ -166,9 +218,36 @@ Add the S3 dependency to your `pom.xml`:
 </dependency>
 ```
 
+## Rust
+
+Add the CloudMock Rust crate:
+
+```toml
+[dependencies]
+cloudmock = "0.1"
+```
+
+Or configure the AWS SDK for Rust directly:
+
+```rust
+use aws_config::BehaviorVersion;
+use aws_credential_types::Credentials;
+
+let config = aws_config::defaults(BehaviorVersion::latest())
+    .endpoint_url("http://localhost:4566")
+    .credentials_provider(Credentials::new("test", "test", None, None, "cloudmock"))
+    .region(aws_config::Region::new("us-east-1"))
+    .load()
+    .await;
+
+let s3 = aws_sdk_s3::Client::new(&config);
+```
+
 ## Tips
 
 **Keep production code clean.** Rather than hardcoding `localhost:4566`, use the environment variable approach. Your application reads `AWS_ENDPOINT_URL` automatically -- set it in development, leave it unset in production.
+
+**Use in-process mode for Go tests.** The CloudMock Go SDK runs at ~20 μs/op -- over 110x faster than HTTP-based alternatives. See the [testing guide](/docs/guides/testing/) for complete examples.
 
 **S3 path style.** CloudMock requires path-style S3 URLs (`localhost:4566/bucket`) rather than virtual-hosted-style (`bucket.localhost:4566`). All the examples above set the path style option. This does not affect non-S3 services.
 

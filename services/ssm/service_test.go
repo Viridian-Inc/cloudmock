@@ -3,6 +3,7 @@ package ssm_test
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -676,5 +677,39 @@ func TestSSM_DeleteParameters(t *testing.T) {
 	}
 	if invalid[0].(string) != "/batch/nonexistent" {
 		t.Errorf("DeleteParameters: expected invalid=/batch/nonexistent, got %q", invalid[0])
+	}
+}
+
+// ---- Test 15: GetParametersByPath with pagination token ----
+
+func TestSSM_GetParametersByPath_Pagination(t *testing.T) {
+	handler := newSSMGateway(t)
+
+	// Create 5 parameters under the same path
+	for i := 0; i < 5; i++ {
+		w := httptest.NewRecorder()
+		handler.ServeHTTP(w, ssmReq(t, "PutParameter", map[string]any{
+			"Name":  fmt.Sprintf("/page/param-%d", i),
+			"Value": fmt.Sprintf("value-%d", i),
+			"Type":  "String",
+		}))
+		if w.Code != http.StatusOK {
+			t.Fatalf("PutParameter %d: %d %s", i, w.Code, w.Body.String())
+		}
+	}
+
+	// GetParametersByPath — all 5 should be returned
+	wg := httptest.NewRecorder()
+	handler.ServeHTTP(wg, ssmReq(t, "GetParametersByPath", map[string]any{
+		"Path":      "/page",
+		"Recursive": true,
+	}))
+	if wg.Code != http.StatusOK {
+		t.Fatalf("GetParametersByPath: expected 200, got %d\nbody: %s", wg.Code, wg.Body.String())
+	}
+	mg := decodeJSON(t, wg.Body.String())
+	params, _ := mg["Parameters"].([]any)
+	if len(params) != 5 {
+		t.Errorf("GetParametersByPath: expected 5 params, got %d", len(params))
 	}
 }

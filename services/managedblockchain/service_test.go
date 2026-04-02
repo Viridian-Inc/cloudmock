@@ -223,6 +223,22 @@ func TestMB_DuplicateVote(t *testing.T) {
 	assert.Contains(t, err.Error(), "not in IN_PROGRESS")
 }
 
+func TestMB_MemberNotFound(t *testing.T) {
+	s := newService()
+	netID, _ := createNetwork(t, s)
+
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/networks/"+netID+"/members/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestMB_ProposalNotFound(t *testing.T) {
+	s := newService()
+	netID, _ := createNetwork(t, s)
+
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/networks/"+netID+"/proposals/no-such-prop", nil))
+	require.Error(t, err)
+}
+
 func TestMB_EthereumNetwork(t *testing.T) {
 	s := newService()
 	resp, err := s.HandleRequest(restCtx(http.MethodPost, "/networks", map[string]any{

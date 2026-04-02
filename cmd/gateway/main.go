@@ -198,6 +198,7 @@ import (
 	verifiedpermissionssvc "github.com/neureaux/cloudmock/services/verifiedpermissions"
 	wafregionalsvc "github.com/neureaux/cloudmock/services/wafregional"
 	wafv2svc "github.com/neureaux/cloudmock/services/wafv2"
+	xraysvc "github.com/neureaux/cloudmock/services/xray"
 )
 
 // cleanLabel strips common IaC prefixes (e.g. "autotend-") and environment
@@ -755,6 +756,7 @@ func main() {
 	_ = registerOrDefer("identitystore", func() service.Service { return identitystoresvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("elasticbeanstalk", func() service.Service { return ebsvc2.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("batch", func() service.Service { return batchsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("xray", func() service.Service { return xraysvc.New(cfg.AccountID, cfg.Region) })
 
 	// Auto-provision resources from IaC source (Pulumi/Terraform).
 	// This reads DynamoDB table definitions, API Gateway routes, etc. from the

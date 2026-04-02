@@ -829,3 +829,55 @@ func TestRDS_UnknownAction(t *testing.T) {
 		t.Fatalf("unknown action: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
+
+// ---- Test 14: DeleteDBCluster ----
+
+func TestRDS_DeleteDBCluster(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	mustCreateCluster(t, handler, "del-cluster", "aurora-mysql")
+
+	// DeleteDBCluster
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, rdsReq(t, "DeleteDBCluster", url.Values{
+		"DBClusterIdentifier": {"del-cluster"},
+	}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("DeleteDBCluster: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	if !strings.Contains(wd.Body.String(), "del-cluster") {
+		t.Errorf("DeleteDBCluster: expected identifier in response\nbody: %s", wd.Body.String())
+	}
+
+	// Describe after delete — should not find cluster
+	wcheck := httptest.NewRecorder()
+	handler.ServeHTTP(wcheck, rdsReq(t, "DescribeDBClusters", url.Values{
+		"DBClusterIdentifier": {"del-cluster"},
+	}))
+	if wcheck.Code == http.StatusOK && strings.Contains(wcheck.Body.String(), "del-cluster") {
+		t.Error("DeleteDBCluster: cluster should be gone after delete")
+	}
+
+	// Delete non-existent cluster — should fail
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, rdsReq(t, "DeleteDBCluster", url.Values{
+		"DBClusterIdentifier": {"no-such-cluster"},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Errorf("DeleteDBCluster non-existent: expected error, got 200")
+	}
+}
+
+// ---- Test 15: DescribeDBClusters not found ----
+
+func TestRDS_DescribeDBClusters_NotFound(t *testing.T) {
+	handler := newRDSGateway(t)
+
+	wne := httptest.NewRecorder()
+	handler.ServeHTTP(wne, rdsReq(t, "DescribeDBClusters", url.Values{
+		"DBClusterIdentifier": {"no-such-cluster"},
+	}))
+	if wne.Code == http.StatusOK {
+		t.Errorf("DescribeDBClusters non-existent: expected error, got 200\nbody: %s", wne.Body.String())
+	}
+}

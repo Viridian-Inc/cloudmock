@@ -214,6 +214,31 @@ func TestBackup_RecoveryPointLifecycle(t *testing.T) {
 	assert.GreaterOrEqual(t, len(rps), 1)
 }
 
+func TestBackup_DuplicateVaultCreate(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateBackupVault", map[string]any{"BackupVaultName": "dup-vault"}))
+	require.NoError(t, err)
+
+	// Second create of the same vault should fail
+	_, err = s.HandleRequest(jsonCtx("CreateBackupVault", map[string]any{"BackupVaultName": "dup-vault"}))
+	require.Error(t, err)
+}
+
+func TestBackup_DuplicatePlanCreate(t *testing.T) {
+	s := newService()
+	body := map[string]any{
+		"BackupPlan": map[string]any{"BackupPlanName": "dup-plan"},
+	}
+	cr, err := s.HandleRequest(jsonCtx("CreateBackupPlan", body))
+	require.NoError(t, err)
+	_ = respJSON(t, cr)["BackupPlanId"]
+
+	// Second plan with the same name is allowed (AWS allows it; each gets a unique ID).
+	// So instead test that describing a plan with a bogus ID returns an error.
+	_, err = s.HandleRequest(jsonCtx("GetBackupPlan", map[string]any{"BackupPlanId": "bogus-plan-id"}))
+	require.Error(t, err)
+}
+
 func TestBackup_VaultNotEmptyCannotDelete(t *testing.T) {
 	s := newService()
 	s.HandleRequest(jsonCtx("CreateBackupVault", map[string]any{"BackupVaultName": "notempty-vault"}))

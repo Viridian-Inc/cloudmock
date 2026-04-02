@@ -779,3 +779,97 @@ func TestCW_PutMetricData_MissingNamespace(t *testing.T) {
 		t.Fatalf("PutMetricData no namespace: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
+
+// ---- Test 14: ListTagsForResource on non-existent ARN returns error ----
+
+func TestCW_ListTagsForResource_NotFound(t *testing.T) {
+	handler := newCWGateway(t)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cwReq(t, "ListTagsForResource", url.Values{
+		"ResourceARN": {"arn:aws:cloudwatch:us-east-1:123456789012:alarm:no-such-alarm"},
+	}))
+	if w.Code != http.StatusNotFound && w.Code != http.StatusBadRequest {
+		t.Fatalf("ListTagsForResource non-existent: expected 4xx, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+}
+
+// ---- Test 15: UntagResource removes specific tags ----
+
+func TestCW_UntagResource(t *testing.T) {
+	handler := newCWGateway(t)
+
+	// Create alarm
+	wput := httptest.NewRecorder()
+	handler.ServeHTTP(wput, cwReq(t, "PutMetricAlarm", url.Values{
+		"AlarmName":          {"untag-alarm"},
+		"Namespace":          {"Test/NS"},
+		"MetricName":         {"Metric"},
+		"ComparisonOperator": {"GreaterThanThreshold"},
+		"Threshold":          {"10"},
+		"EvaluationPeriods":  {"1"},
+		"Period":             {"60"},
+		"Statistic":          {"Average"},
+	}))
+	if wput.Code != http.StatusOK {
+		t.Fatalf("PutMetricAlarm: expected 200, got %d", wput.Code)
+	}
+
+	// Get ARN
+	wdesc := httptest.NewRecorder()
+	handler.ServeHTTP(wdesc, cwReq(t, "DescribeAlarms", url.Values{
+		"AlarmNames.member.1": {"untag-alarm"},
+	}))
+	var descResp struct {
+		Result struct {
+			Alarms []struct {
+				AlarmArn string `xml:"AlarmArn"`
+			} `xml:"MetricAlarms>member"`
+		} `xml:"DescribeAlarmsResult"`
+	}
+	if err := xml.Unmarshal(wdesc.Body.Bytes(), &descResp); err != nil {
+		t.Fatalf("DescribeAlarms unmarshal: %v", err)
+	}
+	if len(descResp.Result.Alarms) == 0 {
+		t.Fatal("no alarms found")
+	}
+	arn := descResp.Result.Alarms[0].AlarmArn
+
+	// Tag the alarm
+	wtag := httptest.NewRecorder()
+	handler.ServeHTTP(wtag, cwReq(t, "TagResource", url.Values{
+		"ResourceARN":         {arn},
+		"Tags.member.1.Key":   {"k1"},
+		"Tags.member.1.Value": {"v1"},
+		"Tags.member.2.Key":   {"k2"},
+		"Tags.member.2.Value": {"v2"},
+	}))
+	if wtag.Code != http.StatusOK {
+		t.Fatalf("TagResource: expected 200, got %d", wtag.Code)
+	}
+
+	// Untag k1
+	wun := httptest.NewRecorder()
+	handler.ServeHTTP(wun, cwReq(t, "UntagResource", url.Values{
+		"ResourceARN":           {arn},
+		"TagKeys.member.1":      {"k1"},
+	}))
+	if wun.Code != http.StatusOK {
+		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", wun.Code, wun.Body.String())
+	}
+
+	// List tags — only k2 should remain
+	wlist := httptest.NewRecorder()
+	handler.ServeHTTP(wlist, cwReq(t, "ListTagsForResource", url.Values{
+		"ResourceARN": {arn},
+	}))
+	if wlist.Code != http.StatusOK {
+		t.Fatalf("ListTagsForResource after untag: expected 200, got %d", wlist.Code)
+	}
+	if strings.Contains(wlist.Body.String(), "k1") {
+		t.Errorf("UntagResource: k1 should have been removed\nbody: %s", wlist.Body.String())
+	}
+	if !strings.Contains(wlist.Body.String(), "k2") {
+		t.Errorf("UntagResource: k2 should still be present\nbody: %s", wlist.Body.String())
+	}
+}

@@ -603,6 +603,37 @@ func TestFirehose_ListDeliveryStreams_Empty(t *testing.T) {
 	}
 }
 
+// ---- Positive: ListDeliveryStreams returns multiple streams ----
+
+func TestFirehose_ListDeliveryStreams_Multiple(t *testing.T) {
+	handler := newFirehoseGateway(t)
+
+	for _, name := range []string{"stream-alpha", "stream-beta", "stream-gamma"} {
+		wc := httptest.NewRecorder()
+		handler.ServeHTTP(wc, firehoseReq(t, "CreateDeliveryStream", map[string]any{
+			"DeliveryStreamName": name,
+			"S3DestinationConfiguration": map[string]any{
+				"BucketARN": "arn:aws:s3:::bucket-" + name,
+				"RoleARN":   "arn:aws:iam::123456789012:role/r",
+			},
+		}))
+		if wc.Code != http.StatusOK {
+			t.Fatalf("CreateDeliveryStream %s: %d %s", name, wc.Code, wc.Body.String())
+		}
+	}
+
+	wl := httptest.NewRecorder()
+	handler.ServeHTTP(wl, firehoseReq(t, "ListDeliveryStreams", nil))
+	if wl.Code != http.StatusOK {
+		t.Fatalf("ListDeliveryStreams: expected 200, got %d\nbody: %s", wl.Code, wl.Body.String())
+	}
+	m := decodeJSON(t, wl.Body.String())
+	streamNames, _ := m["DeliveryStreamNames"].([]any)
+	if len(streamNames) != 3 {
+		t.Errorf("ListDeliveryStreams: expected 3 streams, got %d", len(streamNames))
+	}
+}
+
 // contains is a helper to check if s contains substr.
 func contains(s, substr string) bool {
 	return len(s) >= len(substr) && (s == substr || len(substr) == 0 ||

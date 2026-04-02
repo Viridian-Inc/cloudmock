@@ -273,3 +273,29 @@ func TestServiceNameAndHealthCheck(t *testing.T) {
 	assert.Equal(t, "airflow", s.Name())
 	assert.NoError(t, s.HealthCheck())
 }
+
+// ---- Test 14: GetEnvironment not found returns ResourceNotFoundException ----
+
+func TestGetEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetEnvironment", map[string]any{"Name": "does-not-exist"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok, "expected *service.AWSError, got %T", err)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+	assert.Equal(t, http.StatusNotFound, awsErr.StatusCode())
+}
+
+// ---- Test 15: UpdateEnvironment not found returns ResourceNotFoundException ----
+
+func TestUpdateEnvironmentNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateEnvironment", map[string]any{
+		"Name":       "ghost-env",
+		"MaxWorkers": float64(5),
+	}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}

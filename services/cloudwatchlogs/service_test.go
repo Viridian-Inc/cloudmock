@@ -872,3 +872,30 @@ func TestLogs_UnknownAction(t *testing.T) {
 		t.Errorf("unknown action: expected __type=InvalidAction, got %q", errType)
 	}
 }
+
+// ---- Test 15: CreateLogGroup duplicate returns ResourceAlreadyExistsException ----
+
+func TestLogs_CreateLogGroup_Duplicate(t *testing.T) {
+	handler := newLogsGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, logsReq(t, "CreateLogGroup", map[string]any{
+		"logGroupName": "/dup/group",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateLogGroup first: expected 200, got %d\nbody: %s", wc.Code, wc.Body.String())
+	}
+
+	wc2 := httptest.NewRecorder()
+	handler.ServeHTTP(wc2, logsReq(t, "CreateLogGroup", map[string]any{
+		"logGroupName": "/dup/group",
+	}))
+	if wc2.Code != http.StatusBadRequest {
+		t.Fatalf("CreateLogGroup duplicate: expected 400, got %d\nbody: %s", wc2.Code, wc2.Body.String())
+	}
+	m := decodeJSON(t, wc2.Body.String())
+	errType, _ := m["__type"].(string)
+	if !strings.Contains(errType, "AlreadyExists") && errType != "ResourceAlreadyExistsException" {
+		t.Errorf("CreateLogGroup duplicate: expected AlreadyExists error, got %q", errType)
+	}
+}

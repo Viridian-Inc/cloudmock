@@ -69,13 +69,13 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 | **Snap** | `sudo snap install cloudmock` |
 | **Docker** | `docker run -p 4566:4566 -p 4500:4500 ghcr.io/viridian-inc/cloudmock:latest` |
 | **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.4/cloudmock_1.0.4_amd64.deb && sudo apt install cloudmock_1.0.4_amd64.deb` |
-| **Shell** | `curl -fsSL https://cloudmock.dev/install.sh \| bash` |
+| **Shell** | `curl -fsSL https://cloudmock.pages.dev/install.sh \| bash` |
 
 ## Services
 
 98 AWS services including S3, DynamoDB, SQS, SNS, Lambda, API Gateway, Cognito, EC2, ECS, EKS, EventBridge, IAM, KMS, RDS, Route 53, Step Functions, and many more.
 
-See the full list at [cloudmock.dev/docs/services](https://cloudmock.dev/docs/).
+See the full list at [cloudmock.pages.dev/docs/services](https://cloudmock.pages.dev/docs/).
 
 ## Comparison
 
@@ -90,7 +90,7 @@ See the full list at [cloudmock.dev/docs/services](https://cloudmock.dev/docs/).
 
 ## Documentation
 
-Full docs at **[cloudmock.dev](https://cloudmock.dev)**
+Full docs at **[cloudmock.pages.dev](https://cloudmock.pages.dev)**
 
 ## Community
 

@@ -18,6 +18,7 @@ CloudMock emulates AWS CodeBuild, supporting project management, build execution
 | DeleteProject | Supported | Deletes a project |
 | StartBuild | Supported | Starts a build with simulated phases |
 | BatchGetBuilds | Supported | Returns details for multiple builds |
+| ListBuilds | Supported | Lists all build IDs across all projects |
 | ListBuildsForProject | Supported | Lists builds for a project |
 | StopBuild | Supported | Stops a running build |
 | CreateReportGroup | Supported | Creates a report group |

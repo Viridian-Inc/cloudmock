@@ -438,6 +438,29 @@ func TestBuildPhases_Present(t *testing.T) {
 	}
 }
 
+func TestListBuilds(t *testing.T) {
+	s := newService()
+	createProject(t, s, "listbuilds-proj")
+
+	s.HandleRequest(jsonCtx("StartBuild", map[string]any{"projectName": "listbuilds-proj"}))
+	s.HandleRequest(jsonCtx("StartBuild", map[string]any{"projectName": "listbuilds-proj"}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListBuilds", map[string]any{}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	ids := body["ids"].([]any)
+	assert.Len(t, ids, 2)
+}
+
+func TestListBuildsEmpty(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("ListBuilds", map[string]any{}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	ids := body["ids"].([]any)
+	assert.Empty(t, ids)
+}
+
 func TestBuildNumberIncrements(t *testing.T) {
 	s := newService()
 	createProject(t, s, "incr-proj")

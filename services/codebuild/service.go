@@ -50,6 +50,7 @@ func (s *CodeBuildService) Actions() []service.Action {
 		// Builds
 		{Name: "StartBuild", Method: http.MethodPost, IAMAction: "codebuild:StartBuild"},
 		{Name: "BatchGetBuilds", Method: http.MethodPost, IAMAction: "codebuild:BatchGetBuilds"},
+		{Name: "ListBuilds", Method: http.MethodPost, IAMAction: "codebuild:ListBuilds"},
 		{Name: "ListBuildsForProject", Method: http.MethodPost, IAMAction: "codebuild:ListBuildsForProject"},
 		{Name: "StopBuild", Method: http.MethodPost, IAMAction: "codebuild:StopBuild"},
 		// Report Groups
@@ -82,6 +83,8 @@ func (s *CodeBuildService) HandleRequest(ctx *service.RequestContext) (*service.
 		return handleStartBuild(ctx, s.store)
 	case "BatchGetBuilds":
 		return handleBatchGetBuilds(ctx, s.store)
+	case "ListBuilds":
+		return handleListBuilds(ctx, s.store)
 	case "ListBuildsForProject":
 		return handleListBuildsForProject(ctx, s.store)
 	case "StopBuild":

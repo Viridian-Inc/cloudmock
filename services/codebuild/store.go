@@ -400,6 +400,17 @@ func (s *Store) syncBuildPhases(b *Build) {
 	}
 }
 
+func (s *Store) ListBuilds() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var ids []string
+	for id := range s.builds {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
 func (s *Store) ListBuildsForProject(projectName string) []string {
 	s.mu.RLock()
 	defer s.mu.RUnlock()

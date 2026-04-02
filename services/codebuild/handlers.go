@@ -192,6 +192,14 @@ func handleBatchGetBuilds(ctx *service.RequestContext, store *Store) (*service.R
 	})
 }
 
+func handleListBuilds(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	ids := store.ListBuilds()
+	if ids == nil {
+		ids = []string{}
+	}
+	return jsonOK(map[string]any{"ids": ids})
+}
+
 func handleListBuildsForProject(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {

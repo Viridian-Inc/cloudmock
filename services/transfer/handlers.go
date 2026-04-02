@@ -268,3 +268,161 @@ func handleDeleteSSHPublicKey(params map[string]any, store *Store) (*service.Res
 	}
 	return jsonOK(map[string]any{})
 }
+
+// ---- UpdateServer ----
+
+func handleUpdateServer(params map[string]any, store *Store) (*service.Response, error) {
+	serverID := str(params, "ServerId")
+	if serverID == "" {
+		return jsonErr(service.ErrValidation("ServerId is required"))
+	}
+	protocols := strSlice(params, "Protocols")
+	srv, err := store.UpdateServer(serverID, str(params, "LoggingRole"), protocols)
+	if err != nil {
+		return jsonErr(service.ErrNotFound("Server", serverID))
+	}
+	return jsonOK(map[string]any{"ServerId": srv.ServerID})
+}
+
+// ---- UpdateUser ----
+
+func handleUpdateUser(params map[string]any, store *Store) (*service.Response, error) {
+	serverID := str(params, "ServerId")
+	userName := str(params, "UserName")
+	if serverID == "" || userName == "" {
+		return jsonErr(service.ErrValidation("ServerId and UserName are required"))
+	}
+	user, err := store.UpdateUser(serverID, userName, str(params, "HomeDirectory"), str(params, "Role"))
+	if err != nil {
+		return jsonErr(service.ErrNotFound("User", userName))
+	}
+	return jsonOK(map[string]any{"ServerId": serverID, "UserName": user.UserName})
+}
+
+// ---- Workflows ----
+
+func getSliceMaps(params map[string]any, key string) []map[string]any {
+	if v, ok := params[key].([]any); ok {
+		out := make([]map[string]any, 0, len(v))
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				out = append(out, m)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
+func handleCreateWorkflow(params map[string]any, store *Store) (*service.Response, error) {
+	tags := parseTags(params)
+	steps := getSliceMaps(params, "Steps")
+	onException := getSliceMaps(params, "OnExceptionSteps")
+	wf, err := store.CreateWorkflow(str(params, "Description"), steps, onException, tags)
+	if err != nil {
+		return jsonErr(service.NewAWSError("InternalFailure", err.Error(), 500))
+	}
+	return jsonOK(map[string]any{"WorkflowId": wf.WorkflowID})
+}
+
+func handleDescribeWorkflow(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "WorkflowId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("WorkflowId is required"))
+	}
+	wf, ok := store.DescribeWorkflow(id)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Workflow", id))
+	}
+	return jsonOK(map[string]any{
+		"Workflow": map[string]any{
+			"WorkflowId":  wf.WorkflowID,
+			"Arn":         wf.Arn,
+			"Description": wf.Description,
+			"Steps":       wf.Steps,
+			"CreatedAt":   wf.CreatedAt.Unix(),
+		},
+	})
+}
+
+func handleListWorkflows(store *Store) (*service.Response, error) {
+	workflows := store.ListWorkflows()
+	items := make([]map[string]any, 0, len(workflows))
+	for _, wf := range workflows {
+		items = append(items, map[string]any{
+			"WorkflowId":  wf.WorkflowID,
+			"Arn":         wf.Arn,
+			"Description": wf.Description,
+		})
+	}
+	return jsonOK(map[string]any{"Workflows": items})
+}
+
+func handleDeleteWorkflow(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "WorkflowId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("WorkflowId is required"))
+	}
+	if !store.DeleteWorkflow(id) {
+		return jsonErr(service.ErrNotFound("Workflow", id))
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ---- Tags ----
+
+func parseTags(params map[string]any) map[string]string {
+	result := make(map[string]string)
+	if v, ok := params["Tags"].([]any); ok {
+		for _, item := range v {
+			if m, ok := item.(map[string]any); ok {
+				k, _ := m["Key"].(string)
+				val, _ := m["Value"].(string)
+				if k != "" {
+					result[k] = val
+				}
+			}
+		}
+	}
+	return result
+}
+
+func handleTagResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "Arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("Arn is required"))
+	}
+	tags := parseTags(params)
+	if !store.TagResource(arn, tags) {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "Arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("Arn is required"))
+	}
+	keys := strSlice(params, "TagKeys")
+	if !store.UntagResource(arn, keys) {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(params map[string]any, store *Store) (*service.Response, error) {
+	arn := str(params, "Arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("Arn is required"))
+	}
+	tags, ok := store.ListTagsForResource(arn)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Resource", arn))
+	}
+	items := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		items = append(items, map[string]any{"Key": k, "Value": v})
+	}
+	return jsonOK(map[string]any{"Tags": items})
+}

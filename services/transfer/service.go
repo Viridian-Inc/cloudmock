@@ -25,18 +25,31 @@ func (s *TransferService) Name() string { return "transfer" }
 // Actions returns the list of Transfer Family API actions supported by this service.
 func (s *TransferService) Actions() []service.Action {
 	return []service.Action{
+		// Servers
 		{Name: "CreateServer", Method: http.MethodPost, IAMAction: "transfer:CreateServer"},
 		{Name: "DescribeServer", Method: http.MethodPost, IAMAction: "transfer:DescribeServer"},
 		{Name: "ListServers", Method: http.MethodPost, IAMAction: "transfer:ListServers"},
+		{Name: "UpdateServer", Method: http.MethodPost, IAMAction: "transfer:UpdateServer"},
 		{Name: "StartServer", Method: http.MethodPost, IAMAction: "transfer:StartServer"},
 		{Name: "StopServer", Method: http.MethodPost, IAMAction: "transfer:StopServer"},
 		{Name: "DeleteServer", Method: http.MethodPost, IAMAction: "transfer:DeleteServer"},
+		// Users
 		{Name: "CreateUser", Method: http.MethodPost, IAMAction: "transfer:CreateUser"},
 		{Name: "DescribeUser", Method: http.MethodPost, IAMAction: "transfer:DescribeUser"},
 		{Name: "ListUsers", Method: http.MethodPost, IAMAction: "transfer:ListUsers"},
+		{Name: "UpdateUser", Method: http.MethodPost, IAMAction: "transfer:UpdateUser"},
 		{Name: "DeleteUser", Method: http.MethodPost, IAMAction: "transfer:DeleteUser"},
 		{Name: "ImportSshPublicKey", Method: http.MethodPost, IAMAction: "transfer:ImportSshPublicKey"},
 		{Name: "DeleteSshPublicKey", Method: http.MethodPost, IAMAction: "transfer:DeleteSshPublicKey"},
+		// Workflows
+		{Name: "CreateWorkflow", Method: http.MethodPost, IAMAction: "transfer:CreateWorkflow"},
+		{Name: "DescribeWorkflow", Method: http.MethodPost, IAMAction: "transfer:DescribeWorkflow"},
+		{Name: "ListWorkflows", Method: http.MethodPost, IAMAction: "transfer:ListWorkflows"},
+		{Name: "DeleteWorkflow", Method: http.MethodPost, IAMAction: "transfer:DeleteWorkflow"},
+		// Tags
+		{Name: "TagResource", Method: http.MethodPost, IAMAction: "transfer:TagResource"},
+		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "transfer:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "transfer:ListTagsForResource"},
 	}
 }
 
@@ -49,6 +62,9 @@ func (s *TransferService) HandleRequest(ctx *service.RequestContext) (*service.R
 	if len(ctx.Body) > 0 {
 		json.Unmarshal(ctx.Body, &params)
 	}
+	if params == nil {
+		params = make(map[string]any)
+	}
 
 	switch ctx.Action {
 	case "CreateServer":
@@ -57,6 +73,8 @@ func (s *TransferService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleDescribeServer(params, s.store)
 	case "ListServers":
 		return handleListServers(s.store)
+	case "UpdateServer":
+		return handleUpdateServer(params, s.store)
 	case "StartServer":
 		return handleStartServer(params, s.store)
 	case "StopServer":
@@ -69,12 +87,28 @@ func (s *TransferService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleDescribeUser(params, s.store)
 	case "ListUsers":
 		return handleListUsers(params, s.store)
+	case "UpdateUser":
+		return handleUpdateUser(params, s.store)
 	case "DeleteUser":
 		return handleDeleteUser(params, s.store)
 	case "ImportSshPublicKey":
 		return handleImportSSHPublicKey(params, s.store)
 	case "DeleteSshPublicKey":
 		return handleDeleteSSHPublicKey(params, s.store)
+	case "CreateWorkflow":
+		return handleCreateWorkflow(params, s.store)
+	case "DescribeWorkflow":
+		return handleDescribeWorkflow(params, s.store)
+	case "ListWorkflows":
+		return handleListWorkflows(s.store)
+	case "DeleteWorkflow":
+		return handleDeleteWorkflow(params, s.store)
+	case "TagResource":
+		return handleTagResource(params, s.store)
+	case "UntagResource":
+		return handleUntagResource(params, s.store)
+	case "ListTagsForResource":
+		return handleListTagsForResource(params, s.store)
 	default:
 		return jsonErr(service.NewAWSError("InvalidAction",
 			"The action "+ctx.Action+" is not valid for this web service.",

@@ -5,52 +5,35 @@ description: AWS Transfer Family emulation in CloudMock
 
 ## Overview
 
-CloudMock emulates AWS Transfer Family, supporting SFTP/FTPS/FTP server management, user management, and SSH public key operations.
+CloudMock emulates AWS Transfer Family, supporting managed SFTP/FTPS/FTP/AS2 servers, users with SSH public key management, workflows, and tagging. Server lifecycle transitions through OFFLINE → STARTING → ONLINE → STOPPING.
 
 ## Supported Operations
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| CreateServer | Supported | Creates a Transfer server |
-| DescribeServer | Supported | Returns server details |
+| CreateServer | Supported | Validates protocol types: SFTP, FTPS, FTP, AS2 |
+| DescribeServer | Supported | Returns server details and endpoint URL |
 | ListServers | Supported | Lists all servers |
-| StartServer | Supported | Starts a server |
-| StopServer | Supported | Stops a server |
+| UpdateServer | Supported | Updates protocols and logging role |
+| StartServer | Supported | Transitions OFFLINE → STARTING → ONLINE |
+| StopServer | Supported | Transitions ONLINE → STOPPING → OFFLINE |
 | DeleteServer | Supported | Deletes a server |
-| CreateUser | Supported | Creates a user on a server |
-| DescribeUser | Supported | Returns user details |
+| CreateUser | Supported | Validates home directory starts with / |
+| DescribeUser | Supported | Returns user details and SSH keys |
 | ListUsers | Supported | Lists users for a server |
+| UpdateUser | Supported | Updates home directory and IAM role |
 | DeleteUser | Supported | Deletes a user |
-| ImportSshPublicKey | Supported | Imports an SSH public key for a user |
-| DeleteSshPublicKey | Supported | Deletes an SSH public key |
+| ImportSshPublicKey | Supported | Adds SSH public key to user |
+| DeleteSshPublicKey | Supported | Removes SSH public key |
+| CreateWorkflow | Supported | Creates a transfer workflow |
+| DescribeWorkflow | Supported | Returns workflow steps |
+| ListWorkflows | Supported | Lists all workflows |
+| DeleteWorkflow | Supported | Deletes a workflow |
+| TagResource | Supported | Adds tags by ARN |
+| UntagResource | Supported | Removes tags by key |
+| ListTagsForResource | Supported | Lists tags by ARN |
 
 ## Quick Start
-
-### Node.js
-
-```typescript
-import { TransferClient, CreateServerCommand, CreateUserCommand } from '@aws-sdk/client-transfer';
-
-const client = new TransferClient({
-  endpoint: 'http://localhost:4566',
-  region: 'us-east-1',
-  credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
-});
-
-const { ServerId } = await client.send(new CreateServerCommand({
-  Protocols: ['SFTP'],
-  IdentityProviderType: 'SERVICE_MANAGED',
-}));
-
-await client.send(new CreateUserCommand({
-  ServerId,
-  UserName: 'my-user',
-  Role: 'arn:aws:iam::000000000000:role/transfer-role',
-  HomeDirectory: '/my-bucket',
-}));
-```
-
-### Python
 
 ```python
 import boto3
@@ -61,22 +44,29 @@ client = boto3.client('transfer',
     aws_access_key_id='test',
     aws_secret_access_key='test')
 
-response = client.create_server(
-    Protocols=['SFTP'],
-    IdentityProviderType='SERVICE_MANAGED')
-server_id = response['ServerId']
+# Create SFTP server
+server = client.create_server(Protocols=['SFTP'])
+server_id = server['ServerId']
 
+# Create user
 client.create_user(
     ServerId=server_id,
-    UserName='my-user',
-    Role='arn:aws:iam::000000000000:role/transfer-role',
-    HomeDirectory='/my-bucket')
+    UserName='alice',
+    Role='arn:aws:iam::123456789012:role/transfer-role',
+    HomeDirectory='/home/alice',
+)
+
+# Import SSH public key
+client.import_ssh_public_key(
+    ServerId=server_id,
+    UserName='alice',
+    SshPublicKeyBody='ssh-rsa AAAA...',
+)
 ```
 
 ## Configuration
 
 ```yaml
-# cloudmock.yml
 services:
   transfer:
     enabled: true
@@ -84,6 +74,6 @@ services:
 
 ## Known Differences from AWS
 
-- No actual SFTP/FTPS/FTP server is provisioned
-- Server endpoints are generated but not functional
-- SSH key authentication is not performed
+- No actual SFTP/FTP connections are accepted
+- Server endpoints are generated deterministically from the server ID
+- Workflow steps are stored but not executed on file uploads

@@ -45,15 +45,29 @@ type SSHPublicKey struct {
 	DateImported     time.Time
 }
 
+// Workflow represents an AWS Transfer Family workflow.
+type Workflow struct {
+	WorkflowID  string
+	Arn         string
+	Description string
+	Steps       []map[string]any
+	OnException []map[string]any
+	Tags        map[string]string
+	CreatedAt   time.Time
+}
+
 // Store manages Transfer Family resources in memory.
 type Store struct {
 	mu        sync.RWMutex
 	servers   map[string]*Server
 	users     map[string]map[string]*User // serverID -> userName -> User
+	workflows map[string]*Workflow        // workflowID -> Workflow
+	tagsByArn map[string]map[string]string
 	accountID string
 	region    string
 	lcConfig  *lifecycle.Config
 	keySeq    int
+	wfSeq     int
 }
 
 // NewStore returns a new empty Transfer Store.
@@ -61,6 +75,8 @@ func NewStore(accountID, region string) *Store {
 	return &Store{
 		servers:   make(map[string]*Server),
 		users:     make(map[string]map[string]*User),
+		workflows: make(map[string]*Workflow),
+		tagsByArn: make(map[string]map[string]string),
 		accountID: accountID,
 		region:    region,
 		lcConfig:  lifecycle.DefaultConfig(),
@@ -118,6 +134,7 @@ func (s *Store) CreateServer(domain, endpointType, identityProvider, loggingRole
 
 	s.servers[id] = srv
 	s.users[id] = make(map[string]*User)
+	s.tagsByArn[srv.Arn] = tags
 	return srv, nil
 }
 
@@ -328,4 +345,141 @@ func (s *Store) DeleteSSHPublicKey(serverID, userName, keyID string) error {
 		}
 	}
 	return fmt.Errorf("SSH public key not found: %s", keyID)
+}
+
+// UpdateServer updates a server's configuration.
+func (s *Store) UpdateServer(id, loggingRole string, protocols []string) (*Server, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	srv, ok := s.servers[id]
+	if !ok {
+		return nil, fmt.Errorf("server not found: %s", id)
+	}
+	if loggingRole != "" {
+		srv.LoggingRole = loggingRole
+	}
+	if len(protocols) > 0 {
+		srv.Protocols = protocols
+	}
+	return srv, nil
+}
+
+// UpdateUser updates a user's configuration.
+func (s *Store) UpdateUser(serverID, userName, homeDir, role string) (*User, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	userMap, ok := s.users[serverID]
+	if !ok {
+		return nil, fmt.Errorf("server not found: %s", serverID)
+	}
+	user, ok := userMap[userName]
+	if !ok {
+		return nil, fmt.Errorf("user not found: %s", userName)
+	}
+	if homeDir != "" {
+		user.HomeDirectory = homeDir
+	}
+	if role != "" {
+		user.Role = role
+	}
+	return user, nil
+}
+
+// CreateWorkflow creates a new Transfer workflow.
+func (s *Store) CreateWorkflow(description string, steps, onException []map[string]any, tags map[string]string) (*Workflow, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+	s.wfSeq++
+	id := fmt.Sprintf("w-%012d", s.wfSeq)
+	arn := s.arnPrefix() + "workflow/" + id
+	wf := &Workflow{
+		WorkflowID:  id,
+		Arn:         arn,
+		Description: description,
+		Steps:       steps,
+		OnException: onException,
+		Tags:        tags,
+		CreatedAt:   time.Now().UTC(),
+	}
+	s.workflows[id] = wf
+	s.tagsByArn[arn] = tags
+	return wf, nil
+}
+
+// DescribeWorkflow retrieves a workflow by ID.
+func (s *Store) DescribeWorkflow(id string) (*Workflow, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	wf, ok := s.workflows[id]
+	return wf, ok
+}
+
+// ListWorkflows returns all workflows.
+func (s *Store) ListWorkflows() []*Workflow {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*Workflow, 0, len(s.workflows))
+	for _, wf := range s.workflows {
+		out = append(out, wf)
+	}
+	return out
+}
+
+// DeleteWorkflow removes a workflow.
+func (s *Store) DeleteWorkflow(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	wf, ok := s.workflows[id]
+	if !ok {
+		return false
+	}
+	delete(s.tagsByArn, wf.Arn)
+	delete(s.workflows, id)
+	return true
+}
+
+// TagResource adds tags to a resource by ARN.
+func (s *Store) TagResource(arn string, tags map[string]string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return false
+	}
+	for k, v := range tags {
+		existing[k] = v
+	}
+	return true
+}
+
+// UntagResource removes tags from a resource by ARN.
+func (s *Store) UntagResource(arn string, keys []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tagsByArn[arn]
+	if !ok {
+		return false
+	}
+	for _, k := range keys {
+		delete(existing, k)
+	}
+	return true
+}
+
+// ListTagsForResource returns tags for a resource by ARN.
+func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tags, ok := s.tagsByArn[arn]
+	if !ok {
+		return nil, false
+	}
+	cp := make(map[string]string, len(tags))
+	for k, v := range tags {
+		cp[k] = v
+	}
+	return cp, true
 }

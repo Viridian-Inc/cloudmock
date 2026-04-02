@@ -222,3 +222,151 @@ func TestTransfer_UserHomeDirValidation(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "home directory must start with /")
 }
+
+// ---- Test: UpdateServer ----
+
+func TestTransfer_UpdateServer(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateServer", map[string]any{
+		"Protocols": []any{"SFTP"},
+	}))
+	serverID := respJSON(t, cr)["ServerId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateServer", map[string]any{
+		"ServerId":  serverID,
+		"Protocols": []any{"SFTP", "FTP"},
+	}))
+	require.NoError(t, err)
+	body := respJSON(t, resp)
+	assert.Equal(t, serverID, body["ServerId"])
+
+	// Verify update
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeServer", map[string]any{"ServerId": serverID}))
+	srv := respJSON(t, descResp)["Server"].(map[string]any)
+	protocols := srv["Protocols"].([]any)
+	assert.Len(t, protocols, 2)
+}
+
+func TestTransfer_UpdateServerNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateServer", map[string]any{
+		"ServerId": "s-ghost",
+	}))
+	require.Error(t, err)
+}
+
+// ---- Test: UpdateUser ----
+
+func TestTransfer_UpdateUser(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateServer", map[string]any{}))
+	serverID := respJSON(t, cr)["ServerId"].(string)
+
+	_, _ = s.HandleRequest(jsonCtx("CreateUser", map[string]any{
+		"ServerId":      serverID,
+		"UserName":      "upd-user",
+		"Role":          "arn:aws:iam::123456789012:role/transfer",
+		"HomeDirectory": "/home/orig",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateUser", map[string]any{
+		"ServerId":      serverID,
+		"UserName":      "upd-user",
+		"HomeDirectory": "/home/updated",
+	}))
+	require.NoError(t, err)
+	body := respJSON(t, resp)
+	assert.Equal(t, "upd-user", body["UserName"])
+
+	// Verify
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeUser", map[string]any{
+		"ServerId": serverID, "UserName": "upd-user",
+	}))
+	user := respJSON(t, descResp)["User"].(map[string]any)
+	assert.Equal(t, "/home/updated", user["HomeDirectory"])
+}
+
+// ---- Test: Workflows ----
+
+func TestTransfer_WorkflowCRUD(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateWorkflow", map[string]any{
+		"Description": "Test workflow",
+		"Steps": []any{
+			map[string]any{"Type": "COPY", "CopyStepDetails": map[string]any{}},
+		},
+	}))
+	require.NoError(t, err)
+	wfID := respJSON(t, createResp)["WorkflowId"].(string)
+	assert.NotEmpty(t, wfID)
+
+	// Describe
+	descResp, err := s.HandleRequest(jsonCtx("DescribeWorkflow", map[string]any{
+		"WorkflowId": wfID,
+	}))
+	require.NoError(t, err)
+	wf := respJSON(t, descResp)["Workflow"].(map[string]any)
+	assert.Equal(t, wfID, wf["WorkflowId"])
+	assert.Equal(t, "Test workflow", wf["Description"])
+
+	// List
+	listResp, err := s.HandleRequest(jsonCtx("ListWorkflows", map[string]any{}))
+	require.NoError(t, err)
+	workflows := respJSON(t, listResp)["Workflows"].([]any)
+	assert.Len(t, workflows, 1)
+
+	// Delete
+	_, err = s.HandleRequest(jsonCtx("DeleteWorkflow", map[string]any{"WorkflowId": wfID}))
+	require.NoError(t, err)
+
+	listResp2, _ := s.HandleRequest(jsonCtx("ListWorkflows", map[string]any{}))
+	workflows2 := respJSON(t, listResp2)["Workflows"].([]any)
+	assert.Len(t, workflows2, 0)
+}
+
+func TestTransfer_WorkflowNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DescribeWorkflow", map[string]any{"WorkflowId": "w-ghost"}))
+	require.Error(t, err)
+}
+
+// ---- Test: Tagging ----
+
+func TestTransfer_Tagging(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateServer", map[string]any{}))
+	serverID := respJSON(t, cr)["ServerId"].(string)
+
+	descResp, _ := s.HandleRequest(jsonCtx("DescribeServer", map[string]any{"ServerId": serverID}))
+	arn := respJSON(t, descResp)["Server"].(map[string]any)["Arn"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"Arn":  arn,
+		"Tags": []any{map[string]any{"Key": "env", "Value": "test"}},
+	}))
+	require.NoError(t, err)
+
+	listResp, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"Arn": arn}))
+	require.NoError(t, err)
+	tags := respJSON(t, listResp)["Tags"].([]any)
+	assert.Len(t, tags, 1)
+
+	_, err = s.HandleRequest(jsonCtx("UntagResource", map[string]any{
+		"Arn":     arn,
+		"TagKeys": []any{"env"},
+	}))
+	require.NoError(t, err)
+
+	listResp2, _ := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"Arn": arn}))
+	tags2 := respJSON(t, listResp2)["Tags"].([]any)
+	assert.Len(t, tags2, 0)
+}
+
+func TestTransfer_TaggingNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"Arn":  "arn:aws:transfer:us-east-1:123456789012:server/ghost",
+		"Tags": []any{},
+	}))
+	require.Error(t, err)
+}

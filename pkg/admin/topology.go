@@ -312,7 +312,12 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	// Cognito → Lambda triggers (auth hooks)
 	for fn := range lambdaFunctions {
 		if strings.Contains(fn, "cognito") || strings.Contains(fn, "auth") || strings.Contains(fn, "authorizer") {
-			addEdge("cognito:user-pool", "microservice:"+fn, "trigger", "Cognito trigger", "config")
+			// Use the node ID that actually exists (lambda: for discovered, microservice: for IaC)
+			targetID := "lambda:" + fn
+			if nodeIDs["microservice:"+fn] {
+				targetID = "microservice:" + fn
+			}
+			addEdge("cognito:user-pool", targetID, "trigger", "Cognito trigger", "config")
 		}
 	}
 
@@ -356,18 +361,22 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		}
 	}
 
-	// Connect webhook/subscription tables to their services
-	if dynamoTables["webhook-dev"] {
-		addEdge("microservice:webhook", "dynamodb:webhook-dev", "read_write", "table access", "config")
+	// Connect webhook/subscription tables to their services by matching table base names.
+	// Table names may have environment suffixes (e.g. webhook-dev, webhook-prod).
+	tableServiceMap := map[string]string{
+		"webhook":         "webhook",
+		"webhookDelivery": "webhook",
+		"subscription":    "billing",
+		"notification":    "notification",
 	}
-	if dynamoTables["webhookDelivery-dev"] {
-		addEdge("microservice:webhook", "dynamodb:webhookDelivery-dev", "read_write", "table access", "config")
-	}
-	if dynamoTables["subscription-dev"] {
-		addEdge("microservice:billing", "dynamodb:subscription-dev", "read_write", "table access", "config")
-	}
-	if dynamoTables["notification-dev"] {
-		addEdge("microservice:notification", "dynamodb:notification-dev", "read_write", "table access", "config")
+	for table := range dynamoTables {
+		baseName := strings.TrimSuffix(table, "-"+a.environment())
+		if svcName, ok := tableServiceMap[baseName]; ok {
+			msID := "microservice:" + svcName
+			if nodeIDs[msID] {
+				addEdge(msID, "dynamodb:"+table, "read_write", "table access", "config")
+			}
+		}
 	}
 
 	// SES — notification service sends email
@@ -452,6 +461,12 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	// 11. All service relationship edges come from IaC config (pushed via /api/topology/config).
 	// No hardcoded edges — the topology is derived from Pulumi/Terraform definitions.
 
+	// Clean labels: strip project prefixes and env suffixes for display
+	env := a.environment()
+	for i := range nodes {
+		nodes[i].Label = cleanNodeLabel(nodes[i].Label, env)
+	}
+
 	// Enrich edges with latency stats from request log
 	if a.log != nil {
 		enrichEdgesWithLatency(edges, a.log)
@@ -462,6 +477,22 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		Edges:  edges,
 		Groups: topologyGroups,
 	}
+}
+
+// cleanNodeLabel strips common IaC prefixes and environment suffixes from node labels.
+func cleanNodeLabel(label, env string) string {
+	cleaned := label
+	for _, prefix := range []string{"autotend-", "autotend_"} {
+		cleaned = strings.TrimPrefix(cleaned, prefix)
+	}
+	if env != "" {
+		cleaned = strings.TrimSuffix(cleaned, "-"+env)
+		cleaned = strings.TrimSuffix(cleaned, "_"+env)
+	}
+	if len(cleaned) <= 1 {
+		return label
+	}
+	return cleaned
 }
 
 // enrichEdgesWithLatency computes average latency and call count per service
@@ -876,6 +907,14 @@ func extractJSONField(body, field string) string {
 		return ""
 	}
 	return rest[:end]
+}
+
+// environment returns the configured IaC environment name, defaulting to "dev".
+func (a *API) environment() string {
+	if a.cfg != nil && a.cfg.IaCEnv != "" {
+		return a.cfg.IaCEnv
+	}
+	return "dev"
 }
 
 // serviceHasActivity checks if a service has received any traffic in the request log.

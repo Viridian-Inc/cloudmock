@@ -343,27 +343,12 @@ export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
     if (ci) return ci;
 
     // Lambda function name → manifest service name mapping
-    // e.g., "autotend-order-handler" → strip prefix/suffix → "order" → try manifest
+    // Strip common prefixes/suffixes to find matching manifest entry
     const stripped = svcKey
-      .replace(/^autotend-/, '')
       .replace(/-handler$/, '')
       .replace(/-sync$/, '');
     const byStripped = manifest.find((s) => s.name.toLowerCase() === stripped.toLowerCase());
     if (byStripped) return byStripped;
-
-    // Known Lambda → microservice mappings (from lambda-defs.ts)
-    const lambdaToService: Record<string, string> = {
-      'autotend-order-handler': 'billing',
-      'autotend-attendance-handler': 'attendance',
-      'autotend-notification-handler': 'notifications',
-      'autotend-membership-handler': 'organizations',
-      'autotend-stream-sync': 'calendar',
-    };
-    const mapped = lambdaToService[svcKey];
-    if (mapped) {
-      const byMapped = manifest.find((s) => s.name === mapped);
-      if (byMapped) return byMapped;
-    }
 
     // Partial match: manifest service name contained in svcKey or vice versa
     const partial = manifest.find((s) =>

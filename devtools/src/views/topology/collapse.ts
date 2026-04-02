@@ -72,14 +72,8 @@ export function collapseTopology(
     }
   }
 
-  // Lambda function name → friendly microservice name
-  const LAMBDA_NAMES: Record<string, string> = {
-    'autotend-attendance-handler': 'Attendance',
-    'autotend-order-handler': 'Billing',
-    'autotend-membership-handler': 'Organizations',
-    'autotend-notification-handler': 'Notifications',
-    'autotend-stream-sync': 'Calendar Sync',
-  };
+  // Lambda function name → friendly microservice name (populated dynamically from node labels)
+  const LAMBDA_NAMES: Record<string, string> = {};
 
   // Pass 2: Remap edge endpoints
   function resolveId(id: string): string {

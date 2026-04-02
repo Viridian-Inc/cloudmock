@@ -315,19 +315,10 @@ interface DeploysTabProps {
 function DeploysTab({ svcKey, deploys }: DeploysTabProps) {
   const [selectedDeploy, setSelectedDeploy] = useState<DeployEvent | null>(null);
 
-  // Match deploys flexibly:
-  // svcKey might be: "bff-service", "autotend-order-handler", "dynamodb", etc.
-  // Deploy service might be: "bff", "billing", "attendance", etc.
+  // Match deploys flexibly — strip common prefixes/suffixes for fuzzy matching.
   const svcLower = svcKey.toLowerCase();
-  const stripped = svcLower.replace(/^autotend-/, '').replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
-  const lambdaMap: Record<string, string> = {
-    'autotend-order-handler': 'billing',
-    'autotend-attendance-handler': 'attendance',
-    'autotend-notification-handler': 'notifications',
-    'autotend-membership-handler': 'organizations',
-    'autotend-stream-sync': 'calendar',
-  };
-  const mappedName = lambdaMap[svcKey]?.toLowerCase();
+  const stripped = svcLower.replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
+  const mappedName: string | undefined = undefined;
   const filtered = deploys.filter((d) => {
     const ds = (d.service || '').toLowerCase();
     return ds === svcLower ||             // exact: "bff" === "bff"

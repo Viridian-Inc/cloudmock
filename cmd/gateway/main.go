@@ -199,6 +199,114 @@ import (
 	wafv2svc "github.com/neureaux/cloudmock/services/wafv2"
 )
 
+// cleanLabel strips common IaC prefixes (e.g. "autotend-") and environment
+// suffixes (e.g. "-dev", "-prod") from resource names for display.
+// It avoids stripping if the result would be empty or a single generic word.
+func cleanLabel(name string) string {
+	cleaned := name
+	// Strip known project prefixes
+	for _, prefix := range []string{"autotend-", "autotend_"} {
+		cleaned = strings.TrimPrefix(cleaned, prefix)
+	}
+	// Strip environment suffixes
+	for _, suffix := range []string{"-dev", "-stage", "-staging", "-prod", "-production", "-local", "-test"} {
+		cleaned = strings.TrimSuffix(cleaned, suffix)
+	}
+	for _, suffix := range []string{"_dev", "_stage", "_staging", "_prod", "_production", "_local", "_test"} {
+		cleaned = strings.TrimSuffix(cleaned, suffix)
+	}
+	// Don't return empty or single-char results
+	if len(cleaned) <= 1 {
+		return name
+	}
+	return cleaned
+}
+
+// buildIaCTopology converts an IaCImportResult into topology nodes and edges
+// with properly populated Service fields for dashboard rendering.
+func buildIaCTopology(result *iac.IaCImportResult) ([]admin.TopologyNodeV2, []admin.TopologyEdgeV2) {
+	if result == nil {
+		return nil, nil
+	}
+	var nodes []admin.TopologyNodeV2
+	var edges []admin.TopologyEdgeV2
+	nodeSet := make(map[string]bool)
+
+	// Microservices
+	for _, ms := range result.Microservices {
+		nodeID := "microservice:" + ms.Name
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: nodeID, Label: ms.Name, Service: "lambda", Type: "function", Group: "Compute",
+		})
+		nodeSet[nodeID] = true
+		for _, table := range ms.Tables {
+			edges = append(edges, admin.TopologyEdgeV2{
+				Source: nodeID, Target: "dynamodb:" + table, Type: "read_write", Label: "table access", Discovered: "config",
+			})
+		}
+	}
+
+	// Standalone Lambda functions
+	for _, fn := range result.Lambdas {
+		nodeID := "lambda:" + fn.Name
+		if nodeSet[nodeID] || nodeSet["microservice:"+fn.Name] {
+			continue
+		}
+		group := "Compute"
+		typ := "function"
+		if strings.Contains(fn.Name, "bff") {
+			group = "API"
+			typ = "server"
+		}
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: nodeID, Label: cleanLabel(fn.Name), Service: "lambda", Type: typ, Group: group,
+		})
+		nodeSet[nodeID] = true
+	}
+
+	// Cognito pools
+	for _, pool := range result.CognitoPools {
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: "svc:cognito:" + pool.Name, Label: cleanLabel(pool.Name), Service: "cognito-idp", Type: "aws-service", Group: "Auth",
+		})
+	}
+
+	// SQS queues
+	for _, q := range result.SQSQueues {
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: "svc:sqs:" + q.Name, Label: cleanLabel(q.Name), Service: "sqs", Type: "aws-service", Group: "Messaging",
+		})
+	}
+
+	// SNS topics
+	for _, t := range result.SNSTopics {
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: "svc:sns:" + t.Name, Label: cleanLabel(t.Name), Service: "sns", Type: "aws-service", Group: "Messaging",
+		})
+	}
+
+	// S3 buckets
+	for _, b := range result.S3Buckets {
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: "svc:s3:" + b.Name, Label: cleanLabel(b.Name), Service: "s3", Type: "aws-service", Group: "Storage",
+		})
+	}
+
+	// API Gateway
+	for _, gw := range result.APIGateways {
+		nodes = append(nodes, admin.TopologyNodeV2{
+			ID: "svc:apigateway:" + gw.Name, Label: cleanLabel(gw.Name), Service: "apigateway", Type: "aws-service", Group: "API",
+		})
+		for _, ms := range result.Microservices {
+			edges = append(edges, admin.TopologyEdgeV2{
+				Source: "svc:apigateway:" + gw.Name, Target: "microservice:" + ms.Name, Type: "trigger", Discovered: "config",
+			})
+		}
+	}
+
+	return nodes, edges
+}
+
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.
 	logFormat := os.Getenv("CLOUDMOCK_LOG_FORMAT")
@@ -928,91 +1036,37 @@ func main() {
 		adminAPI.SetMicroservices(iacMicroservices)
 
 		// Build topology nodes + edges from IaC-discovered resources
-		var topoNodes []admin.TopologyNodeV2
-		var topoEdges []admin.TopologyEdgeV2
-
-		// Lambda microservices → Compute nodes with edges to their DynamoDB tables
-		for _, ms := range iacMicroservices {
-			nodeID := "ms:" + ms.Name
-			topoNodes = append(topoNodes, admin.TopologyNodeV2{
-				ID: nodeID, Label: ms.Name, Type: "lambda", Group: "Compute",
-			})
-			for _, table := range ms.Tables {
-				topoEdges = append(topoEdges, admin.TopologyEdgeV2{
-					Source: nodeID, Target: "svc:dynamodb",
-				})
-				_ = table // edges go to dynamodb service, not individual tables
-				break // one edge per service, not per table
-			}
-		}
-
-		// Standalone Lambda functions (BFF, control-plane, stream-sync, scheduled-tasks)
-		if iacResult != nil {
-			for _, fn := range iacResult.Lambdas {
-				nodeID := "lambda:" + fn.Name
-				// Skip if already added as microservice
-				exists := false
-				for _, n := range topoNodes {
-					if n.ID == nodeID || n.Label == fn.Name {
-						exists = true
-						break
-					}
-				}
-				if !exists {
-					group := "Compute"
-					typ := "lambda"
-					// BFF is an API node
-					if strings.Contains(fn.Name, "bff") {
-						group = "API"
-						typ = "server"
-					}
-					topoNodes = append(topoNodes, admin.TopologyNodeV2{
-						ID: nodeID, Label: fn.Name, Type: typ, Group: group,
-					})
-				}
-			}
-
-			// Cognito pools → nodes
-			for _, pool := range iacResult.CognitoPools {
-				topoNodes = append(topoNodes, admin.TopologyNodeV2{
-					ID: "svc:cognito:" + pool.Name, Label: pool.Name, Type: "aws-service", Group: "Auth",
-				})
-			}
-
-			// SQS queues → edges from microservices
-			for _, q := range iacResult.SQSQueues {
-				topoNodes = append(topoNodes, admin.TopologyNodeV2{
-					ID: "svc:sqs:" + q.Name, Label: q.Name, Type: "aws-service", Group: "Messaging",
-				})
-			}
-
-			// S3 buckets
-			for _, b := range iacResult.S3Buckets {
-				topoNodes = append(topoNodes, admin.TopologyNodeV2{
-					ID: "svc:s3:" + b.Name, Label: b.Name, Type: "aws-service", Group: "Storage",
-				})
-			}
-
-			// API Gateway
-			for _, gw := range iacResult.APIGateways {
-				topoNodes = append(topoNodes, admin.TopologyNodeV2{
-					ID: "svc:apigateway:" + gw.Name, Label: gw.Name, Type: "aws-service", Group: "API",
-				})
-				// API Gateway → all Lambda microservices
-				for _, ms := range iacMicroservices {
-					topoEdges = append(topoEdges, admin.TopologyEdgeV2{
-						Source: "svc:apigateway:" + gw.Name, Target: "ms:" + ms.Name,
-					})
-				}
-			}
-		}
-
-		// Set topology if we built nodes
+		topoNodes, topoEdges := buildIaCTopology(iacResult)
 		if len(topoNodes) > 0 {
 			adminAPI.SetTopologyFromIaC(topoNodes, topoEdges)
 			slog.Info("topology built from IaC", "nodes", len(topoNodes), "edges", len(topoEdges))
 		}
 	}
+	// Start IaC file watcher for hot-reload (re-scans on .ts/.tf file changes).
+	if *iacDir != "" {
+		reconciler := iac.NewReconciler(registry, slog.Default())
+		iacWatcher, watchErr := iac.NewWatcher(*iacDir, *iacEnv, slog.Default(), func(result *iac.IaCImportResult) {
+			// Reconcile resources: provision new, remove stale
+			reconciler.Reconcile(result)
+
+			// Update microservices
+			adminAPI.SetMicroservices(result.Microservices)
+
+			// Rebuild and replace topology from fresh scan
+			topoNodes, topoEdges := buildIaCTopology(result)
+			if len(topoNodes) > 0 {
+				adminAPI.SetTopologyFromIaC(topoNodes, topoEdges)
+				slog.Info("topology rebuilt from IaC hot-reload", "nodes", len(topoNodes), "edges", len(topoEdges))
+			}
+		})
+		if watchErr != nil {
+			slog.Error("failed to start IaC file watcher", "error", watchErr)
+		} else {
+			slog.Info("iac file watcher started", "dir", *iacDir)
+			defer iacWatcher.Stop()
+		}
+	}
+
 	// Audit logger
 	var auditLog audit.Logger
 	switch mode {

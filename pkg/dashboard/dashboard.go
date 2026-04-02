@@ -4,10 +4,12 @@ package dashboard
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
 	"strings"
+	"time"
 )
 
 //go:embed all:dist
@@ -21,6 +23,7 @@ type Handler struct {
 	fileServer   http.Handler
 	adminPort    int
 	adminHandler http.Handler
+	bootID       string
 }
 
 // New creates a dashboard Handler. The adminPort parameter is kept for API
@@ -31,6 +34,7 @@ func New(adminPort int) *Handler {
 	return &Handler{
 		fileServer: http.FileServer(http.FS(dist)),
 		adminPort:  adminPort,
+		bootID:     fmt.Sprintf("%d", time.Now().UnixMilli()),
 	}
 }
 
@@ -51,6 +55,13 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Force cache-bust: redirect bare / to /?v=<bootID> so the browser
+	// can't serve a stale HTML page from disk cache.
+	if r.URL.Path == "/" && r.URL.Query().Get("v") != h.bootID {
+		http.Redirect(w, r, "/?v="+h.bootID, http.StatusTemporaryRedirect)
+		return
+	}
+
 	// Try to open the requested file in the embedded FS.
 	path := strings.TrimPrefix(r.URL.Path, "/")
 	if path == "" {
@@ -65,6 +76,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	f.Close()
 
+	// HTML files: no caching (ensures fresh JS/CSS references after rebuilds).
+	// Hashed assets (JS/CSS): immutable, cache forever.
+	if strings.HasSuffix(path, ".html") || path == "index.html" {
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+	}
+
 	// File exists — serve it with the embedded file server.
 	h.fileServer.ServeHTTP(w, r)
 }
@@ -77,6 +96,7 @@ func (h *Handler) serveIndex(w http.ResponseWriter, _ *http.Request) {
 	}
 	defer f.Close()
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
 	w.WriteHeader(http.StatusOK)
 	io.Copy(w, f)
 }

@@ -4,28 +4,6 @@
  */
 
 const SERVICE_PATHS: Record<string, string> = {
-  // AutoTend microservices
-  'attendance': 'autotend-api-services/services/attendance',
-  'bff': 'autotend-api-services/services/bff',
-  'billing': 'autotend-api-services/services/billing',
-  'calendar': 'autotend-api-services/services/calendar',
-  'compliance': 'autotend-api-services/services/compliance',
-  'identity': 'autotend-api-services/services/identity',
-  'integrations': 'autotend-api-services/services/integrations',
-  'notifications': 'autotend-api-services/services/notifications',
-  'organizations': 'autotend-api-services/services/organizations',
-  // Lambda / IaC resource name aliases
-  'autotend-order-handler': 'autotend-api-services/services/billing',
-  'autotend-attendance-handler': 'autotend-api-services/services/attendance',
-  'autotend-notification-handler': 'autotend-api-services/services/notifications',
-  'autotend-membership-handler': 'autotend-api-services/services/organizations',
-  'autotend-stream-sync': 'autotend-api-services/services/calendar',
-  'bff-service': 'autotend-api-services/services/bff',
-  // AutoTend app
-  'autotend-app': 'autotend-app/apps/app-native',
-  'app-native': 'autotend-app/apps/app-native',
-  // Infrastructure
-  'autotend-infra': 'autotend-infra/pulumi',
   // CloudMock services
   'dynamodb': 'cloudmock/services/dynamodb',
   'lambda': 'cloudmock/services/lambda',

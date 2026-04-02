@@ -448,8 +448,16 @@ func (a *API) SetTopologyFromIaC(nodes []TopologyNodeV2, edges []TopologyEdgeV2)
 	if a.iacTopology == nil {
 		a.iacTopology = &IaCTopologyConfig{}
 	}
-	a.iacTopology.Nodes = append(a.iacTopology.Nodes, nodes...)
-	a.iacTopology.Edges = append(a.iacTopology.Edges, edges...)
+	a.iacTopology.Nodes = nodes
+	a.iacTopology.Edges = edges
+
+	// Notify connected dashboard clients that the topology has changed.
+	if a.broadcaster != nil {
+		a.broadcaster.Broadcast("topology_updated", map[string]int{
+			"nodes": len(nodes),
+			"edges": len(edges),
+		})
+	}
 }
 
 // SetLambdaLogs sets the Lambda log buffer for the admin API to serve.

@@ -254,7 +254,29 @@ func ImportPulumiDir(dir string, environment string, logger *slog.Logger) (*IaCI
 		return nil, fmt.Errorf("walk pulumi dir: %w", err)
 	}
 
+	// Filter out resources with unresolved template variables (${...} in name).
+	// These are phantom entries from IaC patterns we can't fully resolve.
+	result.Tables = filterSlice(result.Tables, func(t DynamoTableDef) bool { return !strings.Contains(t.Name, "${") })
+	result.Lambdas = filterSlice(result.Lambdas, func(l LambdaDef) bool { return !strings.Contains(l.Name, "${") })
+	result.CognitoPools = filterSlice(result.CognitoPools, func(c CognitoDef) bool { return !strings.Contains(c.Name, "${") })
+	result.SQSQueues = filterSlice(result.SQSQueues, func(q SQSQueueDef) bool { return !strings.Contains(q.Name, "${") })
+	result.SNSTopics = filterSlice(result.SNSTopics, func(t SNSTopicDef) bool { return !strings.Contains(t.Name, "${") })
+	result.S3Buckets = filterSlice(result.S3Buckets, func(b S3BucketDef) bool { return !strings.Contains(b.Name, "${") })
+	result.APIGateways = filterSlice(result.APIGateways, func(a APIGatewayDef) bool { return !strings.Contains(a.Name, "${") })
+	result.Microservices = filterSlice(result.Microservices, func(m MicroserviceDef) bool { return !strings.Contains(m.Name, "${") })
+
 	return result, nil
+}
+
+// filterSlice returns only the elements of s for which keep returns true.
+func filterSlice[T any](s []T, keep func(T) bool) []T {
+	out := s[:0]
+	for _, v := range s {
+		if keep(v) {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 // parseDynamoTables extracts DynamoDB table definitions from Pulumi TypeScript source.

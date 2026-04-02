@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
 import { SplitPanel } from '../../components/panels/split-panel';
-import { api, cachedApi } from '../../lib/api';
+import { api, cachedApi, getAdminBase } from '../../lib/api';
 import { useTopologyMetrics, type TimeWindow } from '../../hooks/use-topology-metrics';
 import { loadDomainConfig, type DomainConfig } from '../../lib/domains';
 import type { ServiceMetrics, DeployEvent } from '../../lib/health';
@@ -101,7 +101,7 @@ const DOMAIN_GROUPS: Record<string, { label: string; members: string[] }> = {
 
 /** Nodes that are always shown individually (never grouped). */
 const ALWAYS_INDIVIDUAL = new Set([
-  'client:', 'apigw:', 'lambda:autotend-bff', 'svc:cognito', 'cognito:',
+  'client:', 'apigw:', 'svc:cognito', 'cognito:',
   'svc:sns', 'sns:', 'svc:sqs', 'sqs:',
   'svc:s3', 's3:', 'eventbridge:', 'svc:events',
 ]);
@@ -130,10 +130,6 @@ function collapseTopology(
   const collapseMap = new Map<string, string>();
   const expanded = expandedGroups || new Set<string>();
 
-  // Infrastructure to hide entirely (plumbing, not app-relevant)
-  const HIDDEN = new Set(['iam', 'sts', 'kms', 'logs', 'monitoring', 'secretsmanager',
-    'ssm', 'cloudformation', 'rds', 'ec2', 'ecr', 'ecs', 'route53', 'ses']);
-
   // Track domain group membership counts
   const groupCounts = new Map<string, number>();
   const groupMembers = new Map<string, RawNode[]>();
@@ -141,11 +137,6 @@ function collapseTopology(
   for (const n of rawNodes) {
     const prefix = n.id.split(':')[0];
     const svc = n.service || prefix;
-
-    // Hide infra plumbing
-    if (HIDDEN.has(prefix) || HIDDEN.has(svc)) {
-      continue;
-    }
 
     // Always-individual nodes pass through
     if (isAlwaysIndividual(n.id)) {
@@ -539,17 +530,42 @@ export function TopologyView() {
     return () => document.removeEventListener('mousedown', handler);
   }, [layoutDropdownOpen]);
 
-  // Load topology
-  useEffect(() => {
-    setLoading(true);
-    cachedApi<{ nodes: RawNode[]; edges: RawEdge[] }>('/api/topology', 'topology:graph')
+  // Load topology — always fetch fresh (no localStorage cache).
+  // Re-fetches on SSE topology_updated events and polls every 30s as fallback.
+  const fetchTopology = useCallback(() => {
+    api<{ nodes: RawNode[]; edges: RawEdge[] }>('/api/topology')
       .then((data) => {
         setRawNodes(data.nodes || []);
         setRawEdges(data.edges || []);
       })
-      .catch(() => { setRawNodes([]); setRawEdges([]); })
-      .finally(() => setLoading(false));
+      .catch(() => { setRawNodes([]); setRawEdges([]); });
   }, []);
+
+  useEffect(() => {
+    setLoading(true);
+    fetchTopology();
+    setLoading(false);
+
+    // Poll every 30s as fallback
+    const interval = setInterval(fetchTopology, 30_000);
+
+    // Listen for real-time topology updates via SSE
+    const base = getAdminBase();
+    const es = new EventSource(`${base}/api/stream`);
+    es.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'topology_updated') {
+          fetchTopology();
+        }
+      } catch { /* ignore parse errors */ }
+    };
+
+    return () => {
+      clearInterval(interval);
+      es.close();
+    };
+  }, [fetchTopology]);
 
   // Apply default layout on initial topology load
   const defaultLayoutAppliedRef = useRef(false);

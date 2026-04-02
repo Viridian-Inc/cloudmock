@@ -135,12 +135,12 @@ export function filterRequestsByEdgeServices(
   );
 
   const svcLower = serviceName.toLowerCase();
-  const stripped = svcLower.replace(/^autotend-/, '').replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
+  const stripped = svcLower.replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
 
   return allRequests.filter((r) => {
     const rs = (r.service || '').toLowerCase();
-    // Also strip the request's service name for fuzzy matching
-    const rsStripped = rs.replace(/^autotend-/, '').replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
+    // Strip common suffixes for fuzzy matching
+    const rsStripped = rs.replace(/-handler$/, '').replace(/-sync$/, '').replace(/-service$/, '');
     return rs === svcLower || rs === stripped ||
       rsStripped === stripped || rsStripped === svcLower.replace(/-service$/, '') ||
       svcLower.includes(rs) || rs.includes(stripped) ||

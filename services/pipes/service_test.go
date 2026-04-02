@@ -370,6 +370,130 @@ func TestPipeStartStopPolling(t *testing.T) {
 	assert.GreaterOrEqual(t, pollCount, 2, "Should have polled again after restart")
 }
 
+// ---- Additional coverage tests ----
+
+func TestCreatePipeWithDesiredStateStopped(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreatePipe", map[string]any{
+		"Name":         "stopped-pipe",
+		"Source":       "arn:aws:sqs:us-east-1:123456789012:my-queue",
+		"Target":       "arn:aws:lambda:us-east-1:123456789012:function:my-func",
+		"RoleArn":      "arn:aws:iam::123456789012:role/pipe-role",
+		"DesiredState": "STOPPED",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "STOPPED", m["DesiredState"])
+}
+
+func TestCreatePipeWithDescription(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreatePipe", map[string]any{
+		"Name":        "desc-pipe",
+		"Description": "A test pipe with description",
+		"Source":      "arn:aws:sqs:us-east-1:123456789012:my-queue",
+		"Target":      "arn:aws:lambda:us-east-1:123456789012:function:my-func",
+		"RoleArn":     "arn:aws:iam::123456789012:role/pipe-role",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "A test pipe with description", m["Description"])
+}
+
+func TestCreatePipeWithEnrichment(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreatePipe", map[string]any{
+		"Name":       "enrich-pipe",
+		"Source":     "arn:aws:sqs:us-east-1:123456789012:my-queue",
+		"Target":     "arn:aws:lambda:us-east-1:123456789012:function:my-func",
+		"RoleArn":    "arn:aws:iam::123456789012:role/pipe-role",
+		"Enrichment": "arn:aws:lambda:us-east-1:123456789012:function:enrichment-func",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "enrich-pipe", m["Name"])
+}
+
+func TestListPipesCurrentStateFilter(t *testing.T) {
+	s := newService()
+	mustCreatePipe(t, s, "pipe-a")
+	mustCreatePipe(t, s, "pipe-b")
+
+	resp, err := s.HandleRequest(jsonCtx("ListPipes", map[string]any{
+		"CurrentState": "RUNNING",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	pipes := m["Pipes"].([]any)
+	// With instant lifecycle all should be RUNNING
+	assert.Len(t, pipes, 2)
+}
+
+func TestUpdatePipeDesiredState(t *testing.T) {
+	s := newService()
+	mustCreatePipe(t, s, "state-pipe")
+
+	resp, err := s.HandleRequest(jsonCtx("UpdatePipe", map[string]any{
+		"Name":         "state-pipe",
+		"DesiredState": "STOPPED",
+		"RoleArn":      "arn:aws:iam::123456789012:role/pipe-role",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "state-pipe", m["Name"])
+}
+
+func TestListTagsForPipeNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{
+		"ResourceArn": "arn:aws:pipes:us-east-1:123456789012:pipe/nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestPipeARNContainsName(t *testing.T) {
+	s := newService()
+	m := mustCreatePipe(t, s, "arn-test-pipe")
+	assert.Contains(t, m["Arn"].(string), "arn-test-pipe")
+	assert.Contains(t, m["Arn"].(string), "arn:aws:pipes:")
+}
+
+func TestDeletePipeReturnsState(t *testing.T) {
+	s := newService()
+	mustCreatePipe(t, s, "del-state-pipe")
+
+	resp, err := s.HandleRequest(jsonCtx("DeletePipe", map[string]any{"Name": "del-state-pipe"}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "DELETING", m["CurrentState"])
+}
+
+func TestUpdatePipeTarget(t *testing.T) {
+	s := newService()
+	mustCreatePipe(t, s, "target-pipe")
+
+	newTarget := "arn:aws:lambda:us-east-1:123456789012:function:new-func"
+	resp, err := s.HandleRequest(jsonCtx("UpdatePipe", map[string]any{
+		"Name":    "target-pipe",
+		"Target":  newTarget,
+		"RoleArn": "arn:aws:iam::123456789012:role/pipe-role",
+	}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	assert.Equal(t, "target-pipe", m["Name"])
+
+	// Verify target updated
+	descResp, _ := s.HandleRequest(jsonCtx("DescribePipe", map[string]any{"Name": "target-pipe"}))
+	descM := decode(t, descResp)
+	assert.Equal(t, newTarget, descM["Target"])
+}
+
+func TestServiceNameAndHealthCheck(t *testing.T) {
+	s := newService()
+	assert.Equal(t, "pipes", s.Name())
+	assert.NoError(t, s.HealthCheck())
+}
+
 // ---- Test helpers for behavioral tests ----
 
 type mockTargetService struct {

@@ -15,6 +15,10 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 	return &service.Response{Format: service.FormatJSON}, awsErr
 }
 
+func emptyOK() (*service.Response, error) {
+	return &service.Response{StatusCode: http.StatusOK, Body: struct{}{}, Format: service.FormatJSON}, nil
+}
+
 func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
@@ -924,4 +928,197 @@ func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*serv
 		return jsonErr(service.NewAWSError("NotFoundException", "Resource not found.", http.StatusNotFound))
 	}
 	return jsonOK(&listTagsResponse{Tags: tags})
+}
+
+// ---- Type handlers ----
+
+type createTypeRequest struct {
+	ApiId       string `json:"apiId"`
+	TypeName    string `json:"typeName"`
+	Definition  string `json:"definition"`
+	Format      string `json:"format"`
+	Description string `json:"description"`
+}
+
+type typeResponse struct {
+	Arn         string `json:"arn"`
+	Name        string `json:"name"`
+	Format      string `json:"format"`
+	Definition  string `json:"definition,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+func typeToResp(td *TypeDef) *typeResponse {
+	return &typeResponse{Arn: td.ARN, Name: td.Name, Format: td.Format, Definition: td.Definition, Description: td.Description}
+}
+
+func handleCreateType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTypeRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	if apiID == "" {
+		return jsonErr(service.ErrValidation("apiId is required."))
+	}
+	if req.Definition == "" || req.Format == "" {
+		return jsonErr(service.ErrValidation("definition and format are required."))
+	}
+	// Prefer explicit typeName, else extract from SDL.
+	name := req.TypeName
+	if name == "" {
+		name = extractTypeName(req.Definition)
+	}
+	if name == "" {
+		name = "UnnamedType"
+	}
+	td, ok := store.CreateType(apiID, name, req.Format, req.Definition, req.Description)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "API "+apiID+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"type": typeToResp(td)})
+}
+
+func handleGetType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTypeRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	typeName := req.TypeName
+	if typeName == "" {
+		typeName = ctx.Params["typeName"]
+	}
+	format := req.Format
+	if format == "" {
+		format = ctx.Params["format"]
+	}
+	td, ok := store.GetType(apiID, typeName, format)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "Type "+typeName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"type": typeToResp(td)})
+}
+
+func handleListTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTypeRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	format := req.Format
+	if format == "" {
+		format = ctx.Params["format"]
+	}
+	types := store.ListTypes(apiID, format)
+	result := make([]*typeResponse, 0, len(types))
+	for _, td := range types {
+		result = append(result, typeToResp(td))
+	}
+	return jsonOK(map[string]any{"types": result})
+}
+
+func handleUpdateType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTypeRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	typeName := req.TypeName
+	if typeName == "" {
+		typeName = ctx.Params["typeName"]
+	}
+	td, ok := store.UpdateType(apiID, typeName, req.Format, req.Definition, req.Description)
+	if !ok {
+		return jsonErr(service.NewAWSError("NotFoundException", "Type "+typeName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"type": typeToResp(td)})
+}
+
+func handleDeleteType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTypeRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	typeName := req.TypeName
+	if typeName == "" {
+		typeName = ctx.Params["typeName"]
+	}
+	if !store.DeleteType(apiID, typeName) {
+		return jsonErr(service.NewAWSError("NotFoundException", "Type "+typeName+" not found.", http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- Schema handlers ----
+
+type startSchemaCreationRequest struct {
+	ApiId      string `json:"apiId"`
+	Definition string `json:"definition"`
+}
+
+func handleStartSchemaCreation(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req startSchemaCreationRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	if req.Definition == "" {
+		return jsonErr(service.ErrValidation("definition is required."))
+	}
+	if !store.StartSchemaCreation(apiID, req.Definition) {
+		return jsonErr(service.NewAWSError("NotFoundException", "API "+apiID+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"status": "PROCESSING"})
+}
+
+func handleGetSchemaCreationStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req startSchemaCreationRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	apiID := req.ApiId
+	if apiID == "" {
+		apiID = ctx.Params["apiId"]
+	}
+	sc, ok := store.GetSchemaCreationStatus(apiID)
+	if !ok {
+		return jsonOK(map[string]any{"status": "NOT_STARTED", "details": ""})
+	}
+	return jsonOK(map[string]any{"status": sc.Status, "details": sc.Details})
+}
+
+// extractTypeName parses a simple SDL definition to find the type name.
+func extractTypeName(definition string) string {
+	// Look for "type Name" or "input Name" or "interface Name" patterns.
+	for i, ch := range definition {
+		if ch == ' ' {
+			start := i + 1
+			for j := start; j < len(definition); j++ {
+				if definition[j] == ' ' || definition[j] == '{' || definition[j] == '\n' {
+					return definition[start:j]
+				}
+			}
+		}
+	}
+	return ""
 }

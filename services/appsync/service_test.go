@@ -437,6 +437,156 @@ func TestCreateGraphqlApiMissingNameReturnsError(t *testing.T) {
 	assert.NotEqual(t, http.StatusOK, w.Code)
 }
 
+// ---- Type tests ----
+
+func TestCreateType(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "type-api")
+
+	w := doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId":      apiId,
+		"typeName":   "Query",
+		"definition": "type Query { hello: String }",
+		"format":     "SDL",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+	td := decodeBody(t, w)["type"].(map[string]any)
+	assert.Equal(t, "Query", td["name"])
+	assert.Equal(t, "SDL", td["format"])
+}
+
+func TestGetType(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "get-type-api")
+
+	doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+		"definition": "type Query { hello: String }", "format": "SDL",
+	})
+
+	w := doAppSync(t, gw, "GetType", map[string]any{
+		"apiId": apiId, "typeName": "Query", "format": "SDL",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+	td := decodeBody(t, w)["type"].(map[string]any)
+	assert.Equal(t, "Query", td["name"])
+}
+
+func TestGetTypeNotFound(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "no-type-api")
+
+	w := doAppSync(t, gw, "GetType", map[string]any{
+		"apiId": apiId, "typeName": "NonExistent", "format": "SDL",
+	})
+	assert.Equal(t, http.StatusNotFound, w.Code)
+}
+
+func TestListTypes(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "list-types-api")
+
+	doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+		"definition": "type Query { hello: String }", "format": "SDL",
+	})
+	doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId": apiId, "typeName": "Mutation",
+		"definition": "type Mutation { createItem: String }", "format": "SDL",
+	})
+
+	w := doAppSync(t, gw, "ListTypes", map[string]any{
+		"apiId": apiId, "format": "SDL",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+	types := decodeBody(t, w)["types"].([]any)
+	assert.Len(t, types, 2)
+}
+
+func TestUpdateType(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "update-type-api")
+
+	doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+		"definition": "type Query { hello: String }", "format": "SDL",
+	})
+
+	w := doAppSync(t, gw, "UpdateType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+		"definition": "type Query { hello: String world: String }", "format": "SDL",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+	td := decodeBody(t, w)["type"].(map[string]any)
+	assert.Equal(t, "Query", td["name"])
+}
+
+func TestDeleteType(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "delete-type-api")
+
+	doAppSync(t, gw, "CreateType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+		"definition": "type Query { hello: String }", "format": "SDL",
+	})
+
+	w := doAppSync(t, gw, "DeleteType", map[string]any{
+		"apiId": apiId, "typeName": "Query",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Verify deleted
+	w2 := doAppSync(t, gw, "GetType", map[string]any{
+		"apiId": apiId, "typeName": "Query", "format": "SDL",
+	})
+	assert.Equal(t, http.StatusNotFound, w2.Code)
+}
+
+// ---- Schema tests ----
+
+func TestStartSchemaCreation(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "schema-api")
+
+	w := doAppSync(t, gw, "StartSchemaCreation", map[string]any{
+		"apiId":      apiId,
+		"definition": "type Query { hello: String }",
+	})
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w)
+	assert.Equal(t, "PROCESSING", body["status"])
+}
+
+func TestGetSchemaCreationStatus(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "schema-status-api")
+
+	// Before starting: NOT_STARTED
+	w := doAppSync(t, gw, "GetSchemaCreationStatus", map[string]any{"apiId": apiId})
+	assert.Equal(t, http.StatusOK, w.Code)
+	body := decodeBody(t, w)
+	assert.Equal(t, "NOT_STARTED", body["status"])
+
+	// Start schema creation
+	doAppSync(t, gw, "StartSchemaCreation", map[string]any{
+		"apiId": apiId, "definition": "type Query { hello: String }",
+	})
+
+	// After starting: ACTIVE (instant in mock)
+	w2 := doAppSync(t, gw, "GetSchemaCreationStatus", map[string]any{"apiId": apiId})
+	assert.Equal(t, http.StatusOK, w2.Code)
+	body2 := decodeBody(t, w2)
+	assert.Equal(t, "ACTIVE", body2["status"])
+}
+
+func TestStartSchemaCreationMissingDefinition(t *testing.T) {
+	gw := newAppSyncGateway(t)
+	apiId := mustCreateApi(t, gw, "bad-schema-api")
+
+	w := doAppSync(t, gw, "StartSchemaCreation", map[string]any{"apiId": apiId})
+	assert.NotEqual(t, http.StatusOK, w.Code)
+}
+
 // ---- Invalid action ----
 
 func TestInvalidAction(t *testing.T) {

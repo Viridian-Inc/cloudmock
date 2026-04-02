@@ -75,14 +75,32 @@ type ApiKey struct {
 	Deletes     int64
 }
 
+// TypeDef represents an AppSync type definition.
+type TypeDef struct {
+	ApiId       string
+	Name        string
+	Format      string
+	Definition  string
+	Description string
+	ARN         string
+}
+
+// SchemaCreation tracks schema creation state.
+type SchemaCreation struct {
+	Status  string // PROCESSING | ACTIVE | FAILED | DELETING
+	Details string
+}
+
 // Store manages all AppSync state in memory.
 type Store struct {
 	mu          sync.RWMutex
 	apis        map[string]*GraphqlApi
-	dataSources map[string]map[string]*DataSource // apiID -> name -> ds
-	resolvers   map[string]map[string]*Resolver   // apiID -> typeName.fieldName -> resolver
+	dataSources map[string]map[string]*DataSource  // apiID -> name -> ds
+	resolvers   map[string]map[string]*Resolver    // apiID -> typeName.fieldName -> resolver
 	functions   map[string]map[string]*Function    // apiID -> funcID -> function
 	apiKeys     map[string]map[string]*ApiKey      // apiID -> keyID -> key
+	types       map[string]map[string]*TypeDef     // apiID -> name -> type
+	schemas     map[string]*SchemaCreation         // apiID -> schema creation status
 	accountID   string
 	region      string
 	nextFuncNum int
@@ -96,6 +114,8 @@ func NewStore(accountID, region string) *Store {
 		resolvers:   make(map[string]map[string]*Resolver),
 		functions:   make(map[string]map[string]*Function),
 		apiKeys:     make(map[string]map[string]*ApiKey),
+		types:       make(map[string]map[string]*TypeDef),
+		schemas:     make(map[string]*SchemaCreation),
 		accountID:   accountID,
 		region:      region,
 		nextFuncNum: 1,
@@ -610,4 +630,122 @@ func (s *Store) ListTagsForResource(arn string) (map[string]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// ---- Type methods ----
+
+// CreateType creates a new type definition for an API.
+func (s *Store) CreateType(apiID, name, format, definition, description string) (*TypeDef, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.apis[apiID]; !ok {
+		return nil, false
+	}
+	if _, ok := s.types[apiID]; !ok {
+		s.types[apiID] = make(map[string]*TypeDef)
+	}
+	td := &TypeDef{
+		ApiId:       apiID,
+		Name:        name,
+		Format:      format,
+		Definition:  definition,
+		Description: description,
+		ARN:         fmt.Sprintf("arn:aws:appsync:%s:%s:apis/%s/types/%s", s.region, s.accountID, apiID, name),
+	}
+	s.types[apiID][name] = td
+	return td, true
+}
+
+// GetType returns a type definition.
+func (s *Store) GetType(apiID, typeName, format string) (*TypeDef, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if ts, ok := s.types[apiID]; ok {
+		if td, ok := ts[typeName]; ok {
+			return td, true
+		}
+	}
+	return nil, false
+}
+
+// ListTypes returns all types for an API.
+func (s *Store) ListTypes(apiID, format string) []*TypeDef {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ts, ok := s.types[apiID]
+	if !ok {
+		return nil
+	}
+	result := make([]*TypeDef, 0, len(ts))
+	for _, td := range ts {
+		if format == "" || td.Format == format {
+			result = append(result, td)
+		}
+	}
+	return result
+}
+
+// UpdateType updates a type definition.
+func (s *Store) UpdateType(apiID, typeName, format, definition, description string) (*TypeDef, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ts, ok := s.types[apiID]
+	if !ok {
+		return nil, false
+	}
+	td, ok := ts[typeName]
+	if !ok {
+		return nil, false
+	}
+	if format != "" {
+		td.Format = format
+	}
+	if definition != "" {
+		td.Definition = definition
+	}
+	if description != "" {
+		td.Description = description
+	}
+	return td, true
+}
+
+// DeleteType removes a type definition.
+func (s *Store) DeleteType(apiID, typeName string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ts, ok := s.types[apiID]
+	if !ok {
+		return false
+	}
+	if _, ok := ts[typeName]; !ok {
+		return false
+	}
+	delete(ts, typeName)
+	return true
+}
+
+// ---- Schema methods ----
+
+// StartSchemaCreation begins schema creation for an API.
+func (s *Store) StartSchemaCreation(apiID, definition string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.apis[apiID]; !ok {
+		return false
+	}
+	// In mock mode, schema is immediately ACTIVE.
+	s.schemas[apiID] = &SchemaCreation{Status: "ACTIVE", Details: "Schema created successfully."}
+	// Also extract simple type names from SDL if possible (simplified).
+	if _, ok := s.types[apiID]; !ok {
+		s.types[apiID] = make(map[string]*TypeDef)
+	}
+	return true
+}
+
+// GetSchemaCreationStatus returns the schema creation status for an API.
+func (s *Store) GetSchemaCreationStatus(apiID string) (*SchemaCreation, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sc, ok := s.schemas[apiID]
+	return sc, ok
 }

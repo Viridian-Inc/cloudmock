@@ -53,6 +53,13 @@ func (s *AppSyncService) Actions() []service.Action {
 		{Name: "ListApiKeys", Method: http.MethodGet, IAMAction: "appsync:ListApiKeys"},
 		{Name: "UpdateApiKey", Method: http.MethodPost, IAMAction: "appsync:UpdateApiKey"},
 		{Name: "DeleteApiKey", Method: http.MethodDelete, IAMAction: "appsync:DeleteApiKey"},
+		{Name: "CreateType", Method: http.MethodPost, IAMAction: "appsync:CreateType"},
+		{Name: "GetType", Method: http.MethodGet, IAMAction: "appsync:GetType"},
+		{Name: "ListTypes", Method: http.MethodGet, IAMAction: "appsync:ListTypes"},
+		{Name: "UpdateType", Method: http.MethodPost, IAMAction: "appsync:UpdateType"},
+		{Name: "DeleteType", Method: http.MethodDelete, IAMAction: "appsync:DeleteType"},
+		{Name: "StartSchemaCreation", Method: http.MethodPost, IAMAction: "appsync:StartSchemaCreation"},
+		{Name: "GetSchemaCreationStatus", Method: http.MethodGet, IAMAction: "appsync:GetSchemaCreationStatus"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "appsync:TagResource"},
 		{Name: "UntagResource", Method: http.MethodDelete, IAMAction: "appsync:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodGet, IAMAction: "appsync:ListTagsForResource"},
@@ -118,6 +125,20 @@ func (s *AppSyncService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleUpdateApiKey(ctx, s.store)
 	case "DeleteApiKey":
 		return handleDeleteApiKey(ctx, s.store)
+	case "CreateType":
+		return handleCreateType(ctx, s.store)
+	case "GetType":
+		return handleGetType(ctx, s.store)
+	case "ListTypes":
+		return handleListTypes(ctx, s.store)
+	case "UpdateType":
+		return handleUpdateType(ctx, s.store)
+	case "DeleteType":
+		return handleDeleteType(ctx, s.store)
+	case "StartSchemaCreation":
+		return handleStartSchemaCreation(ctx, s.store)
+	case "GetSchemaCreationStatus":
+		return handleGetSchemaCreationStatus(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

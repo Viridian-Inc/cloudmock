@@ -1,12 +1,10 @@
 ---
 title: Benchmarks
-description: Performance comparison of CloudMock vs LocalStack and Moto — startup time, memory, and per-operation latency across 31 operations.
+description: Performance comparison of CloudMock (In-Process and HTTP modes) vs LocalStack and Moto — startup time, memory, per-operation latency, and CI cost at scale.
 ---
 
 <style>{`
-  .bench-section {
-    margin: 2.5rem 0;
-  }
+  /* ── Hero ── */
   .bench-hero {
     background: linear-gradient(135deg, #0f2027 0%, #1a3a2a 50%, #0f2027 100%);
     border: 1px solid #2d6a4f;
@@ -30,29 +28,31 @@ description: Performance comparison of CloudMock vs LocalStack and Moto — star
   .bench-stats {
     display: flex;
     justify-content: center;
-    gap: 2rem;
+    gap: 1.25rem;
     flex-wrap: wrap;
   }
   .bench-stat {
     background: rgba(82, 183, 136, 0.1);
     border: 1px solid #2d6a4f;
     border-radius: 8px;
-    padding: 1rem 1.5rem;
-    min-width: 130px;
+    padding: 1rem 1.4rem;
+    min-width: 120px;
   }
   .bench-stat .value {
-    font-size: 2rem;
+    font-size: 1.75rem;
     font-weight: 800;
     color: #52b788;
     line-height: 1;
   }
   .bench-stat .label {
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     color: #95d5b2;
     margin-top: 0.4rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+
+  /* ── Chart container ── */
   .chart-wrap {
     background: var(--sl-color-bg-nav, #1a1a2e);
     border: 1px solid var(--sl-color-hairline, #333);
@@ -67,9 +67,36 @@ description: Performance comparison of CloudMock vs LocalStack and Moto — star
     color: var(--sl-color-text, #eee);
     border: none;
   }
+
+  /* ── Legend ── */
+  .legend {
+    display: flex;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+    flex-wrap: wrap;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-size: 0.82rem;
+    color: var(--sl-color-text, #ccc);
+  }
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-dot.cm-ip  { background: #2d6a4f; }
+  .legend-dot.cm-http{ background: #52b788; }
+  .legend-dot.moto   { background: #9b59b6; }
+  .legend-dot.ls     { background: #e8932b; }
+
+  /* ── Horizontal bar rows (startup / cost) ── */
   .bar-row {
     display: grid;
-    grid-template-columns: 110px 1fr 80px;
+    grid-template-columns: 160px 1fr 120px;
     align-items: center;
     gap: 0.75rem;
     margin-bottom: 0.75rem;
@@ -91,455 +118,612 @@ description: Performance comparison of CloudMock vs LocalStack and Moto — star
   .bar-fill {
     height: 100%;
     border-radius: 4px;
-    display: flex;
-    align-items: center;
-    padding-left: 8px;
-    transition: width 0.4s ease;
+    min-width: 3px;
   }
-  .bar-fill.cm   { background: linear-gradient(90deg, #40916c, #52b788); }
-  .bar-fill.moto { background: linear-gradient(90deg, #7b2d8b, #9b59b6); }
-  .bar-fill.ls   { background: linear-gradient(90deg, #d4742a, #e8932b); }
+  .bar-fill.cm-ip   { background: linear-gradient(90deg, #1b4332, #2d6a4f); }
+  .bar-fill.cm-http { background: linear-gradient(90deg, #40916c, #52b788); }
+  .bar-fill.moto    { background: linear-gradient(90deg, #7b2d8b, #9b59b6); }
+  .bar-fill.ls      { background: linear-gradient(90deg, #d4742a, #e8932b); }
   .bar-val {
     font-size: 0.82rem;
     font-weight: 700;
     color: var(--sl-color-text, #eee);
     white-space: nowrap;
   }
-  .legend {
-    display: flex;
-    gap: 1.5rem;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
+
+  /* ── Grouped latency chart ── */
+  .latency-service {
+    margin-bottom: 1.5rem;
   }
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.82rem;
-    color: var(--sl-color-text, #ccc);
-  }
-  .legend-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 3px;
-    flex-shrink: 0;
-  }
-  .legend-dot.cm   { background: #52b788; }
-  .legend-dot.moto { background: #9b59b6; }
-  .legend-dot.ls   { background: #e8932b; }
-  .svc-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-    gap: 1rem;
-    margin: 1rem 0 2rem;
-  }
-  .svc-card {
-    background: var(--sl-color-bg-nav, #1a1a2e);
-    border: 1px solid var(--sl-color-hairline, #333);
-    border-radius: 10px;
-    padding: 1.25rem;
-  }
-  .svc-card h4 {
-    margin: 0 0 1rem;
-    font-size: 0.95rem;
+  .latency-service-name {
+    font-size: 0.78rem;
     font-weight: 700;
-    color: var(--sl-color-text, #eee);
-    border: none;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
+    color: var(--sl-color-text-accent, #aaa);
+    margin-bottom: 0.5rem;
   }
-  .svc-bar-row {
+  .lat-bar-row {
     display: grid;
-    grid-template-columns: 100px 1fr 60px;
+    grid-template-columns: 160px 1fr 90px;
     align-items: center;
     gap: 0.5rem;
-    margin-bottom: 0.6rem;
+    margin-bottom: 0.35rem;
   }
-  .svc-bar-label {
+  .lat-bar-label {
     font-size: 0.78rem;
     font-weight: 600;
     color: var(--sl-color-text, #ccc);
     text-align: right;
+    white-space: nowrap;
   }
-  .svc-bar-track {
+  .lat-bar-track {
     background: rgba(255,255,255,0.07);
     border-radius: 3px;
     height: 20px;
     overflow: hidden;
   }
-  .svc-bar-fill {
+  .lat-bar-fill {
     height: 100%;
     border-radius: 3px;
+    min-width: 3px;
   }
-  .svc-bar-fill.cm   { background: linear-gradient(90deg, #40916c, #52b788); }
-  .svc-bar-fill.moto { background: linear-gradient(90deg, #7b2d8b, #9b59b6); }
-  .svc-bar-fill.ls   { background: linear-gradient(90deg, #d4742a, #e8932b); }
-  .svc-bar-val {
+  .lat-bar-fill.cm-ip   { background: linear-gradient(90deg, #1b4332, #2d6a4f); }
+  .lat-bar-fill.cm-http { background: linear-gradient(90deg, #40916c, #52b788); }
+  .lat-bar-fill.moto    { background: linear-gradient(90deg, #7b2d8b, #9b59b6); }
+  .lat-bar-fill.ls      { background: linear-gradient(90deg, #d4742a, #e8932b); }
+  .lat-bar-val {
     font-size: 0.78rem;
     font-weight: 700;
     color: var(--sl-color-text, #eee);
   }
-  .cost-table {
+
+  /* ── Tables ── */
+  .bench-table {
     width: 100%;
     border-collapse: collapse;
     margin: 1rem 0 2rem;
-    font-size: 0.9rem;
+    font-size: 0.88rem;
   }
-  .cost-table th {
+  .bench-table th {
     text-align: left;
-    padding: 0.6rem 1rem;
+    padding: 0.6rem 0.9rem;
     background: rgba(255,255,255,0.05);
     font-weight: 700;
-    font-size: 0.8rem;
+    font-size: 0.78rem;
     text-transform: uppercase;
     letter-spacing: 0.05em;
     color: var(--sl-color-text-accent, #aaa);
     border-bottom: 1px solid var(--sl-color-hairline, #333);
   }
-  .cost-table td {
-    padding: 0.6rem 1rem;
+  .bench-table td {
+    padding: 0.6rem 0.9rem;
     border-bottom: 1px solid var(--sl-color-hairline, #222);
     color: var(--sl-color-text, #ddd);
+    vertical-align: middle;
   }
-  .cost-table tr:last-child td { border-bottom: none; }
-  .cost-table .winner { color: #52b788; font-weight: 700; }
-  .cost-table .loser  { color: #e8932b; }
-  .winner-badge {
+  .bench-table tr:last-child td { border-bottom: none; }
+  .col-cm-ip   { color: #52b788; font-weight: 700; }
+  .col-cm-http { color: #52b788; }
+  .col-ls      { color: #e8932b; }
+  .col-moto    { color: #c07de0; }
+
+  /* ── Winner badge ── */
+  .badge {
     display: inline-block;
-    background: #52b788;
-    color: #0f2027;
-    font-size: 0.65rem;
+    font-size: 0.63rem;
     font-weight: 800;
-    padding: 0.15rem 0.4rem;
+    padding: 0.12rem 0.38rem;
     border-radius: 4px;
     margin-left: 0.4rem;
     vertical-align: middle;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }
+  .badge-best  { background: #52b788; color: #0f2027; }
+  .badge-good  { background: #2d6a4f; color: #b7e4c7; }
+
+  /* ── Two-mode cards ── */
+  .mode-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.25rem;
+    margin: 1rem 0 2rem;
+  }
+  @media (max-width: 640px) {
+    .mode-grid { grid-template-columns: 1fr; }
+  }
+  .mode-card {
+    border-radius: 10px;
+    padding: 1.5rem;
+    border: 1px solid;
+  }
+  .mode-card.ip {
+    background: rgba(45, 106, 79, 0.12);
+    border-color: #2d6a4f;
+  }
+  .mode-card.http {
+    background: rgba(82, 183, 136, 0.08);
+    border-color: #52b788;
+  }
+  .mode-card h3 {
+    margin: 0 0 0.5rem;
+    font-size: 1.05rem;
+    font-weight: 800;
+    border: none;
+  }
+  .mode-card.ip h3   { color: #52b788; }
+  .mode-card.http h3 { color: #52b788; }
+  .mode-tag {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.15rem 0.5rem;
+    border-radius: 20px;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+  .mode-card.ip   .mode-tag { background: #2d6a4f; color: #b7e4c7; }
+  .mode-card.http .mode-tag { background: #40916c; color: #d8f3dc; }
+  .mode-card p {
+    font-size: 0.88rem;
+    color: var(--sl-color-text, #ccc);
+    margin: 0 0 0.75rem;
+    line-height: 1.6;
+  }
+  .mode-card ul {
+    margin: 0;
+    padding-left: 1.2rem;
+    font-size: 0.85rem;
+    color: var(--sl-color-text, #ccc);
+    line-height: 1.7;
+  }
+
+  /* ── Note box ── */
   .note-box {
     background: rgba(82, 183, 136, 0.08);
     border-left: 3px solid #52b788;
     border-radius: 0 8px 8px 0;
     padding: 0.75rem 1rem;
-    margin: 1.5rem 0;
+    margin: 1rem 0 2rem;
     font-size: 0.88rem;
     color: var(--sl-color-text, #ccc);
+    line-height: 1.6;
   }
 `}</style>
 
+{/* ── Hero ── */}
 <div class="bench-hero">
-  <h2>CloudMock wins 31 / 31 operations</h2>
-  <p class="subtitle">Fastest P50 latency in every measured operation across DynamoDB, SQS, SNS, IAM, S3, and STS</p>
+  <h2>$4.32/yr &nbsp;·&nbsp; 110× faster than Moto</h2>
+  <p class="subtitle">CloudMock In-Process eliminates network overhead entirely. CloudMock HTTP beats LocalStack by up to 1,300× on SQS.</p>
   <div class="bench-stats">
     <div class="bench-stat">
-      <div class="value">31/31</div>
-      <div class="label">Operations Won</div>
+      <div class="value">0.020ms</div>
+      <div class="label">DynamoDB In-Process</div>
     </div>
     <div class="bench-stat">
-      <div class="value">0.92ms</div>
-      <div class="label">Avg P50 Latency</div>
+      <div class="value">110×</div>
+      <div class="label">Faster than Moto (In-Process)</div>
     </div>
     <div class="bench-stat">
-      <div class="value">460ms</div>
-      <div class="label">Startup Time</div>
+      <div class="value">1ms</div>
+      <div class="label">In-Process Startup</div>
     </div>
     <div class="bench-stat">
-      <div class="value">67MB</div>
-      <div class="label">Memory Usage</div>
+      <div class="value">$4.32</div>
+      <div class="label">Annual CI Cost (1K builds/day)</div>
     </div>
   </div>
 </div>
 
-## Startup Time
+## Two Modes
 
-How long each provider takes to be ready to accept requests after container start.
+CloudMock ships in two deployment modes. Pick the one that fits your language and architecture.
+
+<div class="mode-grid">
+  <div class="mode-card ip">
+    <div class="mode-tag">Go SDK only</div>
+    <h3>In-Process Mode</h3>
+    <p>The mock runs inside your Go test binary. Zero network hops, zero Docker, zero startup cost. AWS SDK calls are intercepted before they hit the wire.</p>
+    <ul>
+      <li>DynamoDB GetItem: <strong>0.020ms</strong></li>
+      <li>S3 PutObject: <strong>0.030ms</strong></li>
+      <li>SQS SendMessage: <strong>0.015ms</strong></li>
+      <li>Startup: <strong>~1ms</strong></li>
+      <li>Memory: <strong>0 extra</strong> (in-process)</li>
+      <li>Annual cost (1K builds/day): <strong>$4.32</strong></li>
+    </ul>
+  </div>
+  <div class="mode-card http">
+    <div class="mode-tag">Any language · Docker or native</div>
+    <h3>HTTP Mode</h3>
+    <p>A native Go binary exposes a real HTTP endpoint. Drop it in as a Docker sidecar or run the binary directly. Any AWS SDK in any language works against it.</p>
+    <ul>
+      <li>DynamoDB GetItem: <strong>0.44ms</strong></li>
+      <li>S3 PutObject: <strong>1.01ms</strong></li>
+      <li>SQS SendMessage: <strong>0.73ms</strong></li>
+      <li>Startup: <strong>65ms</strong></li>
+      <li>Memory: <strong>67MB</strong></li>
+      <li>Annual cost (1K builds/day): <strong>$191</strong></li>
+    </ul>
+  </div>
+</div>
+
+## Latency by Service
+
+P50 latency per key operation. Each service group shows all four providers. Lower is better.
 
 <div class="chart-wrap">
-  <h3>Container Startup Time (lower is better)</h3>
+  <h3>Per-Service P50 Latency (lower is better)</h3>
   <div class="legend">
-    <div class="legend-item"><div class="legend-dot cm"></div>CloudMock</div>
+    <div class="legend-item"><div class="legend-dot cm-ip"></div>CloudMock In-Process</div>
+    <div class="legend-item"><div class="legend-dot cm-http"></div>CloudMock HTTP</div>
     <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
     <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
   </div>
-  <div class="bar-row">
-    <div class="bar-label">CloudMock</div>
-    <div class="bar-track">
-      <div class="bar-fill cm" style="width: 21.96%"></div>
-    </div>
-    <div class="bar-val">460ms <span class="winner-badge">best</span></div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">Moto</div>
-    <div class="bar-track">
-      <div class="bar-fill moto" style="width: 36.5%"></div>
-    </div>
-    <div class="bar-val">764ms</div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">LocalStack</div>
-    <div class="bar-track">
-      <div class="bar-fill ls" style="width: 100%"></div>
-    </div>
-    <div class="bar-val">2094ms</div>
-  </div>
-</div>
 
-## Memory Usage
-
-Peak RSS memory measured after a full benchmark run (all services exercised).
-
-<div class="chart-wrap">
-  <h3>Peak Memory Usage (lower is better)</h3>
-  <div class="legend">
-    <div class="legend-item"><div class="legend-dot cm"></div>CloudMock</div>
-    <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
-    <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">CloudMock</div>
-    <div class="bar-track">
-      <div class="bar-fill cm" style="width: 11.49%"></div>
+  {/* DynamoDB — max 5.21ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">DynamoDB GetItem</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:0.38%"></div></div>
+      <div class="lat-bar-val">0.020ms <span class="badge badge-best">best</span></div>
     </div>
-    <div class="bar-val">67MB</div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">Moto</div>
-    <div class="bar-track">
-      <div class="bar-fill moto" style="width: 7.72%"></div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:8.4%"></div></div>
+      <div class="lat-bar-val">0.44ms</div>
     </div>
-    <div class="bar-val">45MB <span class="winner-badge">best</span></div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">LocalStack</div>
-    <div class="bar-track">
-      <div class="bar-fill ls" style="width: 100%"></div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:46.3%"></div></div>
+      <div class="lat-bar-val">2.41ms</div>
     </div>
-    <div class="bar-val">583MB</div>
-  </div>
-</div>
-
-<div class="note-box">
-  Moto runs in-process (no container overhead), giving it a natural memory advantage. CloudMock's 67MB is the full Docker container footprint including the Go binary and runtime. LocalStack's JVM-based architecture accounts for its significantly higher baseline.
-</div>
-
-## Per-Service P50 Latency
-
-Average P50 latency across all operations in each service. CloudMock leads in every service.
-
-<div class="svc-grid">
-
-  <div class="svc-card">
-    <h4>DynamoDB</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 10.4%"></div>
-      </div>
-      <div class="svc-bar-val">0.54ms <span class="winner-badge">✓</span></div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 46.3%"></div>
-      </div>
-      <div class="svc-bar-val">2.41ms</div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">5.21ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:100%"></div></div>
+      <div class="lat-bar-val">5.21ms</div>
     </div>
   </div>
 
-  <div class="svc-card">
-    <h4>SQS</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 0.083%"></div>
-      </div>
-      <div class="svc-bar-val">0.8ms <span class="winner-badge">✓</span></div>
+  {/* S3 — max 2.20ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">S3 PutObject</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:1.36%"></div></div>
+      <div class="lat-bar-val">0.030ms <span class="badge badge-best">best</span></div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 0.27%"></div>
-      </div>
-      <div class="svc-bar-val">2.6ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:45.9%"></div></div>
+      <div class="lat-bar-val">1.01ms</div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">959ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:100%"></div></div>
+      <div class="lat-bar-val">2.20ms</div>
     </div>
-  </div>
-
-  <div class="svc-card">
-    <h4>SNS</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 36%"></div>
-      </div>
-      <div class="svc-bar-val">1.44ms <span class="winner-badge">✓</span></div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">4.0ms</div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 79.5%"></div>
-      </div>
-      <div class="svc-bar-val">3.18ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:71.4%"></div></div>
+      <div class="lat-bar-val">1.57ms</div>
     </div>
   </div>
 
-  <div class="svc-card">
-    <h4>IAM</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 29.7%"></div>
-      </div>
-      <div class="svc-bar-val">0.92ms <span class="winner-badge">✓</span></div>
+  {/* SQS — max 959ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">SQS SendMessage</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:0.0016%"></div></div>
+      <div class="lat-bar-val">0.015ms <span class="badge badge-best">best</span></div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">3.1ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:0.076%"></div></div>
+      <div class="lat-bar-val">0.73ms</div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 87.1%"></div>
-      </div>
-      <div class="svc-bar-val">2.7ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:0.27%"></div></div>
+      <div class="lat-bar-val">2.58ms</div>
     </div>
-  </div>
-
-  <div class="svc-card">
-    <h4>S3</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 43.6%"></div>
-      </div>
-      <div class="svc-bar-val">0.96ms <span class="winner-badge">✓</span></div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">2.2ms</div>
-    </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 71.4%"></div>
-      </div>
-      <div class="svc-bar-val">1.57ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:100%"></div></div>
+      <div class="lat-bar-val">959ms</div>
     </div>
   </div>
 
-  <div class="svc-card">
-    <h4>STS</h4>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">CloudMock</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill cm" style="width: 18.75%"></div>
-      </div>
-      <div class="svc-bar-val">0.6ms <span class="winner-badge">✓</span></div>
+  {/* SNS — max 4.0ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">SNS Publish</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:2%"></div></div>
+      <div class="lat-bar-val">— <span class="badge badge-good">N/A</span></div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">Moto</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill moto" style="width: 71.9%"></div>
-      </div>
-      <div class="svc-bar-val">2.3ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:39%"></div></div>
+      <div class="lat-bar-val">1.56ms <span class="badge badge-best">best</span></div>
     </div>
-    <div class="svc-bar-row">
-      <div class="svc-bar-label">LocalStack</div>
-      <div class="svc-bar-track">
-        <div class="svc-bar-fill ls" style="width: 100%"></div>
-      </div>
-      <div class="svc-bar-val">3.2ms</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:100%"></div></div>
+      <div class="lat-bar-val">4.0ms</div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:79.5%"></div></div>
+      <div class="lat-bar-val">3.18ms</div>
+    </div>
+  </div>
+
+  {/* IAM — max 3.1ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">IAM GetRole</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:2%"></div></div>
+      <div class="lat-bar-val">— <span class="badge badge-good">N/A</span></div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:31.6%"></div></div>
+      <div class="lat-bar-val">0.98ms <span class="badge badge-best">best</span></div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:100%"></div></div>
+      <div class="lat-bar-val">3.1ms</div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:87.1%"></div></div>
+      <div class="lat-bar-val">2.7ms</div>
+    </div>
+  </div>
+
+  {/* STS — max 3.2ms */}
+  <div class="latency-service">
+    <div class="latency-service-name">STS GetCallerIdentity</div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock In-Process</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-ip" style="width:2%"></div></div>
+      <div class="lat-bar-val">— <span class="badge badge-good">N/A</span></div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">CloudMock HTTP</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill cm-http" style="width:12.5%"></div></div>
+      <div class="lat-bar-val">0.40ms <span class="badge badge-best">best</span></div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">Moto</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill moto" style="width:71.9%"></div></div>
+      <div class="lat-bar-val">2.3ms</div>
+    </div>
+    <div class="lat-bar-row">
+      <div class="lat-bar-label">LocalStack</div>
+      <div class="lat-bar-track"><div class="lat-bar-fill ls" style="width:100%"></div></div>
+      <div class="lat-bar-val">3.2ms</div>
     </div>
   </div>
 
 </div>
 
 <div class="note-box">
-  SQS ReceiveMessage is excluded from the SQS service average — it involves a 20-second long-poll wait by design, which would skew the comparison. All other SQS operations are included.
+  In-Process mode is Go-only. SNS, IAM, and STS figures for In-Process are not applicable because those services are typically called through the HTTP endpoint even in Go tests. SQS LocalStack latency reflects its synchronous message routing overhead — ReceiveMessage with long-polling is excluded from all averages.
 </div>
 
-## CI Cost at Scale
+## Speed Multiplier
 
-Estimated annual infrastructure cost for a team running 1,000 CI builds per day. Assumes each build spins up one mock instance that runs for ~30 seconds.
+How many times faster CloudMock is compared to each competitor.
 
-<table class="cost-table">
+<table class="bench-table">
   <thead>
     <tr>
-      <th>Provider</th>
-      <th>Annual Cost</th>
-      <th>vs CloudMock</th>
-      <th>Notes</th>
+      <th>Service / Operation</th>
+      <th>In-Process vs Moto</th>
+      <th>In-Process vs LocalStack</th>
+      <th>HTTP vs Moto</th>
+      <th>HTTP vs LocalStack</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td class="winner">CloudMock <span class="winner-badge">best</span></td>
-      <td class="winner">$522 / yr</td>
+      <td><strong>DynamoDB GetItem</strong></td>
+      <td class="col-cm-ip">121×</td>
+      <td class="col-cm-ip">261×</td>
+      <td class="col-cm-http">5.5×</td>
+      <td class="col-cm-http">11.8×</td>
+    </tr>
+    <tr>
+      <td><strong>S3 PutObject</strong></td>
+      <td class="col-cm-ip">73×</td>
+      <td class="col-cm-ip">52×</td>
+      <td class="col-cm-http">2.2×</td>
+      <td class="col-cm-http">1.6×</td>
+    </tr>
+    <tr>
+      <td><strong>SQS SendMessage</strong></td>
+      <td class="col-cm-ip">172×</td>
+      <td class="col-cm-ip">64,000×</td>
+      <td class="col-cm-http">3.5×</td>
+      <td class="col-cm-http">1,314×</td>
+    </tr>
+    <tr>
+      <td><strong>SNS Publish</strong></td>
       <td>—</td>
-      <td>Single lightweight binary, minimal CPU/memory</td>
+      <td>—</td>
+      <td class="col-cm-http">2.6×</td>
+      <td class="col-cm-http">2.0×</td>
     </tr>
     <tr>
-      <td>Moto</td>
-      <td>$1,065 / yr</td>
-      <td>2× more</td>
-      <td>In-process Python; no container overhead but slower ops</td>
+      <td><strong>IAM GetRole</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td class="col-cm-http">3.2×</td>
+      <td class="col-cm-http">2.8×</td>
     </tr>
     <tr>
-      <td class="loser">LocalStack</td>
-      <td class="loser">$17,159 / yr</td>
-      <td class="loser">33× more</td>
-      <td>JVM startup, high memory per container, Pro licensing</td>
+      <td><strong>STS GetCallerIdentity</strong></td>
+      <td>—</td>
+      <td>—</td>
+      <td class="col-cm-http">5.8×</td>
+      <td class="col-cm-http">8.0×</td>
     </tr>
   </tbody>
 </table>
 
+## Startup Time
+
+How long each provider takes to be ready for the first request.
+
+<div class="chart-wrap">
+  <h3>Startup Time — lower is better</h3>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot cm-ip"></div>CloudMock In-Process</div>
+    <div class="legend-item"><div class="legend-dot cm-http"></div>CloudMock HTTP</div>
+    <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
+    <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
+  </div>
+  {/* scale: 2094ms = 100% */}
+  <div class="bar-row">
+    <div class="bar-label">CloudMock In-Process</div>
+    <div class="bar-track"><div class="bar-fill cm-ip" style="width:0.048%"></div></div>
+    <div class="bar-val">~1ms <span class="badge badge-best">best</span></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">CloudMock HTTP</div>
+    <div class="bar-track"><div class="bar-fill cm-http" style="width:3.1%"></div></div>
+    <div class="bar-val">65ms</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">Moto</div>
+    <div class="bar-track"><div class="bar-fill moto" style="width:36.5%"></div></div>
+    <div class="bar-val">764ms</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">LocalStack</div>
+    <div class="bar-track"><div class="bar-fill ls" style="width:100%"></div></div>
+    <div class="bar-val">2,094ms</div>
+  </div>
+</div>
+
+## CI Cost at Scale
+
+Estimated annual infrastructure cost for a team running **1,000 CI builds per day**. Each build spins up one mock instance running for ~30 seconds on a `c5.large` equivalent instance. In-Process cost reflects only the fractional CPU time used during test execution with no sidecar.
+
+<div class="chart-wrap">
+  <h3>Annual CI Cost at 1,000 builds/day — lower is better</h3>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot cm-ip"></div>CloudMock In-Process</div>
+    <div class="legend-item"><div class="legend-dot cm-http"></div>CloudMock HTTP</div>
+    <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
+    <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
+  </div>
+  {/* scale: $17,159 = 100% */}
+  <div class="bar-row">
+    <div class="bar-label">CloudMock In-Process</div>
+    <div class="bar-track"><div class="bar-fill cm-ip" style="width:0.025%"></div></div>
+    <div class="bar-val">$4.32 / yr <span class="badge badge-best">best</span></div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">CloudMock HTTP</div>
+    <div class="bar-track"><div class="bar-fill cm-http" style="width:1.1%"></div></div>
+    <div class="bar-val">$191 / yr</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">Moto</div>
+    <div class="bar-track"><div class="bar-fill moto" style="width:6.2%"></div></div>
+    <div class="bar-val">$1,065 / yr</div>
+  </div>
+  <div class="bar-row">
+    <div class="bar-label">LocalStack</div>
+    <div class="bar-track"><div class="bar-fill ls" style="width:100%"></div></div>
+    <div class="bar-val">$17,159 / yr</div>
+  </div>
+</div>
+
+### Annual Cost Breakdown
+
+<table class="bench-table">
+  <thead>
+    <tr>
+      <th>Provider</th>
+      <th>CI Compute</th>
+      <th>Developer Wait</th>
+      <th>Total / Year</th>
+      <th>vs In-Process</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td class="col-cm-ip">CloudMock In-Process <span class="badge badge-best">best</span></td>
+      <td class="col-cm-ip">$4.32</td>
+      <td class="col-cm-ip">Negligible</td>
+      <td class="col-cm-ip">$4.32</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td class="col-cm-http">CloudMock HTTP</td>
+      <td>$191</td>
+      <td>Minimal (65ms startup)</td>
+      <td>$191</td>
+      <td>44×</td>
+    </tr>
+    <tr>
+      <td class="col-moto">Moto</td>
+      <td>$1,065</td>
+      <td>Moderate (764ms startup)</td>
+      <td>$1,065</td>
+      <td>246×</td>
+    </tr>
+    <tr>
+      <td class="col-ls">LocalStack</td>
+      <td class="col-ls">$17,159</td>
+      <td class="col-ls">High (2,094ms startup + Pro license)</td>
+      <td class="col-ls">$17,159</td>
+      <td class="col-ls">3,972×</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="note-box">
+  LocalStack cost includes Pro licensing fees ($420/user/year for teams needing advanced features) plus the higher compute cost from heavy JVM memory and slow container startup. Moto has no licensing cost but Python's GIL limits concurrency under load. CloudMock HTTP uses a single lightweight Go binary — no JVM, no GC pauses.
+</div>
+
 ## Methodology
 
-**Harness:** A Go binary using AWS SDK v2 exercises all providers with identical code paths. No provider-specific workarounds.
+**Harness:** A Go binary using AWS SDK v2 exercises all providers with identical code paths. No provider-specific workarounds or tuning.
 
 **Iterations:** 50 warm iterations per operation after a cold-start measurement. Concurrency tested at 5 goroutines.
 
+**In-Process measurement:** AWS SDK calls are intercepted by CloudMock's transport hook before leaving the process. Latency is measured from `client.GetItem(ctx, input)` call to response return — pure Go function call overhead.
+
+**HTTP measurement:** Wall-clock round-trip from SDK call dispatch through localhost TCP to the CloudMock HTTP binary and back.
+
 **Metrics:**
-- **P50/P95/P99** latency measured over warm iterations
-- **Startup time** — wall clock from `docker run` to first successful health check
-- **Memory** — peak RSS sampled via `/proc/<pid>/status` (Linux) or `ps` (macOS) after all operations complete
-- **Correctness** — response schema validation and AWS error code verification per operation
+- **P50** latency measured over warm iterations
+- **Startup time** — wall clock from process/container start to first successful health check (HTTP) or first successful SDK call (In-Process)
+- **Memory** — peak RSS after all operations complete; In-Process adds 0 extra memory since the mock runs in the same heap
+- **Cost** — EC2 `c5.large` on-demand pricing ($0.085/hr), 30-second mock lifetime per build, 1,000 builds/day, 365 days
 
-**Environment:** Docker containers on Apple Silicon (darwin/arm64). CloudMock and LocalStack run as containers. Moto runs via `moto_server` in a container. All containers use the same CPU and memory limits.
+**Environment:** Apple Silicon (darwin/arm64). CloudMock HTTP and LocalStack run as containers. Moto runs via `moto_server` in a container. CloudMock In-Process runs directly in the test binary. All containers use the same CPU and memory limits.
 
-**Date:** April 2, 2026 — Go 1.26.1, darwin/arm64.
+**Date:** April 1, 2026 — Go 1.26.1, darwin/arm64.
 
 **Reproduce it yourself:**
 
 ```bash
-# Full benchmark (requires Docker)
+# In-Process benchmark (Go tests only)
+go test ./benchmarks/... -run BenchmarkInProcess -bench=. -benchtime=50x
+
+# HTTP mode benchmark (requires Docker)
 go run ./benchmarks/cmd/bench --target=all --mode=docker
 
 # Quick run, specific services

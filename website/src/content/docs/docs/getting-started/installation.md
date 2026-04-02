@@ -15,6 +15,13 @@ npx cloudmock start
 
 This downloads the latest release binary and starts the gateway. No global install required.
 
+## Snap (Linux)
+
+```bash
+sudo snap install cloudmock
+cloudmock start
+```
+
 ## Homebrew (macOS / Linux)
 
 ```bash
@@ -62,19 +69,15 @@ cloudmock start
 
 ## apt (Debian / Ubuntu)
 
-Download the `.deb` from the [latest release](https://github.com/Viridian-Inc/cloudmock/releases/latest):
-
 ```bash
-curl -LO https://github.com/Viridian-Inc/cloudmock/releases/latest/download/cloudmock_1.0.3_amd64.deb
-sudo dpkg -i cloudmock_1.0.3_amd64.deb
+curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.3/cloudmock_1.0.3_amd64.deb && sudo apt install cloudmock_1.0.3_amd64.deb
 cloudmock start
 ```
 
 ARM64:
 
 ```bash
-curl -LO https://github.com/Viridian-Inc/cloudmock/releases/latest/download/cloudmock_1.0.3_arm64.deb
-sudo dpkg -i cloudmock_1.0.3_arm64.deb
+curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.3/cloudmock_1.0.3_arm64.deb && sudo apt install cloudmock_1.0.3_arm64.deb
 ```
 
 ## go install (from source)
@@ -138,6 +141,19 @@ CLOUDMOCK_PROFILE=standard cloudmock start
 # Disable IAM enforcement for quick prototyping
 CLOUDMOCK_IAM_MODE=none cloudmock start
 ```
+
+## Try the demo
+
+Clone the example project and run it in under a minute:
+
+```bash
+git clone https://github.com/Viridian-Inc/cloudmock-todo-demo.git
+cd cloudmock-todo-demo/node
+npx cloudmock &
+npm install && npx tsx quickstart.ts
+```
+
+See the [full demo project](https://github.com/Viridian-Inc/cloudmock-todo-demo) for Python and Go examples.
 
 ## Next step
 

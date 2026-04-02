@@ -316,6 +316,199 @@ func handleMergePullRequestBySquash(ctx *service.RequestContext, store *Store) (
 	return jsonOK(map[string]any{"pullRequest": prToMap(pr)})
 }
 
+func handleUpdatePullRequestTitle(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	prID := getStr(req, "pullRequestId")
+	title := getStr(req, "title")
+
+	pr, awsErr := store.UpdatePullRequestTitle(prID, title)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"pullRequest": prToMap(pr)})
+}
+
+func handleMergePullRequestByFastForward(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	prID := getStr(req, "pullRequestId")
+	repoName := getStr(req, "repositoryName")
+
+	pr, awsErr := store.MergePullRequestByFastForward(prID, repoName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"pullRequest": prToMap(pr)})
+}
+
+func handlePostCommentForPullRequest(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	prID := getStr(req, "pullRequestId")
+	repoName := getStr(req, "repositoryName")
+	content := getStr(req, "content")
+	beforeCommitID := getStr(req, "beforeCommitId")
+	afterCommitID := getStr(req, "afterCommitId")
+	filePath := getStr(req, "filePath")
+
+	comment, awsErr := store.PostCommentForPullRequest(prID, repoName, content, beforeCommitID, afterCommitID, filePath)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"comment": commentToMap(comment)})
+}
+
+func handleGetCommentsForPullRequest(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	prID := getStr(req, "pullRequestId")
+	comments, awsErr := store.GetCommentsForPullRequest(prID)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	result := make([]map[string]any, len(comments))
+	for i, c := range comments {
+		result[i] = commentToMap(c)
+	}
+	return jsonOK(map[string]any{"commentsForPullRequestData": result})
+}
+
+func handlePutRepositoryTriggers(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	repoName := getStr(req, "repositoryName")
+	var triggers []RepositoryTrigger
+	if tList, ok := req["triggers"].([]any); ok {
+		for _, t := range tList {
+			if tm, ok := t.(map[string]any); ok {
+				trigger := RepositoryTrigger{
+					Name:           getStr(tm, "name"),
+					DestinationARN: getStr(tm, "destinationArn"),
+					CustomData:     getStr(tm, "customData"),
+				}
+				if branches, ok := tm["branches"].([]any); ok {
+					for _, b := range branches {
+						if bs, ok := b.(string); ok {
+							trigger.Branches = append(trigger.Branches, bs)
+						}
+					}
+				}
+				if events, ok := tm["events"].([]any); ok {
+					for _, e := range events {
+						if es, ok := e.(string); ok {
+							trigger.Events = append(trigger.Events, es)
+						}
+					}
+				}
+				triggers = append(triggers, trigger)
+			}
+		}
+	}
+
+	configID, awsErr := store.PutRepositoryTriggers(repoName, triggers)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"configurationId": configID})
+}
+
+func handleGetRepositoryTriggers(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	repoName := getStr(req, "repositoryName")
+	triggers, awsErr := store.GetRepositoryTriggers(repoName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	result := make([]map[string]any, len(triggers))
+	for i, t := range triggers {
+		result[i] = map[string]any{
+			"name":           t.Name,
+			"destinationArn": t.DestinationARN,
+			"customData":     t.CustomData,
+			"branches":       t.Branches,
+			"events":         t.Events,
+		}
+	}
+	return jsonOK(map[string]any{"triggers": result})
+}
+
+// ---- Tag handlers ----
+
+func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+
+	var tags map[string]string
+	if tagMap, ok := req["tags"].(map[string]any); ok {
+		tags = make(map[string]string)
+		for k, v := range tagMap {
+			if sv, ok := v.(string); ok {
+				tags[k] = sv
+			}
+		}
+	}
+
+	if awsErr := store.TagResource(arn, tags); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	arn := getStr(req, "resourceArn")
+	keys := getStrSlice(req, "tagKeys")
+
+	if awsErr := store.UntagResource(arn, keys); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	arn := getStr(req, "resourceArn")
+	tags := store.ListTagsForResource(arn)
+	return jsonOK(map[string]any{"tags": tags})
+}
+
 // ---- Commit & Diff handlers ----
 
 func handleGetCommit(ctx *service.RequestContext, store *Store) (*service.Response, error) {
@@ -402,6 +595,22 @@ func repoToMap(r *Repository) map[string]any {
 		"defaultBranch":         r.DefaultBranch,
 		"creationDate":          float64(r.CreatedAt.Unix()),
 		"lastModifiedDate":      float64(r.LastModified.Unix()),
+	}
+}
+
+func commentToMap(c *Comment) map[string]any {
+	return map[string]any{
+		"commentId":      c.CommentID,
+		"content":        c.Content,
+		"authorArn":      c.AuthorARN,
+		"pullRequestId":  c.PullRequestID,
+		"repositoryName": c.RepositoryName,
+		"beforeCommitId": c.BeforeCommitID,
+		"afterCommitId":  c.AfterCommitID,
+		"filePath":       c.FilePath,
+		"creationDate":   float64(c.CreationDate.Unix()),
+		"lastModifiedDate": float64(c.LastModified.Unix()),
+		"deleted":        c.Deleted,
 	}
 }
 

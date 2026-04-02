@@ -542,6 +542,280 @@ func TestGetDifferences(t *testing.T) {
 	assert.Equal(t, "M", diff["changeType"])
 }
 
+// --- UpdatePullRequestTitle ---
+
+func TestUpdatePullRequestTitle(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "title-repo")
+
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "Old Title",
+		"targets": []any{map[string]any{"repositoryName": "title-repo", "sourceReference": "feature", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	ctx := jsonCtx("UpdatePullRequestTitle", map[string]any{
+		"pullRequestId": prID,
+		"title":         "New Title",
+	})
+	resp2, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp2)
+	assert.Equal(t, "New Title", body["pullRequest"].(map[string]any)["title"])
+}
+
+func TestUpdatePullRequestTitleMissingTitle(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "notitle-repo")
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "PR",
+		"targets": []any{map[string]any{"repositoryName": "notitle-repo", "sourceReference": "f", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	ctx := jsonCtx("UpdatePullRequestTitle", map[string]any{
+		"pullRequestId": prID,
+		"title":         "",
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+// --- MergePullRequestByFastForward ---
+
+func TestMergePullRequestByFastForward(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "ffmerge-repo")
+
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "FF PR",
+		"targets": []any{map[string]any{"repositoryName": "ffmerge-repo", "sourceReference": "feature", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	ctx := jsonCtx("MergePullRequestByFastForward", map[string]any{
+		"pullRequestId":  prID,
+		"repositoryName": "ffmerge-repo",
+	})
+	resp2, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp2)
+	pr := body["pullRequest"].(map[string]any)
+	assert.Equal(t, "MERGED", pr["pullRequestStatus"])
+	targets := pr["pullRequestTargets"].([]any)
+	mergeMetadata := targets[0].(map[string]any)["mergeMetadata"].(map[string]any)
+	assert.Equal(t, true, mergeMetadata["isMerged"])
+}
+
+func TestMergePullRequestByFastForwardAlreadyMerged(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "ffmerge2-repo")
+
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "FF PR",
+		"targets": []any{map[string]any{"repositoryName": "ffmerge2-repo", "sourceReference": "feature", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	// Merge it
+	s.HandleRequest(jsonCtx("MergePullRequestByFastForward", map[string]any{
+		"pullRequestId":  prID,
+		"repositoryName": "ffmerge2-repo",
+	}))
+
+	// Try to merge again
+	_, err := s.HandleRequest(jsonCtx("MergePullRequestByFastForward", map[string]any{
+		"pullRequestId":  prID,
+		"repositoryName": "ffmerge2-repo",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PullRequestStatusRequiredException")
+}
+
+// --- PostCommentForPullRequest ---
+
+func TestPostCommentForPullRequest(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "comment-repo")
+
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "Commented PR",
+		"targets": []any{map[string]any{"repositoryName": "comment-repo", "sourceReference": "feature", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	ctx := jsonCtx("PostCommentForPullRequest", map[string]any{
+		"pullRequestId":  prID,
+		"repositoryName": "comment-repo",
+		"content":        "LGTM!",
+		"beforeCommitId": "abc123",
+		"afterCommitId":  "def456",
+	})
+	resp2, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp2)
+	comment := body["comment"].(map[string]any)
+	assert.Equal(t, "LGTM!", comment["content"])
+	assert.NotEmpty(t, comment["commentId"])
+	assert.Equal(t, prID, comment["pullRequestId"])
+}
+
+func TestPostCommentForPullRequestMissingContent(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "nocomment-repo")
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "PR",
+		"targets": []any{map[string]any{"repositoryName": "nocomment-repo", "sourceReference": "f", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("PostCommentForPullRequest", map[string]any{
+		"pullRequestId":  prID,
+		"repositoryName": "nocomment-repo",
+		"content":        "",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+// --- GetCommentsForPullRequest ---
+
+func TestGetCommentsForPullRequest(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "getcomments-repo")
+
+	resp, _ := s.HandleRequest(jsonCtx("CreatePullRequest", map[string]any{
+		"title":   "PR with Comments",
+		"targets": []any{map[string]any{"repositoryName": "getcomments-repo", "sourceReference": "feature", "destinationReference": "main"}},
+	}))
+	prID := respBody(t, resp)["pullRequest"].(map[string]any)["pullRequestId"].(string)
+
+	s.HandleRequest(jsonCtx("PostCommentForPullRequest", map[string]any{
+		"pullRequestId": prID, "repositoryName": "getcomments-repo", "content": "Comment 1",
+	}))
+	s.HandleRequest(jsonCtx("PostCommentForPullRequest", map[string]any{
+		"pullRequestId": prID, "repositoryName": "getcomments-repo", "content": "Comment 2",
+	}))
+
+	ctx := jsonCtx("GetCommentsForPullRequest", map[string]any{"pullRequestId": prID})
+	resp2, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp2)
+	comments := body["commentsForPullRequestData"].([]any)
+	assert.Len(t, comments, 2)
+}
+
+func TestGetCommentsForPullRequestNotFound(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("GetCommentsForPullRequest", map[string]any{"pullRequestId": "999"})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "PullRequestDoesNotExistException")
+}
+
+// --- PutRepositoryTriggers / GetRepositoryTriggers ---
+
+func TestPutAndGetRepositoryTriggers(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "trigger-repo")
+
+	ctx := jsonCtx("PutRepositoryTriggers", map[string]any{
+		"repositoryName": "trigger-repo",
+		"triggers": []any{
+			map[string]any{
+				"name":           "my-trigger",
+				"destinationArn": "arn:aws:sns:us-east-1:123456789012:my-topic",
+				"branches":       []any{"main"},
+				"events":         []any{"all"},
+			},
+		},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.NotEmpty(t, body["configurationId"])
+
+	ctx2 := jsonCtx("GetRepositoryTriggers", map[string]any{"repositoryName": "trigger-repo"})
+	resp2, err2 := s.HandleRequest(ctx2)
+	require.NoError(t, err2)
+	body2 := respBody(t, resp2)
+	triggers := body2["triggers"].([]any)
+	assert.Len(t, triggers, 1)
+	trigger := triggers[0].(map[string]any)
+	assert.Equal(t, "my-trigger", trigger["name"])
+}
+
+func TestGetRepositoryTriggersEmpty(t *testing.T) {
+	s := newService()
+	createRepo(t, s, "emptytrigger-repo")
+
+	ctx := jsonCtx("GetRepositoryTriggers", map[string]any{"repositoryName": "emptytrigger-repo"})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.Empty(t, body["triggers"])
+}
+
+func TestPutRepositoryTriggersRepoNotFound(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("PutRepositoryTriggers", map[string]any{
+		"repositoryName": "nope",
+		"triggers":       []any{},
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "RepositoryDoesNotExistException")
+}
+
+// --- TagResource / UntagResource / ListTagsForResource ---
+
+func TestCodeCommitTagging(t *testing.T) {
+	s := newService()
+	body := createRepo(t, s, "tagged-repo")
+	arn := body["repositoryMetadata"].(map[string]any)["Arn"].(string)
+
+	ctx := jsonCtx("TagResource", map[string]any{
+		"resourceArn": arn,
+		"tags":        map[string]any{"env": "prod", "team": "backend"},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	ctx2 := jsonCtx("ListTagsForResource", map[string]any{"resourceArn": arn})
+	resp2, err2 := s.HandleRequest(ctx2)
+	require.NoError(t, err2)
+	body2 := respBody(t, resp2)
+	tags := body2["tags"].(map[string]any)
+	assert.Equal(t, "prod", tags["env"])
+	assert.Equal(t, "backend", tags["team"])
+
+	ctx3 := jsonCtx("UntagResource", map[string]any{
+		"resourceArn": arn,
+		"tagKeys":     []any{"env"},
+	})
+	resp3, err3 := s.HandleRequest(ctx3)
+	require.NoError(t, err3)
+	assert.Equal(t, 200, resp3.StatusCode)
+
+	resp4, _ := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"resourceArn": arn}))
+	body4 := respBody(t, resp4)
+	tags4 := body4["tags"].(map[string]any)
+	assert.Len(t, tags4, 1)
+	assert.Equal(t, "backend", tags4["team"])
+}
+
+func TestTagResourceMissingArn(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("TagResource", map[string]any{
+		"tags": map[string]any{"key": "val"},
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
 // --- Invalid Action ---
 
 func TestInvalidAction(t *testing.T) {

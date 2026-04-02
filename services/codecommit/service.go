@@ -58,7 +58,19 @@ func (s *CodeCommitService) Actions() []service.Action {
 		{Name: "GetPullRequest", Method: http.MethodPost, IAMAction: "codecommit:GetPullRequest"},
 		{Name: "ListPullRequests", Method: http.MethodPost, IAMAction: "codecommit:ListPullRequests"},
 		{Name: "UpdatePullRequestStatus", Method: http.MethodPost, IAMAction: "codecommit:UpdatePullRequestStatus"},
+		{Name: "UpdatePullRequestTitle", Method: http.MethodPost, IAMAction: "codecommit:UpdatePullRequestTitle"},
 		{Name: "MergePullRequestBySquash", Method: http.MethodPost, IAMAction: "codecommit:MergePullRequestBySquash"},
+		{Name: "MergePullRequestByFastForward", Method: http.MethodPost, IAMAction: "codecommit:MergePullRequestByFastForward"},
+		// Comments
+		{Name: "PostCommentForPullRequest", Method: http.MethodPost, IAMAction: "codecommit:PostCommentForPullRequest"},
+		{Name: "GetCommentsForPullRequest", Method: http.MethodPost, IAMAction: "codecommit:GetCommentsForPullRequest"},
+		// Triggers
+		{Name: "PutRepositoryTriggers", Method: http.MethodPost, IAMAction: "codecommit:PutRepositoryTriggers"},
+		{Name: "GetRepositoryTriggers", Method: http.MethodPost, IAMAction: "codecommit:GetRepositoryTriggers"},
+		// Tags
+		{Name: "TagResource", Method: http.MethodPost, IAMAction: "codecommit:TagResource"},
+		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "codecommit:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "codecommit:ListTagsForResource"},
 		// Commits & Diffs
 		{Name: "GetCommit", Method: http.MethodPost, IAMAction: "codecommit:GetCommit"},
 		{Name: "GetDifferences", Method: http.MethodPost, IAMAction: "codecommit:GetDifferences"},
@@ -102,8 +114,29 @@ func (s *CodeCommitService) HandleRequest(ctx *service.RequestContext) (*service
 		return handleListPullRequests(ctx, s.store)
 	case "UpdatePullRequestStatus":
 		return handleUpdatePullRequestStatus(ctx, s.store)
+	case "UpdatePullRequestTitle":
+		return handleUpdatePullRequestTitle(ctx, s.store)
 	case "MergePullRequestBySquash":
 		return handleMergePullRequestBySquash(ctx, s.store)
+	case "MergePullRequestByFastForward":
+		return handleMergePullRequestByFastForward(ctx, s.store)
+	// Comments
+	case "PostCommentForPullRequest":
+		return handlePostCommentForPullRequest(ctx, s.store)
+	case "GetCommentsForPullRequest":
+		return handleGetCommentsForPullRequest(ctx, s.store)
+	// Triggers
+	case "PutRepositoryTriggers":
+		return handlePutRepositoryTriggers(ctx, s.store)
+	case "GetRepositoryTriggers":
+		return handleGetRepositoryTriggers(ctx, s.store)
+	// Tags
+	case "TagResource":
+		return handleTagResource(ctx, s.store)
+	case "UntagResource":
+		return handleUntagResource(ctx, s.store)
+	case "ListTagsForResource":
+		return handleListTagsForResource(ctx, s.store)
 	// Commits & Diffs
 	case "GetCommit":
 		return handleGetCommit(ctx, s.store)

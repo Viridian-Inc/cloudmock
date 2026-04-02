@@ -107,16 +107,43 @@ type BlobInfo struct {
 	Mode   string
 }
 
+// Comment represents a comment on a pull request.
+type Comment struct {
+	CommentID       string
+	Content         string
+	PullRequestID   string
+	RepositoryName  string
+	BeforeCommitID  string
+	AfterCommitID   string
+	FilePath        string
+	AuthorARN       string
+	CreationDate    time.Time
+	LastModified    time.Time
+	Deleted         bool
+}
+
+// RepositoryTrigger represents a trigger on a repository.
+type RepositoryTrigger struct {
+	Name            string
+	DestinationARN  string
+	CustomData      string
+	Branches        []string
+	Events          []string
+}
+
 // Store is the in-memory store for all CodeCommit resources.
 type Store struct {
 	mu           sync.RWMutex
 	accountID    string
 	region       string
 	repositories map[string]*Repository
-	branches     map[string]map[string]*Branch  // repoName -> branchName -> Branch
-	commits      map[string]map[string]*Commit  // repoName -> commitID -> Commit
-	pullRequests map[string]*PullRequest        // prID -> PullRequest
+	branches     map[string]map[string]*Branch   // repoName -> branchName -> Branch
+	commits      map[string]map[string]*Commit   // repoName -> commitID -> Commit
+	pullRequests map[string]*PullRequest         // prID -> PullRequest
+	comments     map[string][]*Comment           // prID -> []Comment
+	triggers     map[string][]RepositoryTrigger  // repoName -> []Trigger
 	prCounter    int
+	commentCounter int
 	tags         map[string]map[string]string
 }
 
@@ -129,6 +156,8 @@ func NewStore(accountID, region string) *Store {
 		branches:     make(map[string]map[string]*Branch),
 		commits:      make(map[string]map[string]*Commit),
 		pullRequests: make(map[string]*PullRequest),
+		comments:     make(map[string][]*Comment),
+		triggers:     make(map[string][]RepositoryTrigger),
 		tags:         make(map[string]map[string]string),
 	}
 }
@@ -506,6 +535,133 @@ func (s *Store) UpdatePullRequestStatus(prID, status string) (*PullRequest, *ser
 	pr.Status = status
 	pr.LastActivityDate = time.Now().UTC()
 	return pr, nil
+}
+
+func (s *Store) UpdatePullRequestTitle(prID, title string) (*PullRequest, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pr, ok := s.pullRequests[prID]
+	if !ok {
+		return nil, service.NewAWSError("PullRequestDoesNotExistException",
+			fmt.Sprintf("Pull request does not exist: %s", prID), http.StatusNotFound)
+	}
+	if title == "" {
+		return nil, service.ErrValidation("Pull request title is required.")
+	}
+	pr.Title = title
+	pr.LastActivityDate = time.Now().UTC()
+	return pr, nil
+}
+
+func (s *Store) MergePullRequestByFastForward(prID, repoName string) (*PullRequest, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	pr, ok := s.pullRequests[prID]
+	if !ok {
+		return nil, service.NewAWSError("PullRequestDoesNotExistException",
+			fmt.Sprintf("Pull request does not exist: %s", prID), http.StatusNotFound)
+	}
+	if pr.Status != PRStatusOpen {
+		return nil, service.NewAWSError("PullRequestStatusRequiredException",
+			"Pull request must be open to merge.", http.StatusBadRequest)
+	}
+
+	mergeCommitID := newCommitID()
+	pr.Status = PRStatusMerged
+	pr.MergeMetadata = &MergeMetadata{
+		IsMerged:      true,
+		MergedBy:      fmt.Sprintf("arn:aws:iam::%s:root", s.accountID),
+		MergeCommitID: mergeCommitID,
+	}
+	pr.LastActivityDate = time.Now().UTC()
+
+	if s.commits[repoName] == nil {
+		s.commits[repoName] = make(map[string]*Commit)
+	}
+	now := time.Now().UTC()
+	s.commits[repoName][mergeCommitID] = &Commit{
+		CommitID:  mergeCommitID,
+		TreeID:    newCommitID(),
+		Author:    UserInfo{Name: "System", Email: "system@cloudmock", Date: now},
+		Committer: UserInfo{Name: "System", Email: "system@cloudmock", Date: now},
+		Message:   fmt.Sprintf("Fast-forward merge PR #%s: %s", prID, pr.Title),
+	}
+
+	branches := s.branches[repoName]
+	if branches != nil {
+		if destBranch, ok := branches[pr.DestinationReference]; ok {
+			destBranch.CommitID = mergeCommitID
+		}
+	}
+
+	return pr, nil
+}
+
+func (s *Store) PostCommentForPullRequest(prID, repoName, content, beforeCommitID, afterCommitID, filePath string) (*Comment, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.pullRequests[prID]; !ok {
+		return nil, service.NewAWSError("PullRequestDoesNotExistException",
+			fmt.Sprintf("Pull request does not exist: %s", prID), http.StatusNotFound)
+	}
+	if content == "" {
+		return nil, service.ErrValidation("Comment content is required.")
+	}
+
+	s.commentCounter++
+	now := time.Now().UTC()
+	comment := &Comment{
+		CommentID:      fmt.Sprintf("%d", s.commentCounter),
+		Content:        content,
+		PullRequestID:  prID,
+		RepositoryName: repoName,
+		BeforeCommitID: beforeCommitID,
+		AfterCommitID:  afterCommitID,
+		FilePath:       filePath,
+		AuthorARN:      fmt.Sprintf("arn:aws:iam::%s:root", s.accountID),
+		CreationDate:   now,
+		LastModified:   now,
+	}
+	s.comments[prID] = append(s.comments[prID], comment)
+	return comment, nil
+}
+
+func (s *Store) GetCommentsForPullRequest(prID string) ([]*Comment, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if _, ok := s.pullRequests[prID]; !ok {
+		return nil, service.NewAWSError("PullRequestDoesNotExistException",
+			fmt.Sprintf("Pull request does not exist: %s", prID), http.StatusNotFound)
+	}
+	return s.comments[prID], nil
+}
+
+func (s *Store) PutRepositoryTriggers(repoName string, triggers []RepositoryTrigger) (string, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.repositories[repoName]; !ok {
+		return "", service.NewAWSError("RepositoryDoesNotExistException",
+			fmt.Sprintf("Repository does not exist: %s", repoName), http.StatusNotFound)
+	}
+	s.triggers[repoName] = triggers
+	// Return a configuration ID (hash-like)
+	return newCommitID()[:8], nil
+}
+
+func (s *Store) GetRepositoryTriggers(repoName string) ([]RepositoryTrigger, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if _, ok := s.repositories[repoName]; !ok {
+		return nil, service.NewAWSError("RepositoryDoesNotExistException",
+			fmt.Sprintf("Repository does not exist: %s", repoName), http.StatusNotFound)
+	}
+	return s.triggers[repoName], nil
 }
 
 func (s *Store) MergePullRequestBySquash(prID, repoName string) (*PullRequest, *service.AWSError) {

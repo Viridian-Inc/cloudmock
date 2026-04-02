@@ -25,7 +25,16 @@ CloudMock emulates AWS CodeCommit, supporting repository management, branches, p
 | GetPullRequest | Supported | Returns pull request details |
 | ListPullRequests | Supported | Lists pull requests |
 | UpdatePullRequestStatus | Supported | Updates pull request status |
+| UpdatePullRequestTitle | Supported | Updates the title of a pull request |
 | MergePullRequestBySquash | Supported | Merges a pull request via squash |
+| MergePullRequestByFastForward | Supported | Merges a pull request via fast-forward |
+| PostCommentForPullRequest | Supported | Posts a comment on a pull request |
+| GetCommentsForPullRequest | Supported | Retrieves comments for a pull request |
+| PutRepositoryTriggers | Supported | Configures triggers for a repository |
+| GetRepositoryTriggers | Supported | Returns triggers for a repository |
+| TagResource | Supported | Adds tags to a repository |
+| UntagResource | Supported | Removes tags from a repository |
+| ListTagsForResource | Supported | Lists tags for a repository |
 | GetCommit | Supported | Returns commit details |
 | GetDifferences | Supported | Returns differences between commits |
 

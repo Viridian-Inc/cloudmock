@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/neureaux/cloudmock/pkg/service"
-	"github.com/neureaux/cloudmock/pkg/stub"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -35,52 +34,6 @@ func (f *fakeBasicService) HandleRequest(ctx *service.RequestContext) (*service.
 func (f *fakeBasicService) HealthCheck() error           { return nil }
 
 // ── Tests ───────────────────────────────────────────────────────────────────
-
-func TestExtractFromStubModels(t *testing.T) {
-	models := []*stub.ServiceModel{
-		{
-			ServiceName: "autoscaling",
-			Protocol:    "query",
-			Actions: map[string]stub.Action{
-				"CreateAutoScalingGroup":    {Name: "CreateAutoScalingGroup", Type: "create", ResourceType: "asg", IdField: "AutoScalingGroupName"},
-				"DescribeAutoScalingGroups": {Name: "DescribeAutoScalingGroups", Type: "list", ResourceType: "asg"},
-				"DeleteAutoScalingGroup":    {Name: "DeleteAutoScalingGroup", Type: "delete", ResourceType: "asg", IdField: "AutoScalingGroupName"},
-				"UpdateAutoScalingGroup":    {Name: "UpdateAutoScalingGroup", Type: "update", ResourceType: "asg", IdField: "AutoScalingGroupName"},
-			},
-			ResourceTypes: map[string]stub.ResourceType{
-				"asg": {
-					Name:       "AutoScalingGroup",
-					IdField:    "AutoScalingGroupName",
-					ArnPattern: "arn:aws:autoscaling:{region}:{account}:autoScalingGroup/{id}",
-					Fields: []stub.Field{
-						{Name: "AutoScalingGroupName", Type: "string", Required: false},
-						{Name: "MinSize", Type: "integer", Required: false},
-						{Name: "MaxSize", Type: "integer", Required: false},
-					},
-				},
-			},
-		},
-	}
-
-	schemas := ExtractFromStubModels(models, "123456789012", "us-east-1")
-	require.Len(t, schemas, 1)
-
-	s := schemas[0]
-	assert.Equal(t, "autoscaling", s.ServiceName)
-	assert.Equal(t, "cloudmock_autoscaling_auto_scaling_group", s.TerraformType)
-	assert.Equal(t, "AWS::AutoScaling::AutoScalingGroup", s.AWSType)
-	assert.Equal(t, "CreateAutoScalingGroup", s.CreateAction)
-	assert.Equal(t, "DeleteAutoScalingGroup", s.DeleteAction)
-	assert.Equal(t, "UpdateAutoScalingGroup", s.UpdateAction)
-	assert.Equal(t, "DescribeAutoScalingGroups", s.ListAction)
-	assert.Equal(t, "AutoScalingGroupName", s.ImportID)
-
-	require.Len(t, s.Attributes, 3)
-	assert.Equal(t, "auto_scaling_group_name", s.Attributes[0].Name)
-	assert.Equal(t, "string", s.Attributes[0].Type)
-	assert.Equal(t, "min_size", s.Attributes[1].Name)
-	assert.Equal(t, "int", s.Attributes[1].Type)
-}
 
 func TestExtractFromServices(t *testing.T) {
 	svc := &fakeSchemaService{

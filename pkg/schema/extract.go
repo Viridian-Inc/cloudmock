@@ -5,7 +5,6 @@ import (
 	"unicode"
 
 	"github.com/neureaux/cloudmock/pkg/service"
-	"github.com/neureaux/cloudmock/pkg/stub"
 )
 
 // ExtractFromServices takes a list of service.Service instances and extracts
@@ -18,57 +17,6 @@ func ExtractFromServices(services []service.Service) []ResourceSchema {
 			schemas = append(schemas, sp.ResourceSchemas()...)
 		}
 	}
-	return schemas
-}
-
-// ExtractFromStubModels converts stub ServiceModel definitions to ResourceSchemas.
-func ExtractFromStubModels(models []*stub.ServiceModel, accountID, region string) []ResourceSchema {
-	var schemas []ResourceSchema
-
-	for _, model := range models {
-		for rtKey, resType := range model.ResourceTypes {
-			rs := ResourceSchema{
-				ServiceName:   model.ServiceName,
-				ResourceType:  "aws_" + model.ServiceName + "_" + toSnakeCase(resType.Name),
-				TerraformType: "cloudmock_" + model.ServiceName + "_" + toSnakeCase(resType.Name),
-				AWSType:       "AWS::" + toPascalCase(model.ServiceName) + "::" + resType.Name,
-				ImportID:      resType.IdField,
-			}
-
-			// Map fields to attributes.
-			for _, field := range resType.Fields {
-				attr := AttributeSchema{
-					Name:     toSnakeCase(field.Name),
-					Type:     mapStubFieldType(field.Type),
-					Required: field.Required,
-					Computed: isComputedField(field.Name),
-				}
-				rs.Attributes = append(rs.Attributes, attr)
-			}
-
-			// Map actions to CRUD operations.
-			for _, action := range model.Actions {
-				if action.ResourceType != rtKey {
-					continue
-				}
-				switch action.Type {
-				case "create":
-					rs.CreateAction = action.Name
-				case "describe":
-					rs.ReadAction = action.Name
-				case "list":
-					rs.ListAction = action.Name
-				case "update":
-					rs.UpdateAction = action.Name
-				case "delete":
-					rs.DeleteAction = action.Name
-				}
-			}
-
-			schemas = append(schemas, rs)
-		}
-	}
-
 	return schemas
 }
 
@@ -180,26 +128,6 @@ func isComputedField(name string) bool {
 	return strings.Contains(lower, "arn") ||
 		strings.HasSuffix(lower, "id") ||
 		strings.Contains(lower, "created")
-}
-
-// mapStubFieldType converts stub field types to schema attribute types.
-func mapStubFieldType(t string) string {
-	switch t {
-	case "string":
-		return "string"
-	case "integer":
-		return "int"
-	case "boolean":
-		return "bool"
-	case "timestamp":
-		return "string"
-	case "list":
-		return "list"
-	case "map":
-		return "map"
-	default:
-		return "string"
-	}
 }
 
 // toSnakeCase converts PascalCase or camelCase to snake_case.

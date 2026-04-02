@@ -12,7 +12,6 @@ import (
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	ec2svc "github.com/neureaux/cloudmock/services/ec2"
-	"github.com/neureaux/cloudmock/services/stubs"
 )
 
 // setupEC2Gateway builds a full gateway with the Tier 1 EC2 service registered
@@ -29,11 +28,8 @@ func setupEC2Gateway(t *testing.T) *httptest.Server {
 
 	registry := routing.NewRegistry()
 
-	// Register Tier 1 EC2 service (takes precedence over stub).
+	// Register Tier 1 EC2 service.
 	registry.Register(ec2svc.New(cfg.AccountID, cfg.Region))
-
-	// Register Tier 2 stubs (EC2 is no longer in this list).
-	stubs.RegisterAll(registry, cfg.AccountID, cfg.Region)
 
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	return httptest.NewServer(gw)

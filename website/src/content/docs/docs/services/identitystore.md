@@ -14,15 +14,19 @@ CloudMock emulates AWS Identity Store, supporting user, group, and group members
 | CreateUser | Supported | Creates a user |
 | DescribeUser | Supported | Returns user details |
 | ListUsers | Supported | Lists all users |
+| UpdateUser | Supported | Updates user attributes |
 | DeleteUser | Supported | Deletes a user |
 | CreateGroup | Supported | Creates a group |
 | DescribeGroup | Supported | Returns group details |
 | ListGroups | Supported | Lists all groups |
+| UpdateGroup | Supported | Updates group attributes |
 | DeleteGroup | Supported | Deletes a group |
 | CreateGroupMembership | Supported | Adds a user to a group |
-| GetGroupMembershipId | Supported | Returns a membership ID |
+| GetGroupMembership | Supported | Returns a group membership by ID |
+| GetGroupMembershipId | Supported | Looks up a membership ID by user and group |
 | ListGroupMemberships | Supported | Lists group memberships |
 | DeleteGroupMembership | Supported | Removes a user from a group |
+| IsMemberInGroups | Supported | Checks if a user is a member of multiple groups |
 
 ## Quick Start
 

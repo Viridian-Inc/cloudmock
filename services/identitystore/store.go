@@ -151,6 +151,39 @@ func (s *Store) ListUsers(identityStoreID string) []*User {
 	return out
 }
 
+// UpdateUser applies attribute updates to a user.
+func (s *Store) UpdateUser(identityStoreID, userID string, updates map[string]any) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	u, ok := s.users[userID]
+	if !ok || u.IdentityStoreID != identityStoreID {
+		return false
+	}
+	for attr, val := range updates {
+		switch attr {
+		case "displayName":
+			if v, ok := val.(string); ok {
+				u.DisplayName = v
+			}
+		case "name.givenName":
+			if v, ok := val.(string); ok {
+				if u.Name == nil {
+					u.Name = &Name{}
+				}
+				u.Name.GivenName = v
+			}
+		case "name.familyName":
+			if v, ok := val.(string); ok {
+				if u.Name == nil {
+					u.Name = &Name{}
+				}
+				u.Name.FamilyName = v
+			}
+		}
+	}
+	return true
+}
+
 // DeleteUser removes a user.
 func (s *Store) DeleteUser(identityStoreID, userID string) bool {
 	s.mu.Lock()
@@ -210,6 +243,29 @@ func (s *Store) ListGroups(identityStoreID string) []*Group {
 		}
 	}
 	return out
+}
+
+// UpdateGroup applies attribute updates to a group.
+func (s *Store) UpdateGroup(identityStoreID, groupID string, updates map[string]any) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g, ok := s.groups[groupID]
+	if !ok || g.IdentityStoreID != identityStoreID {
+		return false
+	}
+	for attr, val := range updates {
+		switch attr {
+		case "displayName":
+			if v, ok := val.(string); ok {
+				g.DisplayName = v
+			}
+		case "description":
+			if v, ok := val.(string); ok {
+				g.Description = v
+			}
+		}
+	}
+	return true
 }
 
 // DeleteGroup removes a group.

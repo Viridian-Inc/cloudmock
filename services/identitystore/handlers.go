@@ -305,3 +305,113 @@ func handleDeleteGroupMembership(params map[string]any, store *Store) (*service.
 	}
 	return jsonOK(map[string]any{})
 }
+
+func handleUpdateUser(params map[string]any, store *Store) (*service.Response, error) {
+	identityStoreID := str(params, "IdentityStoreId")
+	userID := str(params, "UserId")
+	if identityStoreID == "" || userID == "" {
+		return jsonErr(service.ErrValidation("IdentityStoreId and UserId are required"))
+	}
+
+	ops, _ := params["Operations"].([]any)
+	updates := make(map[string]any)
+	for _, op := range ops {
+		if m, ok := op.(map[string]any); ok {
+			attr, _ := m["AttributePath"].(string)
+			val := m["AttributeValue"]
+			if attr != "" {
+				updates[attr] = val
+			}
+		}
+	}
+
+	if !store.UpdateUser(identityStoreID, userID, updates) {
+		return jsonErr(service.ErrNotFound("User", userID))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleUpdateGroup(params map[string]any, store *Store) (*service.Response, error) {
+	identityStoreID := str(params, "IdentityStoreId")
+	groupID := str(params, "GroupId")
+	if identityStoreID == "" || groupID == "" {
+		return jsonErr(service.ErrValidation("IdentityStoreId and GroupId are required"))
+	}
+
+	ops, _ := params["Operations"].([]any)
+	updates := make(map[string]any)
+	for _, op := range ops {
+		if m, ok := op.(map[string]any); ok {
+			attr, _ := m["AttributePath"].(string)
+			val := m["AttributeValue"]
+			if attr != "" {
+				updates[attr] = val
+			}
+		}
+	}
+
+	if !store.UpdateGroup(identityStoreID, groupID, updates) {
+		return jsonErr(service.ErrNotFound("Group", groupID))
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleGetGroupMembership(params map[string]any, store *Store) (*service.Response, error) {
+	identityStoreID := str(params, "IdentityStoreId")
+	membershipID := str(params, "MembershipId")
+	if identityStoreID == "" || membershipID == "" {
+		return jsonErr(service.ErrValidation("IdentityStoreId and MembershipId are required"))
+	}
+	m, ok := store.GetGroupMembership(identityStoreID, membershipID)
+	if !ok {
+		return jsonErr(service.ErrNotFound("GroupMembership", membershipID))
+	}
+	return jsonOK(map[string]any{
+		"MembershipId":    m.MembershipID,
+		"IdentityStoreId": m.IdentityStoreID,
+		"GroupId":         m.GroupID,
+		"MemberId":        map[string]any{"UserId": m.MemberID},
+	})
+}
+
+func handleIsMemberInGroups(params map[string]any, store *Store) (*service.Response, error) {
+	identityStoreID := str(params, "IdentityStoreId")
+	if identityStoreID == "" {
+		return jsonErr(service.ErrValidation("IdentityStoreId is required"))
+	}
+
+	var memberID string
+	if mid, ok := params["MemberId"].(map[string]any); ok {
+		memberID = str(mid, "UserId")
+	}
+	if memberID == "" {
+		return jsonErr(service.ErrValidation("MemberId.UserId is required"))
+	}
+
+	var groupIDs []string
+	if rawGroups, ok := params["GroupIds"].([]any); ok {
+		for _, g := range rawGroups {
+			if s, ok := g.(string); ok {
+				groupIDs = append(groupIDs, s)
+			}
+		}
+	}
+
+	results := make([]map[string]any, 0, len(groupIDs))
+	for _, groupID := range groupIDs {
+		memberships := store.ListGroupMemberships(identityStoreID, groupID)
+		isMember := false
+		for _, m := range memberships {
+			if m.MemberID == memberID {
+				isMember = true
+				break
+			}
+		}
+		results = append(results, map[string]any{
+			"GroupId":          groupID,
+			"MembershipExists": isMember,
+		})
+	}
+
+	return jsonOK(map[string]any{"Results": results})
+}

@@ -132,3 +132,72 @@ func TestRG_SearchResources(t *testing.T) {
 	m := respJSON(t, resp)
 	assert.Len(t, m["ResourceIdentifiers"].([]any), 1)
 }
+
+func TestRG_CreateGroupMissingName(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodPost, "/groups", map[string]any{"Description": "no name"}))
+	require.Error(t, err)
+}
+
+func TestRG_DeleteGroupNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodDelete, "/groups/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestRG_UpdateGroupNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodPut, "/groups/nonexistent", map[string]any{"Description": "x"}))
+	require.Error(t, err)
+}
+
+func TestRG_GroupHasARN(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(restCtx(http.MethodPost, "/groups", map[string]any{"Name": "arn-test"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	arn := m["Group"].(map[string]any)["GroupArn"].(string)
+	assert.Contains(t, arn, "arn:aws:resource-groups:")
+}
+
+func TestRG_UntagResource(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(restCtx(http.MethodPost, "/groups", map[string]any{
+		"Name": "untag-g", "Tags": map[string]any{"env": "prod", "team": "sre"},
+	}))
+	arn := respJSON(t, cr)["Group"].(map[string]any)["GroupArn"].(string)
+
+	resp, err := s.HandleRequest(restCtx(http.MethodDelete, "/resources/"+arn+"/tags", map[string]any{
+		"Keys": []string{"team"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	getResp, _ := s.HandleRequest(restCtx(http.MethodGet, "/resources/"+arn+"/tags", nil))
+	tags := respJSON(t, getResp)["Tags"].(map[string]any)
+	assert.Nil(t, tags["team"])
+	assert.Equal(t, "prod", tags["env"])
+}
+
+func TestRG_ListGroupsEmpty(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/groups", nil))
+	require.NoError(t, err)
+	groups := respJSON(t, resp)["Groups"].([]any)
+	assert.Len(t, groups, 0)
+}
+
+func TestRG_GetGroupQuery(t *testing.T) {
+	s := newService()
+	s.HandleRequest(restCtx(http.MethodPost, "/groups", map[string]any{
+		"Name": "query-g",
+		"ResourceQuery": map[string]any{
+			"Type":  "TAG_FILTERS_1_0",
+			"Query": `{"ResourceTypeFilters":["AWS::EC2::Instance"]}`,
+		},
+	}))
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/groups/query-g/query", nil))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.NotNil(t, m["ResourceQuery"])
+}

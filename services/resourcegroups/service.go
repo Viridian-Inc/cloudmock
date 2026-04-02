@@ -84,6 +84,18 @@ func (s *ResourceGroupsService) HandleRequest(ctx *service.RequestContext) (*ser
 		return handleSearchResources(params, s.store)
 	}
 
+	// /groups/{name}/query -> GetGroupQuery/UpdateGroupQuery (must be before /groups/{name})
+	if strings.HasPrefix(path, "/groups/") && strings.HasSuffix(path, "/query") {
+		name := strings.TrimPrefix(path, "/groups/")
+		name = strings.TrimSuffix(name, "/query")
+		switch method {
+		case http.MethodGet:
+			return handleGetGroupQuery(name, s.store)
+		case http.MethodPut:
+			return handleUpdateGroupQuery(name, params, s.store)
+		}
+	}
+
 	// /groups/{name} -> Get/Update/Delete
 	if strings.HasPrefix(path, "/groups/") {
 		name := strings.TrimPrefix(path, "/groups/")
@@ -107,6 +119,8 @@ func (s *ResourceGroupsService) HandleRequest(ctx *service.RequestContext) (*ser
 		case http.MethodPut:
 			return handleTagResource(arn, params, s.store)
 		case http.MethodPatch:
+			return handleUntagResource(arn, params, s.store)
+		case http.MethodDelete:
 			return handleUntagResource(arn, params, s.store)
 		}
 	}

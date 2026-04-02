@@ -233,3 +233,23 @@ func (s *Store) UntagResource(arn string, keys []string) bool {
 	}
 	return false
 }
+
+// GetGroupQuery returns the resource query for a group.
+func (s *Store) GetGroupQuery(name string) (*Group, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	g, ok := s.groups[name]
+	return g, ok
+}
+
+// UpdateGroupQuery updates the resource query for a group.
+func (s *Store) UpdateGroupQuery(name string, query *ResourceQuery) (*Group, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g, ok := s.groups[name]
+	if !ok {
+		return nil, false
+	}
+	g.ResourceQuery = query
+	return g, true
+}

@@ -241,3 +241,42 @@ func handleUntagResource(arn string, params map[string]any, store *Store) (*serv
 		"Keys": keys,
 	})
 }
+
+func handleGetGroupQuery(name string, store *Store) (*service.Response, error) {
+	g, ok := store.GetGroupQuery(name)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Group", name))
+	}
+	rq := map[string]any{}
+	if g.ResourceQuery != nil {
+		rq = map[string]any{"Type": g.ResourceQuery.Type, "Query": g.ResourceQuery.Query}
+	}
+	return jsonOK(map[string]any{
+		"GroupName":     g.Name,
+		"GroupArn":      g.GroupArn,
+		"ResourceQuery": rq,
+	})
+}
+
+func handleUpdateGroupQuery(name string, params map[string]any, store *Store) (*service.Response, error) {
+	var rq *ResourceQuery
+	if qm, ok := params["ResourceQuery"].(map[string]any); ok {
+		rq = &ResourceQuery{
+			Type:  str(qm, "Type"),
+			Query: str(qm, "Query"),
+		}
+	}
+	g, ok := store.UpdateGroupQuery(name, rq)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Group", name))
+	}
+	rqOut := map[string]any{}
+	if g.ResourceQuery != nil {
+		rqOut = map[string]any{"Type": g.ResourceQuery.Type, "Query": g.ResourceQuery.Query}
+	}
+	return jsonOK(map[string]any{
+		"GroupName":     g.Name,
+		"GroupArn":      g.GroupArn,
+		"ResourceQuery": rqOut,
+	})
+}

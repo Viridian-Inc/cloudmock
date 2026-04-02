@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -24,15 +25,29 @@ func (s *s3Suite) Operations() []harness.Operation {
 	key := "bench-object.txt"
 	body := []byte("benchmark payload data for testing")
 
-	newClient := func(endpoint string) (*s3.Client, error) {
+	// sharedClient caches one S3 client per endpoint so that HTTP connections are
+	// reused across warm-phase iterations. Creating a new client per Run call causes
+	// a TCP handshake on every iteration, masking actual handler latency.
+	var (
+		clientMu  sync.Mutex
+		clientMap = make(map[string]*s3.Client)
+	)
+	getClient := func(endpoint string) (*s3.Client, error) {
+		clientMu.Lock()
+		defer clientMu.Unlock()
+		if c, ok := clientMap[endpoint]; ok {
+			return c, nil
+		}
 		cfg, err := awsclient.NewConfig(endpoint)
 		if err != nil {
 			return nil, err
 		}
-		return s3.NewFromConfig(cfg, func(o *s3.Options) {
+		c := s3.NewFromConfig(cfg, func(o *s3.Options) {
 			o.BaseEndpoint = awsclient.Endpoint(endpoint)
 			o.UsePathStyle = true
-		}), nil
+		})
+		clientMap[endpoint] = c
+		return c, nil
 	}
 
 	createBucket := func(ctx context.Context, client *s3.Client) error {
@@ -70,7 +85,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "CreateBucket",
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -79,7 +94,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -92,14 +107,14 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "PutObject",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
 				return createBucket(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -110,7 +125,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -126,7 +141,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "GetObject",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -136,7 +151,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				return putObject(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -146,7 +161,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -202,7 +217,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "ListObjects",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -212,7 +227,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				return putObject(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -221,7 +236,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -266,7 +281,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "CopyObject",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -276,7 +291,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				return putObject(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -287,7 +302,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -306,7 +321,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "DeleteObject",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -316,7 +331,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				return putObject(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}
@@ -326,7 +341,7 @@ func (s *s3Suite) Operations() []harness.Operation {
 				})
 			},
 			Teardown: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
@@ -339,14 +354,14 @@ func (s *s3Suite) Operations() []harness.Operation {
 		{
 			Name: "DeleteBucket",
 			Setup: func(ctx context.Context, endpoint string) error {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return err
 				}
 				return createBucket(ctx, client)
 			},
 			Run: func(ctx context.Context, endpoint string) (any, error) {
-				client, err := newClient(endpoint)
+				client, err := getClient(endpoint)
 				if err != nil {
 					return nil, err
 				}

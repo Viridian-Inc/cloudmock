@@ -1715,10 +1715,11 @@ func main() {
 		handler = quotaMiddleware.Handler(handler)
 	}
 	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
-		Broadcaster: adminAPI.Broadcaster(),
-		TraceStore:  traceStore,
-		SLOEngine:   sloEngine,
-		DataPlane:   dp,
+		Broadcaster:   adminAPI.Broadcaster(),
+		TraceStore:    traceStore,
+		SLOEngine:     sloEngine,
+		DataPlane:     dp,
+		CaptureStacks: os.Getenv("CLOUDMOCK_CAPTURE_STACKS") == "true",
 		OnRequest: func(service string, latencyMs float64, statusCode int) {
 			// Feed latency and error rate into anomaly detector baselines.
 			anomalyDetector.UpdateBaseline(service, "latency_p50", latencyMs)

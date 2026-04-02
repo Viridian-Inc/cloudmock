@@ -16,13 +16,14 @@ import (
 
 // Gateway is the main HTTP handler that routes AWS API requests to service mocks.
 type Gateway struct {
-	cfg      *config.Config
-	registry *routing.Registry
-	plugins  *plugin.Manager
-	mux      *http.ServeMux
-	store    *iampkg.Store
-	engine   *iampkg.Engine
-	bus      *eventbus.Bus
+	cfg          *config.Config
+	registry     *routing.Registry
+	plugins      *plugin.Manager
+	mux          *http.ServeMux
+	store        *iampkg.Store
+	engine       *iampkg.Engine
+	bus          *eventbus.Bus
+	rootIdentity *service.CallerIdentity // pre-built for IAM-mode "none"
 }
 
 // New creates a Gateway with routes pre-registered.
@@ -31,6 +32,17 @@ func New(cfg *config.Config, registry *routing.Registry) *Gateway {
 		cfg:      cfg,
 		registry: registry,
 		mux:      http.NewServeMux(),
+	}
+
+	// Pre-build root identity once for IAM-mode "none" to avoid per-request fmt.Sprintf.
+	if cfg.IAM.Mode == "none" {
+		g.rootIdentity = &service.CallerIdentity{
+			AccountID:   cfg.AccountID,
+			ARN:         "arn:aws:iam::" + cfg.AccountID + ":root",
+			UserID:      cfg.AccountID,
+			AccessKeyID: cfg.IAM.RootAccessKey,
+			IsRoot:      true,
+		}
 	}
 
 	g.mux.HandleFunc("/_cloudmock/health", g.handleHealth)
@@ -206,10 +218,19 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 
 	// 5. Build RequestContext.
 	action := routing.DetectAction(r)
-	params := make(map[string]string)
-	for k, v := range r.URL.Query() {
-		if len(v) > 0 {
-			params[k] = v[0]
+
+	// Only allocate the params map when there are query parameters to parse.
+	// S3 REST-XML requests rarely carry dispatch params, so this is a common fast path.
+	var params map[string]string
+	if r.URL.RawQuery != "" {
+		qv := r.URL.Query()
+		if len(qv) > 0 {
+			params = make(map[string]string, len(qv))
+			for k, v := range qv {
+				if len(v) > 0 {
+					params[k] = v[0]
+				}
+			}
 		}
 	}
 
@@ -224,14 +245,21 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 6. Authenticate request.
-	identity, authErr := g.authenticateRequest(r)
-	if authErr != nil {
-		_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
-		return
+	// Hot path for IAM-mode "none": use pre-built root identity, skip all header parsing.
+	var identity *service.CallerIdentity
+	if g.rootIdentity != nil {
+		identity = g.rootIdentity
+	} else {
+		var authErr *service.AWSError
+		identity, authErr = g.authenticateRequest(r)
+		if authErr != nil {
+			_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
+			return
+		}
 	}
 	ctx.Identity = identity
 
-	// Authorize request.
+	// Authorize request — only evaluated in "enforce" mode; short-circuits otherwise.
 	if g.engine != nil {
 		iamAction := svcName + ":" + action
 		if authzErr := g.authorizeRequest(identity, iamAction, "*"); authzErr != nil {

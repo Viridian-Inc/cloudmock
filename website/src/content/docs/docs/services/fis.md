@@ -14,11 +14,17 @@ CloudMock emulates AWS Fault Injection Simulator (FIS), supporting experiment te
 | CreateExperimentTemplate | Supported | Creates an experiment template |
 | GetExperimentTemplate | Supported | Returns template details |
 | ListExperimentTemplates | Supported | Lists all templates |
+| UpdateExperimentTemplate | Supported | Updates description, roleArn, and tags of a template |
 | DeleteExperimentTemplate | Supported | Deletes a template |
-| StartExperiment | Supported | Starts an experiment |
-| GetExperiment | Supported | Returns experiment details |
+| StartExperiment | Supported | Starts an experiment from a template |
+| GetExperiment | Supported | Returns experiment details with action/target states |
 | ListExperiments | Supported | Lists all experiments |
 | StopExperiment | Supported | Stops a running experiment |
+| ListTargetResourceTypes | Supported | Returns supported target resource types |
+| ListActions | Supported | Returns available FIS actions |
+| TagResource | Supported | Adds tags to a template or experiment |
+| UntagResource | Supported | Removes tags from a template or experiment |
+| ListTagsForResource | Supported | Lists tags for a template or experiment |
 
 ## Quick Start
 

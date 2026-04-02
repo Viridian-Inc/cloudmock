@@ -24,10 +24,12 @@ CloudMock emulates AWS AppConfig, supporting application, environment, configura
 | CreateConfigurationProfile | Supported | Creates a configuration profile |
 | GetConfigurationProfile | Supported | Returns configuration profile details |
 | ListConfigurationProfiles | Supported | Lists configuration profiles |
+| UpdateConfigurationProfile | Supported | Updates name/description of a configuration profile |
 | DeleteConfigurationProfile | Supported | Deletes a configuration profile |
 | CreateDeploymentStrategy | Supported | Creates a deployment strategy |
 | GetDeploymentStrategy | Supported | Returns deployment strategy details |
 | ListDeploymentStrategies | Supported | Lists deployment strategies |
+| UpdateDeploymentStrategy | Supported | Updates a deployment strategy (LINEAR or EXPONENTIAL growth types) |
 | DeleteDeploymentStrategy | Supported | Deletes a deployment strategy |
 | StartDeployment | Supported | Starts a configuration deployment |
 | GetDeployment | Supported | Returns deployment details |

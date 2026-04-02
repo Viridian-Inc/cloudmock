@@ -35,6 +35,10 @@ CloudMock emulates AWS Amplify, supporting app, branch, domain association, webh
 | GetJob | Supported | Returns job details |
 | ListJobs | Supported | Lists jobs |
 | StopJob | Supported | Stops a running job |
+| CreateBackendEnvironment | Supported | Creates a backend environment for an app |
+| GetBackendEnvironment | Supported | Returns backend environment details |
+| ListBackendEnvironments | Supported | Lists backend environments for an app |
+| DeleteBackendEnvironment | Supported | Deletes a backend environment |
 | TagResource | Supported | Adds tags to a resource |
 | UntagResource | Supported | Removes tags from a resource |
 | ListTagsForResource | Supported | Lists tags for a resource |

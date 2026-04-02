@@ -26,6 +26,7 @@ CloudMock emulates AWS Elemental MediaConvert, supporting transcoding jobs, job 
 | CreateQueue | Supported | Creates a queue |
 | GetQueue | Supported | Returns queue details |
 | ListQueues | Supported | Lists all queues |
+| UpdateQueue | Supported | Updates queue description |
 | DeleteQueue | Supported | Deletes a queue |
 
 ## Quick Start

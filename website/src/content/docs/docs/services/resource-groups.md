@@ -20,9 +20,11 @@ CloudMock emulates AWS Resource Groups, supporting group management, resource gr
 | UngroupResources | Supported | Removes resources from a group |
 | ListGroupResources | Supported | Lists resources in a group |
 | SearchResources | Supported | Searches for resources |
+| GetGroupQuery | Supported | Returns the resource query for a group |
+| UpdateGroupQuery | Supported | Updates the resource query for a group |
 | GetTags | Supported | Returns tags for a group |
 | TagResource | Supported | Adds tags to a group |
-| UntagResource | Supported | Removes tags from a group |
+| UntagResource | Supported | Removes tags from a group (supports PATCH and DELETE methods) |
 
 ## Quick Start
 

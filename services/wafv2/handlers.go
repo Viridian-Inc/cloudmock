@@ -467,6 +467,35 @@ func handleListRegexPatternSets(ctx *service.RequestContext, store *Store) (*ser
 	return jsonOK(map[string]any{"RegexPatternSets": items})
 }
 
+func handleUpdateRegexPatternSet(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name, _ := params["Name"].(string)
+	scope, _ := params["Scope"].(string)
+	id, _ := params["Id"].(string)
+	lockToken, _ := params["LockToken"].(string)
+	description, _ := params["Description"].(string)
+	var patterns []string
+	if raw, ok := params["RegularExpressionList"].([]any); ok {
+		for _, item := range raw {
+			if m, ok := item.(map[string]any); ok {
+				if regex, ok := m["RegexString"].(string); ok {
+					patterns = append(patterns, regex)
+				}
+			} else if s, ok := item.(string); ok {
+				patterns = append(patterns, s)
+			}
+		}
+	}
+	rps, awsErr := store.UpdateRegexPatternSet(name, scope, id, lockToken, patterns, description)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"NextLockToken": rps.LockToken})
+}
+
 func handleDeleteRegexPatternSet(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

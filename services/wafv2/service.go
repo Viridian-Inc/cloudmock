@@ -46,6 +46,7 @@ func (s *WAFv2Service) Actions() []service.Action {
 		{Name: "CreateRegexPatternSet", Method: http.MethodPost, IAMAction: "wafv2:CreateRegexPatternSet"},
 		{Name: "GetRegexPatternSet", Method: http.MethodPost, IAMAction: "wafv2:GetRegexPatternSet"},
 		{Name: "ListRegexPatternSets", Method: http.MethodPost, IAMAction: "wafv2:ListRegexPatternSets"},
+		{Name: "UpdateRegexPatternSet", Method: http.MethodPost, IAMAction: "wafv2:UpdateRegexPatternSet"},
 		{Name: "DeleteRegexPatternSet", Method: http.MethodPost, IAMAction: "wafv2:DeleteRegexPatternSet"},
 		{Name: "AssociateWebACL", Method: http.MethodPost, IAMAction: "wafv2:AssociateWebACL"},
 		{Name: "DisassociateWebACL", Method: http.MethodPost, IAMAction: "wafv2:DisassociateWebACL"},
@@ -103,6 +104,8 @@ func (s *WAFv2Service) HandleRequest(ctx *service.RequestContext) (*service.Resp
 		return handleGetRegexPatternSet(ctx, s.store)
 	case "ListRegexPatternSets":
 		return handleListRegexPatternSets(ctx, s.store)
+	case "UpdateRegexPatternSet":
+		return handleUpdateRegexPatternSet(ctx, s.store)
 	case "DeleteRegexPatternSet":
 		return handleDeleteRegexPatternSet(ctx, s.store)
 	case "AssociateWebACL":

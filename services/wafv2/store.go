@@ -505,6 +505,30 @@ func (s *Store) ListRegexPatternSets(scope string) []*RegexPatternSet {
 	return out
 }
 
+// UpdateRegexPatternSet updates a regex pattern set.
+func (s *Store) UpdateRegexPatternSet(name, scope, id, lockToken string, patterns []string, description string) (*RegexPatternSet, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	rps, ok := s.regexPatternSets[id]
+	if !ok {
+		return nil, service.NewAWSError("WAFNonexistentItemException",
+			"Regex pattern set not found.", http.StatusBadRequest)
+	}
+	if rps.LockToken != lockToken {
+		return nil, service.NewAWSError("WAFOptimisticLockException",
+			"Lock token mismatch.", http.StatusBadRequest)
+	}
+	if patterns != nil {
+		rps.RegularExpressionList = patterns
+	}
+	if description != "" {
+		rps.Description = description
+	}
+	rps.UpdatedAt = time.Now().UTC()
+	rps.LockToken = newLockToken()
+	return rps, nil
+}
+
 // DeleteRegexPatternSet removes a regex pattern set.
 func (s *Store) DeleteRegexPatternSet(name, scope, id, lockToken string) *service.AWSError {
 	s.mu.Lock()

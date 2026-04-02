@@ -3,45 +3,105 @@ on:
   push:
     tags: ['v*']
 jobs:
-  release:
+  build-devtools:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with: { go-version: '1.26' }
       - uses: actions/setup-node@v4
         with: { node-version: '20' }
       - uses: pnpm/action-setup@v4
         with: { version: 9 }
-      - name: Install devtools dependencies
-        run: cd devtools && pnpm install --frozen-lockfile
-      - name: Build binaries
-        run: make release
-      - name: Package release archives
+      - name: Install and build devtools
+        run: cd devtools && pnpm install --frozen-lockfile && pnpm build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devtools-dist
+          path: devtools/dist/
+
+  build-binary:
+    needs: build-devtools
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            goos: linux
+            goarch: amd64
+          - os: ubuntu-24.04-arm
+            goos: linux
+            goarch: arm64
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+          - os: macos-14
+            goos: darwin
+            goarch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with: { go-version: '1.26' }
+      - uses: actions/download-artifact@v4
+        with:
+          name: devtools-dist
+          path: pkg/dashboard/dist/
+      - name: Build binary
         run: |
-          cd dist
-          for bin in cloudmock-linux-amd64 cloudmock-linux-arm64 cloudmock-darwin-amd64 cloudmock-darwin-arm64; do
-            tar czf "${bin}.tar.gz" "${bin}" -C .. bin/cmk --transform='s|bin/||'
-          done
-          zip cloudmock-windows-amd64.zip cloudmock-windows-amd64.exe ../bin/cmk
+          CGO_ENABLED=1 go build -ldflags="-s -w" \
+            -o cloudmock-${{ matrix.goos }}-${{ matrix.goarch }} \
+            ./cmd/gateway
+      - uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.goos }}-${{ matrix.goarch }}
+          path: cloudmock-${{ matrix.goos }}-${{ matrix.goarch }}
+
+  release:
+    needs: build-binary
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            dist/*.tar.gz
-            dist/*.zip
-            dist/cloudmock-*
+          files: dist/cloudmock-*
           generate_release_notes: true
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+
+  publish-npm:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+      - name: Publish npm package
+        run: cd npm/cloudmock && npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-docker:
+    needs: build-binary
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+          merge-multiple: true
+      - uses: docker/build-push-action@v5
         with:
           push: true
           tags: |
             ghcr.io/Viridian-Inc/cloudmock:${{ github.ref_name }}
             ghcr.io/Viridian-Inc/cloudmock:latest
-      - name: Publish npm package
-        run: |
-          cd npm/cloudmock
-          npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

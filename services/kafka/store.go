@@ -52,6 +52,7 @@ type Configuration struct {
 	Name             string
 	Arn              string
 	LatestRevision   ConfigurationRevision
+	Revisions        []ConfigurationRevision
 	Description      string
 	KafkaVersions    []string
 	State            string
@@ -346,6 +347,9 @@ func (s *Store) CreateConfiguration(name, description, kafkaVersion, serverPrope
 			CreationTime:     now,
 			ServerProperties: serverProperties,
 		},
+		Revisions: []ConfigurationRevision{
+			{Revision: 1, Description: description, CreationTime: now, ServerProperties: serverProperties},
+		},
 		CreationTime: now,
 		Tags:         tags,
 	}
@@ -384,16 +388,50 @@ func (s *Store) UpdateConfiguration(arn, description, serverProperties string) (
 			fmt.Sprintf("Configuration %s not found", arn), http.StatusNotFound)
 	}
 	now := time.Now().UTC()
-	cfg.LatestRevision = ConfigurationRevision{
+	newRev := ConfigurationRevision{
 		Revision:         cfg.LatestRevision.Revision + 1,
 		Description:      description,
 		CreationTime:     now,
 		ServerProperties: serverProperties,
 	}
+	cfg.LatestRevision = newRev
+	cfg.Revisions = append(cfg.Revisions, newRev)
 	if description != "" {
 		cfg.Description = description
 	}
 	return cfg, nil
+}
+
+// DescribeConfigurationRevision returns a specific revision of a configuration.
+func (s *Store) DescribeConfigurationRevision(arn string, revision int64) (*Configuration, *ConfigurationRevision, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cfg, ok := s.configurations[arn]
+	if !ok {
+		return nil, nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Configuration %s not found", arn), http.StatusNotFound)
+	}
+	for i := range cfg.Revisions {
+		if cfg.Revisions[i].Revision == revision {
+			return cfg, &cfg.Revisions[i], nil
+		}
+	}
+	return nil, nil, service.NewAWSError("NotFoundException",
+		fmt.Sprintf("Revision %d not found for configuration %s", revision, arn), http.StatusNotFound)
+}
+
+// ListConfigurationRevisions returns all revisions for a configuration.
+func (s *Store) ListConfigurationRevisions(arn string) (*Configuration, []ConfigurationRevision, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	cfg, ok := s.configurations[arn]
+	if !ok {
+		return nil, nil, service.NewAWSError("NotFoundException",
+			fmt.Sprintf("Configuration %s not found", arn), http.StatusNotFound)
+	}
+	revs := make([]ConfigurationRevision, len(cfg.Revisions))
+	copy(revs, cfg.Revisions)
+	return cfg, revs, nil
 }
 
 func (s *Store) DeleteConfiguration(arn string) *service.AWSError {

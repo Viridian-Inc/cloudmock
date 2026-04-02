@@ -42,6 +42,8 @@ func (s *KafkaService) Actions() []service.Action {
 		{Name: "ListConfigurations", Method: http.MethodGet, IAMAction: "kafka:ListConfigurations"},
 		{Name: "UpdateConfiguration", Method: http.MethodPut, IAMAction: "kafka:UpdateConfiguration"},
 		{Name: "DeleteConfiguration", Method: http.MethodDelete, IAMAction: "kafka:DeleteConfiguration"},
+		{Name: "DescribeConfigurationRevision", Method: http.MethodGet, IAMAction: "kafka:DescribeConfigurationRevision"},
+		{Name: "ListConfigurationRevisions", Method: http.MethodGet, IAMAction: "kafka:ListConfigurationRevisions"},
 		{Name: "ListClusterOperations", Method: http.MethodGet, IAMAction: "kafka:ListClusterOperations"},
 		{Name: "DescribeClusterOperation", Method: http.MethodGet, IAMAction: "kafka:DescribeClusterOperation"},
 		{Name: "GetBootstrapBrokers", Method: http.MethodGet, IAMAction: "kafka:GetBootstrapBrokers"},
@@ -98,6 +100,10 @@ func (s *KafkaService) HandleRequest(ctx *service.RequestContext) (*service.Resp
 		return handleUpdateConfiguration(params, s.store)
 	case "DeleteConfiguration":
 		return handleDeleteConfiguration(params, s.store)
+	case "DescribeConfigurationRevision":
+		return handleDescribeConfigurationRevision(params, s.store)
+	case "ListConfigurationRevisions":
+		return handleListConfigurationRevisions(params, s.store)
 	case "ListClusterOperations":
 		return handleListClusterOperations(params, s.store)
 	case "DescribeClusterOperation":

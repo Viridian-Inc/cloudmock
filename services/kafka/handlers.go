@@ -319,6 +319,58 @@ func handleDeleteConfiguration(p map[string]any, store *Store) (*service.Respons
 	return jsonOK(map[string]any{"arn": arn, "state": "DELETING"})
 }
 
+func handleDescribeConfigurationRevision(p map[string]any, store *Store) (*service.Response, error) {
+	arn := getStr(p, "arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("arn is required."))
+	}
+	var revision int64
+	if v, ok := p["revision"]; ok {
+		switch rv := v.(type) {
+		case float64:
+			revision = int64(rv)
+		case int64:
+			revision = rv
+		case int:
+			revision = int64(rv)
+		}
+	}
+	if revision == 0 {
+		return jsonErr(service.ErrValidation("revision is required."))
+	}
+	_, rev, awsErr := store.DescribeConfigurationRevision(arn, revision)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"arn":              arn,
+		"revision":         rev.Revision,
+		"description":      rev.Description,
+		"serverProperties": rev.ServerProperties,
+		"creationTime":     rev.CreationTime.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
+func handleListConfigurationRevisions(p map[string]any, store *Store) (*service.Response, error) {
+	arn := getStr(p, "arn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("arn is required."))
+	}
+	_, revisions, awsErr := store.ListConfigurationRevisions(arn)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	entries := make([]map[string]any, 0, len(revisions))
+	for _, rev := range revisions {
+		entries = append(entries, map[string]any{
+			"revision":    rev.Revision,
+			"description": rev.Description,
+			"creationTime": rev.CreationTime.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	return jsonOK(map[string]any{"revisions": entries})
+}
+
 // ---- Operation handlers ----
 
 func handleListClusterOperations(p map[string]any, store *Store) (*service.Response, error) {

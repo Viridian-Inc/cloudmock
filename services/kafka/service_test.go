@@ -51,6 +51,18 @@ func createCluster(t *testing.T, s *svc.KafkaService, name string) string {
 	return body["clusterArn"].(string)
 }
 
+func createConfiguration(t *testing.T, s *svc.KafkaService, name string) string {
+	t.Helper()
+	resp, err := s.HandleRequest(jsonCtx("CreateConfiguration", map[string]any{
+		"name":             name,
+		"description":      "Test configuration",
+		"kafkaVersion":     "3.5.1",
+		"serverProperties": "auto.create.topics.enable=true",
+	}))
+	require.NoError(t, err)
+	return respBody(t, resp)["arn"].(string)
+}
+
 // ---- Test 1: CreateCluster ----
 
 func TestCreateCluster(t *testing.T) {
@@ -295,4 +307,128 @@ func TestServiceNameAndHealthCheck(t *testing.T) {
 	s := newService()
 	assert.Equal(t, "kafka", s.Name())
 	assert.NoError(t, s.HealthCheck())
+}
+
+// ---- Test 16: UpdateBrokerStorage ----
+
+func TestUpdateBrokerStorage(t *testing.T) {
+	s := newService()
+	arn := createCluster(t, s, "storage-cluster")
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateBrokerStorage", map[string]any{
+		"clusterArn": arn,
+		"targetBrokerEBSVolumeInfo": []any{
+			map[string]any{"kafkaBrokerNodeId": "ALL", "volumeSizeGB": float64(100)},
+		},
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.NotEmpty(t, body["clusterOperationArn"])
+}
+
+// ---- Test 17: UpdateClusterConfiguration ----
+
+func TestUpdateClusterConfiguration(t *testing.T) {
+	s := newService()
+	clusterArn := createCluster(t, s, "cfg-cluster")
+	configArn := createConfiguration(t, s, "cfg-config")
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateClusterConfiguration", map[string]any{
+		"clusterArn":            clusterArn,
+		"configurationInfo": map[string]any{
+			"arn":      configArn,
+			"revision": float64(1),
+		},
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.NotEmpty(t, body["clusterOperationArn"])
+}
+
+// ---- Test 18: ListClusterOperations ----
+
+func TestListClusterOperations(t *testing.T) {
+	s := newService()
+	arn := createCluster(t, s, "ops-cluster")
+
+	// Perform an update to create an operation
+	s.HandleRequest(jsonCtx("UpdateBrokerCount", map[string]any{
+		"clusterArn":                arn,
+		"targetNumberOfBrokerNodes": float64(6),
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListClusterOperations", map[string]any{"clusterArn": arn}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	ops := body["clusterOperationInfoList"].([]any)
+	assert.GreaterOrEqual(t, len(ops), 1)
+}
+
+// ---- Test 19: DescribeConfigurationRevision ----
+
+func TestDescribeConfigurationRevision(t *testing.T) {
+	s := newService()
+	configArn := createConfiguration(t, s, "rev-config")
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeConfigurationRevision", map[string]any{
+		"arn":      configArn,
+		"revision": float64(1),
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.Equal(t, configArn, body["arn"])
+	assert.Equal(t, float64(1), body["revision"])
+	assert.NotEmpty(t, body["serverProperties"])
+}
+
+// ---- Test 20: ListConfigurationRevisions ----
+
+func TestListConfigurationRevisions(t *testing.T) {
+	s := newService()
+	configArn := createConfiguration(t, s, "list-rev-config")
+
+	// Update to create a second revision
+	_, err := s.HandleRequest(jsonCtx("UpdateConfiguration", map[string]any{
+		"arn":              configArn,
+		"description":      "second revision",
+		"serverProperties": "auto.create.topics.enable=false",
+	}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("ListConfigurationRevisions", map[string]any{"arn": configArn}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	revisions := body["revisions"].([]any)
+	assert.Len(t, revisions, 2)
+}
+
+// ---- Test 21: DescribeClusterOperation ----
+
+func TestDescribeClusterOperation(t *testing.T) {
+	s := newService()
+	arn := createCluster(t, s, "op-desc-cluster")
+
+	opResp, err := s.HandleRequest(jsonCtx("UpdateBrokerCount", map[string]any{
+		"clusterArn":                arn,
+		"targetNumberOfBrokerNodes": float64(6),
+	}))
+	require.NoError(t, err)
+	opArn := respBody(t, opResp)["clusterOperationArn"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("DescribeClusterOperation", map[string]any{
+		"clusterOperationArn": opArn,
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	opInfo := body["clusterOperationInfo"].(map[string]any)
+	assert.Equal(t, opArn, opInfo["operationArn"])
+}
+
+// ---- Test 22: Cluster ARN format ----
+
+func TestClusterARNFormat(t *testing.T) {
+	s := newService()
+	arn := createCluster(t, s, "arn-cluster")
+	assert.Contains(t, arn, "arn:aws:kafka:")
+	assert.Contains(t, arn, "cluster")
 }

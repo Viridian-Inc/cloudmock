@@ -28,6 +28,7 @@ CloudMock emulates Amazon Verified Permissions, supporting policy stores, polici
 | CreatePolicyTemplate | Supported | Creates a policy template |
 | GetPolicyTemplate | Supported | Returns template details |
 | ListPolicyTemplates | Supported | Lists policy templates |
+| UpdatePolicyTemplate | Supported | Updates a policy template |
 | DeletePolicyTemplate | Supported | Deletes a policy template |
 | CreateIdentitySource | Supported | Creates an identity source |
 | GetIdentitySource | Supported | Returns identity source details |

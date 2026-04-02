@@ -45,6 +45,7 @@ func (s *VerifiedPermissionsService) Actions() []service.Action {
 		{Name: "CreatePolicyTemplate", Method: http.MethodPost, IAMAction: "verifiedpermissions:CreatePolicyTemplate"},
 		{Name: "GetPolicyTemplate", Method: http.MethodPost, IAMAction: "verifiedpermissions:GetPolicyTemplate"},
 		{Name: "ListPolicyTemplates", Method: http.MethodPost, IAMAction: "verifiedpermissions:ListPolicyTemplates"},
+		{Name: "UpdatePolicyTemplate", Method: http.MethodPost, IAMAction: "verifiedpermissions:UpdatePolicyTemplate"},
 		{Name: "DeletePolicyTemplate", Method: http.MethodPost, IAMAction: "verifiedpermissions:DeletePolicyTemplate"},
 		{Name: "CreateIdentitySource", Method: http.MethodPost, IAMAction: "verifiedpermissions:CreateIdentitySource"},
 		{Name: "GetIdentitySource", Method: http.MethodPost, IAMAction: "verifiedpermissions:GetIdentitySource"},
@@ -93,6 +94,8 @@ func (s *VerifiedPermissionsService) HandleRequest(ctx *service.RequestContext) 
 		return handleGetPolicyTemplate(ctx, s.store)
 	case "ListPolicyTemplates":
 		return handleListPolicyTemplates(ctx, s.store)
+	case "UpdatePolicyTemplate":
+		return handleUpdatePolicyTemplate(ctx, s.store)
 	case "DeletePolicyTemplate":
 		return handleDeletePolicyTemplate(ctx, s.store)
 	case "CreateIdentitySource":

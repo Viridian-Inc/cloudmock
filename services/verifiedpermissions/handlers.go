@@ -330,6 +330,27 @@ func handleListPolicyTemplates(ctx *service.RequestContext, store *Store) (*serv
 	return jsonOK(map[string]any{"policyTemplates": items})
 }
 
+func handleUpdatePolicyTemplate(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	storeId, _ := params["policyStoreId"].(string)
+	templateId, _ := params["policyTemplateId"].(string)
+	description, _ := params["description"].(string)
+	statement, _ := params["statement"].(string)
+	tmpl, awsErr := store.UpdatePolicyTemplate(storeId, templateId, description, statement)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"policyStoreId":   tmpl.PolicyStoreId,
+		"policyTemplateId": tmpl.PolicyTemplateId,
+		"createdDate":     tmpl.CreatedDate.Format("2006-01-02T15:04:05Z"),
+		"lastUpdatedDate": tmpl.LastUpdatedDate.Format("2006-01-02T15:04:05Z"),
+	})
+}
+
 func handleDeletePolicyTemplate(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

@@ -405,6 +405,30 @@ func (s *Store) DeletePolicyTemplate(storeId, templateId string) *service.AWSErr
 	return nil
 }
 
+// UpdatePolicyTemplate updates a policy template's description and statement.
+func (s *Store) UpdatePolicyTemplate(storeId, templateId, description, statement string) (*PolicyTemplate, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	storeTemplates, ok := s.policyTemplates[storeId]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			"Policy store not found.", http.StatusNotFound)
+	}
+	tmpl, ok := storeTemplates[templateId]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Policy template %s not found.", templateId), http.StatusNotFound)
+	}
+	if description != "" {
+		tmpl.Description = description
+	}
+	if statement != "" {
+		tmpl.Statement = statement
+	}
+	tmpl.LastUpdatedDate = time.Now().UTC()
+	return tmpl, nil
+}
+
 // CreateIdentitySource creates an identity source.
 func (s *Store) CreateIdentitySource(storeId, principalEntityType string, config map[string]any) (*IdentitySource, *service.AWSError) {
 	s.mu.Lock()

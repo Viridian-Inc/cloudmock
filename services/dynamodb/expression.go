@@ -74,12 +74,9 @@ func compareValues(a, b AttributeValue) (int, bool) {
 
 // evaluateCondition evaluates a condition expression against an item.
 // Supports: =, <, >, <=, >=, BETWEEN, begins_with, attribute_exists, attribute_not_exists, AND, OR.
+// It compiles the expression into an AST once and then evaluates it.
 func evaluateCondition(expr string, item Item, names map[string]string, values map[string]AttributeValue) bool {
-	expr = strings.TrimSpace(resolveNames(expr, names))
-	if expr == "" {
-		return true
-	}
-	return evalOr(expr, item, values)
+	return CompileCondition(expr, names, values).Evaluate(item)
 }
 
 // evalOr splits on top-level OR.

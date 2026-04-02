@@ -459,6 +459,138 @@ func TestScheduleCronExpression(t *testing.T) {
 	assert.True(t, invoked, "Cron schedule should fire once immediately in mock mode")
 }
 
+// ---- Additional coverage tests ----
+
+func TestListSchedulesWithStateFilter(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name": "enabled-sched", "ScheduleExpression": "rate(5 minutes)", "State": "ENABLED",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+	s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name": "disabled-sched", "ScheduleExpression": "rate(10 minutes)", "State": "DISABLED",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListSchedules", map[string]any{"State": "ENABLED"}))
+	require.NoError(t, err)
+	m := decode(t, resp)
+	schedules := m["Schedules"].([]any)
+	assert.Len(t, schedules, 1)
+}
+
+func TestListSchedulesNamePrefixFilter(t *testing.T) {
+	s := newService()
+	for _, name := range []string{"prod-1", "prod-2", "dev-1"} {
+		s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+			"Name": name, "ScheduleExpression": "rate(5 minutes)",
+			"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+			"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+		}))
+	}
+
+	resp, err := s.HandleRequest(jsonCtx("ListSchedules", map[string]any{"NamePrefix": "prod"}))
+	require.NoError(t, err)
+	schedules := decode(t, resp)["Schedules"].([]any)
+	assert.Len(t, schedules, 2)
+}
+
+func TestScheduleARNFormat(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name": "arn-sched", "ScheduleExpression": "rate(5 minutes)",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+	require.NoError(t, err)
+	body := decode(t, resp)
+	assert.Contains(t, body["ScheduleArn"].(string), "arn:aws:scheduler:")
+	assert.Contains(t, body["ScheduleArn"].(string), "arn-sched")
+}
+
+func TestScheduleGroupARNFormat(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateScheduleGroup", map[string]any{
+		"Name": "arn-group",
+	}))
+	require.NoError(t, err)
+	body := decode(t, resp)
+	assert.Contains(t, body["ScheduleGroupArn"].(string), "arn:aws:scheduler:")
+	assert.Contains(t, body["ScheduleGroupArn"].(string), "arn-group")
+}
+
+func TestUpdateScheduleExpression(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name": "upd-expr-sched", "ScheduleExpression": "rate(5 minutes)",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+
+	_, err := s.HandleRequest(jsonCtx("UpdateSchedule", map[string]any{
+		"Name": "upd-expr-sched", "ScheduleExpression": "rate(10 minutes)",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+	require.NoError(t, err)
+
+	// Verify via GetSchedule
+	getResp, err := s.HandleRequest(jsonCtx("GetSchedule", map[string]any{"Name": "upd-expr-sched"}))
+	require.NoError(t, err)
+	getBody := decode(t, getResp)
+	assert.Equal(t, "rate(10 minutes)", getBody["ScheduleExpression"])
+}
+
+func TestDeleteScheduleGroupWithSchedules(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateScheduleGroup", map[string]any{"Name": "del-group"}))
+	s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name": "del-group-sched", "GroupName": "del-group", "ScheduleExpression": "rate(5 minutes)",
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+		"FlexibleTimeWindow": map[string]any{"Mode": "OFF"},
+	}))
+
+	// Delete group should also delete its schedules
+	_, err := s.HandleRequest(jsonCtx("DeleteScheduleGroup", map[string]any{"Name": "del-group"}))
+	require.NoError(t, err)
+
+	// Group should be gone
+	_, err = s.HandleRequest(jsonCtx("GetScheduleGroup", map[string]any{"Name": "del-group"}))
+	require.Error(t, err)
+}
+
+func TestServiceNameAndHealthCheck(t *testing.T) {
+	s := newService()
+	assert.Equal(t, "scheduler", s.Name())
+	assert.NoError(t, s.HealthCheck())
+}
+
+func TestScheduleFlexibleTimeWindow(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateSchedule", map[string]any{
+		"Name":               "flex-sched",
+		"ScheduleExpression": "rate(15 minutes)",
+		"FlexibleTimeWindow": map[string]any{
+			"Mode":                   "FLEXIBLE",
+			"MaximumWindowInMinutes": float64(10),
+		},
+		"Target": map[string]any{"Arn": "arn:aws:lambda:us-east-1:123456789012:function:f", "RoleArn": "arn:aws:iam::123456789012:role/r"},
+	}))
+	require.NoError(t, err)
+	body := decode(t, resp)
+	assert.NotEmpty(t, body["ScheduleArn"])
+
+	// Get and verify flexible time window
+	getResp, err := s.HandleRequest(jsonCtx("GetSchedule", map[string]any{"Name": "flex-sched"}))
+	require.NoError(t, err)
+	getBody := decode(t, getResp)
+	ftw := getBody["FlexibleTimeWindow"].(map[string]any)
+	assert.Equal(t, "FLEXIBLE", ftw["Mode"])
+	assert.Equal(t, float64(10), ftw["MaximumWindowInMinutes"])
+}
+
 // ---- Test helpers for behavioral tests ----
 
 type mockTargetService struct {

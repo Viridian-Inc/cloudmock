@@ -31,10 +31,8 @@ parts:
       - nodejs
       - npm
     override-build: |
-      corepack enable
-      corepack prepare pnpm@latest --activate
-      pnpm install --frozen-lockfile
-      pnpm build
+      npm install
+      npm run build
       mkdir -p $SNAPCRAFT_PART_INSTALL/devtools-dist
       cp -r dist/* $SNAPCRAFT_PART_INSTALL/devtools-dist/
 

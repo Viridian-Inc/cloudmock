@@ -320,6 +320,101 @@ func TestGetStatementResult(t *testing.T) {
 	assert.Len(t, colMeta, 2)
 }
 
+// ---- PauseCluster / ResumeCluster ----
+
+func TestPauseCluster(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(queryCtx("CreateCluster", map[string]string{
+		"ClusterIdentifier": "pause-cluster", "NodeType": "dc2.large",
+	}))
+	resp, err := s.HandleRequest(queryCtx("PauseCluster", map[string]string{
+		"ClusterIdentifier": "pause-cluster",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestPauseCluster_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(queryCtx("PauseCluster", map[string]string{
+		"ClusterIdentifier": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestResumeCluster(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(queryCtx("CreateCluster", map[string]string{
+		"ClusterIdentifier": "resume-cluster", "NodeType": "dc2.large",
+	}))
+	_, _ = s.HandleRequest(queryCtx("PauseCluster", map[string]string{
+		"ClusterIdentifier": "resume-cluster",
+	}))
+	resp, err := s.HandleRequest(queryCtx("ResumeCluster", map[string]string{
+		"ClusterIdentifier": "resume-cluster",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestResumeCluster_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(queryCtx("ResumeCluster", map[string]string{
+		"ClusterIdentifier": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestPauseResumeCycle(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(queryCtx("CreateCluster", map[string]string{
+		"ClusterIdentifier": "cycle-cluster", "NodeType": "dc2.large",
+	}))
+
+	// Pause
+	resp, err := s.HandleRequest(queryCtx("PauseCluster", map[string]string{
+		"ClusterIdentifier": "cycle-cluster",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Resume
+	resp, err = s.HandleRequest(queryCtx("ResumeCluster", map[string]string{
+		"ClusterIdentifier": "cycle-cluster",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestAddTagsToResource(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(queryCtx("CreateCluster", map[string]string{
+		"ClusterIdentifier": "tag-res-cluster", "NodeType": "dc2.large",
+	}))
+	arn := "arn:aws:redshift:us-east-1:123456789012:cluster:tag-res-cluster"
+	resp, err := s.HandleRequest(queryCtx("AddTagsToResource", map[string]string{
+		"ResourceName": arn, "Tags.Tag.1.Key": "env", "Tags.Tag.1.Value": "prod",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestRemoveTagsFromResource(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(queryCtx("CreateCluster", map[string]string{
+		"ClusterIdentifier": "untag-res-cluster", "NodeType": "dc2.large",
+	}))
+	arn := "arn:aws:redshift:us-east-1:123456789012:cluster:untag-res-cluster"
+	_, _ = s.HandleRequest(queryCtx("AddTagsToResource", map[string]string{
+		"ResourceName": arn, "Tags.Tag.1.Key": "rm", "Tags.Tag.1.Value": "me",
+	}))
+	resp, err := s.HandleRequest(queryCtx("RemoveTagsFromResource", map[string]string{
+		"ResourceName": arn, "TagKeys.TagKey.1": "rm",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 func TestRestoreFromSnapshot_CopiesSchema(t *testing.T) {
 	s := newService()
 	// Create cluster, create a table via ExecuteStatement, snapshot, restore

@@ -331,6 +331,36 @@ func (s *Store) RebootCluster(id string) (*Cluster, bool) {
 	return c, true
 }
 
+func (s *Store) PauseCluster(id string) (*Cluster, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.clusters[id]
+	if !ok {
+		return nil, false
+	}
+	c.Status = "paused"
+	return c, true
+}
+
+func (s *Store) ResumeCluster(id string) (*Cluster, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.clusters[id]
+	if !ok {
+		return nil, false
+	}
+	c.Status = "available"
+	return c, true
+}
+
+func (s *Store) AddTagsToResource(arn string, tags map[string]string) bool {
+	return s.AddTags(arn, tags)
+}
+
+func (s *Store) RemoveTagsFromResource(arn string, keys []string) bool {
+	return s.RemoveTags(arn, keys)
+}
+
 // ---- Snapshot operations ----
 
 func (s *Store) CreateClusterSnapshot(snapshotID, clusterID string, tags map[string]string) (*ClusterSnapshot, bool) {

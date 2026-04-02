@@ -43,9 +43,13 @@ func (s *RedshiftService) Actions() []service.Action {
 		{Name: "CreateClusterParameterGroup", Method: http.MethodPost, IAMAction: "redshift:CreateClusterParameterGroup"},
 		{Name: "DescribeClusterParameterGroups", Method: http.MethodPost, IAMAction: "redshift:DescribeClusterParameterGroups"},
 		{Name: "DeleteClusterParameterGroup", Method: http.MethodPost, IAMAction: "redshift:DeleteClusterParameterGroup"},
+		{Name: "PauseCluster", Method: http.MethodPost, IAMAction: "redshift:PauseCluster"},
+		{Name: "ResumeCluster", Method: http.MethodPost, IAMAction: "redshift:ResumeCluster"},
 		{Name: "CreateTags", Method: http.MethodPost, IAMAction: "redshift:CreateTags"},
 		{Name: "DeleteTags", Method: http.MethodPost, IAMAction: "redshift:DeleteTags"},
 		{Name: "DescribeTags", Method: http.MethodPost, IAMAction: "redshift:DescribeTags"},
+		{Name: "AddTagsToResource", Method: http.MethodPost, IAMAction: "redshift:CreateTags"},
+		{Name: "RemoveTagsFromResource", Method: http.MethodPost, IAMAction: "redshift:DeleteTags"},
 		{Name: "ExecuteStatement", Method: http.MethodPost, IAMAction: "redshift-data:ExecuteStatement"},
 		{Name: "DescribeStatement", Method: http.MethodPost, IAMAction: "redshift-data:DescribeStatement"},
 		{Name: "GetStatementResult", Method: http.MethodPost, IAMAction: "redshift-data:GetStatementResult"},
@@ -94,12 +98,20 @@ func (s *RedshiftService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleDescribeClusterParameterGroups(ctx, s.store)
 	case "DeleteClusterParameterGroup":
 		return handleDeleteClusterParameterGroup(ctx, s.store)
+	case "PauseCluster":
+		return handlePauseCluster(ctx, s.store)
+	case "ResumeCluster":
+		return handleResumeCluster(ctx, s.store)
 	case "CreateTags":
 		return handleCreateTags(ctx, s.store)
 	case "DeleteTags":
 		return handleDeleteTags(ctx, s.store)
 	case "DescribeTags":
 		return handleDescribeTags(ctx, s.store)
+	case "AddTagsToResource":
+		return handleAddTagsToResource(ctx, s.store)
+	case "RemoveTagsFromResource":
+		return handleRemoveTagsFromResource(ctx, s.store)
 	case "ExecuteStatement":
 		return handleExecuteStatement(ctx, s.store)
 	case "DescribeStatement":

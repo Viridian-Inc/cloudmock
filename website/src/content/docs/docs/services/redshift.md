@@ -5,31 +5,35 @@ description: Amazon Redshift emulation in CloudMock
 
 ## Overview
 
-CloudMock emulates Amazon Redshift, supporting cluster lifecycle, snapshots, subnet groups, parameter groups, tagging, and basic SQL statement execution.
+CloudMock emulates Amazon Redshift, supporting cluster lifecycle, snapshots, subnet groups, parameter groups, tagging, pause/resume, and basic SQL statement execution. Cluster states follow `creating -> available -> pausing -> paused -> resuming`.
 
 ## Supported Operations
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
 | CreateCluster | Supported | Creates a Redshift cluster |
-| DescribeClusters | Supported | Lists clusters |
+| DescribeClusters | Supported | Lists clusters with optional identifier filter |
 | DeleteCluster | Supported | Deletes a cluster |
-| ModifyCluster | Supported | Modifies cluster configuration |
-| RebootCluster | Supported | Reboots a cluster |
-| CreateClusterSnapshot | Supported | Creates a snapshot |
+| ModifyCluster | Supported | Modifies node type or node count |
+| RebootCluster | Supported | Reboots a cluster (no-op in mock) |
+| PauseCluster | Supported | Pauses a cluster (status set to `paused`) |
+| ResumeCluster | Supported | Resumes a paused cluster |
+| CreateClusterSnapshot | Supported | Creates a snapshot including schema metadata |
 | DescribeClusterSnapshots | Supported | Lists snapshots |
 | DeleteClusterSnapshot | Supported | Deletes a snapshot |
-| RestoreFromClusterSnapshot | Supported | Restores a cluster from snapshot |
+| RestoreFromClusterSnapshot | Supported | Restores a cluster from snapshot (schema is copied) |
 | CreateClusterSubnetGroup | Supported | Creates a subnet group |
 | DescribeClusterSubnetGroups | Supported | Lists subnet groups |
 | DeleteClusterSubnetGroup | Supported | Deletes a subnet group |
 | CreateClusterParameterGroup | Supported | Creates a parameter group |
 | DescribeClusterParameterGroups | Supported | Lists parameter groups |
 | DeleteClusterParameterGroup | Supported | Deletes a parameter group |
-| CreateTags | Supported | Adds tags to a resource |
+| CreateTags | Supported | Adds tags to a resource (by ARN) |
 | DeleteTags | Supported | Removes tags from a resource |
-| DescribeTags | Supported | Lists tags |
-| ExecuteStatement | Supported | Executes a SQL statement (stub) |
+| DescribeTags | Supported | Lists tags for a resource |
+| AddTagsToResource | Supported | Alias for CreateTags |
+| RemoveTagsFromResource | Supported | Alias for DeleteTags |
+| ExecuteStatement | Supported | Executes SQL with basic parsing and validation |
 | DescribeStatement | Supported | Returns statement execution status |
 | GetStatementResult | Supported | Returns stub query results |
 

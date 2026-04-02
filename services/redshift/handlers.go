@@ -619,6 +619,106 @@ func handleDescribeTags(ctx *service.RequestContext, store *Store) (*service.Res
 	return xmlOK(resp)
 }
 
+// ---- PauseCluster ----
+
+type xmlPauseClusterResponse struct {
+	XMLName xml.Name             `xml:"PauseClusterResponse"`
+	Xmlns   string               `xml:"xmlns,attr"`
+	Result  xmlPauseClusterResult `xml:"PauseClusterResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
+}
+
+type xmlPauseClusterResult struct {
+	Cluster xmlCluster `xml:"Cluster"`
+}
+
+func handlePauseCluster(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	id := form.Get("ClusterIdentifier")
+	if id == "" {
+		return xmlErr(service.ErrValidation("ClusterIdentifier is required."))
+	}
+	c, ok := store.PauseCluster(id)
+	if !ok {
+		return xmlErr(service.NewAWSError("ClusterNotFound", "Cluster "+id+" not found.", http.StatusNotFound))
+	}
+	return xmlOK(&xmlPauseClusterResponse{
+		Xmlns:  redshiftXmlns,
+		Result: xmlPauseClusterResult{Cluster: toXMLCluster(c)},
+		Meta:   xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+// ---- ResumeCluster ----
+
+type xmlResumeClusterResponse struct {
+	XMLName xml.Name              `xml:"ResumeClusterResponse"`
+	Xmlns   string                `xml:"xmlns,attr"`
+	Result  xmlResumeClusterResult `xml:"ResumeClusterResult"`
+	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+}
+
+type xmlResumeClusterResult struct {
+	Cluster xmlCluster `xml:"Cluster"`
+}
+
+func handleResumeCluster(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	id := form.Get("ClusterIdentifier")
+	if id == "" {
+		return xmlErr(service.ErrValidation("ClusterIdentifier is required."))
+	}
+	c, ok := store.ResumeCluster(id)
+	if !ok {
+		return xmlErr(service.NewAWSError("ClusterNotFound", "Cluster "+id+" not found.", http.StatusNotFound))
+	}
+	return xmlOK(&xmlResumeClusterResponse{
+		Xmlns:  redshiftXmlns,
+		Result: xmlResumeClusterResult{Cluster: toXMLCluster(c)},
+		Meta:   xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+// ---- AddTagsToResource / RemoveTagsFromResource ----
+
+type xmlAddTagsToResourceResponse struct {
+	XMLName xml.Name            `xml:"AddTagsToResourceResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleAddTagsToResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("ResourceName")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("ResourceName is required."))
+	}
+	tags := parseTags(form)
+	if !store.AddTags(arn, tags) {
+		return xmlErr(service.NewAWSError("ResourceNotFoundFault", "Resource "+arn+" not found.", http.StatusNotFound))
+	}
+	return xmlOK(&xmlAddTagsToResourceResponse{Xmlns: redshiftXmlns, Meta: xmlResponseMetadata{RequestID: newRequestID()}})
+}
+
+type xmlRemoveTagsFromResourceResponse struct {
+	XMLName xml.Name            `xml:"RemoveTagsFromResourceResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleRemoveTagsFromResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("ResourceName")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("ResourceName is required."))
+	}
+	keys := parseTagKeys(form)
+	if !store.RemoveTags(arn, keys) {
+		return xmlErr(service.NewAWSError("ResourceNotFoundFault", "Resource "+arn+" not found.", http.StatusNotFound))
+	}
+	return xmlOK(&xmlRemoveTagsFromResourceResponse{Xmlns: redshiftXmlns, Meta: xmlResponseMetadata{RequestID: newRequestID()}})
+}
+
 // ---- Data API handlers (JSON protocol) ----
 
 func jsonOK(body any) (*service.Response, error) {

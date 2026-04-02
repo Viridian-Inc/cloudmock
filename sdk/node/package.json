@@ -1,0 +1,9 @@
+{
+  "name": "@cloudmock/sdk",
+  "version": "1.0.0",
+  "description": "CloudMock SDK — Local AWS emulation for Node.js tests",
+  "main": "src/index.js",
+  "types": "src/index.d.ts",
+  "license": "BSL-1.1",
+  "files": ["src/", "README.md"]
+}

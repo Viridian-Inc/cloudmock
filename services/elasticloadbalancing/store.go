@@ -3,25 +3,29 @@ package elasticloadbalancing
 import (
 	"crypto/rand"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 )
 
-// LoadBalancer represents an ELB/ALB/NLB load balancer.
+// LoadBalancer represents an ELB/ALB/NLB/GWLB load balancer.
 type LoadBalancer struct {
-	Name             string
-	ARN              string
-	DNSName          string
-	Type             string // application, network, gateway
-	Scheme           string // internet-facing, internal
-	State            string // active, provisioning, failed
-	VpcID            string
-	SecurityGroups   []string
-	Subnets          []string
+	Name              string
+	ARN               string
+	DNSName           string
+	CanonicalHostedZoneID string
+	Type              string // application, network, gateway
+	Scheme            string // internet-facing, internal
+	State             string // provisioning, active, active_impaired, failed
+	StateReason       string
+	VpcID             string
+	SecurityGroups    []string
+	Subnets           []string
 	AvailabilityZones []AvailabilityZone
-	IpAddressType    string
-	CreatedTime      time.Time
-	Tags             map[string]string
+	IpAddressType     string
+	CreatedTime       time.Time
+	Tags              map[string]string
+	Attributes        map[string]string
 }
 
 // AvailabilityZone holds a subnet mapping for a load balancer.
@@ -32,27 +36,35 @@ type AvailabilityZone struct {
 
 // TargetGroup represents an ELB target group.
 type TargetGroup struct {
-	Name                string
-	ARN                 string
-	Protocol            string
-	Port                int
-	VpcID               string
-	TargetType          string // instance, ip, lambda, alb
-	HealthCheckEnabled  bool
-	HealthCheckPath     string
-	HealthCheckProtocol string
-	HealthCheckPort     string
-	HealthyThreshold    int
-	UnhealthyThreshold  int
-	Targets             map[string]*Target // key: targetID
-	Tags                map[string]string
+	Name                       string
+	ARN                        string
+	Protocol                   string
+	ProtocolVersion            string
+	Port                       int
+	VpcID                      string
+	TargetType                 string // instance, ip, lambda, alb
+	HealthCheckEnabled         bool
+	HealthCheckPath            string
+	HealthCheckProtocol        string
+	HealthCheckPort            string
+	HealthCheckIntervalSeconds int
+	HealthCheckTimeoutSeconds  int
+	HealthyThreshold           int
+	UnhealthyThreshold         int
+	Matcher                    string // HTTP codes e.g. "200"
+	LoadBalancerARNs           []string
+	Targets                    map[string]*Target // key: targetID or targetID:port
+	Tags                       map[string]string
+	Attributes                 map[string]string
 }
 
 // Target represents a registered target in a target group.
 type Target struct {
-	ID     string
-	Port   int
-	Health string // healthy, unhealthy, initial, draining, unused
+	ID               string
+	Port             int
+	AvailabilityZone string
+	Health           string // healthy, unhealthy, initial, draining, unused, unavailable
+	HealthReason     string
 }
 
 // Listener represents a load balancer listener.
@@ -64,14 +76,34 @@ type Listener struct {
 	DefaultActions  []Action
 	SslPolicy       string
 	CertificateARN  string
+	AlpnPolicy      []string
 	Tags            map[string]string
 }
 
-// Action represents a listener action.
+// Action represents a listener or rule action.
 type Action struct {
-	Type           string // forward, redirect, fixed-response
-	TargetGroupARN string
-	Order          int
+	Type                string // forward, redirect, fixed-response, authenticate-oidc, authenticate-cognito
+	TargetGroupARN      string
+	Order               int
+	RedirectConfig      *RedirectConfig
+	FixedResponseConfig *FixedResponseConfig
+}
+
+// RedirectConfig holds redirect action configuration.
+type RedirectConfig struct {
+	Protocol   string
+	Port       string
+	Host       string
+	Path       string
+	Query      string
+	StatusCode string // HTTP_301, HTTP_302
+}
+
+// FixedResponseConfig holds fixed-response action configuration.
+type FixedResponseConfig struct {
+	StatusCode  string
+	ContentType string
+	MessageBody string
 }
 
 // Rule represents a listener rule.
@@ -82,6 +114,7 @@ type Rule struct {
 	Conditions  []RuleCondition
 	Actions     []Action
 	IsDefault   bool
+	Tags        map[string]string
 }
 
 // RuleCondition represents a rule condition.
@@ -92,17 +125,17 @@ type RuleCondition struct {
 
 // Store manages all ELB resources.
 type Store struct {
-	mu             sync.RWMutex
-	loadBalancers  map[string]*LoadBalancer  // keyed by ARN
-	targetGroups   map[string]*TargetGroup   // keyed by ARN
-	listeners      map[string]*Listener      // keyed by ARN
-	rules          map[string]*Rule          // keyed by ARN
-	lbByName       map[string]string         // name -> ARN
-	tgByName       map[string]string         // name -> ARN
-	accountID      string
-	region         string
-	listenerSeq    int
-	ruleSeq        int
+	mu            sync.RWMutex
+	loadBalancers map[string]*LoadBalancer // keyed by ARN
+	targetGroups  map[string]*TargetGroup  // keyed by ARN
+	listeners     map[string]*Listener     // keyed by ARN
+	rules         map[string]*Rule         // keyed by ARN
+	lbByName      map[string]string        // name -> ARN
+	tgByName      map[string]string        // name -> ARN
+	accountID     string
+	region        string
+	listenerSeq   int
+	ruleSeq       int
 }
 
 // NewStore returns a new Store for the given account and region.
@@ -121,14 +154,16 @@ func NewStore(accountID, region string) *Store {
 
 // ---- ARN helpers ----
 
-func (s *Store) lbARN(name string) string {
+func (s *Store) lbARN(name, lbType string) string {
 	suffix := randomHex(8)
-	return fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/app/%s/%s", s.region, s.accountID, name, suffix)
-}
-
-func (s *Store) nlbARN(name string) string {
-	suffix := randomHex(8)
-	return fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/net/%s/%s", s.region, s.accountID, name, suffix)
+	prefix := "app"
+	switch lbType {
+	case "network":
+		prefix = "net"
+	case "gateway":
+		prefix = "gwy"
+	}
+	return fmt.Sprintf("arn:aws:elasticloadbalancing:%s:%s:loadbalancer/%s/%s/%s", s.region, s.accountID, prefix, name, suffix)
 }
 
 func (s *Store) tgARN(name string) string {
@@ -154,14 +189,56 @@ func (s *Store) dnsName(name, lbType string) string {
 	return fmt.Sprintf("%s-%s.%s.elb.amazonaws.com", name, suffix, s.region)
 }
 
+// defaultLBAttributes returns the default attributes for a load balancer type.
+func defaultLBAttributes(lbType string) map[string]string {
+	attrs := map[string]string{
+		"deletion_protection.enabled":                         "false",
+		"access_logs.s3.enabled":                              "false",
+		"access_logs.s3.bucket":                               "",
+		"access_logs.s3.prefix":                               "",
+		"idle_timeout.timeout_seconds":                        "60",
+		"routing.http.drop_invalid_header_fields.enabled":     "false",
+		"routing.http.desync_mitigation_mode":                 "defensive",
+		"routing.http.x_amzn_tls_version_and_cipher_suite.enabled": "false",
+		"routing.http.xff_client_port.enabled":                "false",
+		"routing.http2.enabled":                               "true",
+		"waf.fail_open.enabled":                               "false",
+	}
+	if lbType == "network" {
+		attrs = map[string]string{
+			"deletion_protection.enabled":                   "false",
+			"access_logs.s3.enabled":                        "false",
+			"access_logs.s3.bucket":                         "",
+			"access_logs.s3.prefix":                         "",
+			"load_balancing.cross_zone.enabled":             "false",
+			"dns_record.client_routing_policy":              "any_availability_zone",
+		}
+	}
+	return attrs
+}
+
+// defaultTGAttributes returns the default attributes for a target group.
+func defaultTGAttributes() map[string]string {
+	return map[string]string{
+		"deregistration_delay.timeout_seconds":          "300",
+		"stickiness.enabled":                            "false",
+		"stickiness.type":                               "lb_cookie",
+		"stickiness.lb_cookie.duration_seconds":         "86400",
+		"slow_start.duration_seconds":                   "0",
+		"load_balancing.algorithm.type":                 "round_robin",
+		"target_group_health.dns_failover.minimum_healthy_targets.count": "1",
+		"target_group_health.unhealthy_state_routing.minimum_healthy_targets.count": "1",
+	}
+}
+
 // ---- LoadBalancer operations ----
 
-func (s *Store) CreateLoadBalancer(name, lbType, scheme, ipAddressType, vpcID string, subnets, securityGroups []string) (*LoadBalancer, bool) {
+func (s *Store) CreateLoadBalancer(name, lbType, scheme, ipAddressType, vpcID string, subnets, securityGroups []string, tags map[string]string) (*LoadBalancer, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, exists := s.lbByName[name]; exists {
-		return nil, false
+		return nil, fmt.Errorf("DuplicateLoadBalancerName")
 	}
 
 	if lbType == "" {
@@ -174,12 +251,7 @@ func (s *Store) CreateLoadBalancer(name, lbType, scheme, ipAddressType, vpcID st
 		ipAddressType = "ipv4"
 	}
 
-	var arn string
-	if lbType == "network" {
-		arn = s.nlbARN(name)
-	} else {
-		arn = s.lbARN(name)
-	}
+	arn := s.lbARN(name, lbType)
 
 	azs := make([]AvailabilityZone, 0, len(subnets))
 	for i, sub := range subnets {
@@ -189,24 +261,34 @@ func (s *Store) CreateLoadBalancer(name, lbType, scheme, ipAddressType, vpcID st
 		})
 	}
 
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
 	lb := &LoadBalancer{
-		Name:              name,
-		ARN:               arn,
-		DNSName:           s.dnsName(name, lbType),
-		Type:              lbType,
-		Scheme:            scheme,
-		State:             "active",
-		VpcID:             vpcID,
-		SecurityGroups:    securityGroups,
-		Subnets:           subnets,
-		AvailabilityZones: azs,
-		IpAddressType:     ipAddressType,
-		CreatedTime:       time.Now().UTC(),
-		Tags:              make(map[string]string),
+		Name:                  name,
+		ARN:                   arn,
+		DNSName:               s.dnsName(name, lbType),
+		CanonicalHostedZoneID: "Z35SXDOTRQ7X7K",
+		Type:                  lbType,
+		Scheme:                scheme,
+		State:                 "provisioning",
+		VpcID:                 vpcID,
+		SecurityGroups:        securityGroups,
+		Subnets:               subnets,
+		AvailabilityZones:     azs,
+		IpAddressType:         ipAddressType,
+		CreatedTime:           time.Now().UTC(),
+		Tags:                  tags,
+		Attributes:            defaultLBAttributes(lbType),
 	}
 	s.loadBalancers[arn] = lb
 	s.lbByName[name] = arn
-	return lb, true
+
+	// Transition to active immediately for mock purposes.
+	lb.State = "active"
+
+	return lb, nil
 }
 
 func (s *Store) GetLoadBalancer(arn string) (*LoadBalancer, bool) {
@@ -235,6 +317,7 @@ func (s *Store) ListLoadBalancers(names []string, arns []string) []*LoadBalancer
 		for _, lb := range s.loadBalancers {
 			result = append(result, lb)
 		}
+		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 		return result
 	}
 
@@ -253,6 +336,7 @@ func (s *Store) ListLoadBalancers(names []string, arns []string) []*LoadBalancer
 			result = append(result, lb)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result
 }
 
@@ -281,14 +365,75 @@ func (s *Store) DeleteLoadBalancer(arn string) bool {
 	return true
 }
 
+func (s *Store) GetLoadBalancerAttributes(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	lb, ok := s.loadBalancers[arn]
+	if !ok {
+		return nil, false
+	}
+	result := make(map[string]string, len(lb.Attributes))
+	for k, v := range lb.Attributes {
+		result[k] = v
+	}
+	return result, true
+}
+
+func (s *Store) ModifyLoadBalancerAttributes(arn string, attrs map[string]string) (map[string]string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lb, ok := s.loadBalancers[arn]
+	if !ok {
+		return nil, false
+	}
+	for k, v := range attrs {
+		lb.Attributes[k] = v
+	}
+	result := make(map[string]string, len(lb.Attributes))
+	for k, v := range lb.Attributes {
+		result[k] = v
+	}
+	return result, true
+}
+
+func (s *Store) SetSecurityGroups(arn string, securityGroups []string) ([]string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lb, ok := s.loadBalancers[arn]
+	if !ok {
+		return nil, false
+	}
+	lb.SecurityGroups = securityGroups
+	return lb.SecurityGroups, true
+}
+
+func (s *Store) SetSubnets(arn string, subnets []string) ([]AvailabilityZone, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	lb, ok := s.loadBalancers[arn]
+	if !ok {
+		return nil, false
+	}
+	lb.Subnets = subnets
+	azs := make([]AvailabilityZone, 0, len(subnets))
+	for i, sub := range subnets {
+		azs = append(azs, AvailabilityZone{
+			ZoneName: fmt.Sprintf("%s%c", s.region, 'a'+rune(i%3)),
+			SubnetID: sub,
+		})
+	}
+	lb.AvailabilityZones = azs
+	return azs, true
+}
+
 // ---- TargetGroup operations ----
 
-func (s *Store) CreateTargetGroup(name, protocol string, port int, vpcID, targetType, healthPath, healthProtocol, healthPort string) (*TargetGroup, bool) {
+func (s *Store) CreateTargetGroup(name, protocol string, port int, vpcID, targetType, healthPath, healthProtocol, healthPort string, tags map[string]string) (*TargetGroup, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, exists := s.tgByName[name]; exists {
-		return nil, false
+		return nil, fmt.Errorf("DuplicateTargetGroupName")
 	}
 
 	if targetType == "" {
@@ -304,26 +449,35 @@ func (s *Store) CreateTargetGroup(name, protocol string, port int, vpcID, target
 		healthPath = "/"
 	}
 
+	if tags == nil {
+		tags = make(map[string]string)
+	}
+
 	arn := s.tgARN(name)
 	tg := &TargetGroup{
-		Name:                name,
-		ARN:                 arn,
-		Protocol:            protocol,
-		Port:                port,
-		VpcID:               vpcID,
-		TargetType:          targetType,
-		HealthCheckEnabled:  true,
-		HealthCheckPath:     healthPath,
-		HealthCheckProtocol: healthProtocol,
-		HealthCheckPort:     healthPort,
-		HealthyThreshold:    5,
-		UnhealthyThreshold:  2,
-		Targets:             make(map[string]*Target),
-		Tags:                make(map[string]string),
+		Name:                       name,
+		ARN:                        arn,
+		Protocol:                   protocol,
+		ProtocolVersion:            "HTTP1",
+		Port:                       port,
+		VpcID:                      vpcID,
+		TargetType:                 targetType,
+		HealthCheckEnabled:         true,
+		HealthCheckPath:            healthPath,
+		HealthCheckProtocol:        healthProtocol,
+		HealthCheckPort:            healthPort,
+		HealthCheckIntervalSeconds: 30,
+		HealthCheckTimeoutSeconds:  5,
+		HealthyThreshold:           5,
+		UnhealthyThreshold:         2,
+		Matcher:                    "200",
+		Targets:                    make(map[string]*Target),
+		Tags:                       tags,
+		Attributes:                 defaultTGAttributes(),
 	}
 	s.targetGroups[arn] = tg
 	s.tgByName[name] = arn
-	return tg, true
+	return tg, nil
 }
 
 func (s *Store) GetTargetGroup(arn string) (*TargetGroup, bool) {
@@ -342,10 +496,10 @@ func (s *Store) ListTargetGroups(names []string, arns []string, lbARN string) []
 		for _, tg := range s.targetGroups {
 			result = append(result, tg)
 		}
+		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 		return result
 	}
 
-	// Build lookup sets.
 	nameSet := make(map[string]bool, len(names))
 	for _, n := range names {
 		nameSet[n] = true
@@ -375,10 +529,11 @@ func (s *Store) ListTargetGroups(names []string, arns []string, lbARN string) []
 			result = append(result, tg)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 	return result
 }
 
-func (s *Store) ModifyTargetGroup(arn, healthPath, healthProtocol, healthPort string, healthyThresh, unhealthyThresh int) (*TargetGroup, bool) {
+func (s *Store) ModifyTargetGroup(arn, healthPath, healthProtocol, healthPort string, healthyThresh, unhealthyThresh, intervalSeconds, timeoutSeconds int, healthCheckEnabled *bool, matcher string) (*TargetGroup, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -401,23 +556,91 @@ func (s *Store) ModifyTargetGroup(arn, healthPath, healthProtocol, healthPort st
 	if unhealthyThresh > 0 {
 		tg.UnhealthyThreshold = unhealthyThresh
 	}
+	if intervalSeconds > 0 {
+		tg.HealthCheckIntervalSeconds = intervalSeconds
+	}
+	if timeoutSeconds > 0 {
+		tg.HealthCheckTimeoutSeconds = timeoutSeconds
+	}
+	if healthCheckEnabled != nil {
+		tg.HealthCheckEnabled = *healthCheckEnabled
+	}
+	if matcher != "" {
+		tg.Matcher = matcher
+	}
 	return tg, true
 }
 
-func (s *Store) DeleteTargetGroup(arn string) bool {
+func (s *Store) DeleteTargetGroup(arn string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	tg, ok := s.targetGroups[arn]
 	if !ok {
-		return false
+		return false, fmt.Errorf("TargetGroupNotFound")
 	}
+
+	// Check if any listener references this target group
+	for _, l := range s.listeners {
+		for _, a := range l.DefaultActions {
+			if a.TargetGroupARN == arn {
+				return false, fmt.Errorf("ResourceInUse")
+			}
+		}
+	}
+	// Check rules too
+	for _, r := range s.rules {
+		for _, a := range r.Actions {
+			if a.TargetGroupARN == arn {
+				return false, fmt.Errorf("ResourceInUse")
+			}
+		}
+	}
+
 	delete(s.tgByName, tg.Name)
 	delete(s.targetGroups, arn)
-	return true
+	return true, nil
+}
+
+func (s *Store) GetTargetGroupAttributes(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tg, ok := s.targetGroups[arn]
+	if !ok {
+		return nil, false
+	}
+	result := make(map[string]string, len(tg.Attributes))
+	for k, v := range tg.Attributes {
+		result[k] = v
+	}
+	return result, true
+}
+
+func (s *Store) ModifyTargetGroupAttributes(arn string, attrs map[string]string) (map[string]string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	tg, ok := s.targetGroups[arn]
+	if !ok {
+		return nil, false
+	}
+	for k, v := range attrs {
+		tg.Attributes[k] = v
+	}
+	result := make(map[string]string, len(tg.Attributes))
+	for k, v := range tg.Attributes {
+		result[k] = v
+	}
+	return result, true
 }
 
 // ---- Target operations ----
+
+func targetKey(id string, port int) string {
+	if port > 0 {
+		return fmt.Sprintf("%s:%d", id, port)
+	}
+	return id
+}
 
 func (s *Store) RegisterTargets(tgARN string, targets []Target) bool {
 	s.mu.Lock()
@@ -430,7 +653,9 @@ func (s *Store) RegisterTargets(tgARN string, targets []Target) bool {
 	for _, t := range targets {
 		tCopy := t
 		tCopy.Health = "initial"
-		tg.Targets[t.ID] = &tCopy
+		tCopy.HealthReason = "Elb.RegistrationInProgress"
+		key := targetKey(t.ID, t.Port)
+		tg.Targets[key] = &tCopy
 	}
 	return true
 }
@@ -444,7 +669,18 @@ func (s *Store) DeregisterTargets(tgARN string, targetIDs []string) bool {
 		return false
 	}
 	for _, id := range targetIDs {
-		delete(tg.Targets, id)
+		// Try exact match first, then try with just id (no port)
+		if _, exists := tg.Targets[id]; exists {
+			delete(tg.Targets, id)
+		} else {
+			// Search for matching target by ID
+			for key, t := range tg.Targets {
+				if t.ID == id {
+					delete(tg.Targets, key)
+					break
+				}
+			}
+		}
 	}
 	return true
 }
@@ -459,10 +695,10 @@ func (s *Store) DescribeTargetHealth(tgARN string) ([]*Target, bool) {
 	}
 	result := make([]*Target, 0, len(tg.Targets))
 	for _, t := range tg.Targets {
-		// For backward compatibility, promote initial to healthy on read
-		// when no health checker is actively running.
+		// For mock: promote initial to healthy on read (but not draining)
 		if t.Health == "initial" {
 			t.Health = "healthy"
+			t.HealthReason = ""
 		}
 		result = append(result, t)
 	}
@@ -479,8 +715,19 @@ func (s *Store) DeregisterTargetsWithDraining(tgARN string, targetIDs []string) 
 		return false
 	}
 	for _, id := range targetIDs {
+		// Try exact key match first
 		if t, exists := tg.Targets[id]; exists {
 			t.Health = "draining"
+			t.HealthReason = "Target.DeregistrationInProgress"
+			continue
+		}
+		// Search by target ID
+		for _, t := range tg.Targets {
+			if t.ID == id {
+				t.Health = "draining"
+				t.HealthReason = "Target.DeregistrationInProgress"
+				break
+			}
 		}
 	}
 	return true
@@ -488,12 +735,23 @@ func (s *Store) DeregisterTargetsWithDraining(tgARN string, targetIDs []string) 
 
 // ---- Listener operations ----
 
-func (s *Store) CreateListener(lbARN, protocol string, port int, defaultActions []Action, sslPolicy, certARN string) (*Listener, bool) {
+func (s *Store) CreateListener(lbARN, protocol string, port int, defaultActions []Action, sslPolicy, certARN string, tags map[string]string) (*Listener, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.loadBalancers[lbARN]; !ok {
-		return nil, false
+		return nil, fmt.Errorf("LoadBalancerNotFound")
+	}
+
+	// Check for duplicate port on same LB
+	for _, l := range s.listeners {
+		if l.LoadBalancerARN == lbARN && l.Port == port {
+			return nil, fmt.Errorf("DuplicateListener")
+		}
+	}
+
+	if tags == nil {
+		tags = make(map[string]string)
 	}
 
 	arn := s.listenerARN(lbARN)
@@ -505,7 +763,7 @@ func (s *Store) CreateListener(lbARN, protocol string, port int, defaultActions 
 		DefaultActions:  defaultActions,
 		SslPolicy:       sslPolicy,
 		CertificateARN:  certARN,
-		Tags:            make(map[string]string),
+		Tags:            tags,
 	}
 	s.listeners[arn] = l
 
@@ -517,22 +775,33 @@ func (s *Store) CreateListener(lbARN, protocol string, port int, defaultActions 
 		Priority:    "default",
 		Actions:     defaultActions,
 		IsDefault:   true,
+		Tags:        make(map[string]string),
 	}
 	s.rules[ruleARN] = defaultRule
 
-	return l, true
+	return l, nil
 }
 
-func (s *Store) ListListeners(lbARN string) []*Listener {
+func (s *Store) ListListeners(lbARN string, listenerARNs []string) []*Listener {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	arnSet := make(map[string]bool, len(listenerARNs))
+	for _, a := range listenerARNs {
+		arnSet[a] = true
+	}
+
 	result := make([]*Listener, 0)
 	for _, l := range s.listeners {
-		if lbARN == "" || l.LoadBalancerARN == lbARN {
+		if len(arnSet) > 0 {
+			if arnSet[l.ARN] {
+				result = append(result, l)
+			}
+		} else if lbARN == "" || l.LoadBalancerARN == lbARN {
 			result = append(result, l)
 		}
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Port < result[j].Port })
 	return result
 }
 
@@ -589,12 +858,23 @@ func (s *Store) DeleteListener(arn string) bool {
 
 // ---- Rule operations ----
 
-func (s *Store) CreateRule(listenerARN, priority string, conditions []RuleCondition, actions []Action) (*Rule, bool) {
+func (s *Store) CreateRule(listenerARN, priority string, conditions []RuleCondition, actions []Action, tags map[string]string) (*Rule, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	if _, ok := s.listeners[listenerARN]; !ok {
-		return nil, false
+		return nil, fmt.Errorf("ListenerNotFound")
+	}
+
+	// Check for duplicate priority
+	for _, r := range s.rules {
+		if r.ListenerARN == listenerARN && r.Priority == priority && !r.IsDefault {
+			return nil, fmt.Errorf("PriorityInUse")
+		}
+	}
+
+	if tags == nil {
+		tags = make(map[string]string)
 	}
 
 	arn := s.ruleARN(listenerARN)
@@ -605,37 +885,110 @@ func (s *Store) CreateRule(listenerARN, priority string, conditions []RuleCondit
 		Conditions:  conditions,
 		Actions:     actions,
 		IsDefault:   false,
+		Tags:        tags,
 	}
 	s.rules[arn] = r
-	return r, true
+	return r, nil
 }
 
-func (s *Store) ListRules(listenerARN string) []*Rule {
+func (s *Store) GetRule(arn string) (*Rule, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	r, ok := s.rules[arn]
+	return r, ok
+}
+
+func (s *Store) ListRules(listenerARN string, ruleARNs []string) []*Rule {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
+	arnSet := make(map[string]bool, len(ruleARNs))
+	for _, a := range ruleARNs {
+		arnSet[a] = true
+	}
+
 	result := make([]*Rule, 0)
 	for _, r := range s.rules {
-		if listenerARN == "" || r.ListenerARN == listenerARN {
+		if len(arnSet) > 0 {
+			if arnSet[r.ARN] {
+				result = append(result, r)
+			}
+		} else if listenerARN == "" || r.ListenerARN == listenerARN {
 			result = append(result, r)
 		}
 	}
+	// Sort: default rule last, then by priority
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].IsDefault != result[j].IsDefault {
+			return !result[i].IsDefault
+		}
+		return result[i].Priority < result[j].Priority
+	})
 	return result
 }
 
-func (s *Store) DeleteRule(arn string) bool {
+func (s *Store) ModifyRule(arn string, conditions []RuleCondition, actions []Action) (*Rule, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	r, ok := s.rules[arn]
 	if !ok {
-		return false
+		return nil, false
 	}
 	if r.IsDefault {
-		return false // cannot delete default rule
+		// Can only modify actions on default rule
+		if len(actions) > 0 {
+			r.Actions = actions
+		}
+		return r, true
+	}
+	if len(conditions) > 0 {
+		r.Conditions = conditions
+	}
+	if len(actions) > 0 {
+		r.Actions = actions
+	}
+	return r, true
+}
+
+func (s *Store) SetRulePriorities(priorities map[string]string) ([]*Rule, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Validate all rule ARNs exist
+	var rules []*Rule
+	for ruleARN := range priorities {
+		r, ok := s.rules[ruleARN]
+		if !ok {
+			return nil, fmt.Errorf("RuleNotFound")
+		}
+		if r.IsDefault {
+			return nil, fmt.Errorf("OperationNotPermitted")
+		}
+		rules = append(rules, r)
+	}
+
+	// Apply priorities
+	for ruleARN, priority := range priorities {
+		s.rules[ruleARN].Priority = priority
+	}
+
+	return rules, nil
+}
+
+func (s *Store) DeleteRule(arn string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	r, ok := s.rules[arn]
+	if !ok {
+		return false, fmt.Errorf("RuleNotFound")
+	}
+	if r.IsDefault {
+		return false, fmt.Errorf("OperationNotPermitted")
 	}
 	delete(s.rules, arn)
-	return true
+	return true, nil
 }
 
 // ---- Tag operations ----
@@ -684,20 +1037,17 @@ func (s *Store) ListTags(arn string) (map[string]string, bool) {
 }
 
 func (s *Store) tagMapByARN(arn string) map[string]string {
-	for _, lb := range s.loadBalancers {
-		if lb.ARN == arn {
-			return lb.Tags
-		}
+	if lb, ok := s.loadBalancers[arn]; ok {
+		return lb.Tags
 	}
-	for _, tg := range s.targetGroups {
-		if tg.ARN == arn {
-			return tg.Tags
-		}
+	if tg, ok := s.targetGroups[arn]; ok {
+		return tg.Tags
 	}
-	for _, l := range s.listeners {
-		if l.ARN == arn {
-			return l.Tags
-		}
+	if l, ok := s.listeners[arn]; ok {
+		return l.Tags
+	}
+	if r, ok := s.rules[arn]; ok {
+		return r.Tags
 	}
 	return nil
 }

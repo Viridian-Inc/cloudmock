@@ -43,13 +43,16 @@ func (hc *HealthChecker) CheckAllTargets() {
 			if hc.locator != nil && tg.TargetType == "instance" {
 				if hc.ec2InstanceExists(t.ID) {
 					t.Health = "healthy"
+					t.HealthReason = ""
 				} else {
 					t.Health = "unhealthy"
+					t.HealthReason = "Target.NotInService"
 				}
 			} else {
 				// No locator: promote initial to healthy (stub behavior)
 				if t.Health == "initial" {
 					t.Health = "healthy"
+					t.HealthReason = ""
 				}
 			}
 		}
@@ -100,6 +103,7 @@ func (hc *HealthChecker) DeregisterWithDraining(tgARN string, targetIDs []string
 	for _, id := range targetIDs {
 		if t, exists := tg.Targets[id]; exists {
 			t.Health = "draining"
+			t.HealthReason = "Target.DeregistrationInProgress"
 		}
 	}
 	return true

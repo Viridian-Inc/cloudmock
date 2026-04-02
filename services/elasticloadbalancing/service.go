@@ -48,11 +48,16 @@ func (s *ELBService) Actions() []service.Action {
 		{Name: "DescribeLoadBalancers", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DescribeLoadBalancers"},
 		{Name: "DeleteLoadBalancer", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DeleteLoadBalancer"},
 		{Name: "ModifyLoadBalancerAttributes", Method: http.MethodPost, IAMAction: "elasticloadbalancing:ModifyLoadBalancerAttributes"},
+		{Name: "DescribeLoadBalancerAttributes", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DescribeLoadBalancerAttributes"},
+		{Name: "SetSecurityGroups", Method: http.MethodPost, IAMAction: "elasticloadbalancing:SetSecurityGroups"},
+		{Name: "SetSubnets", Method: http.MethodPost, IAMAction: "elasticloadbalancing:SetSubnets"},
 		// Target Groups
 		{Name: "CreateTargetGroup", Method: http.MethodPost, IAMAction: "elasticloadbalancing:CreateTargetGroup"},
 		{Name: "DescribeTargetGroups", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DescribeTargetGroups"},
 		{Name: "DeleteTargetGroup", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DeleteTargetGroup"},
 		{Name: "ModifyTargetGroup", Method: http.MethodPost, IAMAction: "elasticloadbalancing:ModifyTargetGroup"},
+		{Name: "DescribeTargetGroupAttributes", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DescribeTargetGroupAttributes"},
+		{Name: "ModifyTargetGroupAttributes", Method: http.MethodPost, IAMAction: "elasticloadbalancing:ModifyTargetGroupAttributes"},
 		// Targets
 		{Name: "RegisterTargets", Method: http.MethodPost, IAMAction: "elasticloadbalancing:RegisterTargets"},
 		{Name: "DeregisterTargets", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DeregisterTargets"},
@@ -66,6 +71,8 @@ func (s *ELBService) Actions() []service.Action {
 		{Name: "CreateRule", Method: http.MethodPost, IAMAction: "elasticloadbalancing:CreateRule"},
 		{Name: "DescribeRules", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DescribeRules"},
 		{Name: "DeleteRule", Method: http.MethodPost, IAMAction: "elasticloadbalancing:DeleteRule"},
+		{Name: "ModifyRule", Method: http.MethodPost, IAMAction: "elasticloadbalancing:ModifyRule"},
+		{Name: "SetRulePriorities", Method: http.MethodPost, IAMAction: "elasticloadbalancing:SetRulePriorities"},
 		// Tags
 		{Name: "AddTags", Method: http.MethodPost, IAMAction: "elasticloadbalancing:AddTags"},
 		{Name: "RemoveTags", Method: http.MethodPost, IAMAction: "elasticloadbalancing:RemoveTags"},
@@ -98,6 +105,12 @@ func (s *ELBService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDeleteLoadBalancer(ctx, s.store)
 	case "ModifyLoadBalancerAttributes":
 		return handleModifyLoadBalancerAttributes(ctx, s.store)
+	case "DescribeLoadBalancerAttributes":
+		return handleDescribeLoadBalancerAttributes(ctx, s.store)
+	case "SetSecurityGroups":
+		return handleSetSecurityGroups(ctx, s.store)
+	case "SetSubnets":
+		return handleSetSubnets(ctx, s.store)
 	// Target Groups
 	case "CreateTargetGroup":
 		return handleCreateTargetGroup(ctx, s.store)
@@ -107,6 +120,10 @@ func (s *ELBService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDeleteTargetGroup(ctx, s.store)
 	case "ModifyTargetGroup":
 		return handleModifyTargetGroup(ctx, s.store)
+	case "DescribeTargetGroupAttributes":
+		return handleDescribeTargetGroupAttributes(ctx, s.store)
+	case "ModifyTargetGroupAttributes":
+		return handleModifyTargetGroupAttributes(ctx, s.store)
 	// Targets
 	case "RegisterTargets":
 		return handleRegisterTargets(ctx, s.store)
@@ -130,6 +147,10 @@ func (s *ELBService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDescribeRules(ctx, s.store)
 	case "DeleteRule":
 		return handleDeleteRule(ctx, s.store)
+	case "ModifyRule":
+		return handleModifyRule(ctx, s.store)
+	case "SetRulePriorities":
+		return handleSetRulePriorities(ctx, s.store)
 	// Tags
 	case "AddTags":
 		return handleAddTags(ctx, s.store)

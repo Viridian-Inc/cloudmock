@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 
+	"github.com/neureaux/cloudmock/pkg/pagination"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 const elbXmlns = "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/"
+
+// Default page size for ELBv2 list operations (AWS default is 400 for most).
+const defaultPageSize = 400
 
 // ---- shared XML types ----
 
@@ -29,24 +34,35 @@ type xmlAvailabilityZone struct {
 	SubnetId string `xml:"SubnetId"`
 }
 
+type xmlAttribute struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
+}
+
 // ---- LoadBalancer XML types ----
 
 type xmlLoadBalancer struct {
-	LoadBalancerArn    string                `xml:"LoadBalancerArn"`
-	DNSName            string                `xml:"DNSName"`
-	LoadBalancerName   string                `xml:"LoadBalancerName"`
-	Scheme             string                `xml:"Scheme"`
-	Type               string                `xml:"Type"`
-	State              xmlLBState            `xml:"State"`
-	VpcId              string                `xml:"VpcId"`
-	SecurityGroups     []string              `xml:"SecurityGroups>member"`
-	AvailabilityZones  []xmlAvailabilityZone `xml:"AvailabilityZones>member"`
-	IpAddressType      string                `xml:"IpAddressType"`
-	CreatedTime        string                `xml:"CreatedTime"`
+	LoadBalancerArn       string                `xml:"LoadBalancerArn"`
+	DNSName               string                `xml:"DNSName"`
+	CanonicalHostedZoneId string                `xml:"CanonicalHostedZoneId"`
+	LoadBalancerName      string                `xml:"LoadBalancerName"`
+	Scheme                string                `xml:"Scheme"`
+	Type                  string                `xml:"Type"`
+	State                 xmlLBState            `xml:"State"`
+	VpcId                 string                `xml:"VpcId"`
+	SecurityGroups        *xmlSecurityGroups    `xml:"SecurityGroups,omitempty"`
+	AvailabilityZones     []xmlAvailabilityZone `xml:"AvailabilityZones>member"`
+	IpAddressType         string                `xml:"IpAddressType"`
+	CreatedTime           string                `xml:"CreatedTime"`
+}
+
+type xmlSecurityGroups struct {
+	Members []string `xml:"member"`
 }
 
 type xmlLBState struct {
-	Code string `xml:"Code"`
+	Code   string `xml:"Code"`
+	Reason string `xml:"Reason,omitempty"`
 }
 
 func toXMLLoadBalancer(lb *LoadBalancer) xmlLoadBalancer {
@@ -54,28 +70,33 @@ func toXMLLoadBalancer(lb *LoadBalancer) xmlLoadBalancer {
 	for _, az := range lb.AvailabilityZones {
 		azs = append(azs, xmlAvailabilityZone{ZoneName: az.ZoneName, SubnetId: az.SubnetID})
 	}
+	var sgs *xmlSecurityGroups
+	if len(lb.SecurityGroups) > 0 {
+		sgs = &xmlSecurityGroups{Members: lb.SecurityGroups}
+	}
 	return xmlLoadBalancer{
-		LoadBalancerArn:   lb.ARN,
-		DNSName:           lb.DNSName,
-		LoadBalancerName:  lb.Name,
-		Scheme:            lb.Scheme,
-		Type:              lb.Type,
-		State:             xmlLBState{Code: lb.State},
-		VpcId:             lb.VpcID,
-		SecurityGroups:    lb.SecurityGroups,
-		AvailabilityZones: azs,
-		IpAddressType:     lb.IpAddressType,
-		CreatedTime:       lb.CreatedTime.Format("2006-01-02T15:04:05Z"),
+		LoadBalancerArn:       lb.ARN,
+		DNSName:               lb.DNSName,
+		CanonicalHostedZoneId: lb.CanonicalHostedZoneID,
+		LoadBalancerName:      lb.Name,
+		Scheme:                lb.Scheme,
+		Type:                  lb.Type,
+		State:                 xmlLBState{Code: lb.State, Reason: lb.StateReason},
+		VpcId:                 lb.VpcID,
+		SecurityGroups:        sgs,
+		AvailabilityZones:     azs,
+		IpAddressType:         lb.IpAddressType,
+		CreatedTime:           lb.CreatedTime.Format("2006-01-02T15:04:05Z"),
 	}
 }
 
 // ---- CreateLoadBalancer ----
 
 type xmlCreateLoadBalancerResponse struct {
-	XMLName xml.Name                   `xml:"CreateLoadBalancerResponse"`
-	Xmlns   string                     `xml:"xmlns,attr"`
+	XMLName xml.Name                    `xml:"CreateLoadBalancerResponse"`
+	Xmlns   string                      `xml:"xmlns,attr"`
 	Result  xmlCreateLoadBalancerResult `xml:"CreateLoadBalancerResult"`
-	Meta    xmlResponseMetadata        `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
 }
 
 type xmlCreateLoadBalancerResult struct {
@@ -94,9 +115,10 @@ func handleCreateLoadBalancer(ctx *service.RequestContext, store *Store) (*servi
 	ipType := form.Get("IpAddressType")
 	subnets := parseMemberList(form, "Subnets")
 	sgs := parseMemberList(form, "SecurityGroups")
+	tags := parseTags(form)
 
-	lb, ok := store.CreateLoadBalancer(name, lbType, scheme, ipType, "", subnets, sgs)
-	if !ok {
+	lb, err := store.CreateLoadBalancer(name, lbType, scheme, ipType, "", subnets, sgs, tags)
+	if err != nil {
 		return xmlErr(service.NewAWSError("DuplicateLoadBalancerName",
 			"A load balancer with the name '"+name+"' already exists.", http.StatusBadRequest))
 	}
@@ -111,32 +133,46 @@ func handleCreateLoadBalancer(ctx *service.RequestContext, store *Store) (*servi
 // ---- DescribeLoadBalancers ----
 
 type xmlDescribeLoadBalancersResponse struct {
-	XMLName xml.Name                      `xml:"DescribeLoadBalancersResponse"`
-	Xmlns   string                        `xml:"xmlns,attr"`
+	XMLName xml.Name                       `xml:"DescribeLoadBalancersResponse"`
+	Xmlns   string                         `xml:"xmlns,attr"`
 	Result  xmlDescribeLoadBalancersResult `xml:"DescribeLoadBalancersResult"`
-	Meta    xmlResponseMetadata           `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata            `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeLoadBalancersResult struct {
 	LoadBalancers []xmlLoadBalancer `xml:"LoadBalancers>member"`
+	NextMarker    string            `xml:"NextMarker,omitempty"`
 }
 
 func handleDescribeLoadBalancers(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	form := parseForm(ctx)
 	names := parseMemberList(form, "Names")
 	arns := parseMemberList(form, "LoadBalancerArns")
+	marker := form.Get("Marker")
+	pageSize := parsePageSize(form)
 
 	lbs := store.ListLoadBalancers(names, arns)
 
-	xmlLBs := make([]xmlLoadBalancer, 0, len(lbs))
-	for _, lb := range lbs {
+	// If names or arns specified but no results found, return error per AWS behavior
+	if (len(names) > 0 || len(arns) > 0) && len(lbs) == 0 {
+		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
+			"One or more load balancers not found.", http.StatusBadRequest))
+	}
+
+	page := pagination.Paginate(lbs, marker, pageSize, defaultPageSize)
+
+	xmlLBs := make([]xmlLoadBalancer, 0, len(page.Items))
+	for _, lb := range page.Items {
 		xmlLBs = append(xmlLBs, toXMLLoadBalancer(lb))
 	}
 
 	return xmlOK(&xmlDescribeLoadBalancersResponse{
-		Xmlns:  elbXmlns,
-		Result: xmlDescribeLoadBalancersResult{LoadBalancers: xmlLBs},
-		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+		Xmlns: elbXmlns,
+		Result: xmlDescribeLoadBalancersResult{
+			LoadBalancers: xmlLBs,
+			NextMarker:    page.NextToken,
+		},
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
@@ -166,12 +202,52 @@ func handleDeleteLoadBalancer(ctx *service.RequestContext, store *Store) (*servi
 	})
 }
 
+// ---- DescribeLoadBalancerAttributes ----
+
+type xmlDescribeLoadBalancerAttributesResponse struct {
+	XMLName xml.Name                                 `xml:"DescribeLoadBalancerAttributesResponse"`
+	Xmlns   string                                   `xml:"xmlns,attr"`
+	Result  xmlDescribeLoadBalancerAttributesResult   `xml:"DescribeLoadBalancerAttributesResult"`
+	Meta    xmlResponseMetadata                      `xml:"ResponseMetadata"`
+}
+
+type xmlDescribeLoadBalancerAttributesResult struct {
+	Attributes []xmlAttribute `xml:"Attributes>member"`
+}
+
+func handleDescribeLoadBalancerAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("LoadBalancerArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("LoadBalancerArn is required."))
+	}
+
+	attrs, ok := store.GetLoadBalancerAttributes(arn)
+	if !ok {
+		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
+			"Load balancer '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	xmlAttrs := attrsToXML(attrs)
+
+	return xmlOK(&xmlDescribeLoadBalancerAttributesResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlDescribeLoadBalancerAttributesResult{Attributes: xmlAttrs},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
 // ---- ModifyLoadBalancerAttributes ----
 
 type xmlModifyLoadBalancerAttributesResponse struct {
-	XMLName xml.Name            `xml:"ModifyLoadBalancerAttributesResponse"`
-	Xmlns   string              `xml:"xmlns,attr"`
-	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+	XMLName xml.Name                               `xml:"ModifyLoadBalancerAttributesResponse"`
+	Xmlns   string                                 `xml:"xmlns,attr"`
+	Result  xmlModifyLoadBalancerAttributesResult   `xml:"ModifyLoadBalancerAttributesResult"`
+	Meta    xmlResponseMetadata                    `xml:"ResponseMetadata"`
+}
+
+type xmlModifyLoadBalancerAttributesResult struct {
+	Attributes []xmlAttribute `xml:"Attributes>member"`
 }
 
 func handleModifyLoadBalancerAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
@@ -181,58 +257,153 @@ func handleModifyLoadBalancerAttributes(ctx *service.RequestContext, store *Stor
 		return xmlErr(service.ErrValidation("LoadBalancerArn is required."))
 	}
 
-	if _, ok := store.GetLoadBalancer(arn); !ok {
+	attrs := parseAttributes(form)
+
+	result, ok := store.ModifyLoadBalancerAttributes(arn, attrs)
+	if !ok {
 		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
 			"Load balancer '"+arn+"' not found.", http.StatusNotFound))
 	}
 
 	return xmlOK(&xmlModifyLoadBalancerAttributesResponse{
-		Xmlns: elbXmlns,
-		Meta:  xmlResponseMetadata{RequestID: newUUID()},
+		Xmlns:  elbXmlns,
+		Result: xmlModifyLoadBalancerAttributesResult{Attributes: attrsToXML(result)},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- SetSecurityGroups ----
+
+type xmlSetSecurityGroupsResponse struct {
+	XMLName xml.Name                    `xml:"SetSecurityGroupsResponse"`
+	Xmlns   string                      `xml:"xmlns,attr"`
+	Result  xmlSetSecurityGroupsResult  `xml:"SetSecurityGroupsResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+type xmlSetSecurityGroupsResult struct {
+	SecurityGroupIds []string `xml:"SecurityGroupIds>member"`
+}
+
+func handleSetSecurityGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("LoadBalancerArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("LoadBalancerArn is required."))
+	}
+
+	sgs := parseMemberList(form, "SecurityGroups")
+
+	result, ok := store.SetSecurityGroups(arn, sgs)
+	if !ok {
+		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
+			"Load balancer '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlSetSecurityGroupsResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlSetSecurityGroupsResult{SecurityGroupIds: result},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- SetSubnets ----
+
+type xmlSetSubnetsResponse struct {
+	XMLName xml.Name             `xml:"SetSubnetsResponse"`
+	Xmlns   string               `xml:"xmlns,attr"`
+	Result  xmlSetSubnetsResult  `xml:"SetSubnetsResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
+}
+
+type xmlSetSubnetsResult struct {
+	AvailabilityZones []xmlAvailabilityZone `xml:"AvailabilityZones>member"`
+}
+
+func handleSetSubnets(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("LoadBalancerArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("LoadBalancerArn is required."))
+	}
+
+	subnets := parseMemberList(form, "Subnets")
+
+	azs, ok := store.SetSubnets(arn, subnets)
+	if !ok {
+		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
+			"Load balancer '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	xmlAZs := make([]xmlAvailabilityZone, 0, len(azs))
+	for _, az := range azs {
+		xmlAZs = append(xmlAZs, xmlAvailabilityZone{ZoneName: az.ZoneName, SubnetId: az.SubnetID})
+	}
+
+	return xmlOK(&xmlSetSubnetsResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlSetSubnetsResult{AvailabilityZones: xmlAZs},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
 // ---- TargetGroup XML types ----
 
 type xmlTargetGroup struct {
-	TargetGroupArn      string `xml:"TargetGroupArn"`
-	TargetGroupName     string `xml:"TargetGroupName"`
-	Protocol            string `xml:"Protocol"`
-	Port                int    `xml:"Port"`
-	VpcId               string `xml:"VpcId"`
-	TargetType          string `xml:"TargetType"`
-	HealthCheckEnabled  bool   `xml:"HealthCheckEnabled"`
-	HealthCheckPath     string `xml:"HealthCheckPath"`
-	HealthCheckProtocol string `xml:"HealthCheckProtocol"`
-	HealthCheckPort     string `xml:"HealthCheckPort"`
-	HealthyThreshold    int    `xml:"HealthyThresholdCount"`
-	UnhealthyThreshold  int    `xml:"UnhealthyThresholdCount"`
+	TargetGroupArn             string `xml:"TargetGroupArn"`
+	TargetGroupName            string `xml:"TargetGroupName"`
+	Protocol                   string `xml:"Protocol"`
+	ProtocolVersion            string `xml:"ProtocolVersion,omitempty"`
+	Port                       int    `xml:"Port"`
+	VpcId                      string `xml:"VpcId"`
+	TargetType                 string `xml:"TargetType"`
+	HealthCheckEnabled         bool   `xml:"HealthCheckEnabled"`
+	HealthCheckPath            string `xml:"HealthCheckPath,omitempty"`
+	HealthCheckProtocol        string `xml:"HealthCheckProtocol"`
+	HealthCheckPort            string `xml:"HealthCheckPort"`
+	HealthCheckIntervalSeconds int    `xml:"HealthCheckIntervalSeconds"`
+	HealthCheckTimeoutSeconds  int    `xml:"HealthCheckTimeoutSeconds"`
+	HealthyThreshold           int    `xml:"HealthyThresholdCount"`
+	UnhealthyThreshold         int    `xml:"UnhealthyThresholdCount"`
+	Matcher                    *xmlMatcher `xml:"Matcher,omitempty"`
+}
+
+type xmlMatcher struct {
+	HttpCode string `xml:"HttpCode"`
 }
 
 func toXMLTargetGroup(tg *TargetGroup) xmlTargetGroup {
+	var matcher *xmlMatcher
+	if tg.Matcher != "" {
+		matcher = &xmlMatcher{HttpCode: tg.Matcher}
+	}
 	return xmlTargetGroup{
-		TargetGroupArn:      tg.ARN,
-		TargetGroupName:     tg.Name,
-		Protocol:            tg.Protocol,
-		Port:                tg.Port,
-		VpcId:               tg.VpcID,
-		TargetType:          tg.TargetType,
-		HealthCheckEnabled:  tg.HealthCheckEnabled,
-		HealthCheckPath:     tg.HealthCheckPath,
-		HealthCheckProtocol: tg.HealthCheckProtocol,
-		HealthCheckPort:     tg.HealthCheckPort,
-		HealthyThreshold:    tg.HealthyThreshold,
-		UnhealthyThreshold:  tg.UnhealthyThreshold,
+		TargetGroupArn:             tg.ARN,
+		TargetGroupName:            tg.Name,
+		Protocol:                   tg.Protocol,
+		ProtocolVersion:            tg.ProtocolVersion,
+		Port:                       tg.Port,
+		VpcId:                      tg.VpcID,
+		TargetType:                 tg.TargetType,
+		HealthCheckEnabled:         tg.HealthCheckEnabled,
+		HealthCheckPath:            tg.HealthCheckPath,
+		HealthCheckProtocol:        tg.HealthCheckProtocol,
+		HealthCheckPort:            tg.HealthCheckPort,
+		HealthCheckIntervalSeconds: tg.HealthCheckIntervalSeconds,
+		HealthCheckTimeoutSeconds:  tg.HealthCheckTimeoutSeconds,
+		HealthyThreshold:           tg.HealthyThreshold,
+		UnhealthyThreshold:         tg.UnhealthyThreshold,
+		Matcher:                    matcher,
 	}
 }
 
 // ---- CreateTargetGroup ----
 
 type xmlCreateTargetGroupResponse struct {
-	XMLName xml.Name                  `xml:"CreateTargetGroupResponse"`
-	Xmlns   string                    `xml:"xmlns,attr"`
+	XMLName xml.Name                   `xml:"CreateTargetGroupResponse"`
+	Xmlns   string                     `xml:"xmlns,attr"`
 	Result  xmlCreateTargetGroupResult `xml:"CreateTargetGroupResult"`
-	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata        `xml:"ResponseMetadata"`
 }
 
 type xmlCreateTargetGroupResult struct {
@@ -255,9 +426,10 @@ func handleCreateTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 	healthPath := form.Get("HealthCheckPath")
 	healthProtocol := form.Get("HealthCheckProtocol")
 	healthPort := form.Get("HealthCheckPort")
+	tags := parseTags(form)
 
-	tg, ok := store.CreateTargetGroup(name, protocol, port, vpcID, targetType, healthPath, healthProtocol, healthPort)
-	if !ok {
+	tg, err := store.CreateTargetGroup(name, protocol, port, vpcID, targetType, healthPath, healthProtocol, healthPort, tags)
+	if err != nil {
 		return xmlErr(service.NewAWSError("DuplicateTargetGroupName",
 			"A target group with the name '"+name+"' already exists.", http.StatusBadRequest))
 	}
@@ -272,14 +444,15 @@ func handleCreateTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 // ---- DescribeTargetGroups ----
 
 type xmlDescribeTargetGroupsResponse struct {
-	XMLName xml.Name                     `xml:"DescribeTargetGroupsResponse"`
-	Xmlns   string                       `xml:"xmlns,attr"`
+	XMLName xml.Name                      `xml:"DescribeTargetGroupsResponse"`
+	Xmlns   string                        `xml:"xmlns,attr"`
 	Result  xmlDescribeTargetGroupsResult `xml:"DescribeTargetGroupsResult"`
-	Meta    xmlResponseMetadata          `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata           `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeTargetGroupsResult struct {
 	TargetGroups []xmlTargetGroup `xml:"TargetGroups>member"`
+	NextMarker   string           `xml:"NextMarker,omitempty"`
 }
 
 func handleDescribeTargetGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
@@ -287,18 +460,30 @@ func handleDescribeTargetGroups(ctx *service.RequestContext, store *Store) (*ser
 	names := parseMemberList(form, "Names")
 	arns := parseMemberList(form, "TargetGroupArns")
 	lbARN := form.Get("LoadBalancerArn")
+	marker := form.Get("Marker")
+	pageSize := parsePageSize(form)
 
 	tgs := store.ListTargetGroups(names, arns, lbARN)
 
-	xmlTGs := make([]xmlTargetGroup, 0, len(tgs))
-	for _, tg := range tgs {
+	if (len(names) > 0 || len(arns) > 0) && len(tgs) == 0 {
+		return xmlErr(service.NewAWSError("TargetGroupNotFound",
+			"One or more target groups not found.", http.StatusBadRequest))
+	}
+
+	page := pagination.Paginate(tgs, marker, pageSize, defaultPageSize)
+
+	xmlTGs := make([]xmlTargetGroup, 0, len(page.Items))
+	for _, tg := range page.Items {
 		xmlTGs = append(xmlTGs, toXMLTargetGroup(tg))
 	}
 
 	return xmlOK(&xmlDescribeTargetGroupsResponse{
-		Xmlns:  elbXmlns,
-		Result: xmlDescribeTargetGroupsResult{TargetGroups: xmlTGs},
-		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+		Xmlns: elbXmlns,
+		Result: xmlDescribeTargetGroupsResult{
+			TargetGroups: xmlTGs,
+			NextMarker:   page.NextToken,
+		},
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
@@ -317,7 +502,17 @@ func handleDeleteTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 		return xmlErr(service.ErrValidation("TargetGroupArn is required."))
 	}
 
-	if !store.DeleteTargetGroup(arn) {
+	ok, err := store.DeleteTargetGroup(arn)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "ResourceInUse" {
+			return xmlErr(service.NewAWSError("ResourceInUse",
+				"Target group '"+arn+"' is currently in use by a listener or rule.", http.StatusBadRequest))
+		}
+		return xmlErr(service.NewAWSError("TargetGroupNotFound",
+			"Target group '"+arn+"' not found.", http.StatusNotFound))
+	}
+	if !ok {
 		return xmlErr(service.NewAWSError("TargetGroupNotFound",
 			"Target group '"+arn+"' not found.", http.StatusNotFound))
 	}
@@ -331,10 +526,10 @@ func handleDeleteTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 // ---- ModifyTargetGroup ----
 
 type xmlModifyTargetGroupResponse struct {
-	XMLName xml.Name                  `xml:"ModifyTargetGroupResponse"`
-	Xmlns   string                    `xml:"xmlns,attr"`
+	XMLName xml.Name                   `xml:"ModifyTargetGroupResponse"`
+	Xmlns   string                     `xml:"xmlns,attr"`
 	Result  xmlModifyTargetGroupResult `xml:"ModifyTargetGroupResult"`
-	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata        `xml:"ResponseMetadata"`
 }
 
 type xmlModifyTargetGroupResult struct {
@@ -351,6 +546,7 @@ func handleModifyTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 	healthPath := form.Get("HealthCheckPath")
 	healthProtocol := form.Get("HealthCheckProtocol")
 	healthPort := form.Get("HealthCheckPort")
+	matcher := form.Get("Matcher.HttpCode")
 	healthyThresh := 0
 	if v := form.Get("HealthyThresholdCount"); v != "" {
 		healthyThresh, _ = strconv.Atoi(v)
@@ -359,8 +555,21 @@ func handleModifyTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 	if v := form.Get("UnhealthyThresholdCount"); v != "" {
 		unhealthyThresh, _ = strconv.Atoi(v)
 	}
+	intervalSeconds := 0
+	if v := form.Get("HealthCheckIntervalSeconds"); v != "" {
+		intervalSeconds, _ = strconv.Atoi(v)
+	}
+	timeoutSeconds := 0
+	if v := form.Get("HealthCheckTimeoutSeconds"); v != "" {
+		timeoutSeconds, _ = strconv.Atoi(v)
+	}
+	var healthCheckEnabled *bool
+	if v := form.Get("HealthCheckEnabled"); v != "" {
+		b := v == "true"
+		healthCheckEnabled = &b
+	}
 
-	tg, ok := store.ModifyTargetGroup(arn, healthPath, healthProtocol, healthPort, healthyThresh, unhealthyThresh)
+	tg, ok := store.ModifyTargetGroup(arn, healthPath, healthProtocol, healthPort, healthyThresh, unhealthyThresh, intervalSeconds, timeoutSeconds, healthCheckEnabled, matcher)
 	if !ok {
 		return xmlErr(service.NewAWSError("TargetGroupNotFound",
 			"Target group '"+arn+"' not found.", http.StatusNotFound))
@@ -369,6 +578,74 @@ func handleModifyTargetGroup(ctx *service.RequestContext, store *Store) (*servic
 	return xmlOK(&xmlModifyTargetGroupResponse{
 		Xmlns:  elbXmlns,
 		Result: xmlModifyTargetGroupResult{TargetGroups: []xmlTargetGroup{toXMLTargetGroup(tg)}},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- DescribeTargetGroupAttributes ----
+
+type xmlDescribeTargetGroupAttributesResponse struct {
+	XMLName xml.Name                                `xml:"DescribeTargetGroupAttributesResponse"`
+	Xmlns   string                                  `xml:"xmlns,attr"`
+	Result  xmlDescribeTargetGroupAttributesResult   `xml:"DescribeTargetGroupAttributesResult"`
+	Meta    xmlResponseMetadata                     `xml:"ResponseMetadata"`
+}
+
+type xmlDescribeTargetGroupAttributesResult struct {
+	Attributes []xmlAttribute `xml:"Attributes>member"`
+}
+
+func handleDescribeTargetGroupAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("TargetGroupArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("TargetGroupArn is required."))
+	}
+
+	attrs, ok := store.GetTargetGroupAttributes(arn)
+	if !ok {
+		return xmlErr(service.NewAWSError("TargetGroupNotFound",
+			"Target group '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlDescribeTargetGroupAttributesResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlDescribeTargetGroupAttributesResult{Attributes: attrsToXML(attrs)},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- ModifyTargetGroupAttributes ----
+
+type xmlModifyTargetGroupAttributesResponse struct {
+	XMLName xml.Name                              `xml:"ModifyTargetGroupAttributesResponse"`
+	Xmlns   string                                `xml:"xmlns,attr"`
+	Result  xmlModifyTargetGroupAttributesResult   `xml:"ModifyTargetGroupAttributesResult"`
+	Meta    xmlResponseMetadata                   `xml:"ResponseMetadata"`
+}
+
+type xmlModifyTargetGroupAttributesResult struct {
+	Attributes []xmlAttribute `xml:"Attributes>member"`
+}
+
+func handleModifyTargetGroupAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("TargetGroupArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("TargetGroupArn is required."))
+	}
+
+	attrs := parseAttributes(form)
+
+	result, ok := store.ModifyTargetGroupAttributes(arn, attrs)
+	if !ok {
+		return xmlErr(service.NewAWSError("TargetGroupNotFound",
+			"Target group '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlModifyTargetGroupAttributesResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlModifyTargetGroupAttributesResult{Attributes: attrsToXML(result)},
 		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
@@ -439,10 +716,10 @@ func handleDeregisterTargets(ctx *service.RequestContext, store *Store) (*servic
 // ---- DescribeTargetHealth ----
 
 type xmlDescribeTargetHealthResponse struct {
-	XMLName xml.Name                     `xml:"DescribeTargetHealthResponse"`
-	Xmlns   string                       `xml:"xmlns,attr"`
+	XMLName xml.Name                      `xml:"DescribeTargetHealthResponse"`
+	Xmlns   string                        `xml:"xmlns,attr"`
 	Result  xmlDescribeTargetHealthResult `xml:"DescribeTargetHealthResult"`
-	Meta    xmlResponseMetadata          `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata           `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeTargetHealthResult struct {
@@ -460,7 +737,9 @@ type xmlTargetDescription struct {
 }
 
 type xmlTargetHealth struct {
-	State string `xml:"State"`
+	State       string `xml:"State"`
+	Reason      string `xml:"Reason,omitempty"`
+	Description string `xml:"Description,omitempty"`
 }
 
 func handleDescribeTargetHealth(ctx *service.RequestContext, store *Store) (*service.Response, error) {
@@ -480,7 +759,7 @@ func handleDescribeTargetHealth(ctx *service.RequestContext, store *Store) (*ser
 	for _, t := range targets {
 		xmlDescs = append(xmlDescs, xmlTargetHealthDescription{
 			Target:       xmlTargetDescription{Id: t.ID, Port: t.Port},
-			TargetHealth: xmlTargetHealth{State: t.Health},
+			TargetHealth: xmlTargetHealth{State: t.Health, Reason: t.HealthReason},
 		})
 	}
 
@@ -494,12 +773,12 @@ func handleDescribeTargetHealth(ctx *service.RequestContext, store *Store) (*ser
 // ---- Listener XML types ----
 
 type xmlListener struct {
-	ListenerArn     string        `xml:"ListenerArn"`
-	LoadBalancerArn string        `xml:"LoadBalancerArn"`
-	Protocol        string        `xml:"Protocol"`
-	Port            int           `xml:"Port"`
-	SslPolicy       string        `xml:"SslPolicy,omitempty"`
-	DefaultActions  []xmlAction   `xml:"DefaultActions>member"`
+	ListenerArn     string      `xml:"ListenerArn"`
+	LoadBalancerArn string      `xml:"LoadBalancerArn"`
+	Protocol        string      `xml:"Protocol"`
+	Port            int         `xml:"Port"`
+	SslPolicy       string      `xml:"SslPolicy,omitempty"`
+	DefaultActions  []xmlAction `xml:"DefaultActions>member"`
 }
 
 type xmlAction struct {
@@ -530,10 +809,10 @@ func toXMLListener(l *Listener) xmlListener {
 // ---- CreateListener ----
 
 type xmlCreateListenerResponse struct {
-	XMLName xml.Name               `xml:"CreateListenerResponse"`
-	Xmlns   string                 `xml:"xmlns,attr"`
+	XMLName xml.Name                `xml:"CreateListenerResponse"`
+	Xmlns   string                  `xml:"xmlns,attr"`
 	Result  xmlCreateListenerResult `xml:"CreateListenerResult"`
-	Meta    xmlResponseMetadata    `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata     `xml:"ResponseMetadata"`
 }
 
 type xmlCreateListenerResult struct {
@@ -556,11 +835,17 @@ func handleCreateListener(ctx *service.RequestContext, store *Store) (*service.R
 	}
 	sslPolicy := form.Get("SslPolicy")
 	certARN := form.Get("Certificates.member.1.CertificateArn")
+	tags := parseTags(form)
 
 	actions := parseActions(form)
 
-	l, ok := store.CreateListener(lbARN, protocol, port, actions, sslPolicy, certARN)
-	if !ok {
+	l, err := store.CreateListener(lbARN, protocol, port, actions, sslPolicy, certARN, tags)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "DuplicateListener" {
+			return xmlErr(service.NewAWSError("DuplicateListener",
+				"A listener already exists on port "+strconv.Itoa(port)+" for load balancer '"+lbARN+"'.", http.StatusBadRequest))
+		}
 		return xmlErr(service.NewAWSError("LoadBalancerNotFound",
 			"Load balancer '"+lbARN+"' not found.", http.StatusNotFound))
 	}
@@ -575,31 +860,40 @@ func handleCreateListener(ctx *service.RequestContext, store *Store) (*service.R
 // ---- DescribeListeners ----
 
 type xmlDescribeListenersResponse struct {
-	XMLName xml.Name                  `xml:"DescribeListenersResponse"`
-	Xmlns   string                    `xml:"xmlns,attr"`
+	XMLName xml.Name                   `xml:"DescribeListenersResponse"`
+	Xmlns   string                     `xml:"xmlns,attr"`
 	Result  xmlDescribeListenersResult `xml:"DescribeListenersResult"`
-	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata        `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeListenersResult struct {
-	Listeners []xmlListener `xml:"Listeners>member"`
+	Listeners  []xmlListener `xml:"Listeners>member"`
+	NextMarker string        `xml:"NextMarker,omitempty"`
 }
 
 func handleDescribeListeners(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	form := parseForm(ctx)
 	lbARN := form.Get("LoadBalancerArn")
+	listenerARNs := parseMemberList(form, "ListenerArns")
+	marker := form.Get("Marker")
+	pageSize := parsePageSize(form)
 
-	listeners := store.ListListeners(lbARN)
+	listeners := store.ListListeners(lbARN, listenerARNs)
 
-	xmlListeners := make([]xmlListener, 0, len(listeners))
-	for _, l := range listeners {
+	page := pagination.Paginate(listeners, marker, pageSize, defaultPageSize)
+
+	xmlListeners := make([]xmlListener, 0, len(page.Items))
+	for _, l := range page.Items {
 		xmlListeners = append(xmlListeners, toXMLListener(l))
 	}
 
 	return xmlOK(&xmlDescribeListenersResponse{
-		Xmlns:  elbXmlns,
-		Result: xmlDescribeListenersResult{Listeners: xmlListeners},
-		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+		Xmlns: elbXmlns,
+		Result: xmlDescribeListenersResult{
+			Listeners:  xmlListeners,
+			NextMarker: page.NextToken,
+		},
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
@@ -632,10 +926,10 @@ func handleDeleteListener(ctx *service.RequestContext, store *Store) (*service.R
 // ---- ModifyListener ----
 
 type xmlModifyListenerResponse struct {
-	XMLName xml.Name               `xml:"ModifyListenerResponse"`
-	Xmlns   string                 `xml:"xmlns,attr"`
+	XMLName xml.Name                `xml:"ModifyListenerResponse"`
+	Xmlns   string                  `xml:"xmlns,attr"`
 	Result  xmlModifyListenerResult `xml:"ModifyListenerResult"`
-	Meta    xmlResponseMetadata    `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata     `xml:"ResponseMetadata"`
 }
 
 type xmlModifyListenerResult struct {
@@ -707,8 +1001,8 @@ func toXMLRule(r *Rule) xmlRule {
 // ---- CreateRule ----
 
 type xmlCreateRuleResponse struct {
-	XMLName xml.Name           `xml:"CreateRuleResponse"`
-	Xmlns   string             `xml:"xmlns,attr"`
+	XMLName xml.Name            `xml:"CreateRuleResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
 	Result  xmlCreateRuleResult `xml:"CreateRuleResult"`
 	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
@@ -730,9 +1024,15 @@ func handleCreateRule(ctx *service.RequestContext, store *Store) (*service.Respo
 
 	conditions := parseConditions(form)
 	actions := parseActions(form)
+	tags := parseTags(form)
 
-	r, ok := store.CreateRule(listenerARN, priority, conditions, actions)
-	if !ok {
+	r, err := store.CreateRule(listenerARN, priority, conditions, actions, tags)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "PriorityInUse" {
+			return xmlErr(service.NewAWSError("PriorityInUse",
+				"Priority '"+priority+"' is already in use.", http.StatusBadRequest))
+		}
 		return xmlErr(service.NewAWSError("ListenerNotFound",
 			"Listener '"+listenerARN+"' not found.", http.StatusNotFound))
 	}
@@ -747,31 +1047,40 @@ func handleCreateRule(ctx *service.RequestContext, store *Store) (*service.Respo
 // ---- DescribeRules ----
 
 type xmlDescribeRulesResponse struct {
-	XMLName xml.Name              `xml:"DescribeRulesResponse"`
-	Xmlns   string                `xml:"xmlns,attr"`
+	XMLName xml.Name               `xml:"DescribeRulesResponse"`
+	Xmlns   string                 `xml:"xmlns,attr"`
 	Result  xmlDescribeRulesResult `xml:"DescribeRulesResult"`
-	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata    `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeRulesResult struct {
-	Rules []xmlRule `xml:"Rules>member"`
+	Rules      []xmlRule `xml:"Rules>member"`
+	NextMarker string    `xml:"NextMarker,omitempty"`
 }
 
 func handleDescribeRules(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	form := parseForm(ctx)
 	listenerARN := form.Get("ListenerArn")
+	ruleARNs := parseMemberList(form, "RuleArns")
+	marker := form.Get("Marker")
+	pageSize := parsePageSize(form)
 
-	rules := store.ListRules(listenerARN)
+	rules := store.ListRules(listenerARN, ruleARNs)
 
-	xmlRules := make([]xmlRule, 0, len(rules))
-	for _, r := range rules {
+	page := pagination.Paginate(rules, marker, pageSize, defaultPageSize)
+
+	xmlRules := make([]xmlRule, 0, len(page.Items))
+	for _, r := range page.Items {
 		xmlRules = append(xmlRules, toXMLRule(r))
 	}
 
 	return xmlOK(&xmlDescribeRulesResponse{
-		Xmlns:  elbXmlns,
-		Result: xmlDescribeRulesResult{Rules: xmlRules},
-		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+		Xmlns: elbXmlns,
+		Result: xmlDescribeRulesResult{
+			Rules:      xmlRules,
+			NextMarker: page.NextToken,
+		},
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
@@ -790,7 +1099,17 @@ func handleDeleteRule(ctx *service.RequestContext, store *Store) (*service.Respo
 		return xmlErr(service.ErrValidation("RuleArn is required."))
 	}
 
-	if !store.DeleteRule(arn) {
+	ok, err := store.DeleteRule(arn)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "OperationNotPermitted" {
+			return xmlErr(service.NewAWSError("OperationNotPermitted",
+				"Default rules cannot be deleted.", http.StatusBadRequest))
+		}
+		return xmlErr(service.NewAWSError("RuleNotFound",
+			"Rule '"+arn+"' not found.", http.StatusNotFound))
+	}
+	if !ok {
 		return xmlErr(service.NewAWSError("RuleNotFound",
 			"Rule '"+arn+"' not found.", http.StatusNotFound))
 	}
@@ -798,6 +1117,91 @@ func handleDeleteRule(ctx *service.RequestContext, store *Store) (*service.Respo
 	return xmlOK(&xmlDeleteRuleResponse{
 		Xmlns: elbXmlns,
 		Meta:  xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- ModifyRule ----
+
+type xmlModifyRuleResponse struct {
+	XMLName xml.Name            `xml:"ModifyRuleResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Result  xmlModifyRuleResult `xml:"ModifyRuleResult"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+type xmlModifyRuleResult struct {
+	Rules []xmlRule `xml:"Rules>member"`
+}
+
+func handleModifyRule(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	arn := form.Get("RuleArn")
+	if arn == "" {
+		return xmlErr(service.ErrValidation("RuleArn is required."))
+	}
+
+	conditions := parseConditions(form)
+	actions := parseActions(form)
+
+	r, ok := store.ModifyRule(arn, conditions, actions)
+	if !ok {
+		return xmlErr(service.NewAWSError("RuleNotFound",
+			"Rule '"+arn+"' not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlModifyRuleResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlModifyRuleResult{Rules: []xmlRule{toXMLRule(r)}},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- SetRulePriorities ----
+
+type xmlSetRulePrioritiesResponse struct {
+	XMLName xml.Name                   `xml:"SetRulePrioritiesResponse"`
+	Xmlns   string                     `xml:"xmlns,attr"`
+	Result  xmlSetRulePrioritiesResult `xml:"SetRulePrioritiesResult"`
+	Meta    xmlResponseMetadata        `xml:"ResponseMetadata"`
+}
+
+type xmlSetRulePrioritiesResult struct {
+	Rules []xmlRule `xml:"Rules>member"`
+}
+
+func handleSetRulePriorities(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+
+	priorities := make(map[string]string)
+	for i := 1; ; i++ {
+		ruleARN := form.Get(fmt.Sprintf("RulePriorities.member.%d.RuleArn", i))
+		if ruleARN == "" {
+			break
+		}
+		priority := form.Get(fmt.Sprintf("RulePriorities.member.%d.Priority", i))
+		priorities[ruleARN] = priority
+	}
+
+	rules, err := store.SetRulePriorities(priorities)
+	if err != nil {
+		errMsg := err.Error()
+		if errMsg == "OperationNotPermitted" {
+			return xmlErr(service.NewAWSError("OperationNotPermitted",
+				"Cannot set priority of default rule.", http.StatusBadRequest))
+		}
+		return xmlErr(service.NewAWSError("RuleNotFound",
+			"One or more rules not found.", http.StatusNotFound))
+	}
+
+	xmlRules := make([]xmlRule, 0, len(rules))
+	for _, r := range rules {
+		xmlRules = append(xmlRules, toXMLRule(r))
+	}
+
+	return xmlOK(&xmlSetRulePrioritiesResponse{
+		Xmlns:  elbXmlns,
+		Result: xmlSetRulePrioritiesResult{Rules: xmlRules},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 
@@ -815,7 +1219,10 @@ func handleAddTags(ctx *service.RequestContext, store *Store) (*service.Response
 	tags := parseTags(form)
 
 	for _, arn := range arns {
-		store.AddTags(arn, tags)
+		if !store.AddTags(arn, tags) {
+			return xmlErr(service.NewAWSError("LoadBalancerNotFound",
+				"Resource '"+arn+"' not found.", http.StatusNotFound))
+		}
 	}
 
 	return xmlOK(&xmlAddTagsResponse{
@@ -850,10 +1257,10 @@ func handleRemoveTags(ctx *service.RequestContext, store *Store) (*service.Respo
 // ---- DescribeTagsForResource ----
 
 type xmlDescribeTagsResponse struct {
-	XMLName xml.Name             `xml:"DescribeTagsResponse"`
-	Xmlns   string               `xml:"xmlns,attr"`
+	XMLName xml.Name              `xml:"DescribeTagsResponse"`
+	Xmlns   string                `xml:"xmlns,attr"`
 	Result  xmlDescribeTagsResult `xml:"DescribeTagsResult"`
-	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
+	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
 }
 
 type xmlDescribeTagsResult struct {
@@ -931,7 +1338,8 @@ func parseTargets(form url.Values) []Target {
 		if p := form.Get(fmt.Sprintf("Targets.member.%d.Port", i)); p != "" {
 			port, _ = strconv.Atoi(p)
 		}
-		targets = append(targets, Target{ID: id, Port: port})
+		az := form.Get(fmt.Sprintf("Targets.member.%d.AvailabilityZone", i))
+		targets = append(targets, Target{ID: id, Port: port, AvailabilityZone: az})
 	}
 	return targets
 }
@@ -953,6 +1361,8 @@ func parseActions(form url.Values) []Action {
 		}
 		order := i
 		if o := form.Get(fmt.Sprintf("DefaultActions.member.%d.Order", i)); o != "" {
+			order, _ = strconv.Atoi(o)
+		} else if o := form.Get(fmt.Sprintf("Actions.member.%d.Order", i)); o != "" {
 			order, _ = strconv.Atoi(o)
 		}
 		actions = append(actions, Action{Type: aType, TargetGroupARN: tgARN, Order: order})
@@ -1003,6 +1413,36 @@ func parseTagKeys(form url.Values) []string {
 		keys = append(keys, k)
 	}
 	return keys
+}
+
+func parseAttributes(form url.Values) map[string]string {
+	attrs := make(map[string]string)
+	for i := 1; ; i++ {
+		key := form.Get(fmt.Sprintf("Attributes.member.%d.Key", i))
+		if key == "" {
+			break
+		}
+		val := form.Get(fmt.Sprintf("Attributes.member.%d.Value", i))
+		attrs[key] = val
+	}
+	return attrs
+}
+
+func parsePageSize(form url.Values) int {
+	if v := form.Get("PageSize"); v != "" {
+		n, _ := strconv.Atoi(v)
+		return n
+	}
+	return 0
+}
+
+func attrsToXML(attrs map[string]string) []xmlAttribute {
+	result := make([]xmlAttribute, 0, len(attrs))
+	for k, v := range attrs {
+		result = append(result, xmlAttribute{Key: k, Value: v})
+	}
+	sort.Slice(result, func(i, j int) bool { return result[i].Key < result[j].Key })
+	return result
 }
 
 func xmlOK(body any) (*service.Response, error) {

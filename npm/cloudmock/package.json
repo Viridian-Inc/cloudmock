@@ -1,7 +1,7 @@
 {
   "name": "cloudmock",
-  "version": "1.0.0",
-  "description": "Local AWS emulation. 25 services. One command.",
+  "version": "1.0.2",
+  "description": "Local AWS emulation. 98 services. One command.",
   "bin": {
     "cloudmock": "bin/cloudmock.mjs"
   },
@@ -11,7 +11,7 @@
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/neureaux/cloudmock"
+    "url": "https://github.com/Viridian-Inc/cloudmock"
   },
   "keywords": [
     "aws",

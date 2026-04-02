@@ -73,7 +73,7 @@ Both settings are persisted to localStorage and applied immediately.
 
 The Account tab shows a summary of your connection and dashboard state:
 
-- **Connection Mode** -- Shows "Local Development" for localhost connections or "cloudmock.dev" for cloud-hosted instances.
+- **Connection Mode** -- Shows "Local Development" for localhost connections or "cloudmock.app" for cloud-hosted instances.
 - **Authentication** -- In local mode, no authentication is required. Cloud connections show organization, region, and IAM mode.
 - **Dashboard Preferences** -- Summary of total dashboards (presets + custom), favorites count, and hidden count.
 - **Reset Dashboard Preferences** -- Clears all favorites and hidden dashboard settings.

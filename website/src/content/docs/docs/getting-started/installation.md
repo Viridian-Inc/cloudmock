@@ -63,7 +63,7 @@ Then `docker compose up -d`.
 ## Shell installer (macOS / Linux)
 
 ```bash
-curl -fsSL https://cloudmock.dev/install.sh | bash
+curl -fsSL https://cloudmock.app/install.sh | bash
 cloudmock start
 ```
 

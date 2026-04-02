@@ -2,7 +2,7 @@ import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
 export default defineConfig({
-  site: "https://cloudmock.dev",
+  site: "https://cloudmock.app",
   integrations: [
     starlight({
       title: "CloudMock",

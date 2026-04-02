@@ -18,11 +18,16 @@ CloudMock emulates AWS CodeArtifact, supporting domain and repository management
 | CreateRepository | Supported | Creates a repository |
 | DescribeRepository | Supported | Returns repository details |
 | ListRepositories | Supported | Lists all repositories |
+| UpdateRepository | Supported | Updates repository description and upstreams |
 | DeleteRepository | Supported | Deletes a repository |
 | DescribePackage | Supported | Returns package details |
 | ListPackages | Supported | Lists packages in a repository |
 | ListPackageVersions | Supported | Lists versions of a package |
 | DescribePackageVersion | Supported | Returns package version details |
+| GetPackageVersionReadme | Supported | Returns a generated README for a package version |
+| PutDomainPermissionsPolicy | Supported | Sets the resource policy for a domain |
+| GetDomainPermissionsPolicy | Supported | Returns the resource policy for a domain |
+| DeleteDomainPermissionsPolicy | Supported | Deletes the resource policy for a domain |
 | GetRepositoryEndpoint | Supported | Returns the repository endpoint URL |
 | GetAuthorizationToken | Supported | Returns a stub authorization token |
 | TagResource | Supported | Adds tags to a resource |

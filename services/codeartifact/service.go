@@ -51,12 +51,18 @@ func (s *CodeArtifactService) Actions() []service.Action {
 		{Name: "CreateRepository", Method: http.MethodPost, IAMAction: "codeartifact:CreateRepository"},
 		{Name: "DescribeRepository", Method: http.MethodPost, IAMAction: "codeartifact:DescribeRepository"},
 		{Name: "ListRepositories", Method: http.MethodPost, IAMAction: "codeartifact:ListRepositories"},
+		{Name: "UpdateRepository", Method: http.MethodPost, IAMAction: "codeartifact:UpdateRepository"},
 		{Name: "DeleteRepository", Method: http.MethodPost, IAMAction: "codeartifact:DeleteRepository"},
 		// Packages
 		{Name: "DescribePackage", Method: http.MethodPost, IAMAction: "codeartifact:DescribePackage"},
 		{Name: "ListPackages", Method: http.MethodPost, IAMAction: "codeartifact:ListPackages"},
 		{Name: "ListPackageVersions", Method: http.MethodPost, IAMAction: "codeartifact:ListPackageVersions"},
 		{Name: "DescribePackageVersion", Method: http.MethodPost, IAMAction: "codeartifact:DescribePackageVersion"},
+		{Name: "GetPackageVersionReadme", Method: http.MethodPost, IAMAction: "codeartifact:GetPackageVersionReadme"},
+		// Domain Permissions
+		{Name: "PutDomainPermissionsPolicy", Method: http.MethodPost, IAMAction: "codeartifact:PutDomainPermissionsPolicy"},
+		{Name: "GetDomainPermissionsPolicy", Method: http.MethodPost, IAMAction: "codeartifact:GetDomainPermissionsPolicy"},
+		{Name: "DeleteDomainPermissionsPolicy", Method: http.MethodPost, IAMAction: "codeartifact:DeleteDomainPermissionsPolicy"},
 		// Endpoints & Auth
 		{Name: "GetRepositoryEndpoint", Method: http.MethodPost, IAMAction: "codeartifact:GetRepositoryEndpoint"},
 		{Name: "GetAuthorizationToken", Method: http.MethodPost, IAMAction: "codeartifact:GetAuthorizationToken"},
@@ -69,6 +75,9 @@ func (s *CodeArtifactService) Actions() []service.Action {
 
 // HealthCheck always returns nil.
 func (s *CodeArtifactService) HealthCheck() error { return nil }
+
+// Store returns the underlying store (for testing).
+func (s *CodeArtifactService) Store() *Store { return s.store }
 
 // HandleRequest routes an incoming CodeArtifact request to the appropriate handler.
 func (s *CodeArtifactService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
@@ -89,6 +98,8 @@ func (s *CodeArtifactService) HandleRequest(ctx *service.RequestContext) (*servi
 		return handleDescribeRepository(ctx, s.store)
 	case "ListRepositories":
 		return handleListRepositories(ctx, s.store)
+	case "UpdateRepository":
+		return handleUpdateRepository(ctx, s.store)
 	case "DeleteRepository":
 		return handleDeleteRepository(ctx, s.store)
 	// Packages
@@ -100,6 +111,15 @@ func (s *CodeArtifactService) HandleRequest(ctx *service.RequestContext) (*servi
 		return handleListPackageVersions(ctx, s.store)
 	case "DescribePackageVersion":
 		return handleDescribePackageVersion(ctx, s.store)
+	case "GetPackageVersionReadme":
+		return handleGetPackageVersionReadme(ctx, s.store)
+	// Domain Permissions
+	case "PutDomainPermissionsPolicy":
+		return handlePutDomainPermissionsPolicy(ctx, s.store)
+	case "GetDomainPermissionsPolicy":
+		return handleGetDomainPermissionsPolicy(ctx, s.store)
+	case "DeleteDomainPermissionsPolicy":
+		return handleDeleteDomainPermissionsPolicy(ctx, s.store)
 	// Endpoints & Auth
 	case "GetRepositoryEndpoint":
 		return handleGetRepositoryEndpoint(ctx, s.store)

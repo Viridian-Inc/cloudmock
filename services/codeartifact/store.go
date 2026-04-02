@@ -94,28 +94,36 @@ type PackageVersion struct {
 	PublishedTime time.Time
 }
 
+// DomainPermissionsPolicy holds the resource policy for a domain.
+type DomainPermissionsPolicy struct {
+	Document  string
+	Revision  string
+}
+
 // Store is the in-memory store for all CodeArtifact resources.
 type Store struct {
-	mu           sync.RWMutex
-	accountID    string
-	region       string
-	domains      map[string]*Domain
-	repositories map[string]map[string]*Repository // domainName -> repoName -> Repository
-	packages     map[string]map[string]*Package    // domainName/repoName -> format/namespace/name -> Package
-	versions     map[string][]*PackageVersion      // domainName/repoName/packageID -> versions
-	tags         map[string]map[string]string
+	mu               sync.RWMutex
+	accountID        string
+	region           string
+	domains          map[string]*Domain
+	repositories     map[string]map[string]*Repository // domainName -> repoName -> Repository
+	packages         map[string]map[string]*Package    // domainName/repoName -> format/namespace/name -> Package
+	versions         map[string][]*PackageVersion      // domainName/repoName/packageID -> versions
+	domainPolicies   map[string]*DomainPermissionsPolicy // domainName -> policy
+	tags             map[string]map[string]string
 }
 
 // NewStore creates an empty CodeArtifact store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		accountID:    accountID,
-		region:       region,
-		domains:      make(map[string]*Domain),
-		repositories: make(map[string]map[string]*Repository),
-		packages:     make(map[string]map[string]*Package),
-		versions:     make(map[string][]*PackageVersion),
-		tags:         make(map[string]map[string]string),
+		accountID:      accountID,
+		region:         region,
+		domains:        make(map[string]*Domain),
+		repositories:   make(map[string]map[string]*Repository),
+		packages:       make(map[string]map[string]*Package),
+		versions:       make(map[string][]*PackageVersion),
+		domainPolicies: make(map[string]*DomainPermissionsPolicy),
+		tags:           make(map[string]map[string]string),
 	}
 }
 
@@ -304,6 +312,30 @@ func (s *Store) ListRepositories(domainName string) []*Repository {
 	return result
 }
 
+func (s *Store) UpdateRepository(domainName, repoName, description string, upstreams []UpstreamRepo) (*Repository, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	repos := s.repositories[domainName]
+	if repos == nil {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Repository not found: %s/%s", domainName, repoName), http.StatusNotFound)
+	}
+	repo, ok := repos[repoName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Repository not found: %s/%s", domainName, repoName), http.StatusNotFound)
+	}
+
+	if description != "" {
+		repo.Description = description
+	}
+	if upstreams != nil {
+		repo.Upstreams = upstreams
+	}
+	return repo, nil
+}
+
 func (s *Store) DeleteRepository(domainName, repoName string) (*Repository, *service.AWSError) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -436,6 +468,77 @@ func (s *Store) EnsurePackage(domainName, repoName, format, namespace, pkgName, 
 		Revision:      newUUID(),
 		PublishedTime: time.Now().UTC(),
 	})
+}
+
+// ---- Domain Permissions Policy ----
+
+func (s *Store) PutDomainPermissionsPolicy(domainName, document string) (*DomainPermissionsPolicy, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.domains[domainName]; !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Domain not found: %s", domainName), http.StatusNotFound)
+	}
+	if document == "" {
+		return nil, service.ErrValidation("Policy document is required.")
+	}
+
+	policy := &DomainPermissionsPolicy{
+		Document: document,
+		Revision: newUUID()[:8],
+	}
+	s.domainPolicies[domainName] = policy
+	return policy, nil
+}
+
+func (s *Store) GetDomainPermissionsPolicy(domainName string) (*DomainPermissionsPolicy, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	if _, ok := s.domains[domainName]; !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Domain not found: %s", domainName), http.StatusNotFound)
+	}
+
+	policy, ok := s.domainPolicies[domainName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			"No permissions policy found for domain.", http.StatusNotFound)
+	}
+	return policy, nil
+}
+
+func (s *Store) DeleteDomainPermissionsPolicy(domainName string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, ok := s.domains[domainName]; !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Domain not found: %s", domainName), http.StatusNotFound)
+	}
+	delete(s.domainPolicies, domainName)
+	return nil
+}
+
+// GetPackageVersionReadme returns a synthetic README for a package version.
+func (s *Store) GetPackageVersionReadme(domainName, repoName, format, namespace, pkgName, version string) (string, string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	key := packageKey(domainName, repoName)
+	pid := packageID(format, namespace, pkgName)
+	vKey := key + "/" + pid
+
+	versions := s.versions[vKey]
+	for _, v := range versions {
+		if v.Version == version {
+			readme := fmt.Sprintf("# %s\n\nVersion %s\n\nThis is a generated README for CloudMock.", pkgName, version)
+			return readme, v.Version, nil
+		}
+	}
+	return "", "", service.NewAWSError("ResourceNotFoundException",
+		fmt.Sprintf("Package version not found: %s@%s", pkgName, version), http.StatusNotFound)
 }
 
 // ---- Endpoint & Auth ----

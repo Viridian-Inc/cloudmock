@@ -478,6 +478,170 @@ func TestTagResourceMissingArn(t *testing.T) {
 	assert.Contains(t, err.Error(), "ValidationError")
 }
 
+// --- UpdateRepository ---
+
+func TestUpdateRepository(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "upd-domain")
+	createRepo(t, s, "upd-domain", "upd-repo")
+
+	ctx := jsonCtx("UpdateRepository", map[string]any{
+		"domain":      "upd-domain",
+		"repository":  "upd-repo",
+		"description": "Updated description",
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	repo := body["repository"].(map[string]any)
+	assert.Equal(t, "Updated description", repo["description"])
+}
+
+func TestUpdateRepositoryWithUpstreams(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "updups-domain")
+	createRepo(t, s, "updups-domain", "upstream-repo")
+	createRepo(t, s, "updups-domain", "downstream-repo")
+
+	ctx := jsonCtx("UpdateRepository", map[string]any{
+		"domain":     "updups-domain",
+		"repository": "downstream-repo",
+		"upstreams":  []any{map[string]any{"repositoryName": "upstream-repo"}},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	repo := body["repository"].(map[string]any)
+	upstreams := repo["upstreams"].([]any)
+	assert.Len(t, upstreams, 1)
+}
+
+func TestUpdateRepositoryNotFound(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "updnf-domain")
+	ctx := jsonCtx("UpdateRepository", map[string]any{
+		"domain":     "updnf-domain",
+		"repository": "nope",
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+// --- Domain Permissions Policy ---
+
+func TestPutAndGetDomainPermissionsPolicy(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "policy-domain")
+
+	doc := `{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":"*","Action":"codeartifact:*"}]}`
+	ctx := jsonCtx("PutDomainPermissionsPolicy", map[string]any{
+		"domain":         "policy-domain",
+		"policyDocument": doc,
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	policy := body["policy"].(map[string]any)
+	assert.Equal(t, doc, policy["document"])
+	assert.NotEmpty(t, policy["revision"])
+
+	ctx2 := jsonCtx("GetDomainPermissionsPolicy", map[string]any{"domain": "policy-domain"})
+	resp2, err2 := s.HandleRequest(ctx2)
+	require.NoError(t, err2)
+	body2 := respBody(t, resp2)
+	assert.Equal(t, doc, body2["policy"].(map[string]any)["document"])
+}
+
+func TestGetDomainPermissionsPolicyNotSet(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "nopolicy-domain")
+	ctx := jsonCtx("GetDomainPermissionsPolicy", map[string]any{"domain": "nopolicy-domain"})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestDeleteDomainPermissionsPolicy(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "delpolicy-domain")
+
+	s.HandleRequest(jsonCtx("PutDomainPermissionsPolicy", map[string]any{
+		"domain":         "delpolicy-domain",
+		"policyDocument": `{"Version":"2012-10-17"}`,
+	}))
+
+	ctx := jsonCtx("DeleteDomainPermissionsPolicy", map[string]any{"domain": "delpolicy-domain"})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	_, err2 := s.HandleRequest(jsonCtx("GetDomainPermissionsPolicy", map[string]any{"domain": "delpolicy-domain"}))
+	require.Error(t, err2)
+}
+
+func TestPutDomainPermissionsPolicyDomainNotFound(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("PutDomainPermissionsPolicy", map[string]any{
+		"domain":         "nope",
+		"policyDocument": `{}`,
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
+func TestPutDomainPermissionsPolicyMissingDocument(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "nodoc-domain")
+	ctx := jsonCtx("PutDomainPermissionsPolicy", map[string]any{"domain": "nodoc-domain"})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+// --- GetPackageVersionReadme ---
+
+func TestGetPackageVersionReadme(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "readme-domain")
+	createRepo(t, s, "readme-domain", "readme-repo")
+
+	// Ensure a package version exists
+	store := s.Store()
+	store.EnsurePackage("readme-domain", "readme-repo", "npm", "", "my-pkg", "1.0.0")
+
+	ctx := jsonCtx("GetPackageVersionReadme", map[string]any{
+		"domain":         "readme-domain",
+		"repository":     "readme-repo",
+		"format":         "npm",
+		"package":        "my-pkg",
+		"packageVersion": "1.0.0",
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.Contains(t, body["readme"].(string), "my-pkg")
+	assert.Equal(t, "1.0.0", body["version"])
+}
+
+func TestGetPackageVersionReadmeNotFound(t *testing.T) {
+	s := newService()
+	createDomain(t, s, "readme2-domain")
+	createRepo(t, s, "readme2-domain", "readme2-repo")
+
+	ctx := jsonCtx("GetPackageVersionReadme", map[string]any{
+		"domain":         "readme2-domain",
+		"repository":     "readme2-repo",
+		"format":         "npm",
+		"package":        "nonexistent",
+		"packageVersion": "1.0.0",
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ResourceNotFoundException")
+}
+
 // --- Invalid Action ---
 
 func TestInvalidAction(t *testing.T) {

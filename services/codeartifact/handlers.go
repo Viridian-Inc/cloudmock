@@ -220,6 +220,34 @@ func handleListRepositories(ctx *service.RequestContext, store *Store) (*service
 	return jsonOK(map[string]any{"repositories": result})
 }
 
+func handleUpdateRepository(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	domainName := getParam(ctx, req, "domain")
+	repoName := getParam(ctx, req, "repository")
+	description := getStr(req, "description")
+
+	var upstreams []UpstreamRepo
+	if ups, ok := req["upstreams"].([]any); ok {
+		for _, u := range ups {
+			if um, ok := u.(map[string]any); ok {
+				upstreams = append(upstreams, UpstreamRepo{
+					RepositoryName: getStr(um, "repositoryName"),
+				})
+			}
+		}
+	}
+
+	repo, awsErr := store.UpdateRepository(domainName, repoName, description, upstreams)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"repository": repoToMap(repo)})
+}
+
 func handleDeleteRepository(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
@@ -336,6 +364,88 @@ func handleDescribePackageVersion(ctx *service.RequestContext, store *Store) (*s
 			"publishedTime": float64(v.PublishedTime.Unix()),
 		},
 	})
+}
+
+func handleGetPackageVersionReadme(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	domainName := getParam(ctx, req, "domain")
+	repoName := getParam(ctx, req, "repository")
+	format := getParam(ctx, req, "format")
+	namespace := getParam(ctx, req, "namespace")
+	pkgName := getParam(ctx, req, "package")
+	version := getParam(ctx, req, "packageVersion")
+
+	readme, resolvedVersion, awsErr := store.GetPackageVersionReadme(domainName, repoName, format, namespace, pkgName, version)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"format":         format,
+		"namespace":      namespace,
+		"package":        pkgName,
+		"version":        resolvedVersion,
+		"versionRevision": "",
+		"readme":         readme,
+	})
+}
+
+// ---- Domain Permissions Policy handlers ----
+
+func handlePutDomainPermissionsPolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	domainName := getParam(ctx, req, "domain")
+	document := getStr(req, "policyDocument")
+
+	policy, awsErr := store.PutDomainPermissionsPolicy(domainName, document)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"policy": map[string]any{
+			"document": policy.Document,
+			"revision": policy.Revision,
+		},
+	})
+}
+
+func handleGetDomainPermissionsPolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	domainName := getParam(ctx, req, "domain")
+	policy, awsErr := store.GetDomainPermissionsPolicy(domainName)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{
+		"policy": map[string]any{
+			"document": policy.Document,
+			"revision": policy.Revision,
+		},
+	})
+}
+
+func handleDeleteDomainPermissionsPolicy(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	domainName := getParam(ctx, req, "domain")
+	if awsErr := store.DeleteDomainPermissionsPolicy(domainName); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
 }
 
 // ---- Endpoint & Auth handlers ----

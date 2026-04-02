@@ -104,13 +104,18 @@ func New(opts ...Option) *CloudMock {
 	}
 	gw.SetEventBus(bus)
 
-	transport := &inProcessTransport{handler: gw}
+	transport := newInProcessTransport(gw)
 
 	// Build the aws.Config that the caller will pass to SDK clients.
+	// Static credentials avoid per-call credential resolution and keep the
+	// Authorization header needed for service routing. RetryMaxAttempts=1
+	// disables the retry middleware, which otherwise clones the full
+	// *http.Request per attempt.
 	awsConfig, err := awscfg.LoadDefaultConfig(context.Background(),
 		awscfg.WithRegion(o.region),
 		awscfg.WithCredentialsProvider(credentials.NewStaticCredentialsProvider("test", "test", "")),
 		awscfg.WithHTTPClient(&http.Client{Transport: transport}),
+		awscfg.WithRetryMaxAttempts(1),
 	)
 	if err != nil {
 		// Should never happen with static config, but don't swallow it.

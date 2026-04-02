@@ -139,6 +139,42 @@ type LifecycleEvent struct {
 	EndTime            *time.Time
 }
 
+// DeploymentConfig represents a CodeDeploy deployment configuration.
+type DeploymentConfig struct {
+	Name            string
+	ARN             string
+	ComputePlatform string
+	MinimumHealthyHosts *MinimumHealthyHosts
+	TrafficRoutingConfig *TrafficRoutingConfig
+	CreatedAt       time.Time
+	IsBuiltIn       bool
+}
+
+// MinimumHealthyHosts specifies the minimum number of healthy instances.
+type MinimumHealthyHosts struct {
+	Type  string
+	Value int
+}
+
+// TrafficRoutingConfig specifies traffic routing for a deployment.
+type TrafficRoutingConfig struct {
+	Type              string
+	TimeBasedCanary   *TimeBasedCanary
+	TimeBasedLinear   *TimeBasedLinear
+}
+
+// TimeBasedCanary specifies canary deployment config.
+type TimeBasedCanary struct {
+	CanaryPercentage int
+	CanaryInterval   int
+}
+
+// TimeBasedLinear specifies linear deployment config.
+type TimeBasedLinear struct {
+	LinearPercentage int
+	LinearInterval   int
+}
+
 // Store is the in-memory store for all CodeDeploy resources.
 type Store struct {
 	mu               sync.RWMutex
@@ -147,21 +183,41 @@ type Store struct {
 	applications     map[string]*Application
 	deploymentGroups map[string]map[string]*DeploymentGroup // appName -> groupName -> group
 	deployments      map[string]*Deployment                 // deploymentID -> deployment
+	deploymentConfigs map[string]*DeploymentConfig          // configName -> config
 	tags             map[string]map[string]string
 	lcConfig         *lifecycle.Config
 }
 
-// NewStore creates an empty CodeDeploy store.
+// NewStore creates an empty CodeDeploy store with built-in configs.
 func NewStore(accountID, region string) *Store {
-	return &Store{
-		accountID:        accountID,
-		region:           region,
-		applications:     make(map[string]*Application),
-		deploymentGroups: make(map[string]map[string]*DeploymentGroup),
-		deployments:      make(map[string]*Deployment),
-		tags:             make(map[string]map[string]string),
-		lcConfig:         lifecycle.DefaultConfig(),
+	s := &Store{
+		accountID:         accountID,
+		region:            region,
+		applications:      make(map[string]*Application),
+		deploymentGroups:  make(map[string]map[string]*DeploymentGroup),
+		deployments:       make(map[string]*Deployment),
+		deploymentConfigs: make(map[string]*DeploymentConfig),
+		tags:              make(map[string]map[string]string),
+		lcConfig:          lifecycle.DefaultConfig(),
 	}
+	// Seed built-in deployment configurations
+	for _, name := range []string{
+		"CodeDeployDefault.OneAtATime",
+		"CodeDeployDefault.HalfAtATime",
+		"CodeDeployDefault.AllAtOnce",
+		"CodeDeployDefault.ECSCanary10Percent5Minutes",
+		"CodeDeployDefault.ECSLinear10PercentEvery1Minutes",
+		"CodeDeployDefault.LambdaCanary10Percent5Minutes",
+		"CodeDeployDefault.LambdaLinear10PercentEvery1Minute",
+	} {
+		s.deploymentConfigs[name] = &DeploymentConfig{
+			Name:      name,
+			ARN:       fmt.Sprintf("arn:aws:codedeploy:%s::deploymentconfig:%s", region, name),
+			CreatedAt: time.Now().UTC(),
+			IsBuiltIn: true,
+		}
+	}
+	return s
 }
 
 // ---- ARN builders ----
@@ -232,6 +288,34 @@ func (s *Store) ListApplications() []string {
 		names = append(names, name)
 	}
 	return names
+}
+
+func (s *Store) UpdateApplication(oldName, newName string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	app, ok := s.applications[oldName]
+	if !ok {
+		return service.NewAWSError("ApplicationDoesNotExistException",
+			fmt.Sprintf("Application does not exist: %s", oldName), http.StatusNotFound)
+	}
+	if newName == "" || newName == oldName {
+		return nil
+	}
+	if _, exists := s.applications[newName]; exists {
+		return service.NewAWSError("ApplicationAlreadyExistsException",
+			fmt.Sprintf("Application already exists: %s", newName), http.StatusConflict)
+	}
+	delete(s.applications, oldName)
+	app.Name = newName
+	app.ARN = s.applicationARN(newName)
+	s.applications[newName] = app
+	// Migrate deployment groups
+	if groups, ok := s.deploymentGroups[oldName]; ok {
+		s.deploymentGroups[newName] = groups
+		delete(s.deploymentGroups, oldName)
+	}
+	return nil
 }
 
 func (s *Store) DeleteApplication(name string) *service.AWSError {
@@ -606,6 +690,80 @@ func (s *Store) BatchGetDeploymentTargets(deploymentID string, targetIDs []strin
 		}
 	}
 	return targets, nil
+}
+
+// ---- Deployment Config operations ----
+
+func (s *Store) deploymentConfigARN(name string) string {
+	return fmt.Sprintf("arn:aws:codedeploy:%s:%s:deploymentconfig:%s", s.region, s.accountID, name)
+}
+
+func (s *Store) CreateDeploymentConfig(name, computePlatform string, minimumHealthyHosts *MinimumHealthyHosts, trafficRouting *TrafficRoutingConfig) (*DeploymentConfig, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if name == "" {
+		return nil, service.ErrValidation("Deployment config name is required.")
+	}
+	if _, exists := s.deploymentConfigs[name]; exists {
+		return nil, service.NewAWSError("DeploymentConfigAlreadyExistsException",
+			fmt.Sprintf("Deployment config already exists: %s", name), http.StatusConflict)
+	}
+
+	if computePlatform == "" {
+		computePlatform = "Server"
+	}
+
+	cfg := &DeploymentConfig{
+		Name:                 name,
+		ARN:                  s.deploymentConfigARN(name),
+		ComputePlatform:      computePlatform,
+		MinimumHealthyHosts:  minimumHealthyHosts,
+		TrafficRoutingConfig: trafficRouting,
+		CreatedAt:            time.Now().UTC(),
+	}
+	s.deploymentConfigs[name] = cfg
+	return cfg, nil
+}
+
+func (s *Store) GetDeploymentConfig(name string) (*DeploymentConfig, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	cfg, ok := s.deploymentConfigs[name]
+	if !ok {
+		return nil, service.NewAWSError("DeploymentConfigDoesNotExistException",
+			fmt.Sprintf("Deployment config does not exist: %s", name), http.StatusNotFound)
+	}
+	return cfg, nil
+}
+
+func (s *Store) ListDeploymentConfigs() []string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	names := make([]string, 0, len(s.deploymentConfigs))
+	for name := range s.deploymentConfigs {
+		names = append(names, name)
+	}
+	return names
+}
+
+func (s *Store) DeleteDeploymentConfig(name string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	cfg, ok := s.deploymentConfigs[name]
+	if !ok {
+		return service.NewAWSError("DeploymentConfigDoesNotExistException",
+			fmt.Sprintf("Deployment config does not exist: %s", name), http.StatusNotFound)
+	}
+	if cfg.IsBuiltIn {
+		return service.NewAWSError("InvalidDeploymentConfigNameException",
+			"Cannot delete a built-in deployment configuration.", http.StatusBadRequest)
+	}
+	delete(s.deploymentConfigs, name)
+	return nil
 }
 
 // ---- Tag operations ----

@@ -14,7 +14,12 @@ CloudMock emulates AWS CodeDeploy, supporting application, deployment group, and
 | CreateApplication | Supported | Creates an application |
 | GetApplication | Supported | Returns application details |
 | ListApplications | Supported | Lists all applications |
+| UpdateApplication | Supported | Renames an application |
 | DeleteApplication | Supported | Deletes an application |
+| CreateDeploymentConfig | Supported | Creates a deployment configuration |
+| GetDeploymentConfig | Supported | Returns deployment config details |
+| ListDeploymentConfigs | Supported | Lists all deployment configs including built-ins |
+| DeleteDeploymentConfig | Supported | Deletes a custom deployment configuration |
 | CreateDeploymentGroup | Supported | Creates a deployment group |
 | GetDeploymentGroup | Supported | Returns deployment group details |
 | ListDeploymentGroups | Supported | Lists deployment groups |

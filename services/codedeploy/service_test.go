@@ -513,6 +513,185 @@ func TestAddAndRemoveOnPremisesTags(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp2.StatusCode)
 }
 
+// --- UpdateApplication ---
+
+func TestUpdateApplication(t *testing.T) {
+	s := newService()
+	createApp(t, s, "rename-app")
+
+	ctx := jsonCtx("UpdateApplication", map[string]any{
+		"applicationName":    "rename-app",
+		"newApplicationName": "renamed-app",
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	// Verify new name exists
+	resp2, err2 := s.HandleRequest(jsonCtx("GetApplication", map[string]any{"applicationName": "renamed-app"}))
+	require.NoError(t, err2)
+	body := respBody(t, resp2)
+	assert.Equal(t, "renamed-app", body["application"].(map[string]any)["applicationName"])
+
+	// Old name gone
+	_, err3 := s.HandleRequest(jsonCtx("GetApplication", map[string]any{"applicationName": "rename-app"}))
+	require.Error(t, err3)
+}
+
+func TestUpdateApplicationNotFound(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("UpdateApplication", map[string]any{
+		"applicationName":    "nope",
+		"newApplicationName": "new-name",
+	})
+	_, err := s.HandleRequest(ctx)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ApplicationDoesNotExistException")
+}
+
+func TestUpdateApplicationSameName(t *testing.T) {
+	s := newService()
+	createApp(t, s, "same-app")
+	ctx := jsonCtx("UpdateApplication", map[string]any{
+		"applicationName":    "same-app",
+		"newApplicationName": "same-app",
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+// --- Deployment Config Tests ---
+
+func TestCreateDeploymentConfig(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("CreateDeploymentConfig", map[string]any{
+		"deploymentConfigName": "my-config",
+		"computePlatform":      "Server",
+		"minimumHealthyHosts": map[string]any{
+			"type":  "HOST_COUNT",
+			"value": 2,
+		},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	assert.NotEmpty(t, body["deploymentConfigId"])
+}
+
+func TestCreateDeploymentConfigDuplicate(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{"deploymentConfigName": "dup-cfg"}))
+	_, err := s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{"deploymentConfigName": "dup-cfg"}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "DeploymentConfigAlreadyExistsException")
+}
+
+func TestCreateDeploymentConfigMissingName(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "ValidationError")
+}
+
+func TestGetDeploymentConfig(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{
+		"deploymentConfigName": "get-cfg",
+		"computePlatform":      "Server",
+	}))
+
+	resp, err := s.HandleRequest(jsonCtx("GetDeploymentConfig", map[string]any{"deploymentConfigName": "get-cfg"}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	info := body["deploymentConfigInfo"].(map[string]any)
+	assert.Equal(t, "get-cfg", info["deploymentConfigName"])
+	assert.Equal(t, "Server", info["computePlatform"])
+}
+
+func TestGetDeploymentConfigBuiltIn(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("GetDeploymentConfig", map[string]any{
+		"deploymentConfigName": "CodeDeployDefault.OneAtATime",
+	}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	info := body["deploymentConfigInfo"].(map[string]any)
+	assert.Equal(t, "CodeDeployDefault.OneAtATime", info["deploymentConfigName"])
+}
+
+func TestGetDeploymentConfigNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetDeploymentConfig", map[string]any{"deploymentConfigName": "nope"}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "DeploymentConfigDoesNotExistException")
+}
+
+func TestListDeploymentConfigs(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{"deploymentConfigName": "custom-cfg"}))
+
+	resp, err := s.HandleRequest(jsonCtx("ListDeploymentConfigs", map[string]any{}))
+	require.NoError(t, err)
+	body := respBody(t, resp)
+	configs := body["deploymentConfigsList"].([]any)
+	// Includes 7 built-ins + 1 custom
+	assert.GreaterOrEqual(t, len(configs), 8)
+
+	names := make(map[string]bool)
+	for _, c := range configs {
+		names[c.(string)] = true
+	}
+	assert.True(t, names["CodeDeployDefault.OneAtATime"])
+	assert.True(t, names["custom-cfg"])
+}
+
+func TestDeleteDeploymentConfig(t *testing.T) {
+	s := newService()
+	s.HandleRequest(jsonCtx("CreateDeploymentConfig", map[string]any{"deploymentConfigName": "del-cfg"}))
+
+	resp, err := s.HandleRequest(jsonCtx("DeleteDeploymentConfig", map[string]any{"deploymentConfigName": "del-cfg"}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	_, err2 := s.HandleRequest(jsonCtx("GetDeploymentConfig", map[string]any{"deploymentConfigName": "del-cfg"}))
+	require.Error(t, err2)
+}
+
+func TestDeleteDeploymentConfigBuiltIn(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DeleteDeploymentConfig", map[string]any{
+		"deploymentConfigName": "CodeDeployDefault.OneAtATime",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "InvalidDeploymentConfigNameException")
+}
+
+func TestCreateDeploymentConfigWithTrafficRouting(t *testing.T) {
+	s := newService()
+	ctx := jsonCtx("CreateDeploymentConfig", map[string]any{
+		"deploymentConfigName": "canary-cfg",
+		"computePlatform":      "Lambda",
+		"trafficRoutingConfig": map[string]any{
+			"type": "TimeBasedCanary",
+			"timeBasedCanary": map[string]any{
+				"canaryPercentage": 10,
+				"canaryInterval":   5,
+			},
+		},
+	})
+	resp, err := s.HandleRequest(ctx)
+	require.NoError(t, err)
+	assert.NotEmpty(t, respBody(t, resp)["deploymentConfigId"])
+
+	resp2, _ := s.HandleRequest(jsonCtx("GetDeploymentConfig", map[string]any{"deploymentConfigName": "canary-cfg"}))
+	info := respBody(t, resp2)["deploymentConfigInfo"].(map[string]any)
+	tr := info["trafficRoutingConfig"].(map[string]any)
+	assert.Equal(t, "TimeBasedCanary", tr["type"])
+	canary := tr["timeBasedCanary"].(map[string]any)
+	assert.Equal(t, float64(10), canary["canaryPercentage"])
+}
+
 // --- Invalid Action ---
 
 func TestInvalidAction(t *testing.T) {

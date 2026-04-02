@@ -145,6 +145,138 @@ func handleDeleteApplication(ctx *service.RequestContext, store *Store) (*servic
 	return jsonOK(map[string]any{})
 }
 
+func handleUpdateApplication(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	oldName := getStr(req, "applicationName")
+	newName := getStr(req, "newApplicationName")
+
+	if awsErr := store.UpdateApplication(oldName, newName); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ---- Deployment Config handlers ----
+
+func handleCreateDeploymentConfig(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	name := getStr(req, "deploymentConfigName")
+	computePlatform := getStr(req, "computePlatform")
+
+	var minHealthyHosts *MinimumHealthyHosts
+	if mhh, ok := req["minimumHealthyHosts"].(map[string]any); ok {
+		minHealthyHosts = &MinimumHealthyHosts{
+			Type: getStr(mhh, "type"),
+		}
+		if v, ok := mhh["value"].(float64); ok {
+			minHealthyHosts.Value = int(v)
+		}
+	}
+
+	var trafficRouting *TrafficRoutingConfig
+	if tr, ok := req["trafficRoutingConfig"].(map[string]any); ok {
+		trafficRouting = &TrafficRoutingConfig{
+			Type: getStr(tr, "type"),
+		}
+		if canary, ok := tr["timeBasedCanary"].(map[string]any); ok {
+			trafficRouting.TimeBasedCanary = &TimeBasedCanary{}
+			if v, ok := canary["canaryPercentage"].(float64); ok {
+				trafficRouting.TimeBasedCanary.CanaryPercentage = int(v)
+			}
+			if v, ok := canary["canaryInterval"].(float64); ok {
+				trafficRouting.TimeBasedCanary.CanaryInterval = int(v)
+			}
+		}
+		if linear, ok := tr["timeBasedLinear"].(map[string]any); ok {
+			trafficRouting.TimeBasedLinear = &TimeBasedLinear{}
+			if v, ok := linear["linearPercentage"].(float64); ok {
+				trafficRouting.TimeBasedLinear.LinearPercentage = int(v)
+			}
+			if v, ok := linear["linearInterval"].(float64); ok {
+				trafficRouting.TimeBasedLinear.LinearInterval = int(v)
+			}
+		}
+	}
+
+	cfg, awsErr := store.CreateDeploymentConfig(name, computePlatform, minHealthyHosts, trafficRouting)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"deploymentConfigId": cfg.ARN})
+}
+
+func handleGetDeploymentConfig(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	name := getStr(req, "deploymentConfigName")
+	cfg, awsErr := store.GetDeploymentConfig(name)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	info := map[string]any{
+		"deploymentConfigId":   cfg.ARN,
+		"deploymentConfigName": cfg.Name,
+		"computePlatform":      cfg.ComputePlatform,
+		"createTime":           float64(cfg.CreatedAt.Unix()),
+	}
+	if cfg.MinimumHealthyHosts != nil {
+		info["minimumHealthyHosts"] = map[string]any{
+			"type":  cfg.MinimumHealthyHosts.Type,
+			"value": cfg.MinimumHealthyHosts.Value,
+		}
+	}
+	if cfg.TrafficRoutingConfig != nil {
+		tr := map[string]any{"type": cfg.TrafficRoutingConfig.Type}
+		if cfg.TrafficRoutingConfig.TimeBasedCanary != nil {
+			tr["timeBasedCanary"] = map[string]any{
+				"canaryPercentage": cfg.TrafficRoutingConfig.TimeBasedCanary.CanaryPercentage,
+				"canaryInterval":   cfg.TrafficRoutingConfig.TimeBasedCanary.CanaryInterval,
+			}
+		}
+		if cfg.TrafficRoutingConfig.TimeBasedLinear != nil {
+			tr["timeBasedLinear"] = map[string]any{
+				"linearPercentage": cfg.TrafficRoutingConfig.TimeBasedLinear.LinearPercentage,
+				"linearInterval":   cfg.TrafficRoutingConfig.TimeBasedLinear.LinearInterval,
+			}
+		}
+		info["trafficRoutingConfig"] = tr
+	}
+	return jsonOK(map[string]any{"deploymentConfigInfo": info})
+}
+
+func handleListDeploymentConfigs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	names := store.ListDeploymentConfigs()
+	if names == nil {
+		names = []string{}
+	}
+	return jsonOK(map[string]any{"deploymentConfigsList": names})
+}
+
+func handleDeleteDeploymentConfig(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	name := getStr(req, "deploymentConfigName")
+	if awsErr := store.DeleteDeploymentConfig(name); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{})
+}
+
 // ---- Deployment Group handlers ----
 
 func handleCreateDeploymentGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {

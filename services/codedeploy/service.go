@@ -45,7 +45,13 @@ func (s *CodeDeployService) Actions() []service.Action {
 		{Name: "CreateApplication", Method: http.MethodPost, IAMAction: "codedeploy:CreateApplication"},
 		{Name: "GetApplication", Method: http.MethodPost, IAMAction: "codedeploy:GetApplication"},
 		{Name: "ListApplications", Method: http.MethodPost, IAMAction: "codedeploy:ListApplications"},
+		{Name: "UpdateApplication", Method: http.MethodPost, IAMAction: "codedeploy:UpdateApplication"},
 		{Name: "DeleteApplication", Method: http.MethodPost, IAMAction: "codedeploy:DeleteApplication"},
+		// Deployment Configs
+		{Name: "CreateDeploymentConfig", Method: http.MethodPost, IAMAction: "codedeploy:CreateDeploymentConfig"},
+		{Name: "GetDeploymentConfig", Method: http.MethodPost, IAMAction: "codedeploy:GetDeploymentConfig"},
+		{Name: "ListDeploymentConfigs", Method: http.MethodPost, IAMAction: "codedeploy:ListDeploymentConfigs"},
+		{Name: "DeleteDeploymentConfig", Method: http.MethodPost, IAMAction: "codedeploy:DeleteDeploymentConfig"},
 		// Deployment Groups
 		{Name: "CreateDeploymentGroup", Method: http.MethodPost, IAMAction: "codedeploy:CreateDeploymentGroup"},
 		{Name: "GetDeploymentGroup", Method: http.MethodPost, IAMAction: "codedeploy:GetDeploymentGroup"},
@@ -78,8 +84,19 @@ func (s *CodeDeployService) HandleRequest(ctx *service.RequestContext) (*service
 		return handleGetApplication(ctx, s.store)
 	case "ListApplications":
 		return handleListApplications(ctx, s.store)
+	case "UpdateApplication":
+		return handleUpdateApplication(ctx, s.store)
 	case "DeleteApplication":
 		return handleDeleteApplication(ctx, s.store)
+	// Deployment Configs
+	case "CreateDeploymentConfig":
+		return handleCreateDeploymentConfig(ctx, s.store)
+	case "GetDeploymentConfig":
+		return handleGetDeploymentConfig(ctx, s.store)
+	case "ListDeploymentConfigs":
+		return handleListDeploymentConfigs(ctx, s.store)
+	case "DeleteDeploymentConfig":
+		return handleDeleteDeploymentConfig(ctx, s.store)
 	// Deployment Groups
 	case "CreateDeploymentGroup":
 		return handleCreateDeploymentGroup(ctx, s.store)

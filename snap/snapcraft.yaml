@@ -13,7 +13,12 @@ description: |
 
 grade: stable
 confinement: strict
-license: BSL-1.1
+license: Proprietary
+title: CloudMock
+contact: eng@viri.app
+issues: https://github.com/Viridian-Inc/cloudmock/issues
+source-code: https://github.com/Viridian-Inc/cloudmock
+website: https://cloudmock.dev
 
 platforms:
   amd64:

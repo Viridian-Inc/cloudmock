@@ -63,6 +63,10 @@ func (s *ElastiCacheService) Actions() []service.Action {
 		{Name: "DeleteCacheParameterGroup", Method: http.MethodPost, IAMAction: "elasticache:DeleteCacheParameterGroup"},
 		// Failover
 		{Name: "TestFailover", Method: http.MethodPost, IAMAction: "elasticache:TestFailover"},
+		// Snapshots
+		{Name: "CreateSnapshot", Method: http.MethodPost, IAMAction: "elasticache:CreateSnapshot"},
+		{Name: "DescribeSnapshots", Method: http.MethodPost, IAMAction: "elasticache:DescribeSnapshots"},
+		{Name: "DeleteSnapshot", Method: http.MethodPost, IAMAction: "elasticache:DeleteSnapshot"},
 		// Tags
 		{Name: "AddTagsToResource", Method: http.MethodPost, IAMAction: "elasticache:AddTagsToResource"},
 		{Name: "RemoveTagsFromResource", Method: http.MethodPost, IAMAction: "elasticache:RemoveTagsFromResource"},
@@ -118,6 +122,13 @@ func (s *ElastiCacheService) HandleRequest(ctx *service.RequestContext) (*servic
 	// Failover
 	case "TestFailover":
 		return handleTestFailover(ctx, s.store)
+	// Snapshots
+	case "CreateSnapshot":
+		return handleCreateSnapshot(ctx, s.store)
+	case "DescribeSnapshots":
+		return handleDescribeSnapshots(ctx, s.store)
+	case "DeleteSnapshot":
+		return handleDeleteSnapshot(ctx, s.store)
 	// Tags
 	case "AddTagsToResource":
 		return handleAddTagsToResource(ctx, s.store)

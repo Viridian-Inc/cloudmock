@@ -5,19 +5,19 @@ description: Amazon ElastiCache emulation in CloudMock
 
 ## Overview
 
-CloudMock emulates Amazon ElastiCache, supporting cache clusters, replication groups, subnet groups, parameter groups, tagging, and failover testing.
+CloudMock emulates Amazon ElastiCache, supporting cache clusters, replication groups, subnet groups, parameter groups, snapshots, tagging, and failover testing. Cluster states transition `creating -> available -> modifying -> deleting`.
 
 ## Supported Operations
 
 | Operation | Status | Notes |
 |-----------|--------|-------|
-| CreateCacheCluster | Supported | Creates a cache cluster |
-| DescribeCacheClusters | Supported | Lists cache clusters |
-| ModifyCacheCluster | Supported | Modifies a cache cluster |
+| CreateCacheCluster | Supported | Creates a Redis or Memcached cache cluster |
+| DescribeCacheClusters | Supported | Lists cache clusters with optional ID filter |
+| ModifyCacheCluster | Supported | Modifies node type, engine version, or node count |
 | DeleteCacheCluster | Supported | Deletes a cache cluster |
-| CreateReplicationGroup | Supported | Creates a replication group |
+| CreateReplicationGroup | Supported | Creates a Redis replication group with primary/replica nodes |
 | DescribeReplicationGroups | Supported | Lists replication groups |
-| ModifyReplicationGroup | Supported | Modifies a replication group |
+| ModifyReplicationGroup | Supported | Modifies description, node type, or failover settings |
 | DeleteReplicationGroup | Supported | Deletes a replication group |
 | CreateCacheSubnetGroup | Supported | Creates a subnet group |
 | DescribeCacheSubnetGroups | Supported | Lists subnet groups |
@@ -25,10 +25,13 @@ CloudMock emulates Amazon ElastiCache, supporting cache clusters, replication gr
 | CreateCacheParameterGroup | Supported | Creates a parameter group |
 | DescribeCacheParameterGroups | Supported | Lists parameter groups |
 | DeleteCacheParameterGroup | Supported | Deletes a parameter group |
-| AddTagsToResource | Supported | Adds tags to a resource |
+| CreateSnapshot | Supported | Creates a snapshot from a cluster or replication group |
+| DescribeSnapshots | Supported | Lists snapshots with optional filters |
+| DeleteSnapshot | Supported | Deletes a snapshot |
+| AddTagsToResource | Supported | Adds tags to clusters, replication groups, and snapshots |
 | RemoveTagsFromResource | Supported | Removes tags from a resource |
 | ListTagsForResource | Supported | Lists tags for a resource |
-| TestFailover | Supported | Simulates a failover test |
+| TestFailover | Supported | Simulates a failover test for a replication group |
 
 ## Quick Start
 

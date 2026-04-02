@@ -90,6 +90,7 @@ type Store struct {
 	replicationGroups map[string]*ReplicationGroup   // keyed by ID
 	subnetGroups     map[string]*CacheSubnetGroup    // keyed by name
 	parameterGroups  map[string]*CacheParameterGroup // keyed by name
+	snapshots        map[string]*Snapshot            // keyed by name
 	accountID        string
 	region           string
 	lifecycleCfg     *lifecycle.Config
@@ -102,6 +103,7 @@ func NewStore(accountID, region string) *Store {
 		replicationGroups: make(map[string]*ReplicationGroup),
 		subnetGroups:      make(map[string]*CacheSubnetGroup),
 		parameterGroups:   make(map[string]*CacheParameterGroup),
+		snapshots:         make(map[string]*Snapshot),
 		accountID:         accountID,
 		region:            region,
 		lifecycleCfg:      lifecycle.DefaultConfig(),
@@ -514,6 +516,103 @@ func (s *Store) DeleteCacheParameterGroup(name string) bool {
 	return true
 }
 
+// ---- Snapshot operations ----
+
+// Snapshot represents an ElastiCache backup snapshot.
+type Snapshot struct {
+	SnapshotName        string
+	ARN                 string
+	CacheClusterID      string
+	ReplicationGroupID  string
+	Status              string
+	Engine              string
+	EngineVersion       string
+	CacheNodeType       string
+	NumCacheNodes       int
+	Port                int
+	Tags                map[string]string
+	CreatedTime         time.Time
+}
+
+func (s *Store) snapshotARN(name string) string {
+	return fmt.Sprintf("arn:aws:elasticache:%s:%s:snapshot:%s", s.region, s.accountID, name)
+}
+
+func (s *Store) CreateSnapshot(name, clusterID, replicationGroupID string, tags map[string]string) (*Snapshot, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if _, exists := s.snapshots[name]; exists {
+		return nil, fmt.Errorf("already_exists")
+	}
+
+	snap := &Snapshot{
+		SnapshotName:       name,
+		ARN:                s.snapshotARN(name),
+		Status:             "available",
+		Tags:               tags,
+		CreatedTime:        time.Now().UTC(),
+	}
+
+	if clusterID != "" {
+		cc, ok := s.clusters[clusterID]
+		if !ok {
+			return nil, fmt.Errorf("not_found")
+		}
+		snap.CacheClusterID = clusterID
+		snap.Engine = cc.Engine
+		snap.EngineVersion = cc.EngineVersion
+		snap.CacheNodeType = cc.CacheNodeType
+		snap.NumCacheNodes = cc.NumCacheNodes
+		snap.Port = cc.Port
+	} else if replicationGroupID != "" {
+		rg, ok := s.replicationGroups[replicationGroupID]
+		if !ok {
+			return nil, fmt.Errorf("not_found")
+		}
+		snap.ReplicationGroupID = replicationGroupID
+		snap.Engine = rg.Engine
+		snap.EngineVersion = rg.EngineVersion
+		snap.CacheNodeType = rg.CacheNodeType
+		snap.Port = rg.Port
+	}
+
+	s.snapshots[name] = snap
+	return snap, nil
+}
+
+func (s *Store) ListSnapshots(filterName, filterCluster, filterRG string) []*Snapshot {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	result := make([]*Snapshot, 0, len(s.snapshots))
+	for _, snap := range s.snapshots {
+		if filterName != "" && snap.SnapshotName != filterName {
+			continue
+		}
+		if filterCluster != "" && snap.CacheClusterID != filterCluster {
+			continue
+		}
+		if filterRG != "" && snap.ReplicationGroupID != filterRG {
+			continue
+		}
+		result = append(result, snap)
+	}
+	return result
+}
+
+func (s *Store) DeleteSnapshot(name string) (*Snapshot, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	snap, ok := s.snapshots[name]
+	if !ok {
+		return nil, false
+	}
+	delete(s.snapshots, name)
+	return snap, true
+}
+
 // TestFailover simulates a failover for a replication group node group.
 func (s *Store) TestFailover(id, nodeGroupID string) (*ReplicationGroup, bool) {
 	s.mu.Lock()
@@ -586,6 +685,11 @@ func (s *Store) tagMapByARN(arn string) map[string]string {
 	for _, rg := range s.replicationGroups {
 		if rg.ARN == arn {
 			return rg.Tags
+		}
+	}
+	for _, snap := range s.snapshots {
+		if snap.ARN == arn {
+			return snap.Tags
 		}
 	}
 	return nil

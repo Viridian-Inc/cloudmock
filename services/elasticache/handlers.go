@@ -777,6 +777,142 @@ func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*serv
 	})
 }
 
+// ---- Snapshot XML types ----
+
+type xmlSnapshot struct {
+	SnapshotName       string `xml:"SnapshotName"`
+	ARN                string `xml:"ARN"`
+	CacheClusterId     string `xml:"CacheClusterId,omitempty"`
+	ReplicationGroupId string `xml:"ReplicationGroupId,omitempty"`
+	SnapshotStatus     string `xml:"SnapshotStatus"`
+	Engine             string `xml:"Engine,omitempty"`
+	EngineVersion      string `xml:"EngineVersion,omitempty"`
+	CacheNodeType      string `xml:"CacheNodeType,omitempty"`
+	NumCacheNodes      int    `xml:"NumCacheNodes,omitempty"`
+	Port               int    `xml:"Port,omitempty"`
+}
+
+func toXMLSnapshot(snap *Snapshot) xmlSnapshot {
+	return xmlSnapshot{
+		SnapshotName:       snap.SnapshotName,
+		ARN:                snap.ARN,
+		CacheClusterId:     snap.CacheClusterID,
+		ReplicationGroupId: snap.ReplicationGroupID,
+		SnapshotStatus:     snap.Status,
+		Engine:             snap.Engine,
+		EngineVersion:      snap.EngineVersion,
+		CacheNodeType:      snap.CacheNodeType,
+		NumCacheNodes:      snap.NumCacheNodes,
+		Port:               snap.Port,
+	}
+}
+
+// ---- CreateSnapshot ----
+
+type xmlCreateSnapshotResponse struct {
+	XMLName xml.Name                  `xml:"CreateSnapshotResponse"`
+	Xmlns   string                    `xml:"xmlns,attr"`
+	Result  xmlCreateSnapshotResult   `xml:"CreateSnapshotResult"`
+	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+}
+
+type xmlCreateSnapshotResult struct {
+	Snapshot xmlSnapshot `xml:"Snapshot"`
+}
+
+func handleCreateSnapshot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("SnapshotName")
+	if name == "" {
+		return xmlErr(service.ErrValidation("SnapshotName is required."))
+	}
+	clusterID := form.Get("CacheClusterId")
+	rgID := form.Get("ReplicationGroupId")
+
+	tags := parseTags(form)
+	snap, err := store.CreateSnapshot(name, clusterID, rgID, tags)
+	if err != nil {
+		if err.Error() == "already_exists" {
+			return xmlErr(service.NewAWSError("SnapshotAlreadyExistsFault",
+				"Snapshot "+name+" already exists.", http.StatusBadRequest))
+		}
+		return xmlErr(service.NewAWSError("CacheClusterNotFound",
+			"Source resource not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlCreateSnapshotResponse{
+		Xmlns:  ecXmlns,
+		Result: xmlCreateSnapshotResult{Snapshot: toXMLSnapshot(snap)},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- DescribeSnapshots ----
+
+type xmlDescribeSnapshotsResponse struct {
+	XMLName xml.Name                    `xml:"DescribeSnapshotsResponse"`
+	Xmlns   string                      `xml:"xmlns,attr"`
+	Result  xmlDescribeSnapshotsResult  `xml:"DescribeSnapshotsResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+type xmlDescribeSnapshotsResult struct {
+	Snapshots []xmlSnapshot `xml:"Snapshots>Snapshot"`
+}
+
+func handleDescribeSnapshots(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	filterName := form.Get("SnapshotName")
+	filterCluster := form.Get("CacheClusterId")
+	filterRG := form.Get("ReplicationGroupId")
+
+	snaps := store.ListSnapshots(filterName, filterCluster, filterRG)
+
+	xmlSnaps := make([]xmlSnapshot, 0, len(snaps))
+	for _, snap := range snaps {
+		xmlSnaps = append(xmlSnaps, toXMLSnapshot(snap))
+	}
+
+	return xmlOK(&xmlDescribeSnapshotsResponse{
+		Xmlns:  ecXmlns,
+		Result: xmlDescribeSnapshotsResult{Snapshots: xmlSnaps},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
+// ---- DeleteSnapshot ----
+
+type xmlDeleteSnapshotResponse struct {
+	XMLName xml.Name                  `xml:"DeleteSnapshotResponse"`
+	Xmlns   string                    `xml:"xmlns,attr"`
+	Result  xmlDeleteSnapshotResult   `xml:"DeleteSnapshotResult"`
+	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+}
+
+type xmlDeleteSnapshotResult struct {
+	Snapshot xmlSnapshot `xml:"Snapshot"`
+}
+
+func handleDeleteSnapshot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("SnapshotName")
+	if name == "" {
+		return xmlErr(service.ErrValidation("SnapshotName is required."))
+	}
+
+	snap, ok := store.DeleteSnapshot(name)
+	if !ok {
+		return xmlErr(service.NewAWSError("SnapshotNotFoundFault",
+			"Snapshot "+name+" not found.", http.StatusNotFound))
+	}
+
+	return xmlOK(&xmlDeleteSnapshotResponse{
+		Xmlns:  ecXmlns,
+		Result: xmlDeleteSnapshotResult{Snapshot: toXMLSnapshot(snap)},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
 // ---- helper functions ----
 
 func parseForm(ctx *service.RequestContext) url.Values {

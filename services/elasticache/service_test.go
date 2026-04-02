@@ -590,6 +590,188 @@ func TestReplicationGroupFailover(t *testing.T) {
 	require.Equal(t, http.StatusOK, w2.Code)
 }
 
+// ---- Snapshots ----
+
+func TestEC_CreateSnapshot(t *testing.T) {
+	h := newECGateway(t)
+
+	// First create a cluster to snapshot
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "snap-source",
+		"Engine":         "redis",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	// Create snapshot
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, ecReq(t, map[string]string{
+		"Action":         "CreateSnapshot",
+		"SnapshotName":   "test-snapshot",
+		"CacheClusterId": "snap-source",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code, ecBody(t, w2))
+	body := ecBody(t, w2)
+	assert.Contains(t, body, "test-snapshot")
+	assert.Contains(t, body, "available")
+}
+
+func TestEC_CreateSnapshot_Duplicate(t *testing.T) {
+	h := newECGateway(t)
+
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "snap-src2",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	for i := 0; i < 2; i++ {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, ecReq(t, map[string]string{
+			"Action":         "CreateSnapshot",
+			"SnapshotName":   "dup-snap",
+			"CacheClusterId": "snap-src2",
+		}))
+		if i == 0 {
+			require.Equal(t, http.StatusOK, w.Code)
+		} else {
+			assert.Equal(t, http.StatusBadRequest, w.Code)
+			assert.Contains(t, ecBody(t, w), "SnapshotAlreadyExistsFault")
+		}
+	}
+}
+
+func TestEC_CreateSnapshot_MissingName(t *testing.T) {
+	h := newECGateway(t)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action": "CreateSnapshot",
+	}))
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+}
+
+func TestEC_DescribeSnapshots(t *testing.T) {
+	h := newECGateway(t)
+
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "desc-snap-src",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	for _, name := range []string{"s1", "s2"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, ecReq(t, map[string]string{
+			"Action":         "CreateSnapshot",
+			"SnapshotName":   name,
+			"CacheClusterId": "desc-snap-src",
+		}))
+		require.Equal(t, http.StatusOK, w.Code)
+	}
+
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, ecReq(t, map[string]string{
+		"Action": "DescribeSnapshots",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+	body := ecBody(t, w2)
+	assert.Contains(t, body, "s1")
+	assert.Contains(t, body, "s2")
+}
+
+func TestEC_DescribeSnapshots_ByName(t *testing.T) {
+	h := newECGateway(t)
+
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "filter-snap-src",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	for _, name := range []string{"fs1", "fs2"} {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, ecReq(t, map[string]string{
+			"Action":         "CreateSnapshot",
+			"SnapshotName":   name,
+			"CacheClusterId": "filter-snap-src",
+		}))
+		require.Equal(t, http.StatusOK, w.Code)
+	}
+
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, ecReq(t, map[string]string{
+		"Action":       "DescribeSnapshots",
+		"SnapshotName": "fs1",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+	body := ecBody(t, w2)
+	assert.Contains(t, body, "fs1")
+	assert.NotContains(t, body, "fs2")
+}
+
+func TestEC_DeleteSnapshot(t *testing.T) {
+	h := newECGateway(t)
+
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "del-snap-src",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, ecReq(t, map[string]string{
+		"Action":         "CreateSnapshot",
+		"SnapshotName":   "del-snap",
+		"CacheClusterId": "del-snap-src",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code)
+
+	w3 := httptest.NewRecorder()
+	h.ServeHTTP(w3, ecReq(t, map[string]string{
+		"Action":       "DeleteSnapshot",
+		"SnapshotName": "del-snap",
+	}))
+	require.Equal(t, http.StatusOK, w3.Code)
+	assert.Contains(t, ecBody(t, w3), "del-snap")
+}
+
+func TestEC_DeleteSnapshot_NotFound(t *testing.T) {
+	h := newECGateway(t)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action":       "DeleteSnapshot",
+		"SnapshotName": "nope",
+	}))
+	assert.Equal(t, http.StatusNotFound, w.Code)
+	assert.Contains(t, ecBody(t, w), "SnapshotNotFoundFault")
+}
+
+func TestEC_CreateSnapshot_ForReplicationGroup(t *testing.T) {
+	h := newECGateway(t)
+
+	w1 := httptest.NewRecorder()
+	h.ServeHTTP(w1, ecReq(t, map[string]string{
+		"Action":                      "CreateReplicationGroup",
+		"ReplicationGroupId":          "rg-snap-src",
+		"ReplicationGroupDescription": "test",
+	}))
+	require.Equal(t, http.StatusOK, w1.Code)
+
+	w2 := httptest.NewRecorder()
+	h.ServeHTTP(w2, ecReq(t, map[string]string{
+		"Action":             "CreateSnapshot",
+		"SnapshotName":       "rg-snap",
+		"ReplicationGroupId": "rg-snap-src",
+	}))
+	require.Equal(t, http.StatusOK, w2.Code, ecBody(t, w2))
+	assert.Contains(t, ecBody(t, w2), "rg-snap")
+}
+
 func TestTestFailoverNotFound(t *testing.T) {
 	h := newECGateway(t)
 	w := httptest.NewRecorder()

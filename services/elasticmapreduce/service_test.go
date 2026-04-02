@@ -345,3 +345,77 @@ func TestClusterLifecycle_NoLocator(t *testing.T) {
 	// With instant transitions: STARTING -> BOOTSTRAPPING -> RUNNING
 	assert.Equal(t, "RUNNING", result.Result.Cluster.Status.State)
 }
+
+func TestEMR_SecurityConfigurationCRUD(t *testing.T) {
+	s := newService()
+
+	// Create
+	resp, err := s.HandleRequest(queryCtx("CreateSecurityConfiguration", map[string]string{
+		"Name":                  "my-sec-config",
+		"SecurityConfiguration": `{"EncryptionConfiguration":{"EnableInTransitEncryption":true}}`,
+	}))
+	require.NoError(t, err)
+	data, _ := xml.Marshal(resp.Body)
+	assert.Contains(t, string(data), "my-sec-config")
+
+	// Describe
+	descResp, err := s.HandleRequest(queryCtx("DescribeSecurityConfiguration", map[string]string{
+		"Name": "my-sec-config",
+	}))
+	require.NoError(t, err)
+	descData, _ := xml.Marshal(descResp.Body)
+	assert.Contains(t, string(descData), "my-sec-config")
+
+	// List
+	listResp, err := s.HandleRequest(queryCtx("ListSecurityConfigurations", nil))
+	require.NoError(t, err)
+	listData, _ := xml.Marshal(listResp.Body)
+	assert.Contains(t, string(listData), "my-sec-config")
+
+	// Delete
+	_, err = s.HandleRequest(queryCtx("DeleteSecurityConfiguration", map[string]string{
+		"Name": "my-sec-config",
+	}))
+	require.NoError(t, err)
+
+	// Should no longer be found
+	_, err = s.HandleRequest(queryCtx("DescribeSecurityConfiguration", map[string]string{
+		"Name": "my-sec-config",
+	}))
+	require.Error(t, err)
+}
+
+func TestEMR_SecurityConfiguration_Duplicate(t *testing.T) {
+	s := newService()
+	s.HandleRequest(queryCtx("CreateSecurityConfiguration", map[string]string{
+		"Name": "dup-sec-config",
+	}))
+	_, err := s.HandleRequest(queryCtx("CreateSecurityConfiguration", map[string]string{
+		"Name": "dup-sec-config",
+	}))
+	require.Error(t, err)
+}
+
+func TestEMR_SecurityConfiguration_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(queryCtx("DescribeSecurityConfiguration", map[string]string{
+		"Name": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestEMR_DeleteSecurityConfiguration_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(queryCtx("DeleteSecurityConfiguration", map[string]string{
+		"Name": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestEMR_ListSecurityConfigurations_Empty(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(queryCtx("ListSecurityConfigurations", nil))
+	require.NoError(t, err)
+	data, _ := xml.Marshal(resp.Body)
+	assert.Contains(t, string(data), "ListSecurityConfigurationsResponse")
+}

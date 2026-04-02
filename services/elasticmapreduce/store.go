@@ -88,29 +88,38 @@ type ServiceLocator interface {
 	Lookup(name string) (service.Service, error)
 }
 
+// SecurityConfiguration represents an EMR security configuration.
+type SecurityConfiguration struct {
+	Name              string
+	SecurityConfiguration string // JSON blob
+	CreationDateTime  time.Time
+}
+
 // Store manages all EMR resources in memory.
 type Store struct {
-	mu              sync.RWMutex
-	clusters        map[string]*Cluster
-	steps           map[string][]*Step          // clusterID -> steps
-	instanceGroups  map[string][]*InstanceGroup // clusterID -> groups
-	ec2InstanceIDs  map[string][]string         // clusterID -> EC2 instance IDs
-	accountID       string
-	region          string
-	lcConfig        *lifecycle.Config
-	locator         ServiceLocator
+	mu                   sync.RWMutex
+	clusters             map[string]*Cluster
+	steps                map[string][]*Step            // clusterID -> steps
+	instanceGroups       map[string][]*InstanceGroup   // clusterID -> groups
+	ec2InstanceIDs       map[string][]string           // clusterID -> EC2 instance IDs
+	securityConfigs      map[string]*SecurityConfiguration // name -> config
+	accountID            string
+	region               string
+	lcConfig             *lifecycle.Config
+	locator              ServiceLocator
 }
 
 // NewStore creates a new EMR Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		clusters:       make(map[string]*Cluster),
-		steps:          make(map[string][]*Step),
-		instanceGroups: make(map[string][]*InstanceGroup),
-		ec2InstanceIDs: make(map[string][]string),
-		accountID:      accountID,
-		region:         region,
-		lcConfig:       lifecycle.DefaultConfig(),
+		clusters:        make(map[string]*Cluster),
+		steps:           make(map[string][]*Step),
+		instanceGroups:  make(map[string][]*InstanceGroup),
+		ec2InstanceIDs:  make(map[string][]string),
+		securityConfigs: make(map[string]*SecurityConfiguration),
+		accountID:       accountID,
+		region:          region,
+		lcConfig:        lifecycle.DefaultConfig(),
 	}
 }
 
@@ -453,5 +462,53 @@ func (s *Store) RemoveTags(resourceID string, keys []string) bool {
 	for _, k := range keys {
 		delete(c.Tags, k)
 	}
+	return true
+}
+
+// ---- Security Configuration operations ----
+
+// CreateSecurityConfiguration creates a new security configuration.
+func (s *Store) CreateSecurityConfiguration(name, config string) (*SecurityConfiguration, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.securityConfigs[name]; ok {
+		return nil, fmt.Errorf("security configuration already exists: %s", name)
+	}
+	sc := &SecurityConfiguration{
+		Name:                  name,
+		SecurityConfiguration: config,
+		CreationDateTime:      time.Now().UTC(),
+	}
+	s.securityConfigs[name] = sc
+	return sc, nil
+}
+
+// DescribeSecurityConfiguration returns a security configuration by name.
+func (s *Store) DescribeSecurityConfiguration(name string) (*SecurityConfiguration, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sc, ok := s.securityConfigs[name]
+	return sc, ok
+}
+
+// ListSecurityConfigurations returns all security configurations.
+func (s *Store) ListSecurityConfigurations() []*SecurityConfiguration {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make([]*SecurityConfiguration, 0, len(s.securityConfigs))
+	for _, sc := range s.securityConfigs {
+		out = append(out, sc)
+	}
+	return out
+}
+
+// DeleteSecurityConfiguration removes a security configuration.
+func (s *Store) DeleteSecurityConfiguration(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.securityConfigs[name]; !ok {
+		return false
+	}
+	delete(s.securityConfigs, name)
 	return true
 }

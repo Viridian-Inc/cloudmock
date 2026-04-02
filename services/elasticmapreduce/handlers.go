@@ -529,3 +529,99 @@ func handleRemoveTags(ctx *service.RequestContext, store *Store) (*service.Respo
 	}
 	return xmlOK(&xmlRemoveTagsResponse{Xmlns: emrXmlns, Meta: xmlResponseMetadata{RequestID: newRequestID()}})
 }
+
+// ---- Security Configurations ----
+
+type xmlCreateSecurityConfigurationResponse struct {
+	XMLName          xml.Name            `xml:"CreateSecurityConfigurationResponse"`
+	Name             string              `xml:"CreateSecurityConfigurationResult>Name"`
+	CreationDateTime string              `xml:"CreateSecurityConfigurationResult>CreationDateTime"`
+	Meta             xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleCreateSecurityConfiguration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("Name")
+	config := form.Get("SecurityConfiguration")
+	if name == "" {
+		return xmlErr(service.ErrValidation("Name is required."))
+	}
+	sc, err := store.CreateSecurityConfiguration(name, config)
+	if err != nil {
+		return xmlErr(service.ErrAlreadyExists("SecurityConfiguration", name))
+	}
+	return xmlOK(&xmlCreateSecurityConfigurationResponse{
+		Name:             sc.Name,
+		CreationDateTime: sc.CreationDateTime.Format("2006-01-02T15:04:05Z"),
+		Meta:             xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+type xmlDescribeSecurityConfigurationResponse struct {
+	XMLName               xml.Name            `xml:"DescribeSecurityConfigurationResponse"`
+	Name                  string              `xml:"DescribeSecurityConfigurationResult>Name"`
+	SecurityConfiguration string              `xml:"DescribeSecurityConfigurationResult>SecurityConfiguration"`
+	CreationDateTime      string              `xml:"DescribeSecurityConfigurationResult>CreationDateTime"`
+	Meta                  xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDescribeSecurityConfiguration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("Name")
+	if name == "" {
+		return xmlErr(service.ErrValidation("Name is required."))
+	}
+	sc, ok := store.DescribeSecurityConfiguration(name)
+	if !ok {
+		return xmlErr(service.ErrNotFound("SecurityConfiguration", name))
+	}
+	return xmlOK(&xmlDescribeSecurityConfigurationResponse{
+		Name:                  sc.Name,
+		SecurityConfiguration: sc.SecurityConfiguration,
+		CreationDateTime:      sc.CreationDateTime.Format("2006-01-02T15:04:05Z"),
+		Meta:                  xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+type xmlSecurityConfigSummary struct {
+	Name             string `xml:"Name"`
+	CreationDateTime string `xml:"CreationDateTime"`
+}
+
+type xmlListSecurityConfigurationsResponse struct {
+	XMLName              xml.Name                    `xml:"ListSecurityConfigurationsResponse"`
+	SecurityConfigurations []xmlSecurityConfigSummary `xml:"ListSecurityConfigurationsResult>SecurityConfigurations>member"`
+	Meta                 xmlResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+func handleListSecurityConfigurations(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	configs := store.ListSecurityConfigurations()
+	members := make([]xmlSecurityConfigSummary, 0, len(configs))
+	for _, sc := range configs {
+		members = append(members, xmlSecurityConfigSummary{
+			Name:             sc.Name,
+			CreationDateTime: sc.CreationDateTime.Format("2006-01-02T15:04:05Z"),
+		})
+	}
+	return xmlOK(&xmlListSecurityConfigurationsResponse{
+		SecurityConfigurations: members,
+		Meta:                   xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+type xmlDeleteSecurityConfigurationResponse struct {
+	XMLName xml.Name            `xml:"DeleteSecurityConfigurationResponse"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleDeleteSecurityConfiguration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	name := form.Get("Name")
+	if name == "" {
+		return xmlErr(service.ErrValidation("Name is required."))
+	}
+	if !store.DeleteSecurityConfiguration(name) {
+		return xmlErr(service.ErrNotFound("SecurityConfiguration", name))
+	}
+	return xmlOK(&xmlDeleteSecurityConfigurationResponse{Meta: xmlResponseMetadata{RequestID: newRequestID()}})
+}

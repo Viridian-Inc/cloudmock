@@ -47,6 +47,10 @@ func (s *EMRService) Actions() []service.Action {
 		{Name: "SetVisibleToAllUsers", Method: http.MethodPost, IAMAction: "elasticmapreduce:SetVisibleToAllUsers"},
 		{Name: "AddTags", Method: http.MethodPost, IAMAction: "elasticmapreduce:AddTags"},
 		{Name: "RemoveTags", Method: http.MethodPost, IAMAction: "elasticmapreduce:RemoveTags"},
+		{Name: "CreateSecurityConfiguration", Method: http.MethodPost, IAMAction: "elasticmapreduce:CreateSecurityConfiguration"},
+		{Name: "DescribeSecurityConfiguration", Method: http.MethodPost, IAMAction: "elasticmapreduce:DescribeSecurityConfiguration"},
+		{Name: "ListSecurityConfigurations", Method: http.MethodPost, IAMAction: "elasticmapreduce:ListSecurityConfigurations"},
+		{Name: "DeleteSecurityConfiguration", Method: http.MethodPost, IAMAction: "elasticmapreduce:DeleteSecurityConfiguration"},
 	}
 }
 
@@ -90,8 +94,16 @@ func (s *EMRService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAddTags(ctx, s.store)
 	case "RemoveTags":
 		return handleRemoveTags(ctx, s.store)
+	case "CreateSecurityConfiguration":
+		return handleCreateSecurityConfiguration(ctx, s.store)
+	case "DescribeSecurityConfiguration":
+		return handleDescribeSecurityConfiguration(ctx, s.store)
+	case "ListSecurityConfigurations":
+		return handleListSecurityConfigurations(ctx, s.store)
+	case "DeleteSecurityConfiguration":
+		return handleDeleteSecurityConfiguration(ctx, s.store)
 	default:
-		return &service.Response{Format: service.FormatXML},
+		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",
 				"The action "+action+" is not valid for this web service.",
 				http.StatusBadRequest)

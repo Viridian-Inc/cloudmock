@@ -1,4 +1,4 @@
-#include "cloudmock.h"
+#include "../include/cloudmock.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

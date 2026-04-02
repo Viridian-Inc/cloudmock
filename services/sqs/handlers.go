@@ -41,7 +41,7 @@ func handleCreateQueue(ctx *service.RequestContext, store *QueueStore) (*service
 	q, _ := store.CreateQueue(name, attrs)
 
 	resp := &xmlCreateQueueResponse{
-		Result: xmlCreateQueueResult{QueueUrl: q.URL},
+		Result: xmlCreateQueueResult{QueueUrl: q.QueueURL()},
 		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	}
 	return xmlOK(resp)
@@ -121,7 +121,7 @@ func handleGetQueueUrl(ctx *service.RequestContext, store *QueueStore) (*service
 	}
 
 	resp := &xmlGetQueueUrlResponse{
-		Result: xmlGetQueueUrlResult{QueueUrl: q.URL},
+		Result: xmlGetQueueUrlResult{QueueUrl: q.QueueURL()},
 		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	}
 	return xmlOK(resp)
@@ -177,24 +177,19 @@ func handleGetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*
 	attrs := make([]xmlAttribute, 0)
 
 	// Dynamic / computed attributes.
-	q.mu.Lock()
-	approxVisible := len(q.messages)
-	approxInFlight := len(q.inflight)
-	q.mu.Unlock()
-
 	computedAttrs := map[string]string{
-		"ApproximateNumberOfMessages":           strconv.Itoa(approxVisible),
-		"ApproximateNumberOfMessagesNotVisible": strconv.Itoa(approxInFlight),
+		"ApproximateNumberOfMessages":           strconv.Itoa(q.ApproximateNumberOfMessages()),
+		"ApproximateNumberOfMessagesNotVisible": strconv.Itoa(q.ApproximateNumberOfMessagesNotVisible()),
 		"ApproximateNumberOfMessagesDelayed":    "0",
 		"QueueArn": fmt.Sprintf("arn:aws:sqs:%s:%s:%s",
-			regionFromURL(queueURL), accountFromURL(queueURL), q.Name),
+			regionFromURL(queueURL), accountFromURL(queueURL), q.QueueName()),
 		"CreatedTimestamp":      "0",
 		"LastModifiedTimestamp": "0",
 	}
 
 	// Merge static attributes.
 	allAttrs := make(map[string]string)
-	for k, v := range q.Attributes {
+	for k, v := range q.GetAttributes() {
 		allAttrs[k] = v
 	}
 	for k, v := range computedAttrs {
@@ -236,11 +231,7 @@ func handleSetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*
 	}
 
 	newAttrs := parseAttributes(form)
-	q.mu.Lock()
-	for k, v := range newAttrs {
-		q.Attributes[k] = v
-	}
-	q.mu.Unlock()
+	q.SetAttributes(newAttrs)
 
 	return xmlOK(&xmlSetQueueAttributesResponse{Meta: xmlResponseMetadata{RequestID: newUUID()}})
 }
@@ -355,7 +346,14 @@ func handleReceiveMessage(ctx *service.RequestContext, store *QueueStore) (*serv
 		}
 	}
 
-	msgs := q.ReceiveMessages(maxCount, visTimeout)
+	waitTime := 0
+	if s := form.Get("WaitTimeSeconds"); s != "" {
+		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
+			waitTime = v
+		}
+	}
+
+	msgs := q.ReceiveMessages(maxCount, visTimeout, waitTime)
 
 	xmlMsgs := make([]xmlMessage, 0, len(msgs))
 	for _, m := range msgs {
@@ -668,7 +666,7 @@ func resolveQueueURL(ctx *service.RequestContext, form url.Values, store *QueueS
 		if len(parts) == 2 {
 			queueName := parts[1]
 			if q, ok := store.GetByName(queueName); ok {
-				return q.URL
+				return q.QueueURL()
 			}
 		}
 	}

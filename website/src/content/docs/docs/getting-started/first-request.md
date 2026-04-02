@@ -137,6 +137,10 @@ You pointed standard AWS tools at `localhost:4566` and used them exactly as you 
 
 No AWS account. No internet. No cost.
 
+## Want a full example?
+
+Check out the [todo demo project](https://github.com/Viridian-Inc/cloudmock-todo-demo) -- a working app that uses S3, DynamoDB, SQS, and SNS together, with a web UI. Available in Node.js, Python, and Go.
+
 ## Next step
 
 You have made your first request. Now [configure your SDK](/docs/getting-started/with-your-stack/) to use CloudMock in your application code.

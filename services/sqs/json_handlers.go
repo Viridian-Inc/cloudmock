@@ -81,7 +81,7 @@ func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
 }
 
 // resolveQueueFromURL resolves the queue from a QueueUrl field in JSON input.
-func resolveQueueFromURL(queueURL string, store *QueueStore) (*Queue, error) {
+func resolveQueueFromURL(queueURL string, store *QueueStore) (Queue, error) {
 	q, ok := store.GetByURL(queueURL)
 	if ok {
 		return q, nil
@@ -121,7 +121,7 @@ func jsonCreateQueue(ctx *service.RequestContext, store *QueueStore) (*service.R
 	}
 
 	q, _ := store.CreateQueue(input.QueueName, input.Attributes)
-	return jsonOK(&jsonCreateQueueOutput{QueueUrl: q.URL})
+	return jsonOK(&jsonCreateQueueOutput{QueueUrl: q.QueueURL()})
 }
 
 // ---- DeleteQueue ----
@@ -193,7 +193,7 @@ func jsonGetQueueUrl(ctx *service.RequestContext, store *QueueStore) (*service.R
 		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
 			"The specified queue does not exist.", http.StatusBadRequest))
 	}
-	return jsonOK(&jsonGetQueueUrlOutput{QueueUrl: q.URL})
+	return jsonOK(&jsonGetQueueUrlOutput{QueueUrl: q.QueueURL()})
 }
 
 // ---- GetQueueAttributes ----
@@ -232,23 +232,18 @@ func jsonGetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*se
 	}
 
 	// Computed attributes.
-	q.mu.Lock()
-	approxVisible := len(q.messages)
-	approxInFlight := len(q.inflight)
-	q.mu.Unlock()
-
 	computedAttrs := map[string]string{
-		"ApproximateNumberOfMessages":           strconv.Itoa(approxVisible),
-		"ApproximateNumberOfMessagesNotVisible": strconv.Itoa(approxInFlight),
+		"ApproximateNumberOfMessages":           strconv.Itoa(q.ApproximateNumberOfMessages()),
+		"ApproximateNumberOfMessagesNotVisible": strconv.Itoa(q.ApproximateNumberOfMessagesNotVisible()),
 		"ApproximateNumberOfMessagesDelayed":    "0",
 		"QueueArn": fmt.Sprintf("arn:aws:sqs:%s:%s:%s",
-			regionFromURL(q.URL), accountFromURL(q.URL), q.Name),
+			regionFromURL(q.QueueURL()), accountFromURL(q.QueueURL()), q.QueueName()),
 		"CreatedTimestamp":      "0",
 		"LastModifiedTimestamp": "0",
 	}
 
 	allAttrs := make(map[string]string)
-	for k, v := range q.Attributes {
+	for k, v := range q.GetAttributes() {
 		allAttrs[k] = v
 	}
 	for k, v := range computedAttrs {
@@ -283,11 +278,7 @@ func jsonSetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*se
 		return jsonErr(err.(*service.AWSError))
 	}
 
-	q.mu.Lock()
-	for k, v := range input.Attributes {
-		q.Attributes[k] = v
-	}
-	q.mu.Unlock()
+	q.SetAttributes(input.Attributes)
 
 	return jsonOK(map[string]any{})
 }
@@ -391,7 +382,7 @@ func jsonReceiveMessage(ctx *service.RequestContext, store *QueueStore) (*servic
 		visTimeout = 30
 	}
 
-	msgs := q.ReceiveMessages(maxCount, visTimeout)
+	msgs := q.ReceiveMessages(maxCount, visTimeout, input.WaitTimeSeconds)
 
 	outMsgs := make([]jsonMessageOut, 0, len(msgs))
 	for _, m := range msgs {

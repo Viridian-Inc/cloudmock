@@ -1,8 +1,8 @@
 package s3
 
 import (
-	"crypto/md5" //nolint:gosec // MD5 is used for ETags per the S3 specification, not security
-	"fmt"
+	"crypto/md5"  //nolint:gosec // MD5 is used for ETags per the S3 specification, not security
+	"encoding/hex"
 	"net/http"
 	"sort"
 	"strings"
@@ -56,7 +56,12 @@ func NewObjectStore() *ObjectStore {
 // computeETag returns a quoted MD5 hex string for the given data.
 func computeETag(data []byte) string {
 	sum := md5.Sum(data) //nolint:gosec
-	return fmt.Sprintf(`"%x"`, sum)
+	// Avoid fmt.Sprintf: pre-allocate for `"` + 32 hex chars + `"` = 34 bytes.
+	buf := make([]byte, 0, 34)
+	buf = append(buf, '"')
+	buf = append(buf, hex.EncodeToString(sum[:])...)
+	buf = append(buf, '"')
+	return string(buf)
 }
 
 // PutObject stores an object under the given key, replacing any existing value.
@@ -274,13 +279,14 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 		maxKeys = 1000
 	}
 
+	// Acquire the lock once for the entire operation: collect keys and object
+	// references in a single critical section instead of locking per-object.
 	os.mu.RLock()
 	keys := make([]string, 0, len(os.objects))
 	for k := range os.objects {
 		keys = append(keys, k)
 	}
-	os.mu.RUnlock()
-
+	// Sort while still holding the read lock so the map snapshot is consistent.
 	sort.Strings(keys)
 
 	out := &ListObjectsOutput{}
@@ -326,14 +332,14 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 			break
 		}
 
-		os.mu.RLock()
+		// Direct map access — no per-object lock needed.
 		obj := os.objects[k]
-		os.mu.RUnlock()
 		if obj != nil {
 			out.Objects = append(out.Objects, obj)
 		}
 		count++
 	}
+	os.mu.RUnlock()
 
 	sort.Strings(out.CommonPrefixes)
 	return out

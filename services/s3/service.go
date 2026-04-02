@@ -256,22 +256,11 @@ func (s *S3Service) GetObjectData(bucket, key string) ([]byte, error) {
 	return obj.Body, nil
 }
 
-// publishObjectEvent sends an S3 object event to the event bus.
+// publishObjectEvent sends an S3 object event to the event bus asynchronously.
+// The S3 API response does not wait for event delivery.
 func (s *S3Service) publishObjectEvent(ctx *service.RequestContext, bucket, key, eventType string) {
-	// Look up object metadata for the event detail.
-	detail := map[string]any{
-		"bucket": bucket,
-		"key":    key,
-	}
-
-	// Try to include size and etag from the object store.
-	if objs, err := s.store.bucketObjects(bucket); err == nil {
-		if obj, err := objs.GetObject(key); err == nil {
-			detail["size"] = obj.Size
-			detail["etag"] = obj.ETag
-		}
-	}
-
+	// Capture context values before spawning goroutine — ctx must not be
+	// accessed after HandleRequest returns.
 	accountID := ctx.AccountID
 	if accountID == "" {
 		accountID = "000000000000"
@@ -281,12 +270,28 @@ func (s *S3Service) publishObjectEvent(ctx *service.RequestContext, bucket, key,
 		region = "us-east-1"
 	}
 
-	s.bus.Publish(&eventbus.Event{
-		Source:    "s3",
-		Type:      eventType,
-		Detail:    detail,
-		Time:      time.Now().UTC(),
-		Region:    region,
-		AccountID: accountID,
-	})
+	go func() {
+		// Look up object metadata for the event detail.
+		detail := map[string]any{
+			"bucket": bucket,
+			"key":    key,
+		}
+
+		// Try to include size and etag from the object store.
+		if objs, err := s.store.bucketObjects(bucket); err == nil {
+			if obj, err := objs.GetObject(key); err == nil {
+				detail["size"] = obj.Size
+				detail["etag"] = obj.ETag
+			}
+		}
+
+		s.bus.Publish(&eventbus.Event{
+			Source:    "s3",
+			Type:      eventType,
+			Detail:    detail,
+			Time:      time.Now().UTC(),
+			Region:    region,
+			AccountID: accountID,
+		})
+	}()
 }

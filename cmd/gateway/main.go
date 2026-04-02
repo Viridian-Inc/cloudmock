@@ -984,26 +984,30 @@ func main() {
 	// Base directory for file-backed stores.
 	baseDir := filepath.Join(os.Getenv("HOME"), ".cloudmock")
 
-	// Chaos engine for fault injection — file-backed
-	chaosStore, err := filestore.New[gateway.ChaosRule](filepath.Join(baseDir, "chaos"))
-	if err != nil {
-		slog.Error("failed to create chaos file store", "error", err)
-	}
-	var chaosRules []gateway.ChaosRule
-	if chaosStore != nil {
-		chaosRules, _ = chaosStore.List()
-	}
-	chaosEngine := gateway.NewChaosEngineWithRules(chaosRules)
-	if chaosStore != nil {
-		chaosEngine.PersistFunc = func(rules []gateway.ChaosRule) {
-			// Delete all existing files, then save current rules.
-			if existing, err := chaosStore.List(); err == nil {
-				for _, r := range existing {
-					_ = chaosStore.Delete(r.ID)
+	// Chaos engine for fault injection — file-backed.
+	// In minimal profile, skip disk I/O for chaos rules (no rules by default).
+	chaosEngine := gateway.NewChaosEngine()
+	if profile != "minimal" {
+		chaosStore, err := filestore.New[gateway.ChaosRule](filepath.Join(baseDir, "chaos"))
+		if err != nil {
+			slog.Error("failed to create chaos file store", "error", err)
+		}
+		var chaosRules []gateway.ChaosRule
+		if chaosStore != nil {
+			chaosRules, _ = chaosStore.List()
+		}
+		chaosEngine = gateway.NewChaosEngineWithRules(chaosRules)
+		if chaosStore != nil {
+			chaosEngine.PersistFunc = func(rules []gateway.ChaosRule) {
+				// Delete all existing files, then save current rules.
+				if existing, err := chaosStore.List(); err == nil {
+					for _, r := range existing {
+						_ = chaosStore.Delete(r.ID)
+					}
 				}
-			}
-			for _, r := range rules {
-				_ = chaosStore.Save(r.ID, r)
+				for _, r := range rules {
+					_ = chaosStore.Save(r.ID, r)
+				}
 			}
 		}
 	}
@@ -1096,90 +1100,104 @@ func main() {
 
 	adminAPI.SetChaosEngine(chaosEngine)
 
-	profileDir := filepath.Join(os.TempDir(), "cloudmock-profiles")
-	os.MkdirAll(profileDir, 0755)
-	profEngine := profiling.New(profileDir, 100)
-	symbolizer := profiling.NewSymbolizer()
-	adminAPI.SetProfilingEngine(profEngine)
-	adminAPI.SetSymbolizer(symbolizer)
+	// Profiling, cost, trace comparison, and RUM — defer in minimal profile.
+	if profile != "minimal" {
+		profileDir := filepath.Join(os.TempDir(), "cloudmock-profiles")
+		os.MkdirAll(profileDir, 0755)
+		profEngine := profiling.New(profileDir, 100)
+		symbolizer := profiling.NewSymbolizer()
+		adminAPI.SetProfilingEngine(profEngine)
+		adminAPI.SetSymbolizer(symbolizer)
 
-	costEngine := cost.New(dp.Requests, cfg.Cost.Pricing)
-	adminAPI.SetCostEngine(costEngine)
+		costEngine := cost.New(dp.Requests, cfg.Cost.Pricing)
+		adminAPI.SetCostEngine(costEngine)
 
-	tc := tracecompare.New(dp.Traces)
-	adminAPI.SetTraceComparer(tc)
+		tc := tracecompare.New(dp.Traces)
+		adminAPI.SetTraceComparer(tc)
 
-	// RUM (Real User Monitoring) engine
-	if cfg.RUM.Enabled {
-		var rumStore rumpkg.RUMStore
-		if mode == "dynamodb" {
-			rumStore = rumdynamo.New(ddbStore, 7) // 7-day TTL
-		} else {
-			fsStore, rumErr := rumfilestore.New(filepath.Join(baseDir, "rum"), cfg.RUM.MaxEvents)
-			if rumErr != nil {
-				slog.Error("failed to create RUM file store, falling back to memory", "error", rumErr)
+		// RUM (Real User Monitoring) engine
+		if cfg.RUM.Enabled {
+			var rumStore rumpkg.RUMStore
+			if mode == "dynamodb" {
+				rumStore = rumdynamo.New(ddbStore, 7) // 7-day TTL
+			} else {
+				fsStore, rumErr := rumfilestore.New(filepath.Join(baseDir, "rum"), cfg.RUM.MaxEvents)
+				if rumErr != nil {
+					slog.Error("failed to create RUM file store, falling back to memory", "error", rumErr)
+				}
+				rumStore = fsStore
 			}
-			rumStore = fsStore
+			if rumStore != nil {
+				rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
+					SampleRate: cfg.RUM.SampleRate,
+					MaxEvents:  cfg.RUM.MaxEvents,
+				})
+				adminAPI.SetRUMEngine(rumEngine)
+			}
+			slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
 		}
-		if rumStore != nil {
-			rumEngine := rumpkg.New(rumStore, rumpkg.EngineConfig{
-				SampleRate: cfg.RUM.SampleRate,
-				MaxEvents:  cfg.RUM.MaxEvents,
-			})
-			adminAPI.SetRUMEngine(rumEngine)
-		}
-		slog.Info("RUM engine enabled", "sample_rate", cfg.RUM.SampleRate, "max_events", cfg.RUM.MaxEvents)
 	}
 
-	// Session Replay — file-backed
-	replayStore, replayErr := replayfilestore.New(filepath.Join(baseDir, "replay"))
-	if replayErr != nil {
-		slog.Error("failed to create replay file store", "error", replayErr)
-	}
-	if replayStore != nil {
-		adminAPI.SetReplayStore(replayStore)
-	}
-	slog.Info("session replay store initialized", "storage", filepath.Join(baseDir, "replay"))
-
-	// ML-Powered Anomaly Detection — learns baselines and detects deviations.
+	// Anomaly detector — always created (lightweight struct), used by logging middleware.
 	anomalyDetector := anomalypkg.NewDetector(7*24*time.Hour, 2.0)
 	adminAPI.SetAnomalyDetector(anomalyDetector)
-	slog.Info("anomaly detector initialized", "window", "7d", "threshold", 2.0)
 
-	// Uptime / endpoint monitoring — file-backed
-	{
-		uptimeStore, uptimeErr := uptimefilestore.New(filepath.Join(baseDir, "uptime"), 1000)
-		if uptimeErr != nil {
-			slog.Error("failed to create uptime file store", "error", uptimeErr)
+	// Devtools subsystems: session replay, uptime, error tracking, log store.
+	// Defer initialization until the admin API is first accessed to reduce startup time.
+	// On "minimal" profile these are initialized lazily; other profiles initialize eagerly.
+	initDevtoolsStores := func() {
+		// Session Replay — file-backed
+		replayStore, replayErr := replayfilestore.New(filepath.Join(baseDir, "replay"))
+		if replayErr != nil {
+			slog.Error("failed to create replay file store", "error", replayErr)
 		}
-		if uptimeStore != nil {
-			workerPool := worker.NewPool(rootCtx, nil)
-			uptimeEngine := uptimepkg.NewEngine(uptimeStore, workerPool, uptimepkg.DefaultEngineConfig())
-			uptimeEngine.StartAll()
-			adminAPI.SetUptimeEngine(uptimeEngine)
+		if replayStore != nil {
+			adminAPI.SetReplayStore(replayStore)
 		}
-		slog.Info("uptime monitoring engine initialized", "storage", filepath.Join(baseDir, "uptime"))
+		slog.Info("session replay store initialized", "storage", filepath.Join(baseDir, "replay"))
+
+		// Uptime / endpoint monitoring — file-backed
+		{
+			uptimeStore, uptimeErr := uptimefilestore.New(filepath.Join(baseDir, "uptime"), 1000)
+			if uptimeErr != nil {
+				slog.Error("failed to create uptime file store", "error", uptimeErr)
+			}
+			if uptimeStore != nil {
+				workerPool := worker.NewPool(rootCtx, nil)
+				uptimeEngine := uptimepkg.NewEngine(uptimeStore, workerPool, uptimepkg.DefaultEngineConfig())
+				uptimeEngine.StartAll()
+				adminAPI.SetUptimeEngine(uptimeEngine)
+			}
+			slog.Info("uptime monitoring engine initialized", "storage", filepath.Join(baseDir, "uptime"))
+		}
+
+		// Structured error tracking — file-backed
+		errStore, errStoreErr := errsfilestore.New(filepath.Join(baseDir, "errors"), 10000)
+		if errStoreErr != nil {
+			slog.Error("failed to create error file store", "error", errStoreErr)
+		}
+		if errStore != nil {
+			adminAPI.SetErrorStore(errStore)
+		}
+		slog.Info("error tracking store initialized", "storage", filepath.Join(baseDir, "errors"))
+
+		// Log management — file-backed
+		logStore, logStoreErr := logsfilestore.New(filepath.Join(baseDir, "logs"), 50000)
+		if logStoreErr != nil {
+			slog.Error("failed to create log file store", "error", logStoreErr)
+		}
+		if logStore != nil {
+			adminAPI.SetLogStore(logStore)
+		}
+		slog.Info("log store initialized", "storage", filepath.Join(baseDir, "logs"))
 	}
 
-	// Structured error tracking — file-backed
-	errStore, errStoreErr := errsfilestore.New(filepath.Join(baseDir, "errors"), 10000)
-	if errStoreErr != nil {
-		slog.Error("failed to create error file store", "error", errStoreErr)
+	if profile == "minimal" {
+		// Defer devtools store initialization — trigger on first admin API access.
+		adminAPI.SetLazyInitFunc(func() { initDevtoolsStores() })
+	} else {
+		initDevtoolsStores()
 	}
-	if errStore != nil {
-		adminAPI.SetErrorStore(errStore)
-	}
-	slog.Info("error tracking store initialized", "storage", filepath.Join(baseDir, "errors"))
-
-	// Log management — file-backed
-	logStore, logStoreErr := logsfilestore.New(filepath.Join(baseDir, "logs"), 50000)
-	if logStoreErr != nil {
-		slog.Error("failed to create log file store", "error", logStoreErr)
-	}
-	if logStore != nil {
-		adminAPI.SetLogStore(logStore)
-	}
-	slog.Info("log store initialized", "storage", filepath.Join(baseDir, "logs"))
 
 	// Wire Lambda logs, IAM engine, and SES store to admin API.
 	// lambdaService and sesService may be nil when running in minimal profile
@@ -1425,8 +1443,8 @@ func main() {
 		slog.Info("monitor service started", "eval_interval", evalInterval)
 	}
 
-	// Traffic simulator / replay engine
-	{
+	// Traffic simulator / replay engine — deferred in minimal profile.
+	if profile != "minimal" {
 		var tStore trafficpkg.RecordingStore
 		if mode == "dynamodb" {
 			tStore = trafficdynamo.New(ddbStore)
@@ -1444,97 +1462,108 @@ func main() {
 		adminAPI.SetTrafficEngine(trafficEng)
 	}
 
-	// Annotations store — file-backed
-	{
-		annotationsDir := filepath.Join(baseDir, "annotations")
-		annStore, _ := filestore.New[annotationspkg.Annotation](annotationsDir)
-		var existing []annotationspkg.Annotation
-		if annStore != nil {
-			existing, _ = annStore.List()
-		}
-		annotationStore := annotationspkg.NewStoreWithData(existing)
-		if annStore != nil {
-			annotationStore.PersistFunc = func(annotations []annotationspkg.Annotation) {
-				// Delete all, then save current.
-				if old, err := annStore.List(); err == nil {
-					for _, a := range old {
-						_ = annStore.Delete(a.ID)
+	// Devtools features: annotations, CI/CD, synthetics, security, marketplace.
+	// Deferred on "minimal" profile for faster startup.
+	initDevtoolsFeatures := func() {
+		// Annotations store — file-backed
+		{
+			annotationsDir := filepath.Join(baseDir, "annotations")
+			annStore, _ := filestore.New[annotationspkg.Annotation](annotationsDir)
+			var existing []annotationspkg.Annotation
+			if annStore != nil {
+				existing, _ = annStore.List()
+			}
+			annotationStore := annotationspkg.NewStoreWithData(existing)
+			if annStore != nil {
+				annotationStore.PersistFunc = func(annotations []annotationspkg.Annotation) {
+					// Delete all, then save current.
+					if old, err := annStore.List(); err == nil {
+						for _, a := range old {
+							_ = annStore.Delete(a.ID)
+						}
+					}
+					for _, a := range annotations {
+						_ = annStore.Save(a.ID, a)
 					}
 				}
-				for _, a := range annotations {
-					_ = annStore.Save(a.ID, a)
+			}
+			adminAPI.SetAnnotationStore(annotationStore)
+			slog.Info("annotation store initialized", "storage", annotationsDir)
+		}
+
+		// CI/CD visibility store — file-backed
+		{
+			cs, csErr := cicdfilestore.New(filepath.Join(baseDir, "cicd"))
+			if csErr != nil {
+				slog.Error("failed to create CI/CD file store", "error", csErr)
+			}
+			if cs != nil {
+				adminAPI.SetCICDStore(cs)
+			}
+			slog.Info("CI/CD store initialized", "storage", filepath.Join(baseDir, "cicd"))
+		}
+
+		// Synthetic browser/HTTP tests — file-backed
+		{
+			synthDir := filepath.Join(baseDir, "synthetics")
+			synthTestStore, _ := filestore.New[synthetics.SyntheticTest](filepath.Join(synthDir, "tests"))
+			synthResultStore, _ := filestore.New[map[string][]synthetics.TestResult](filepath.Join(synthDir, "results"))
+
+			var existingTests []synthetics.SyntheticTest
+			existingResults := make(map[string][]synthetics.TestResult)
+			if synthTestStore != nil {
+				existingTests, _ = synthTestStore.List()
+			}
+			if synthResultStore != nil {
+				if r, err := synthResultStore.Get("all"); err == nil {
+					existingResults = r
 				}
 			}
-		}
-		adminAPI.SetAnnotationStore(annotationStore)
-		slog.Info("annotation store initialized", "storage", annotationsDir)
-	}
 
-	// CI/CD visibility store — file-backed
-	{
-		cs, csErr := cicdfilestore.New(filepath.Join(baseDir, "cicd"))
-		if csErr != nil {
-			slog.Error("failed to create CI/CD file store", "error", csErr)
-		}
-		if cs != nil {
-			adminAPI.SetCICDStore(cs)
-		}
-		slog.Info("CI/CD store initialized", "storage", filepath.Join(baseDir, "cicd"))
-	}
-
-	// Synthetic browser/HTTP tests — file-backed
-	{
-		synthDir := filepath.Join(baseDir, "synthetics")
-		synthTestStore, _ := filestore.New[synthetics.SyntheticTest](filepath.Join(synthDir, "tests"))
-		synthResultStore, _ := filestore.New[map[string][]synthetics.TestResult](filepath.Join(synthDir, "results"))
-
-		var existingTests []synthetics.SyntheticTest
-		existingResults := make(map[string][]synthetics.TestResult)
-		if synthTestStore != nil {
-			existingTests, _ = synthTestStore.List()
-		}
-		if synthResultStore != nil {
-			if r, err := synthResultStore.Get("all"); err == nil {
-				existingResults = r
-			}
-		}
-
-		synthStore := synthetics.NewStoreWithData(500, existingTests, existingResults)
-		if synthTestStore != nil && synthResultStore != nil {
-			synthStore.PersistFunc = func(tests []synthetics.SyntheticTest, results map[string][]synthetics.TestResult) {
-				// Save tests individually.
-				if old, err := synthTestStore.List(); err == nil {
-					for _, t := range old {
-						_ = synthTestStore.Delete(t.ID)
+			synthStore := synthetics.NewStoreWithData(500, existingTests, existingResults)
+			if synthTestStore != nil && synthResultStore != nil {
+				synthStore.PersistFunc = func(tests []synthetics.SyntheticTest, results map[string][]synthetics.TestResult) {
+					// Save tests individually.
+					if old, err := synthTestStore.List(); err == nil {
+						for _, t := range old {
+							_ = synthTestStore.Delete(t.ID)
+						}
 					}
+					for _, t := range tests {
+						_ = synthTestStore.Save(t.ID, t)
+					}
+					// Save all results as a single blob.
+					_ = synthResultStore.Save("all", results)
 				}
-				for _, t := range tests {
-					_ = synthTestStore.Save(t.ID, t)
-				}
-				// Save all results as a single blob.
-				_ = synthResultStore.Save("all", results)
 			}
+
+			synthWorkerPool := worker.NewPool(rootCtx, nil)
+			synthEngine := synthetics.NewEngine(synthStore, synthWorkerPool)
+			synthEngine.StartAll()
+			adminAPI.SetSyntheticsEngine(synthEngine)
+			slog.Info("synthetics engine initialized", "storage", synthDir)
 		}
 
-		synthWorkerPool := worker.NewPool(rootCtx, nil)
-		synthEngine := synthetics.NewEngine(synthStore, synthWorkerPool)
-		synthEngine.StartAll()
-		adminAPI.SetSyntheticsEngine(synthEngine)
-		slog.Info("synthetics engine initialized", "storage", synthDir)
+		// Security posture scanner — checks mock resources for misconfigurations.
+		{
+			secScanner := security.NewScanner(registry)
+			adminAPI.SetSecurityScanner(secScanner)
+			slog.Info("security scanner initialized")
+		}
+
+		// Plugin marketplace — search and (placeholder) install community plugins.
+		{
+			mpRegistry := marketplace.NewRegistry()
+			adminAPI.SetMarketplace(mpRegistry)
+			slog.Info("marketplace initialized", "listings", len(mpRegistry.List()))
+		}
 	}
 
-	// Security posture scanner — checks mock resources for misconfigurations.
-	{
-		secScanner := security.NewScanner(registry)
-		adminAPI.SetSecurityScanner(secScanner)
-		slog.Info("security scanner initialized")
-	}
-
-	// Plugin marketplace — search and (placeholder) install community plugins.
-	{
-		mpRegistry := marketplace.NewRegistry()
-		adminAPI.SetMarketplace(mpRegistry)
-		slog.Info("marketplace initialized", "listings", len(mpRegistry.List()))
+	if profile == "minimal" {
+		// Append to the existing lazy init so all devtools init together.
+		adminAPI.AppendLazyInitFunc(func() { initDevtoolsFeatures() })
+	} else {
+		initDevtoolsFeatures()
 	}
 
 	// Plugin manager — enables hybrid in-process / external plugin routing.
@@ -1545,34 +1574,40 @@ func main() {
 	// into the plugin system via ServiceAdapter. This makes every AWS service
 	// available through the unified plugin interface while keeping the legacy
 	// registry as a fallback.
-	for _, svc := range registry.List() {
-		adapter := plugin.NewServiceAdapter(svc, cfg.Region, cfg.AccountID)
-		if err := pluginMgr.RegisterServiceAdapter(rootCtx, adapter); err != nil {
-			slog.Warn("failed to register service as plugin", "service", svc.Name(), "error", err)
+	// In minimal profile, defer the bridging to avoid iterating all services at boot.
+	if profile != "minimal" {
+		for _, svc := range registry.List() {
+			adapter := plugin.NewServiceAdapter(svc, cfg.Region, cfg.AccountID)
+			if err := pluginMgr.RegisterServiceAdapter(rootCtx, adapter); err != nil {
+				slog.Warn("failed to register service as plugin", "service", svc.Name(), "error", err)
+			}
 		}
-	}
-	slog.Info("bridged legacy services to plugin system", "count", len(pluginMgr.Names()))
+		slog.Info("bridged legacy services to plugin system", "count", len(pluginMgr.Names()))
 
-	// Register Kubernetes API emulation plugin.
-	k8sPlugin := k8splugin.New()
-	if err := pluginMgr.RegisterInProcess(rootCtx, k8sPlugin); err != nil {
-		slog.Error("failed to register kubernetes plugin", "error", err)
-	}
+		// Register Kubernetes API emulation plugin.
+		k8sPlugin := k8splugin.New()
+		if err := pluginMgr.RegisterInProcess(rootCtx, k8sPlugin); err != nil {
+			slog.Error("failed to register kubernetes plugin", "error", err)
+		}
 
-	// Register ArgoCD API emulation plugin, wired to k8s for sync operations.
-	argoPlugin := argoplugin.New(k8sPlugin)
-	if err := pluginMgr.RegisterInProcess(rootCtx, argoPlugin); err != nil {
-		slog.Error("failed to register argocd plugin", "error", err)
+		// Register ArgoCD API emulation plugin, wired to k8s for sync operations.
+		argoPlugin := argoplugin.New(k8sPlugin)
+		if err := pluginMgr.RegisterInProcess(rootCtx, argoPlugin); err != nil {
+			slog.Error("failed to register argocd plugin", "error", err)
+		}
 	}
 
 	// Load external plugins from filesystem.
-	extPluginDir := *pluginDir
-	if extPluginDir == "" {
-		home, _ := os.UserHomeDir()
-		extPluginDir = filepath.Join(home, ".cloudmock", "plugins")
-	}
-	if err := plugin.LoadExternalPlugins(rootCtx, pluginMgr, extPluginDir, slog.Default()); err != nil {
-		slog.Warn("failed to load external plugins", "dir", extPluginDir, "error", err)
+	// Skip in minimal profile to avoid filesystem scan at boot.
+	if profile != "minimal" {
+		extPluginDir := *pluginDir
+		if extPluginDir == "" {
+			home, _ := os.UserHomeDir()
+			extPluginDir = filepath.Join(home, ".cloudmock", "plugins")
+		}
+		if err := plugin.LoadExternalPlugins(rootCtx, pluginMgr, extPluginDir, slog.Default()); err != nil {
+			slog.Warn("failed to load external plugins", "dir", extPluginDir, "error", err)
+		}
 	}
 
 	// --- SaaS hosted-tier wiring ---

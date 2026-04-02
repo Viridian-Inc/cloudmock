@@ -1,0 +1,125 @@
+---
+title: SDKs
+description: Language-specific SDK adapters for CloudMock
+---
+
+# SDK Adapters
+
+CloudMock provides SDK adapters for 10 languages. Each adapter auto-starts the CloudMock binary, returns pre-configured AWS SDK clients, and stops the server on cleanup.
+
+## Go (In-Process)
+
+The Go SDK runs CloudMock in-process — no server, no network, 20μs per operation.
+
+```go
+import "github.com/neureaux/cloudmock/sdk"
+
+cm := sdk.New()
+defer cm.Close()
+cfg := cm.Config()
+
+s3Client := s3.NewFromConfig(cfg, func(o *s3.Options) { o.UsePathStyle = true })
+ddbClient := dynamodb.NewFromConfig(cfg)
+sqsClient := sqs.NewFromConfig(cfg)
+```
+
+## Python
+
+```python
+from cloudmock import mock_aws
+
+with mock_aws() as cm:
+    s3 = cm.boto3_client("s3")
+    ddb = cm.boto3_client("dynamodb")
+    sqs = cm.boto3_client("sqs")
+```
+
+### pytest fixture
+```python
+import pytest
+from cloudmock import CloudMock
+
+@pytest.fixture(scope="session")
+def aws():
+    with CloudMock() as cm:
+        yield cm
+```
+
+## Node.js / TypeScript
+
+```typescript
+import { mockAWS } from "@cloudmock/sdk";
+import { S3Client, CreateBucketCommand } from "@aws-sdk/client-s3";
+
+const cm = await mockAWS();
+const s3 = new S3Client(cm.clientConfig());
+await s3.send(new CreateBucketCommand({ Bucket: "test" }));
+await cm.stop();
+```
+
+## Java
+
+```java
+try (CloudMock cm = CloudMock.start()) {
+    S3Client s3 = S3Client.builder()
+        .endpointOverride(cm.endpoint())
+        .credentialsProvider(StaticCredentialsProvider.create(
+            AwsBasicCredentials.create("test", "test")))
+        .build();
+}
+```
+
+## Kotlin
+
+```kotlin
+CloudMock.start().use { cm ->
+    val s3 = S3Client { endpointUrl = cm.endpoint; region = "us-east-1" }
+    s3.createBucket { bucket = "test" }
+}
+```
+
+## Rust
+
+```rust
+let cm = CloudMock::start().await?;
+let config = aws_config::defaults(BehaviorVersion::latest())
+    .endpoint_url(cm.endpoint())
+    .load().await;
+let s3 = aws_sdk_s3::Client::new(&config);
+cm.stop().await;
+```
+
+## Ruby
+
+```ruby
+cm = CloudMock.start
+s3 = Aws::S3::Client.new(cm.aws_config)
+s3.create_bucket(bucket: "test")
+cm.stop
+```
+
+## C# / .NET
+
+```csharp
+using var cm = new CloudMockServer();
+var s3 = new AmazonS3Client(new BasicAWSCredentials("test", "test"),
+    new AmazonS3Config { ServiceURL = cm.Endpoint, ForcePathStyle = true });
+```
+
+## Swift
+
+```swift
+let cm = try CloudMockServer(port: 0)
+try cm.start()
+// Configure Soto with cm.endpoint
+cm.stop()
+```
+
+## C / C++
+
+```c
+cloudmock_t *cm = cloudmock_start(NULL);
+printf("Endpoint: %s\n", cloudmock_endpoint(cm));
+// Use AWS SDK for C++ with endpoint
+cloudmock_stop(cm);
+```

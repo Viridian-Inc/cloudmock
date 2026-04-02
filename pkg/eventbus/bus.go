@@ -47,6 +47,15 @@ func (b *Bus) Unsubscribe(id string) {
 	b.subscriptions = updated
 }
 
+// HasSubscribers returns true if there is at least one subscription.
+// Useful for callers to skip event construction when nobody is listening.
+func (b *Bus) HasSubscribers() bool {
+	b.mu.RLock()
+	n := len(b.subscriptions)
+	b.mu.RUnlock()
+	return n > 0
+}
+
 // Publish fans out an event to all matching subscriptions asynchronously.
 // Each matching handler is invoked in its own goroutine. Errors from handlers
 // are silently discarded (fire-and-forget semantics).

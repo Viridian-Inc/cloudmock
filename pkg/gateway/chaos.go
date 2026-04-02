@@ -171,6 +171,12 @@ func (ce *ChaosEngine) Match(svcName, action string) *ChaosRule {
 // before forwarding requests.
 func ChaosMiddleware(next http.Handler, engine *ChaosEngine) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Fast path: skip chaos matching when no rules are enabled.
+		if !engine.HasActiveRules() {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		svcName := detectServiceFromRequest(r)
 		action := detectActionFromRequest(r)
 

@@ -150,6 +150,33 @@ type API struct {
 	marketplace        *marketplace.Registry
 	persistDir         string       // if set, dashboards/views/deploys are persisted here
 	dynamoStore        *DynamoStore // if set, dashboards/views/deploys use DynamoDB
+
+	// Lazy initialization for devtools subsystems (deferred in minimal profile).
+	lazyInitOnce sync.Once
+	lazyInitFns  []func()
+}
+
+// SetLazyInitFunc registers a function to be called once, on first admin API access.
+// Used to defer heavyweight devtools initialization in the minimal profile.
+func (a *API) SetLazyInitFunc(fn func()) {
+	a.lazyInitFns = append(a.lazyInitFns, fn)
+}
+
+// AppendLazyInitFunc appends an additional lazy init function.
+func (a *API) AppendLazyInitFunc(fn func()) {
+	a.lazyInitFns = append(a.lazyInitFns, fn)
+}
+
+// ensureDevtoolsInit runs all registered lazy init functions exactly once.
+func (a *API) ensureDevtoolsInit() {
+	if len(a.lazyInitFns) == 0 {
+		return
+	}
+	a.lazyInitOnce.Do(func() {
+		for _, fn := range a.lazyInitFns {
+			fn()
+		}
+	})
 }
 
 // SetRequestLog sets the direct in-memory request log and stats on the API.
@@ -471,6 +498,8 @@ func (a *API) SetLambdaLogs(logs *lambda.LogBuffer) {
 
 // ServeHTTP implements http.Handler.
 func (a *API) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Trigger lazy initialization of devtools subsystems on first access.
+	a.ensureDevtoolsInit()
 	a.mux.ServeHTTP(w, r)
 }
 

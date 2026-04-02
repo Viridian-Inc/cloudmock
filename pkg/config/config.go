@@ -438,6 +438,9 @@ func LoadFromFile(path string) (*Config, error) {
 
 // ApplyEnv applies environment variable overrides to the Config.
 func (c *Config) ApplyEnv() {
+	if v := os.Getenv("CLOUDMOCK_PROFILE"); v != "" {
+		c.Profile = v
+	}
 	if v := os.Getenv("CLOUDMOCK_REGION"); v != "" {
 		c.Region = v
 	}

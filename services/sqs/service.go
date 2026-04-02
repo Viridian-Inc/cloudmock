@@ -70,7 +70,7 @@ func (s *SQSService) PollMessages(queueName string, maxCount, visibilityTimeout 
 	if !qOK {
 		return nil, nil, nil, false
 	}
-	msgs := q.ReceiveMessages(maxCount, visibilityTimeout)
+	msgs := q.ReceiveMessages(maxCount, visibilityTimeout, 0)
 	ids := make([]string, 0, len(msgs))
 	bds := make([]string, 0, len(msgs))
 	rhs := make([]string, 0, len(msgs))

@@ -1,0 +1,10 @@
+[package]
+name = "cloudmock"
+version = "1.0.0"
+edition = "2021"
+description = "CloudMock — Local AWS emulation for Rust tests"
+license = "BSL-1.1"
+repository = "https://github.com/Viridian-Inc/cloudmock"
+
+[dependencies]
+tokio = { version = "1", features = ["process", "net", "time", "rt"] }

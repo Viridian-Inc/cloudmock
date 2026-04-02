@@ -149,3 +149,263 @@ func TestR53R_InvalidAction(t *testing.T) {
 	_, err := s.HandleRequest(jsonCtx("Bogus", nil))
 	require.Error(t, err)
 }
+
+func TestR53R_UpdateResolverEndpoint(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Name": "original-name", "Direction": "INBOUND",
+	}))
+	epID := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)["Id"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateResolverEndpoint", map[string]any{
+		"ResolverEndpointId": epID,
+		"Name":               "new-name",
+	}))
+	require.NoError(t, err)
+	ep := respJSON(t, resp)["ResolverEndpoint"].(map[string]any)
+	assert.Equal(t, "new-name", ep["Name"])
+}
+
+func TestR53R_UpdateResolverEndpoint_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateResolverEndpoint", map[string]any{
+		"ResolverEndpointId": "nonexistent",
+		"Name":               "does-not-matter",
+	}))
+	require.Error(t, err)
+}
+
+func TestR53R_UpdateResolverRule(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverRule", map[string]any{
+		"Name": "orig-rule", "DomainName": "example.com.", "RuleType": "FORWARD",
+		"TargetIps": []map[string]any{{"Ip": "10.0.0.1", "Port": 53}},
+	}))
+	ruleID := respJSON(t, cr)["ResolverRule"].(map[string]any)["Id"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateResolverRule", map[string]any{
+		"ResolverRuleId": ruleID,
+		"Config": map[string]any{
+			"Name":      "updated-rule",
+			"TargetIps": []map[string]any{{"Ip": "10.0.0.2", "Port": 53}},
+		},
+	}))
+	require.NoError(t, err)
+	rule := respJSON(t, resp)["ResolverRule"].(map[string]any)
+	assert.Equal(t, "updated-rule", rule["Name"])
+}
+
+func TestR53R_UpdateResolverRule_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateResolverRule", map[string]any{
+		"ResolverRuleId": "nonexistent",
+		"Config":         map[string]any{"Name": "x"},
+	}))
+	require.Error(t, err)
+}
+
+func TestR53R_OutboundEndpoint(t *testing.T) {
+	s := newService()
+	cr, err := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Name":             "out-ep",
+		"Direction":        "OUTBOUND",
+		"SecurityGroupIds": []string{"sg-456"},
+		"IpAddresses":      []map[string]any{{"SubnetId": "subnet-a"}, {"SubnetId": "subnet-b"}},
+	}))
+	require.NoError(t, err)
+	ep := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)
+	assert.Equal(t, "OUTBOUND", ep["Direction"])
+	assert.Contains(t, ep["Id"].(string), "rslvr-out")
+}
+
+func TestR53R_MultipleRulesAndList(t *testing.T) {
+	s := newService()
+	for _, domain := range []string{"a.com.", "b.com.", "c.com."} {
+		s.HandleRequest(jsonCtx("CreateResolverRule", map[string]any{
+			"DomainName": domain, "RuleType": "FORWARD",
+		}))
+	}
+	resp, _ := s.HandleRequest(jsonCtx("ListResolverRules", nil))
+	assert.Len(t, respJSON(t, resp)["ResolverRules"].([]any), 3)
+}
+
+func TestR53R_AssociateQueryLogConfig(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverQueryLogConfig", map[string]any{
+		"Name": "assoc-log", "DestinationArn": "arn:aws:s3:::my-log-bucket",
+	}))
+	configID := respJSON(t, cr)["ResolverQueryLogConfig"].(map[string]any)["Id"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("AssociateResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigId": configID,
+		"ResourceId":               "vpc-123456",
+	}))
+	require.NoError(t, err)
+	assoc := respJSON(t, resp)["ResolverQueryLogConfigAssociation"].(map[string]any)
+	assocID := assoc["Id"].(string)
+	assert.NotEmpty(t, assocID)
+	assert.Equal(t, "ACTIVE", assoc["Status"])
+
+	// Check association count
+	getResp, _ := s.HandleRequest(jsonCtx("GetResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigId": configID,
+	}))
+	config := respJSON(t, getResp)["ResolverQueryLogConfig"].(map[string]any)
+	assert.Equal(t, float64(1), config["AssociationCount"])
+}
+
+func TestR53R_DisassociateQueryLogConfig(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverQueryLogConfig", map[string]any{
+		"Name": "disassoc-log", "DestinationArn": "arn:aws:s3:::bucket2",
+	}))
+	configID := respJSON(t, cr)["ResolverQueryLogConfig"].(map[string]any)["Id"].(string)
+
+	assocResp, _ := s.HandleRequest(jsonCtx("AssociateResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigId": configID,
+		"ResourceId":               "vpc-777",
+	}))
+	assocID := respJSON(t, assocResp)["ResolverQueryLogConfigAssociation"].(map[string]any)["Id"].(string)
+
+	disResp, err := s.HandleRequest(jsonCtx("DisassociateResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigAssociationId": assocID,
+	}))
+	require.NoError(t, err)
+	result := respJSON(t, disResp)["ResolverQueryLogConfigAssociation"].(map[string]any)
+	assert.Equal(t, "DELETING", result["Status"])
+}
+
+func TestR53R_TagResource(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Direction": "INBOUND",
+	}))
+	ep := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)
+	arn := ep["Arn"].(string)
+
+	_, err := s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags": []map[string]any{
+			{"Key": "env", "Value": "prod"},
+			{"Key": "team", "Value": "infra"},
+		},
+	}))
+	require.NoError(t, err)
+
+	resp, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{
+		"ResourceArn": arn,
+	}))
+	require.NoError(t, err)
+	tags := respJSON(t, resp)["Tags"].([]any)
+	assert.Len(t, tags, 2)
+}
+
+func TestR53R_UntagResource(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Direction": "OUTBOUND",
+	}))
+	arn := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)["Arn"].(string)
+
+	s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags":        []map[string]any{{"Key": "a", "Value": "1"}, {"Key": "b", "Value": "2"}},
+	}))
+
+	_, err := s.HandleRequest(jsonCtx("UntagResource", map[string]any{
+		"ResourceArn": arn,
+		"TagKeys":     []string{"a"},
+	}))
+	require.NoError(t, err)
+
+	resp, _ := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"ResourceArn": arn}))
+	tags := respJSON(t, resp)["Tags"].([]any)
+	assert.Len(t, tags, 1)
+	tag := tags[0].(map[string]any)
+	assert.Equal(t, "b", tag["Key"])
+}
+
+func TestR53R_UpdateTagValue(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Direction": "INBOUND",
+	}))
+	arn := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)["Arn"].(string)
+
+	// Add tag
+	s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags":        []map[string]any{{"Key": "env", "Value": "dev"}},
+	}))
+	// Update same tag key
+	s.HandleRequest(jsonCtx("TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags":        []map[string]any{{"Key": "env", "Value": "prod"}},
+	}))
+
+	resp, _ := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{"ResourceArn": arn}))
+	tags := respJSON(t, resp)["Tags"].([]any)
+	assert.Len(t, tags, 1)
+	assert.Equal(t, "prod", tags[0].(map[string]any)["Value"])
+}
+
+func TestR53R_AssociateRule_RuleNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("AssociateResolverRule", map[string]any{
+		"ResolverRuleId": "nonexistent",
+		"VPCId":          "vpc-123",
+	}))
+	require.Error(t, err)
+}
+
+func TestR53R_MissingDirection(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Name": "no-direction",
+	}))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "Direction is required")
+}
+
+func TestR53R_SystemRule(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateResolverRule", map[string]any{
+		"DomainName": "amazonaws.com.",
+		"RuleType":   "SYSTEM",
+	}))
+	require.NoError(t, err)
+	rule := respJSON(t, resp)["ResolverRule"].(map[string]any)
+	assert.Equal(t, "SYSTEM", rule["RuleType"])
+}
+
+func TestR53R_DisassociateQueryLogConfig_NotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("DisassociateResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigAssociationId": "nonexistent",
+	}))
+	require.Error(t, err)
+}
+
+func TestR53R_AssociateQueryLogConfig_ConfigNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("AssociateResolverQueryLogConfig", map[string]any{
+		"ResolverQueryLogConfigId": "nonexistent",
+		"ResourceId":               "vpc-123",
+	}))
+	require.Error(t, err)
+}
+
+func TestR53R_ListTagsForResource_Empty(t *testing.T) {
+	s := newService()
+	cr, _ := s.HandleRequest(jsonCtx("CreateResolverEndpoint", map[string]any{
+		"Direction": "INBOUND",
+	}))
+	arn := respJSON(t, cr)["ResolverEndpoint"].(map[string]any)["Arn"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("ListTagsForResource", map[string]any{
+		"ResourceArn": arn,
+	}))
+	require.NoError(t, err)
+	tags := respJSON(t, resp)["Tags"].([]any)
+	assert.Len(t, tags, 0)
+}

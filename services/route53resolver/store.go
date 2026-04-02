@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // ResolverEndpoint represents a Route 53 Resolver endpoint.
@@ -69,32 +70,51 @@ type QueryLogConfig struct {
 	CreationTime     time.Time
 }
 
+// QueryLogConfigAssociation represents an association between a query log config and a VPC.
+type QueryLogConfigAssociation struct {
+	ID         string
+	ConfigID   string
+	ResourceID string
+	Status     string
+}
+
+// ResolverTag is a key-value tag for Route 53 Resolver resources.
+type ResolverTag struct {
+	Key   string
+	Value string
+}
+
 // Store manages Route 53 Resolver resources in memory.
 type Store struct {
-	mu             sync.RWMutex
-	endpoints      map[string]*ResolverEndpoint
-	rules          map[string]*ResolverRule
-	associations   map[string]*RuleAssociation
-	queryLogConfigs map[string]*QueryLogConfig
-	accountID      string
-	region         string
-	lcConfig       *lifecycle.Config
-	epSeq          int
-	ruleSeq        int
-	assocSeq       int
-	qlSeq          int
+	mu                  sync.RWMutex
+	endpoints           map[string]*ResolverEndpoint
+	rules               map[string]*ResolverRule
+	associations        map[string]*RuleAssociation
+	queryLogConfigs     map[string]*QueryLogConfig
+	qlAssociations      map[string]*QueryLogConfigAssociation
+	tags                map[string][]ResolverTag // keyed by resource ARN
+	accountID           string
+	region              string
+	lcConfig            *lifecycle.Config
+	epSeq               int
+	ruleSeq             int
+	assocSeq            int
+	qlSeq               int
+	qlAssocSeq          int
 }
 
 // NewStore returns a new empty Route 53 Resolver Store.
 func NewStore(accountID, region string) *Store {
 	return &Store{
-		endpoints:       make(map[string]*ResolverEndpoint),
-		rules:           make(map[string]*ResolverRule),
-		associations:    make(map[string]*RuleAssociation),
+		endpoints:      make(map[string]*ResolverEndpoint),
+		rules:          make(map[string]*ResolverRule),
+		associations:   make(map[string]*RuleAssociation),
 		queryLogConfigs: make(map[string]*QueryLogConfig),
-		accountID:       accountID,
-		region:          region,
-		lcConfig:        lifecycle.DefaultConfig(),
+		qlAssociations: make(map[string]*QueryLogConfigAssociation),
+		tags:           make(map[string][]ResolverTag),
+		accountID:      accountID,
+		region:         region,
+		lcConfig:       lifecycle.DefaultConfig(),
 	}
 }
 
@@ -361,4 +381,142 @@ func (s *Store) DeleteQueryLogConfig(id string) (*QueryLogConfig, bool) {
 	}
 	delete(s.queryLogConfigs, id)
 	return c, true
+}
+
+// UpdateResolverEndpoint updates the name of a resolver endpoint.
+func (s *Store) UpdateResolverEndpoint(id, name string) (*ResolverEndpoint, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ep, ok := s.endpoints[id]
+	if !ok {
+		return nil, false
+	}
+	if name != "" {
+		ep.Name = name
+	}
+	ep.ModificationTime = time.Now().UTC()
+	return ep, true
+}
+
+// UpdateResolverRule updates a resolver rule from a config map.
+func (s *Store) UpdateResolverRule(id string, config map[string]any) (*ResolverRule, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	r, ok := s.rules[id]
+	if !ok {
+		return nil, false
+	}
+	if config != nil {
+		if name, ok := config["Name"].(string); ok && name != "" {
+			r.Name = name
+		}
+		if endpointID, ok := config["ResolverEndpointId"].(string); ok && endpointID != "" {
+			r.ResolverEndpointID = endpointID
+		}
+		if targetIPs, ok := config["TargetIps"].([]any); ok {
+			newTargets := make([]TargetAddress, 0, len(targetIPs))
+			for _, t := range targetIPs {
+				if tm, ok := t.(map[string]any); ok {
+					ip, _ := tm["Ip"].(string)
+					port := 53
+					if pv, ok := tm["Port"].(float64); ok {
+						port = int(pv)
+					}
+					newTargets = append(newTargets, TargetAddress{IP: ip, Port: port})
+				}
+			}
+			r.TargetIPs = newTargets
+		}
+	}
+	r.ModificationTime = time.Now().UTC()
+	return r, true
+}
+
+// AssociateQueryLogConfig associates a query log config with a resource (VPC).
+func (s *Store) AssociateQueryLogConfig(configID, resourceID string) (*QueryLogConfigAssociation, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.queryLogConfigs[configID]; !ok {
+		return nil, fmt.Errorf("query log config not found: %s", configID)
+	}
+	s.qlAssocSeq++
+	id := fmt.Sprintf("rslvr-qlca-%012d", s.qlAssocSeq)
+	assoc := &QueryLogConfigAssociation{
+		ID:         id,
+		ConfigID:   configID,
+		ResourceID: resourceID,
+		Status:     "ACTIVE",
+	}
+	s.qlAssociations[id] = assoc
+	s.queryLogConfigs[configID].AssociationCount++
+	return assoc, nil
+}
+
+// DisassociateQueryLogConfig removes a query log config association.
+func (s *Store) DisassociateQueryLogConfig(assocID string) (*QueryLogConfigAssociation, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	assoc, ok := s.qlAssociations[assocID]
+	if !ok {
+		return nil, false
+	}
+	if cfg, ok := s.queryLogConfigs[assoc.ConfigID]; ok {
+		if cfg.AssociationCount > 0 {
+			cfg.AssociationCount--
+		}
+	}
+	delete(s.qlAssociations, assocID)
+	return assoc, true
+}
+
+// TagResource adds or updates tags on a resource by ARN.
+func (s *Store) TagResource(resourceArn string, tags []ResolverTag) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing := s.tags[resourceArn]
+	for _, nt := range tags {
+		found := false
+		for i, et := range existing {
+			if et.Key == nt.Key {
+				existing[i].Value = nt.Value
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, nt)
+		}
+	}
+	s.tags[resourceArn] = existing
+	return nil
+}
+
+// UntagResource removes tags from a resource by ARN.
+func (s *Store) UntagResource(resourceArn string, tagKeys []string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	keySet := make(map[string]bool, len(tagKeys))
+	for _, k := range tagKeys {
+		keySet[k] = true
+	}
+	existing := s.tags[resourceArn]
+	filtered := existing[:0]
+	for _, t := range existing {
+		if !keySet[t.Key] {
+			filtered = append(filtered, t)
+		}
+	}
+	s.tags[resourceArn] = filtered
+	return nil
+}
+
+// ListTagsForResource returns tags for a resource by ARN.
+func (s *Store) ListTagsForResource(resourceArn string) ([]ResolverTag, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	tags := s.tags[resourceArn]
+	if tags == nil {
+		return []ResolverTag{}, nil
+	}
+	return tags, nil
 }

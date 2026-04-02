@@ -37,10 +37,17 @@ func (s *Route53ResolverService) Actions() []service.Action {
 		{Name: "GetResolverRuleAssociation", Method: http.MethodPost, IAMAction: "route53resolver:GetResolverRuleAssociation"},
 		{Name: "ListResolverRuleAssociations", Method: http.MethodPost, IAMAction: "route53resolver:ListResolverRuleAssociations"},
 		{Name: "DisassociateResolverRule", Method: http.MethodPost, IAMAction: "route53resolver:DisassociateResolverRule"},
+		{Name: "UpdateResolverEndpoint", Method: http.MethodPost, IAMAction: "route53resolver:UpdateResolverEndpoint"},
+		{Name: "UpdateResolverRule", Method: http.MethodPost, IAMAction: "route53resolver:UpdateResolverRule"},
 		{Name: "CreateResolverQueryLogConfig", Method: http.MethodPost, IAMAction: "route53resolver:CreateResolverQueryLogConfig"},
 		{Name: "GetResolverQueryLogConfig", Method: http.MethodPost, IAMAction: "route53resolver:GetResolverQueryLogConfig"},
 		{Name: "ListResolverQueryLogConfigs", Method: http.MethodPost, IAMAction: "route53resolver:ListResolverQueryLogConfigs"},
 		{Name: "DeleteResolverQueryLogConfig", Method: http.MethodPost, IAMAction: "route53resolver:DeleteResolverQueryLogConfig"},
+		{Name: "AssociateResolverQueryLogConfig", Method: http.MethodPost, IAMAction: "route53resolver:AssociateResolverQueryLogConfig"},
+		{Name: "DisassociateResolverQueryLogConfig", Method: http.MethodPost, IAMAction: "route53resolver:DisassociateResolverQueryLogConfig"},
+		{Name: "TagResource", Method: http.MethodPost, IAMAction: "route53resolver:TagResource"},
+		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "route53resolver:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "route53resolver:ListTagsForResource"},
 	}
 }
 
@@ -61,6 +68,8 @@ func (s *Route53ResolverService) HandleRequest(ctx *service.RequestContext) (*se
 		return handleGetResolverEndpoint(params, s.store)
 	case "ListResolverEndpoints":
 		return handleListResolverEndpoints(s.store)
+	case "UpdateResolverEndpoint":
+		return handleUpdateResolverEndpoint(params, s.store)
 	case "DeleteResolverEndpoint":
 		return handleDeleteResolverEndpoint(params, s.store)
 	case "CreateResolverRule":
@@ -69,6 +78,8 @@ func (s *Route53ResolverService) HandleRequest(ctx *service.RequestContext) (*se
 		return handleGetResolverRule(params, s.store)
 	case "ListResolverRules":
 		return handleListResolverRules(s.store)
+	case "UpdateResolverRule":
+		return handleUpdateResolverRule(params, s.store)
 	case "DeleteResolverRule":
 		return handleDeleteResolverRule(params, s.store)
 	case "AssociateResolverRule":
@@ -87,6 +98,16 @@ func (s *Route53ResolverService) HandleRequest(ctx *service.RequestContext) (*se
 		return handleListQueryLogConfigs(s.store)
 	case "DeleteResolverQueryLogConfig":
 		return handleDeleteQueryLogConfig(params, s.store)
+	case "AssociateResolverQueryLogConfig":
+		return handleAssociateQueryLogConfig(params, s.store)
+	case "DisassociateResolverQueryLogConfig":
+		return handleDisassociateQueryLogConfig(params, s.store)
+	case "TagResource":
+		return handleTagResource(params, s.store)
+	case "UntagResource":
+		return handleUntagResource(params, s.store)
+	case "ListTagsForResource":
+		return handleListTagsForResource(params, s.store)
 	default:
 		return jsonErr(service.NewAWSError("InvalidAction",
 			"The action "+ctx.Action+" is not valid for this web service.",

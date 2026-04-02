@@ -327,3 +327,119 @@ func handleDeleteQueryLogConfig(params map[string]any, store *Store) (*service.R
 		},
 	})
 }
+
+func handleUpdateResolverEndpoint(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ResolverEndpointId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ResolverEndpointId is required"))
+	}
+	name := str(params, "Name")
+	ep, ok := store.UpdateResolverEndpoint(id, name)
+	if !ok {
+		return jsonErr(service.ErrNotFound("ResolverEndpoint", id))
+	}
+	return jsonOK(map[string]any{"ResolverEndpoint": endpointResponse(ep)})
+}
+
+func handleUpdateResolverRule(params map[string]any, store *Store) (*service.Response, error) {
+	id := str(params, "ResolverRuleId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("ResolverRuleId is required"))
+	}
+	var config map[string]any
+	if c, ok := params["Config"].(map[string]any); ok {
+		config = c
+	}
+	rule, ok := store.UpdateResolverRule(id, config)
+	if !ok {
+		return jsonErr(service.ErrNotFound("ResolverRule", id))
+	}
+	return jsonOK(map[string]any{"ResolverRule": ruleResponse(rule)})
+}
+
+func handleAssociateQueryLogConfig(params map[string]any, store *Store) (*service.Response, error) {
+	configID := str(params, "ResolverQueryLogConfigId")
+	resourceArn := str(params, "ResourceId")
+	if configID == "" || resourceArn == "" {
+		return jsonErr(service.ErrValidation("ResolverQueryLogConfigId and ResourceId are required"))
+	}
+	assoc, err := store.AssociateQueryLogConfig(configID, resourceArn)
+	if err != nil {
+		return jsonErr(service.ErrNotFound("ResolverQueryLogConfig", configID))
+	}
+	return jsonOK(map[string]any{
+		"ResolverQueryLogConfigAssociation": map[string]any{
+			"Id":                     assoc.ID,
+			"ResolverQueryLogConfigId": assoc.ConfigID,
+			"ResourceId":              assoc.ResourceID,
+			"Status":                  assoc.Status,
+		},
+	})
+}
+
+func handleDisassociateQueryLogConfig(params map[string]any, store *Store) (*service.Response, error) {
+	assocID := str(params, "ResolverQueryLogConfigAssociationId")
+	if assocID == "" {
+		return jsonErr(service.ErrValidation("ResolverQueryLogConfigAssociationId is required"))
+	}
+	assoc, ok := store.DisassociateQueryLogConfig(assocID)
+	if !ok {
+		return jsonErr(service.ErrNotFound("ResolverQueryLogConfigAssociation", assocID))
+	}
+	return jsonOK(map[string]any{
+		"ResolverQueryLogConfigAssociation": map[string]any{
+			"Id":     assoc.ID,
+			"Status": "DELETING",
+		},
+	})
+}
+
+func handleTagResource(params map[string]any, store *Store) (*service.Response, error) {
+	resourceArn := str(params, "ResourceArn")
+	if resourceArn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	var tags []ResolverTag
+	if rawTags, ok := params["Tags"].([]any); ok {
+		for _, item := range rawTags {
+			if m, ok := item.(map[string]any); ok {
+				tags = append(tags, ResolverTag{
+					Key:   str(m, "Key"),
+					Value: str(m, "Value"),
+				})
+			}
+		}
+	}
+	if err := store.TagResource(resourceArn, tags); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(params map[string]any, store *Store) (*service.Response, error) {
+	resourceArn := str(params, "ResourceArn")
+	if resourceArn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	tagKeys := strSlice(params, "TagKeys")
+	if err := store.UntagResource(resourceArn, tagKeys); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(params map[string]any, store *Store) (*service.Response, error) {
+	resourceArn := str(params, "ResourceArn")
+	if resourceArn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required"))
+	}
+	tags, err := store.ListTagsForResource(resourceArn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	out := make([]map[string]any, 0, len(tags))
+	for _, t := range tags {
+		out = append(out, map[string]any{"Key": t.Key, "Value": t.Value})
+	}
+	return jsonOK(map[string]any{"Tags": out})
+}

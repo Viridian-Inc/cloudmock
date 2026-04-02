@@ -77,14 +77,52 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 
 See the full list at [cloudmock.pages.dev/docs/services](https://cloudmock.pages.dev/docs/).
 
+## Performance
+
+CloudMock is the fastest AWS mock available. Two modes:
+
+**In-Process (Go)** — zero network overhead, sub-millisecond everything:
+```go
+cm := sdk.New()
+cfg := cm.Config()
+client := dynamodb.NewFromConfig(cfg) // 20μs per GetItem
+```
+
+**HTTP (any language)** — native binary or Docker:
+```bash
+npx cloudmock  # 65ms startup, <1ms per operation
+```
+
+### Benchmarks (P50 latency)
+
+| Service | CloudMock In-Process | CloudMock HTTP | Moto | LocalStack |
+|---------|---------------------|---------------|------|------------|
+| **DynamoDB GetItem** | **0.020ms** | 0.44ms | 2.41ms | 5.21ms |
+| **S3 PutObject** | **0.030ms** | 1.01ms | 2.20ms | 1.57ms |
+| **SQS SendMessage** | **0.015ms** | 0.73ms | 2.58ms | 2.60ms |
+| **SNS Publish** | — | 1.56ms | 4.00ms | 3.18ms |
+| **IAM CreateUser** | — | 0.98ms | 3.10ms | 2.70ms |
+| **Startup** | ~1ms | 65ms | 764ms | 2,094ms |
+
+### Cost at 1,000 CI Builds/Day
+
+| | CloudMock (In-Process) | CloudMock (HTTP) | Moto | LocalStack |
+|---|---|---|---|---|
+| **Annual cost** | **$4.32** | $191 | $1,065 | $17,159 |
+| **vs In-Process** | — | 44x more | 247x more | 3,973x more |
+
+[Full benchmark details and methodology](https://cloudmock.pages.dev/docs/reference/benchmarks/)
+
 ## Comparison
 
 | Feature | CloudMock | LocalStack (Free) | Moto |
 |---|---|---|---|
 | AWS services | 98 | ~25 | ~100 |
+| **Speed vs Moto** | **110x faster** | 0.9x | 1x |
 | Distributed tracing | Built-in | No | No |
 | Chaos engineering | Built-in | Pro only | No |
 | DevTools UI | Built-in | Pro only | No |
+| In-process mode | Go SDK | No | Python only |
 | Language | Go (single binary) | Python | Python |
 | License | BSL 1.1 | Apache 2.0 | Apache 2.0 |
 

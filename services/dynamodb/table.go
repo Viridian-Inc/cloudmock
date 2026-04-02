@@ -2,6 +2,7 @@ package dynamodb
 
 import (
 	"fmt"
+	"sync"
 	"sync/atomic"
 )
 
@@ -48,6 +49,7 @@ type LSI struct {
 
 // Table is the in-memory representation of a DynamoDB table.
 type Table struct {
+	mu                    sync.RWMutex // per-table lock for item operations
 	Name                  string
 	KeySchema             []KeySchemaElement
 	AttributeDefinitions  []AttributeDefinition
@@ -334,4 +336,16 @@ func (t *Table) allItems() []Item {
 // itemCount returns the total number of items in the table.
 func (t *Table) itemCount() int64 {
 	return t.count.Load()
+}
+
+// copyItem returns a shallow copy of an item.
+func copyItem(item Item) Item {
+	if item == nil {
+		return nil
+	}
+	result := make(Item, len(item))
+	for k, v := range item {
+		result[k] = v
+	}
+	return result
 }

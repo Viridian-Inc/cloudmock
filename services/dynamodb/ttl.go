@@ -32,22 +32,34 @@ func (s *TableStore) startTTLReaper(done <-chan struct{}) {
 func (s *TableStore) reapExpiredItems() {
 	now := time.Now().Unix()
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for tableName, table := range s.tables {
-		if table.TTL == nil || !table.TTL.Enabled {
-			continue
+	// Snapshot the table list under the store-level read lock.
+	s.mu.RLock()
+	type tableInfo struct {
+		name  string
+		table *Table
+	}
+	var tablesWithTTL []tableInfo
+	for name, table := range s.tables {
+		if table.TTL != nil && table.TTL.Enabled {
+			tablesWithTTL = append(tablesWithTTL, tableInfo{name: name, table: table})
 		}
+	}
+	s.mu.RUnlock()
+
+	for _, ti := range tablesWithTTL {
+		table := ti.table
+
+		table.mu.Lock()
 		attrName := table.TTL.AttributeName
 
+		// Scan all items to find expired ones.
+		allItems := table.scanAll(0)
 		var toDelete []Item
-		for _, item := range table.Items {
+		for _, item := range allItems {
 			av, ok := item[attrName]
 			if !ok {
 				continue
 			}
-			// TTL values are stored as N (number) type.
 			nStr, ok := av["N"].(string)
 			if !ok {
 				continue
@@ -57,7 +69,6 @@ func (s *TableStore) reapExpiredItems() {
 				continue
 			}
 			if ttlVal < now {
-				// Build a key-only item for deletion.
 				keyItem := make(Item)
 				for _, ks := range table.KeySchema {
 					if v, exists := item[ks.AttributeName]; exists {
@@ -68,23 +79,10 @@ func (s *TableStore) reapExpiredItems() {
 			}
 		}
 
-		// Delete expired items, recording stream events.
+		// Delete expired items.
 		for _, key := range toDelete {
-			// Find the full item before deleting (for stream old image).
-			var oldItem Item
-			for _, item := range table.Items {
-				if table.keyMatchesItem(key, item) {
-					oldItem = copyItem(item)
-					break
-				}
-			}
-
-			s.deleteItemLocked(tableName, key)
-
-			// Emit stream record if streams are enabled.
-			if table.Stream != nil && oldItem != nil {
-				table.Stream.appendRecord("REMOVE", oldItem, nil)
-			}
+			s.deleteFromTable(table, key)
 		}
+		table.mu.Unlock()
 	}
 }

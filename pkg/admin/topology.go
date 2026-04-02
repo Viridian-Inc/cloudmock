@@ -282,12 +282,6 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		}
 	}
 
-	// 4a-extra. Client apps — Expo mobile/web app connects to BFF
-	addNode("client:expo-app", "AutoTend App", "client", "client", "Client")
-	addEdge("client:expo-app", "apigw:apis", "invoke", "API calls", "config")
-	// BFF connects to API Gateway
-	addEdge("apigw:apis", "lambda:autotend-bff-dev", "trigger", "BFF route", "config")
-
 	// 4b. IaC-extracted microservices (Lambda endpoints with routes + table dependencies)
 	for _, ms := range a.iacMicroservices {
 		nodeID := "microservice:" + ms.Name
@@ -310,10 +304,6 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 		// Create edge from API Gateway to microservice
 		addEdge("apigw:apis", nodeID, "trigger", fmt.Sprintf("%d routes", len(ms.Routes)), "config")
 
-		// BFF aggregates calls to backend microservices
-		if ms.Name != "bff" {
-			addEdge("lambda:autotend-bff-dev", nodeID, "invoke", "BFF aggregation", "config")
-		}
 	}
 
 	// 4c. Infrastructure edges — key architectural relationships only.

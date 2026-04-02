@@ -138,6 +138,32 @@ func (s *Store) GetCertificateAuthorityCsr(caArn string) (string, *service.AWSEr
 	return csr, nil
 }
 
+// GetCertificateAuthorityCertificate returns the CA certificate and certificate chain.
+func (s *Store) GetCertificateAuthorityCertificate(caArn string) (string, string, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	ca, ok := s.cas[caArn]
+	if !ok {
+		return "", "", service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Could not find certificate authority %s.", caArn), http.StatusBadRequest)
+	}
+
+	caCert := fmt.Sprintf(
+		"-----BEGIN CERTIFICATE-----\n"+
+			"CA: %s\n"+
+			"Type: %s\n"+
+			"Serial: %s\n"+
+			"Subject: CN=%s, O=%s\n"+
+			"-----END CERTIFICATE-----",
+		ca.Arn, ca.Type, ca.Serial,
+		ca.Subject.CommonName, ca.Subject.Organization,
+	)
+
+	chain := s.buildCertificateChain(ca)
+	return caCert, chain, nil
+}
+
 // ListRevokedCertificates returns all revoked certificates for a CA.
 func (s *Store) ListRevokedCertificates(caArn string) ([]*IssuedCertificate, *service.AWSError) {
 	s.mu.RLock()

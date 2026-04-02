@@ -18,8 +18,9 @@ CloudMock emulates AWS Certificate Manager Private Certificate Authority (ACM PC
 | UpdateCertificateAuthority | Supported | Updates CA configuration |
 | IssueCertificate | Supported | Issues a certificate from the CA |
 | GetCertificate | Supported | Returns an issued certificate |
+| GetCertificateAuthorityCertificate | Supported | Returns the CA certificate and chain |
 | RevokeCertificate | Supported | Revokes a certificate |
-| GetCertificateAuthorityCsr | Supported | Returns the CSR for a CA |
+| GetCertificateAuthorityCsr | Supported | Returns the CSR for a CA (requires PENDING_CERTIFICATE state) |
 | TagCertificateAuthority | Supported | Adds tags to a CA |
 | UntagCertificateAuthority | Supported | Removes tags from a CA |
 | ListTags | Supported | Lists tags for a CA |

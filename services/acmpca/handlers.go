@@ -313,6 +313,28 @@ func handleRevokeCertificate(ctx *service.RequestContext, store *Store) (*servic
 	return &service.Response{StatusCode: http.StatusOK, Body: struct{}{}, Format: service.FormatJSON}, nil
 }
 
+func handleGetCertificateAuthorityCertificate(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var params map[string]any
+	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	arn, _ := params["CertificateAuthorityArn"].(string)
+	if arn == "" {
+		return jsonErr(service.ErrValidation("CertificateAuthorityArn is required."))
+	}
+
+	cert, chain, awsErr := store.GetCertificateAuthorityCertificate(arn)
+	if awsErr != nil {
+		return jsonErr(awsErr)
+	}
+
+	return jsonOK(map[string]any{
+		"Certificate":      cert,
+		"CertificateChain": chain,
+	})
+}
+
 func handleGetCertificateAuthorityCsr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if awsErr := parseJSON(ctx.Body, &params); awsErr != nil {

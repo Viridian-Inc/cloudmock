@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "cloudmock"
+version = "1.0.0"
+description = "Local AWS emulation. 98 services. One command."
+readme = "README.md"
+license = {text = "BSL-1.1"}
+requires-python = ">=3.8"
+dependencies = ["boto3>=1.26.0"]
+
+[project.urls]
+Homepage = "https://github.com/Viridian-Inc/cloudmock"
+Documentation = "https://cloudmock.pages.dev"

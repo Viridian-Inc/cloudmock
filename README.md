@@ -1,34 +1,21 @@
 # CloudMock
 
-**The open-source AWS emulator with built-in observability.**
+**Local AWS emulation with built-in observability.**
 
-Local AWS development + distributed tracing + error tracking + alerting -- in one tool. Language-agnostic via OpenTelemetry.
+98 AWS services + distributed tracing + error tracking + alerting — in one binary. Language-agnostic via OpenTelemetry.
 
-```
-  +-----------+        +-------------+        +-----------+
-  |  Your App | -----> |  CloudMock  | -----> |  DevTools |
-  | (any lang)|  AWS   |  98 services|  OTLP  |  :4500    |
-  +-----------+  SDK   +-------------+        +-----------+
-                       traces | metrics | logs | topology
-```
-
-## Why CloudMock?
-
-- **98 AWS services** emulated locally -- no AWS account needed
-- **Full observability** -- traces, metrics, logs, and errors in one dashboard
-- **Language-agnostic** -- works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
-- **Desktop DevTools** -- cross-platform UI for traces, topology, and chaos controls
-- **Chaos engineering** -- inject failures to test error handling before production
-- **Free forever locally** -- open source, no account required
+![CloudMock DevTools — Topology View](docs/devtools-topology.jpg)
 
 ## Quick Start
 
 ```bash
 npx cloudmock
 # or
-brew install cloudmock
+brew install viridian-inc/tap/cloudmock
 # or
-docker run -p 4566:4566 -p 4318:4318 -p 4500:4500 neureaux/cloudmock
+sudo snap install cloudmock
+# or
+docker run -p 4566:4566 -p 4500:4500 ghcr.io/viridian-inc/cloudmock:latest
 ```
 
 Point your AWS SDK:
@@ -37,17 +24,17 @@ Point your AWS SDK:
 export AWS_ENDPOINT_URL=http://localhost:4566
 ```
 
-Send traces via OpenTelemetry:
-
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
-```
-
 Open DevTools at [http://localhost:4500](http://localhost:4500)
 
-## Usage
+## Why CloudMock?
 
-### Any AWS SDK
+- **98 AWS services** emulated locally — no AWS account needed
+- **Full observability** — traces, metrics, logs, and errors in one dashboard
+- **Language-agnostic** — works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
+- **Built-in DevTools** — topology maps, request tracing, chaos engineering
+- **Free for local dev and internal use** — source-available, no account required
+
+## Usage
 
 CloudMock is a drop-in replacement for AWS. Point any SDK at `localhost:4566`:
 
@@ -73,73 +60,22 @@ cfg, _ := config.LoadDefaultConfig(ctx,
     config.WithBaseEndpoint("http://localhost:4566"))
 ```
 
-### cmk CLI
+## Install
 
-`cmk` wraps the AWS CLI with the endpoint pre-configured:
-
-```bash
-cmk s3 ls
-cmk dynamodb list-tables
-cmk sqs create-queue --queue-name jobs
-```
+| Method | Command |
+|--------|---------|
+| **npm** | `npx cloudmock` |
+| **Homebrew** | `brew install viridian-inc/tap/cloudmock` |
+| **Snap** | `sudo snap install cloudmock` |
+| **Docker** | `docker run -p 4566:4566 -p 4500:4500 ghcr.io/viridian-inc/cloudmock:latest` |
+| **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.4/cloudmock_1.0.4_amd64.deb && sudo apt install cloudmock_1.0.4_amd64.deb` |
+| **Shell** | `curl -fsSL https://cloudmock.dev/install.sh \| bash` |
 
 ## Services
 
-**25 Tier 1 services** with full API emulation (429 operations):
+98 AWS services including S3, DynamoDB, SQS, SNS, Lambda, API Gateway, Cognito, EC2, ECS, EKS, EventBridge, IAM, KMS, RDS, Route 53, Step Functions, and many more.
 
-S3, DynamoDB, SQS, SNS, Lambda, API Gateway, CloudFormation, CloudWatch, CloudWatch Logs, Cognito, EC2, ECR, ECS, EventBridge, IAM, Kinesis, KMS, Data Firehose, RDS, Route 53, Secrets Manager, SES, SSM, Step Functions, STS
-
-**73 additional services** available as CRUD stubs. See the [compatibility matrix](docs/compatibility-matrix.md) for the full list.
-
-## Configuration
-
-CloudMock reads `cloudmock.yml` from the working directory:
-
-```yaml
-profile: standard          # minimal | standard | full
-gateway:
-  port: 4566
-devtools:
-  port: 4500
-persistence:
-  enabled: true
-  path: .cloudmock/state
-```
-
-See [docs/configuration.md](docs/configuration.md) for the full reference.
-
-## Architecture
-
-CloudMock is a single Go binary that runs an AWS-compatible API gateway, an OpenTelemetry collector, and a web-based DevTools UI. Services are implemented as in-process handlers with a shared plugin framework.
-
-```
-cmd/gateway      -> main entry point
-gateway/         -> HTTP router, AWS request parsing
-services/        -> one package per AWS service
-pkg/otel/        -> OpenTelemetry collector and trace storage
-pkg/dashboard/   -> embedded DevTools web UI
-pkg/admin/       -> admin API for chaos, snapshots, config
-```
-
-See [docs/architecture.md](docs/architecture.md) for details.
-
-## Documentation
-
-- [Getting Started](docs/getting-started.md)
-- [Configuration](docs/configuration.md)
-- [CLI Reference](docs/cli-reference.md)
-- [Architecture](docs/architecture.md)
-- [Admin API](docs/admin-api.md)
-- [Compatibility Matrix](docs/compatibility-matrix.md)
-
-## Contributing
-
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-
-- Development environment setup
-- Running tests
-- Adding new AWS services
-- PR guidelines
+See the full list at [cloudmock.dev/docs/services](https://cloudmock.dev/docs/).
 
 ## Comparison
 
@@ -150,15 +86,19 @@ We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
 | Chaos engineering | Built-in | Pro only | No |
 | DevTools UI | Built-in | Pro only | No |
 | Language | Go (single binary) | Python | Python |
-| License | Apache 2.0 | Apache 2.0 | Apache 2.0 |
+| License | BSL 1.1 | Apache 2.0 | Apache 2.0 |
+
+## Documentation
+
+Full docs at **[cloudmock.dev](https://cloudmock.dev)**
 
 ## Community
 
-- [GitHub Issues](https://github.com/neureaux/cloudmock/issues) -- bugs and feature requests
-- [GitHub Discussions](https://github.com/neureaux/cloudmock/discussions) -- questions and ideas
+- [GitHub Issues](https://github.com/Viridian-Inc/cloudmock/issues) — bugs and feature requests
+- [GitHub Discussions](https://github.com/Viridian-Inc/cloudmock/discussions) — questions and ideas
 
 ## License
 
-Apache License 2.0. See [LICENSE](LICENSE).
+Business Source License 1.1. Free for local development and internal use. See [LICENSE](LICENSE).
 
-Copyright 2026 Neureaux.
+Copyright 2026 Viridian Inc.

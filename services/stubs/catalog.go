@@ -400,7 +400,9 @@ func jsonServices() []*stub.ServiceModel {
 			Protocol:     "json",
 			TargetPrefix: "AWSInsightsIndexService",
 			Actions: map[string]stub.Action{
-				"GetCostAndUsage": otherAction("GetCostAndUsage", "cost"),
+				"GetCostAndUsage":        otherAction("GetCostAndUsage", "cost"),
+				"GetCostForecast":        otherAction("GetCostForecast", "cost"),
+				"ListCostAllocationTags": listAction("ListCostAllocationTags", "cost"),
 			},
 			ResourceTypes: map[string]stub.ResourceType{
 				"cost": rt("CostReport", "ReportId", "arn:aws:ce:{region}:{account}:report/{id}", nil),
@@ -831,6 +833,56 @@ func restJSONServices() []*stub.ServiceModel {
 		rj("wafv2", "WebACL", "WebACLId"),
 		// 74. Route 53 Resolver
 		rj("route53resolver", "ResolverEndpoint", "Id"),
+		// 75. App Runner
+		rj("apprunner", "Service", "ServiceId"),
+		// 76. App Mesh
+		rj("appmesh", "Mesh", "MeshName"),
+		// 77. CloudMap (alias for servicediscovery REST)
+		rj("cloud9", "Environment", "EnvironmentId"),
+		// 78. CodeStar Connections
+		rj("codestar-connections", "Connection", "ConnectionArn"),
+		// 79. DataSync
+		rj("datasync", "Task", "TaskArn"),
+		// 80. Device Farm
+		rj("devicefarm", "Project", "Arn"),
+		// 81. EventBridge (REST-JSON endpoint)
+		rj("events", "EventBus", "EventBusName"),
+		// 82. FinSpace
+		rj("finspace", "Environment", "EnvironmentId"),
+		// 83. Forecast
+		rj("forecast", "DatasetGroup", "DatasetGroupArn"),
+		// 84. GroundStation
+		rj("groundstation", "Config", "ConfigArn"),
+		// 85. HealthLake
+		rj("healthlake", "FHIRDatastore", "DatastoreId"),
+		// 86. Inspector2
+		rj("inspector2", "Filter", "FilterArn"),
+		// 87. Keyspaces (Managed Cassandra)
+		rj("cassandra", "Keyspace", "keyspaceName"),
+		// 88. Location Service
+		rj("location", "Map", "MapName"),
+		// 89. Lookout for Metrics
+		rj("lookoutmetrics", "AnomalyDetector", "AnomalyDetectorArn"),
+		// 90. Macie
+		rj("macie2", "FindingsFilter", "Id"),
+		// 91. Migration Hub
+		rj("mgh", "ProgressUpdateStream", "ProgressUpdateStreamName"),
+		// 92. Nimble Studio
+		rj("nimble", "Studio", "StudioId"),
+		// 93. Outposts
+		rj("outposts", "Outpost", "OutpostId"),
+		// 94. Panorama
+		rj("panorama", "Device", "DeviceId"),
+		// 95. Private 5G
+		rj("private-networks", "Network", "NetworkArn"),
+		// 96. Proton
+		rj("proton", "EnvironmentTemplate", "TemplateName"),
+		// 97. Rekognition
+		rj("rekognition", "Collection", "CollectionId"),
+		// 98. Robomaker
+		rj("robomaker", "SimulationApplication", "Arn"),
+		// 99. Security Hub
+		rj("securityhub", "Hub", "HubArn"),
 	}
 }
 

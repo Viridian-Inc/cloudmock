@@ -195,6 +195,38 @@ func (s *Store) GetEffectivePermissionsForPath(resourceArn string) []*Permission
 	return s.permissions
 }
 
+// BatchGrantPermissions grants permissions for multiple entries.
+func (s *Store) BatchGrantPermissions(entries []*Permission) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.permissions = append(s.permissions, entries...)
+}
+
+// BatchRevokePermissions revokes permissions for multiple entries.
+func (s *Store) BatchRevokePermissions(entries []*Permission) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, entry := range entries {
+		filtered := make([]*Permission, 0)
+		for _, p := range s.permissions {
+			if p.Principal.DataLakePrincipalIdentifier == entry.Principal.DataLakePrincipalIdentifier &&
+				matchResource(p.Resource, entry.Resource) {
+				continue
+			}
+			filtered = append(filtered, p)
+		}
+		s.permissions = filtered
+	}
+}
+
+// DescribeResource returns resource info by ARN.
+func (s *Store) DescribeResource(arn string) (*Resource, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	r, ok := s.resources[arn]
+	return r, ok
+}
+
 // ---- LFTag operations ----
 
 func (s *Store) CreateLFTag(key string, values []string) bool {

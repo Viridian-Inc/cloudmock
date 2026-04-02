@@ -393,3 +393,85 @@ func handleGetResourceLFTags(ctx *service.RequestContext, store *Store) (*servic
 	}
 	return jsonOK(map[string]any{"LFTagOnDatabase": list})
 }
+
+// ---- BatchGrantPermissions ----
+
+type batchPermissionsEntryJSON struct {
+	Id          string        `json:"Id"`
+	Principal   principalJSON `json:"Principal"`
+	Resource    resourceJSON  `json:"Resource"`
+	Permissions []string      `json:"Permissions"`
+}
+
+type batchGrantPermissionsRequest struct {
+	Entries []batchPermissionsEntryJSON `json:"Entries"`
+}
+
+func handleBatchGrantPermissions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req batchGrantPermissionsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	perms := make([]*Permission, 0, len(req.Entries))
+	for _, e := range req.Entries {
+		if e.Principal.DataLakePrincipalIdentifier == "" {
+			continue
+		}
+		perms = append(perms, &Permission{
+			Principal:   DataLakePrincipal{DataLakePrincipalIdentifier: e.Principal.DataLakePrincipalIdentifier},
+			Resource:    toPermResource(e.Resource),
+			Permissions: e.Permissions,
+		})
+	}
+	store.BatchGrantPermissions(perms)
+	return jsonOK(map[string]any{"Failures": []any{}})
+}
+
+// ---- BatchRevokePermissions ----
+
+type batchRevokePermissionsRequest struct {
+	Entries []batchPermissionsEntryJSON `json:"Entries"`
+}
+
+func handleBatchRevokePermissions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req batchRevokePermissionsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	perms := make([]*Permission, 0, len(req.Entries))
+	for _, e := range req.Entries {
+		perms = append(perms, &Permission{
+			Principal: DataLakePrincipal{DataLakePrincipalIdentifier: e.Principal.DataLakePrincipalIdentifier},
+			Resource:  toPermResource(e.Resource),
+		})
+	}
+	store.BatchRevokePermissions(perms)
+	return jsonOK(map[string]any{"Failures": []any{}})
+}
+
+// ---- DescribeResource ----
+
+type describeResourceRequest struct {
+	ResourceArn string `json:"ResourceArn"`
+}
+
+func handleDescribeResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req describeResourceRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.ResourceArn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	r, ok := store.DescribeResource(req.ResourceArn)
+	if !ok {
+		return jsonErr(service.ErrNotFound("Resource", req.ResourceArn))
+	}
+	return jsonOK(map[string]any{
+		"ResourceInfo": map[string]any{
+			"ResourceArn":    r.ResourceArn,
+			"RoleArn":        r.RoleArn,
+			"LastModified":   float64(r.RegisteredTime.Unix()),
+		},
+	})
+}

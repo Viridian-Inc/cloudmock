@@ -35,6 +35,9 @@ func (s *LakeFormationService) Actions() []service.Action {
 		{Name: "RevokePermissions", Method: http.MethodPost, IAMAction: "lakeformation:RevokePermissions"},
 		{Name: "GetEffectivePermissionsForPath", Method: http.MethodPost, IAMAction: "lakeformation:GetEffectivePermissionsForPath"},
 		{Name: "ListPermissions", Method: http.MethodPost, IAMAction: "lakeformation:ListPermissions"},
+		{Name: "BatchGrantPermissions", Method: http.MethodPost, IAMAction: "lakeformation:BatchGrantPermissions"},
+		{Name: "BatchRevokePermissions", Method: http.MethodPost, IAMAction: "lakeformation:BatchRevokePermissions"},
+		{Name: "DescribeResource", Method: http.MethodPost, IAMAction: "lakeformation:DescribeResource"},
 		{Name: "GetDataLakeSettings", Method: http.MethodPost, IAMAction: "lakeformation:GetDataLakeSettings"},
 		{Name: "PutDataLakeSettings", Method: http.MethodPost, IAMAction: "lakeformation:PutDataLakeSettings"},
 		{Name: "AddLFTagsToResource", Method: http.MethodPost, IAMAction: "lakeformation:AddLFTagsToResource"},
@@ -68,6 +71,12 @@ func (s *LakeFormationService) HandleRequest(ctx *service.RequestContext) (*serv
 		return handleGetEffectivePermissionsForPath(ctx, s.store)
 	case "ListPermissions":
 		return handleListPermissions(ctx, s.store)
+	case "BatchGrantPermissions":
+		return handleBatchGrantPermissions(ctx, s.store)
+	case "BatchRevokePermissions":
+		return handleBatchRevokePermissions(ctx, s.store)
+	case "DescribeResource":
+		return handleDescribeResource(ctx, s.store)
 	case "GetDataLakeSettings":
 		return handleGetDataLakeSettings(ctx, s.store)
 	case "PutDataLakeSettings":

@@ -94,10 +94,11 @@ type Guardrail struct {
 
 type Store struct {
 	mu                   sync.RWMutex
-	customizationJobs    map[string]*ModelCustomizationJob     // keyed by job name
+	customizationJobs    map[string]*ModelCustomizationJob      // keyed by job name
 	provisionedModels    map[string]*ProvisionedModelThroughput // keyed by name
 	foundationModels     []FoundationModel
 	guardrails           map[string]*Guardrail
+	modelEvalJobs        map[string]*ModelEvaluationJob // keyed by job name
 	tagsByArn            map[string]map[string]string
 	accountID            string
 	region               string
@@ -110,6 +111,7 @@ func NewStore(accountID, region string) *Store {
 		customizationJobs: make(map[string]*ModelCustomizationJob),
 		provisionedModels: make(map[string]*ProvisionedModelThroughput),
 		guardrails:        make(map[string]*Guardrail),
+		modelEvalJobs:     make(map[string]*ModelEvaluationJob),
 		tagsByArn:         make(map[string]map[string]string),
 		accountID:         accountID,
 		region:            region,
@@ -488,4 +490,99 @@ func (s *Store) GetGuardrail(id string) (*Guardrail, bool) {
 	defer s.mu.RUnlock()
 	g, ok := s.guardrails[id]
 	return g, ok
+}
+
+// ListGuardrails returns all guardrails.
+func (s *Store) ListGuardrails() []*Guardrail {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*Guardrail, 0, len(s.guardrails))
+	for _, g := range s.guardrails {
+		result = append(result, g)
+	}
+	return result
+}
+
+// UpdateGuardrail updates a guardrail's properties.
+func (s *Store) UpdateGuardrail(id, name, description string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	g, ok := s.guardrails[id]
+	if !ok {
+		return false
+	}
+	if name != "" {
+		g.Name = name
+	}
+	if description != "" {
+		g.Description = description
+	}
+	g.UpdatedAt = time.Now().UTC()
+	return true
+}
+
+// DeleteGuardrail deletes a guardrail by ID.
+func (s *Store) DeleteGuardrail(id string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.guardrails[id]; !ok {
+		return false
+	}
+	delete(s.guardrails, id)
+	return true
+}
+
+// ModelEvaluationJob represents a model evaluation job.
+type ModelEvaluationJob struct {
+	JobArn           string
+	JobName          string
+	Status           string
+	ModelIdentifier  string
+	RoleArn          string
+	EvaluationConfig map[string]any
+	CreationTime     time.Time
+	EndTime          *time.Time
+}
+
+func (s *Store) modelEvalJobARN(name string) string {
+	return fmt.Sprintf("arn:aws:bedrock:%s:%s:evaluation-job/%s", s.region, s.accountID, name)
+}
+
+// CreateModelEvaluationJob creates a new evaluation job.
+func (s *Store) CreateModelEvaluationJob(name, roleArn, modelId string, evalConfig map[string]any) (*ModelEvaluationJob, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.modelEvalJobs[name]; ok {
+		return nil, false
+	}
+	job := &ModelEvaluationJob{
+		JobArn:           s.modelEvalJobARN(name),
+		JobName:          name,
+		Status:           "InProgress",
+		ModelIdentifier:  modelId,
+		RoleArn:          roleArn,
+		EvaluationConfig: evalConfig,
+		CreationTime:     time.Now().UTC(),
+	}
+	s.modelEvalJobs[name] = job
+	return job, true
+}
+
+// GetModelEvaluationJob retrieves an evaluation job by name.
+func (s *Store) GetModelEvaluationJob(name string) (*ModelEvaluationJob, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	job, ok := s.modelEvalJobs[name]
+	return job, ok
+}
+
+// ListModelEvaluationJobs returns all evaluation jobs.
+func (s *Store) ListModelEvaluationJobs() []*ModelEvaluationJob {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*ModelEvaluationJob, 0, len(s.modelEvalJobs))
+	for _, j := range s.modelEvalJobs {
+		result = append(result, j)
+	}
+	return result
 }

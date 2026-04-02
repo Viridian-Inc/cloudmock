@@ -45,7 +45,14 @@ func (s *BedrockService) Actions() []service.Action {
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "bedrock:ListTagsForResource"},
 		{Name: "InvokeModel", Method: http.MethodPost, IAMAction: "bedrock:InvokeModel"},
 		{Name: "CreateGuardrail", Method: http.MethodPost, IAMAction: "bedrock:CreateGuardrail"},
+		{Name: "GetGuardrail", Method: http.MethodGet, IAMAction: "bedrock:GetGuardrail"},
+		{Name: "ListGuardrails", Method: http.MethodGet, IAMAction: "bedrock:ListGuardrails"},
+		{Name: "UpdateGuardrail", Method: http.MethodPut, IAMAction: "bedrock:UpdateGuardrail"},
+		{Name: "DeleteGuardrail", Method: http.MethodDelete, IAMAction: "bedrock:DeleteGuardrail"},
 		{Name: "ApplyGuardrail", Method: http.MethodPost, IAMAction: "bedrock:ApplyGuardrail"},
+		{Name: "CreateModelEvaluationJob", Method: http.MethodPost, IAMAction: "bedrock:CreateModelEvaluationJob"},
+		{Name: "GetModelEvaluationJob", Method: http.MethodGet, IAMAction: "bedrock:GetModelEvaluationJob"},
+		{Name: "ListModelEvaluationJobs", Method: http.MethodGet, IAMAction: "bedrock:ListModelEvaluationJobs"},
 	}
 }
 
@@ -103,8 +110,22 @@ func (s *BedrockService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleInvokeModel(params, s.store)
 	case "CreateGuardrail":
 		return handleCreateGuardrail(params, s.store)
+	case "GetGuardrail":
+		return handleGetGuardrail(params, s.store)
+	case "ListGuardrails":
+		return handleListGuardrails(s.store)
+	case "UpdateGuardrail":
+		return handleUpdateGuardrail(params, s.store)
+	case "DeleteGuardrail":
+		return handleDeleteGuardrail(params, s.store)
 	case "ApplyGuardrail":
 		return handleApplyGuardrail(params, s.store)
+	case "CreateModelEvaluationJob":
+		return handleCreateModelEvaluationJob(params, s.store)
+	case "GetModelEvaluationJob":
+		return handleGetModelEvaluationJob(params, s.store)
+	case "ListModelEvaluationJobs":
+		return handleListModelEvaluationJobs(s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

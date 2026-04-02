@@ -548,3 +548,140 @@ func handleApplyGuardrail(params map[string]any, store *Store) (*service.Respons
 		},
 	})
 }
+
+// ---- GetGuardrail ----
+
+func handleGetGuardrail(params map[string]any, store *Store) (*service.Response, error) {
+	id := getStr(params, "guardrailIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("guardrailIdentifier is required."))
+	}
+	g, ok := store.GetGuardrail(id)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Guardrail %s not found", id), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"guardrailId":  g.ID,
+		"guardrailArn": g.ARN,
+		"name":         g.Name,
+		"description":  g.Description,
+		"version":      g.Version,
+		"status":       g.Status,
+		"createdAt":    unixFloat(g.CreatedAt),
+		"updatedAt":    unixFloat(g.UpdatedAt),
+	})
+}
+
+// ---- ListGuardrails ----
+
+func handleListGuardrails(store *Store) (*service.Response, error) {
+	guardrails := store.ListGuardrails()
+	summaries := make([]map[string]any, 0, len(guardrails))
+	for _, g := range guardrails {
+		summaries = append(summaries, map[string]any{
+			"guardrailId":  g.ID,
+			"guardrailArn": g.ARN,
+			"name":         g.Name,
+			"version":      g.Version,
+			"status":       g.Status,
+			"createdAt":    unixFloat(g.CreatedAt),
+			"updatedAt":    unixFloat(g.UpdatedAt),
+		})
+	}
+	return jsonOK(map[string]any{"guardrails": summaries})
+}
+
+// ---- UpdateGuardrail ----
+
+func handleUpdateGuardrail(params map[string]any, store *Store) (*service.Response, error) {
+	id := getStr(params, "guardrailIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("guardrailIdentifier is required."))
+	}
+	name := getStr(params, "name")
+	description := getStr(params, "description")
+	if !store.UpdateGuardrail(id, name, description) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Guardrail %s not found", id), http.StatusNotFound))
+	}
+	g, _ := store.GetGuardrail(id)
+	return jsonOK(map[string]any{
+		"guardrailId":  g.ID,
+		"guardrailArn": g.ARN,
+		"version":      g.Version,
+		"updatedAt":    unixFloat(g.UpdatedAt),
+	})
+}
+
+// ---- DeleteGuardrail ----
+
+func handleDeleteGuardrail(params map[string]any, store *Store) (*service.Response, error) {
+	id := getStr(params, "guardrailIdentifier")
+	if id == "" {
+		return jsonErr(service.ErrValidation("guardrailIdentifier is required."))
+	}
+	if !store.DeleteGuardrail(id) {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Guardrail %s not found", id), http.StatusNotFound))
+	}
+	return emptyOK()
+}
+
+// ---- CreateModelEvaluationJob ----
+
+func handleCreateModelEvaluationJob(params map[string]any, store *Store) (*service.Response, error) {
+	name := getStr(params, "jobName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("jobName is required."))
+	}
+	roleArn := getStr(params, "roleArn")
+	modelId := getStr(params, "modelIdentifier")
+	evalConfig := getMap(params, "evaluationConfig")
+
+	job, ok := store.CreateModelEvaluationJob(name, roleArn, modelId, evalConfig)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceInUseException",
+			fmt.Sprintf("Model evaluation job %s already exists", name), http.StatusConflict))
+	}
+	return jsonCreated(map[string]any{"jobArn": job.JobArn})
+}
+
+// ---- GetModelEvaluationJob ----
+
+func handleGetModelEvaluationJob(params map[string]any, store *Store) (*service.Response, error) {
+	name := getStr(params, "jobIdentifier")
+	if name == "" {
+		return jsonErr(service.ErrValidation("jobIdentifier is required."))
+	}
+	job, ok := store.GetModelEvaluationJob(name)
+	if !ok {
+		return jsonErr(service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Model evaluation job %s not found", name), http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{
+		"jobArn":          job.JobArn,
+		"jobName":         job.JobName,
+		"status":          job.Status,
+		"modelIdentifier": job.ModelIdentifier,
+		"roleArn":         job.RoleArn,
+		"creationTime":    unixFloat(job.CreationTime),
+		"endTime":         unixFloatPtr(job.EndTime),
+	})
+}
+
+// ---- ListModelEvaluationJobs ----
+
+func handleListModelEvaluationJobs(store *Store) (*service.Response, error) {
+	jobs := store.ListModelEvaluationJobs()
+	summaries := make([]map[string]any, 0, len(jobs))
+	for _, j := range jobs {
+		summaries = append(summaries, map[string]any{
+			"jobArn":       j.JobArn,
+			"jobName":      j.JobName,
+			"status":       j.Status,
+			"creationTime": unixFloat(j.CreationTime),
+		})
+	}
+	return jsonOK(map[string]any{"jobSummaries": summaries})
+}

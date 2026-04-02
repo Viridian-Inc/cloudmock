@@ -429,3 +429,133 @@ func TestApplyGuardrail_NotFound(t *testing.T) {
 	}))
 	require.Error(t, err)
 }
+
+func TestGetGuardrail(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateGuardrail", map[string]any{
+		"name":                    "grd-get",
+		"blockedInputMessaging":   "blocked",
+		"blockedOutputsMessaging": "blocked",
+	}))
+	require.NoError(t, err)
+	cm := respBody(t, createResp)
+	id := cm["guardrailId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("GetGuardrail", map[string]any{"guardrailIdentifier": id}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Equal(t, id, m["guardrailId"])
+	assert.Equal(t, "grd-get", m["name"])
+	assert.Equal(t, "READY", m["status"])
+}
+
+func TestGetGuardrailNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetGuardrail", map[string]any{"guardrailIdentifier": "nonexistent"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestListGuardrails(t *testing.T) {
+	s := newService()
+	for _, name := range []string{"g1", "g2", "g3"} {
+		_, err := s.HandleRequest(jsonCtx("CreateGuardrail", map[string]any{
+			"name": name, "blockedInputMessaging": "x", "blockedOutputsMessaging": "x",
+		}))
+		require.NoError(t, err)
+	}
+	resp, err := s.HandleRequest(jsonCtx("ListGuardrails", map[string]any{}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	list := m["guardrails"].([]any)
+	assert.Len(t, list, 3)
+}
+
+func TestUpdateGuardrail(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateGuardrail", map[string]any{
+		"name": "grd-upd", "blockedInputMessaging": "x", "blockedOutputsMessaging": "x",
+	}))
+	require.NoError(t, err)
+	cm := respBody(t, createResp)
+	id := cm["guardrailId"].(string)
+
+	resp, err := s.HandleRequest(jsonCtx("UpdateGuardrail", map[string]any{
+		"guardrailIdentifier": id,
+		"name":                "grd-upd-new",
+		"description":         "updated desc",
+	}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Equal(t, id, m["guardrailId"])
+}
+
+func TestDeleteGuardrail(t *testing.T) {
+	s := newService()
+	createResp, err := s.HandleRequest(jsonCtx("CreateGuardrail", map[string]any{
+		"name": "grd-del", "blockedInputMessaging": "x", "blockedOutputsMessaging": "x",
+	}))
+	require.NoError(t, err)
+	cm := respBody(t, createResp)
+	id := cm["guardrailId"].(string)
+
+	_, err = s.HandleRequest(jsonCtx("DeleteGuardrail", map[string]any{"guardrailIdentifier": id}))
+	require.NoError(t, err)
+
+	_, err = s.HandleRequest(jsonCtx("GetGuardrail", map[string]any{"guardrailIdentifier": id}))
+	require.Error(t, err)
+}
+
+func TestCreateModelEvaluationJob(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateModelEvaluationJob", map[string]any{
+		"jobName":         "eval-1",
+		"roleArn":         "arn:aws:iam::123456789012:role/Role",
+		"modelIdentifier": "anthropic.claude-3-5-sonnet-20241022-v2:0",
+	}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Contains(t, m["jobArn"].(string), "eval-1")
+}
+
+func TestCreateModelEvaluationJobDuplicate(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateModelEvaluationJob", map[string]any{"jobName": "eval-dup", "roleArn": "r"}))
+	_, err := s.HandleRequest(jsonCtx("CreateModelEvaluationJob", map[string]any{"jobName": "eval-dup", "roleArn": "r"}))
+	require.Error(t, err)
+}
+
+func TestGetModelEvaluationJob(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateModelEvaluationJob", map[string]any{
+		"jobName": "eval-get", "roleArn": "r", "modelIdentifier": "amazon.titan-text-express-v1",
+	}))
+	resp, err := s.HandleRequest(jsonCtx("GetModelEvaluationJob", map[string]any{"jobIdentifier": "eval-get"}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	assert.Equal(t, "eval-get", m["jobName"])
+	assert.Equal(t, "InProgress", m["status"])
+}
+
+func TestGetModelEvaluationJobNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("GetModelEvaluationJob", map[string]any{"jobIdentifier": "nonexistent"}))
+	require.Error(t, err)
+	awsErr, ok := err.(*service.AWSError)
+	require.True(t, ok)
+	assert.Equal(t, "ResourceNotFoundException", awsErr.Code)
+}
+
+func TestListModelEvaluationJobs(t *testing.T) {
+	s := newService()
+	for _, name := range []string{"ej-1", "ej-2"} {
+		_, _ = s.HandleRequest(jsonCtx("CreateModelEvaluationJob", map[string]any{"jobName": name, "roleArn": "r"}))
+	}
+	resp, err := s.HandleRequest(jsonCtx("ListModelEvaluationJobs", map[string]any{}))
+	require.NoError(t, err)
+	m := respBody(t, resp)
+	jobs := m["jobSummaries"].([]any)
+	assert.Len(t, jobs, 2)
+}

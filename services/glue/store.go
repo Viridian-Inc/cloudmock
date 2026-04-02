@@ -146,15 +146,56 @@ type PhysicalConnectionRequirements struct {
 	AvailabilityZone       string
 }
 
+// Partition represents a table partition.
+type Partition struct {
+	DatabaseName string
+	TableName    string
+	Values       []string
+	StorageDesc  StorageDescriptor
+	Parameters   map[string]string
+	CreateTime   time.Time
+}
+
+// Trigger represents a Glue trigger.
+type Trigger struct {
+	Name        string
+	Type        string // SCHEDULED, CONDITIONAL, ON_DEMAND
+	State       string // CREATED, ACTIVATED, DEACTIVATED
+	Description string
+	Schedule    string
+	Actions     []TriggerAction
+	CreateTime  time.Time
+	Tags        map[string]string
+}
+
+// TriggerAction describes what the trigger does.
+type TriggerAction struct {
+	JobName string
+	Arguments map[string]string
+}
+
+// Classifier represents a Glue classifier.
+type Classifier struct {
+	Name       string
+	Type       string // GROK, XML, JSON, CSV
+	GrokPattern string
+	CustomPatterns string
+	CreateTime time.Time
+	LastUpdated time.Time
+}
+
 // Store manages all Glue resources in memory.
 type Store struct {
 	mu          sync.RWMutex
 	databases   map[string]*Database
-	tables      map[string]map[string]*Table // dbName -> tableName -> table
+	tables      map[string]map[string]*Table       // dbName -> tableName -> table
+	partitions  map[string]map[string][]*Partition // dbName -> tableName -> partitions
 	crawlers    map[string]*Crawler
 	jobs        map[string]*Job
 	jobRuns     map[string][]*JobRun // jobName -> runs
 	connections map[string]*Connection
+	triggers    map[string]*Trigger
+	classifiers map[string]*Classifier
 	tags        map[string]map[string]string // arn -> tags
 	accountID   string
 	region      string
@@ -167,10 +208,13 @@ func NewStore(accountID, region string) *Store {
 	return &Store{
 		databases:   make(map[string]*Database),
 		tables:      make(map[string]map[string]*Table),
+		partitions:  make(map[string]map[string][]*Partition),
 		crawlers:    make(map[string]*Crawler),
 		jobs:        make(map[string]*Job),
 		jobRuns:     make(map[string][]*JobRun),
 		connections: make(map[string]*Connection),
+		triggers:    make(map[string]*Trigger),
+		classifiers: make(map[string]*Classifier),
 		tags:        make(map[string]map[string]string),
 		accountID:   accountID,
 		region:      region,
@@ -202,6 +246,237 @@ func (s *Store) tableARN(db, table string) string {
 
 func (s *Store) connectionARN(name string) string {
 	return fmt.Sprintf("arn:aws:glue:%s:%s:connection/%s", s.region, s.accountID, name)
+}
+
+// UpdateDatabase updates a database's description and location.
+func (s *Store) UpdateDatabase(name, description, locationURI string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	db, ok := s.databases[name]
+	if !ok {
+		return false
+	}
+	if description != "" {
+		db.Description = description
+	}
+	if locationURI != "" {
+		db.LocationURI = locationURI
+	}
+	return true
+}
+
+// ---- Partition operations ----
+
+func partitionKey(values []string) string {
+	result := ""
+	for i, v := range values {
+		if i > 0 {
+			result += "/"
+		}
+		result += v
+	}
+	return result
+}
+
+func (s *Store) CreatePartition(dbName, tableName string, partition *Partition) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.tables[dbName]; !ok {
+		return false
+	}
+	if s.partitions[dbName] == nil {
+		s.partitions[dbName] = make(map[string][]*Partition)
+	}
+	partition.DatabaseName = dbName
+	partition.TableName = tableName
+	partition.CreateTime = time.Now().UTC()
+	s.partitions[dbName][tableName] = append(s.partitions[dbName][tableName], partition)
+	return true
+}
+
+func (s *Store) BatchCreatePartitions(dbName, tableName string, partitions []*Partition) []*Partition {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.tables[dbName]; !ok {
+		return partitions // all fail
+	}
+	if s.partitions[dbName] == nil {
+		s.partitions[dbName] = make(map[string][]*Partition)
+	}
+	now := time.Now().UTC()
+	for _, p := range partitions {
+		p.DatabaseName = dbName
+		p.TableName = tableName
+		p.CreateTime = now
+		s.partitions[dbName][tableName] = append(s.partitions[dbName][tableName], p)
+	}
+	return nil // no errors
+}
+
+func (s *Store) GetPartitions(dbName, tableName string) []*Partition {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.partitions[dbName] == nil {
+		return nil
+	}
+	return s.partitions[dbName][tableName]
+}
+
+func (s *Store) DeletePartition(dbName, tableName string, values []string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.partitions[dbName] == nil {
+		return false
+	}
+	key := partitionKey(values)
+	existing := s.partitions[dbName][tableName]
+	for i, p := range existing {
+		if partitionKey(p.Values) == key {
+			s.partitions[dbName][tableName] = append(existing[:i], existing[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// ---- Trigger operations ----
+
+func (s *Store) CreateTrigger(trigger *Trigger) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.triggers[trigger.Name]; ok {
+		return false
+	}
+	trigger.State = "CREATED"
+	trigger.CreateTime = time.Now().UTC()
+	s.triggers[trigger.Name] = trigger
+	return true
+}
+
+func (s *Store) GetTrigger(name string) (*Trigger, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.triggers[name]
+	return t, ok
+}
+
+func (s *Store) ListTriggers() []*Trigger {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*Trigger, 0, len(s.triggers))
+	for _, t := range s.triggers {
+		result = append(result, t)
+	}
+	return result
+}
+
+func (s *Store) UpdateTrigger(name, description, schedule string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	t, ok := s.triggers[name]
+	if !ok {
+		return false
+	}
+	if description != "" {
+		t.Description = description
+	}
+	if schedule != "" {
+		t.Schedule = schedule
+	}
+	return true
+}
+
+func (s *Store) DeleteTrigger(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.triggers[name]; !ok {
+		return false
+	}
+	delete(s.triggers, name)
+	return true
+}
+
+// ---- Classifier operations ----
+
+func (s *Store) CreateClassifier(classifier *Classifier) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.classifiers[classifier.Name]; ok {
+		return false
+	}
+	now := time.Now().UTC()
+	classifier.CreateTime = now
+	classifier.LastUpdated = now
+	s.classifiers[classifier.Name] = classifier
+	return true
+}
+
+func (s *Store) GetClassifier(name string) (*Classifier, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	c, ok := s.classifiers[name]
+	return c, ok
+}
+
+func (s *Store) ListClassifiers() []*Classifier {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	result := make([]*Classifier, 0, len(s.classifiers))
+	for _, c := range s.classifiers {
+		result = append(result, c)
+	}
+	return result
+}
+
+func (s *Store) DeleteClassifier(name string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.classifiers[name]; !ok {
+		return false
+	}
+	delete(s.classifiers, name)
+	return true
+}
+
+// UpdateCrawler updates crawler settings.
+func (s *Store) UpdateCrawler(name, role, description, schedule string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	c, ok := s.crawlers[name]
+	if !ok {
+		return false
+	}
+	if role != "" {
+		c.Role = role
+	}
+	if description != "" {
+		c.Description = description
+	}
+	if schedule != "" {
+		c.Schedule = schedule
+	}
+	c.LastUpdated = time.Now().UTC()
+	return true
+}
+
+// UpdateJob updates job settings.
+func (s *Store) UpdateJob(name, role, description string, maxRetries int) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	j, ok := s.jobs[name]
+	if !ok {
+		return false
+	}
+	if role != "" {
+		j.Role = role
+	}
+	if description != "" {
+		j.Description = description
+	}
+	if maxRetries >= 0 {
+		j.MaxRetries = maxRetries
+	}
+	return true
 }
 
 // ---- Database operations ----

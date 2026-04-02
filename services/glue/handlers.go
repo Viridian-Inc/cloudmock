@@ -803,3 +803,430 @@ func handleGetTags(ctx *service.RequestContext, store *Store) (*service.Response
 	tags := store.GetTags(req.ResourceArn)
 	return jsonOK(map[string]any{"Tags": tags})
 }
+
+// ---- UpdateDatabase ----
+
+type updateDatabaseRequest struct {
+	Name          string `json:"Name"`
+	DatabaseInput struct {
+		Description string `json:"Description"`
+		LocationUri string `json:"LocationUri"`
+	} `json:"DatabaseInput"`
+}
+
+func handleUpdateDatabase(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateDatabaseRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.UpdateDatabase(req.Name, req.DatabaseInput.Description, req.DatabaseInput.LocationUri) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Database "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(struct{}{})
+}
+
+// ---- Partition handlers ----
+
+type partitionValueListJSON struct {
+	Values []string `json:"Values"`
+}
+
+type partitionInputJSON struct {
+	Values            []string        `json:"Values"`
+	StorageDescriptor storageDescJSON `json:"StorageDescriptor"`
+	Parameters        map[string]string `json:"Parameters"`
+}
+
+type createPartitionRequest struct {
+	DatabaseName   string             `json:"DatabaseName"`
+	TableName      string             `json:"TableName"`
+	PartitionInput partitionInputJSON `json:"PartitionInput"`
+}
+
+func toPartition(input partitionInputJSON) *Partition {
+	cols := make([]Column, len(input.StorageDescriptor.Columns))
+	for i, c := range input.StorageDescriptor.Columns {
+		cols[i] = Column{Name: c.Name, Type: c.Type, Comment: c.Comment}
+	}
+	params := input.Parameters
+	if params == nil {
+		params = make(map[string]string)
+	}
+	return &Partition{
+		Values: input.Values,
+		StorageDesc: StorageDescriptor{
+			Location: input.StorageDescriptor.Location,
+			Columns:  cols,
+		},
+		Parameters: params,
+	}
+}
+
+type partitionJSON struct {
+	Values            []string          `json:"Values"`
+	DatabaseName      string            `json:"DatabaseName"`
+	TableName         string            `json:"TableName"`
+	StorageDescriptor storageDescJSON   `json:"StorageDescriptor"`
+	Parameters        map[string]string `json:"Parameters,omitempty"`
+	CreationTime      float64           `json:"CreationTime"`
+}
+
+func toPartitionJSON(p *Partition) partitionJSON {
+	cols := make([]columnJSON, len(p.StorageDesc.Columns))
+	for i, c := range p.StorageDesc.Columns {
+		cols[i] = columnJSON{Name: c.Name, Type: c.Type}
+	}
+	return partitionJSON{
+		Values: p.Values, DatabaseName: p.DatabaseName, TableName: p.TableName,
+		StorageDescriptor: storageDescJSON{Location: p.StorageDesc.Location, Columns: cols},
+		Parameters: p.Parameters, CreationTime: float64(p.CreateTime.Unix()),
+	}
+}
+
+func handleCreatePartition(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createPartitionRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.DatabaseName == "" || req.TableName == "" {
+		return jsonErr(service.ErrValidation("DatabaseName and TableName are required."))
+	}
+	p := toPartition(req.PartitionInput)
+	if !store.CreatePartition(req.DatabaseName, req.TableName, p) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Table "+req.TableName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(struct{}{})
+}
+
+type batchCreatePartitionRequest struct {
+	DatabaseName      string               `json:"DatabaseName"`
+	TableName         string               `json:"TableName"`
+	PartitionInputList []partitionInputJSON `json:"PartitionInputList"`
+}
+
+func handleBatchCreatePartition(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req batchCreatePartitionRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	partitions := make([]*Partition, len(req.PartitionInputList))
+	for i, pi := range req.PartitionInputList {
+		partitions[i] = toPartition(pi)
+	}
+	errs := store.BatchCreatePartitions(req.DatabaseName, req.TableName, partitions)
+	if errs != nil {
+		return jsonOK(map[string]any{"Errors": errs})
+	}
+	return jsonOK(map[string]any{"Errors": []any{}})
+}
+
+type getPartitionsRequest struct {
+	DatabaseName string `json:"DatabaseName"`
+	TableName    string `json:"TableName"`
+}
+
+func handleGetPartitions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getPartitionsRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	partitions := store.GetPartitions(req.DatabaseName, req.TableName)
+	list := make([]partitionJSON, 0, len(partitions))
+	for _, p := range partitions {
+		list = append(list, toPartitionJSON(p))
+	}
+	return jsonOK(map[string]any{"Partitions": list})
+}
+
+type deletePartitionRequest struct {
+	DatabaseName    string   `json:"DatabaseName"`
+	TableName       string   `json:"TableName"`
+	PartitionValues []string `json:"PartitionValues"`
+}
+
+func handleDeletePartition(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deletePartitionRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.DeletePartition(req.DatabaseName, req.TableName, req.PartitionValues) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Partition not found.", http.StatusNotFound))
+	}
+	return jsonOK(struct{}{})
+}
+
+// ---- UpdateCrawler ----
+
+type updateCrawlerRequest struct {
+	Name        string `json:"Name"`
+	Role        string `json:"Role"`
+	Description string `json:"Description"`
+	Schedule    string `json:"Schedule"`
+}
+
+func handleUpdateCrawler(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateCrawlerRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.UpdateCrawler(req.Name, req.Role, req.Description, req.Schedule) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Crawler "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(struct{}{})
+}
+
+func handleListCrawlers(_ *service.RequestContext, store *Store) (*service.Response, error) {
+	crawlers := store.ListCrawlers()
+	names := make([]string, 0, len(crawlers))
+	for _, c := range crawlers {
+		names = append(names, c.Name)
+	}
+	return jsonOK(map[string]any{"CrawlerNames": names})
+}
+
+// ---- UpdateJob ----
+
+type updateJobRequest struct {
+	JobName  string `json:"JobName"`
+	JobUpdate struct {
+		Role        string `json:"Role"`
+		Description string `json:"Description"`
+		MaxRetries  int    `json:"MaxRetries"`
+	} `json:"JobUpdate"`
+}
+
+func handleUpdateJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateJobRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.UpdateJob(req.JobName, req.JobUpdate.Role, req.JobUpdate.Description, req.JobUpdate.MaxRetries) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Job "+req.JobName+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]string{"JobName": req.JobName})
+}
+
+// ---- Trigger handlers ----
+
+type triggerActionJSON struct {
+	JobName   string            `json:"JobName"`
+	Arguments map[string]string `json:"Arguments,omitempty"`
+}
+
+type createTriggerRequest struct {
+	Name        string              `json:"Name"`
+	Type        string              `json:"Type"`
+	Description string              `json:"Description"`
+	Schedule    string              `json:"Schedule"`
+	Actions     []triggerActionJSON `json:"Actions"`
+	Tags        map[string]string   `json:"Tags"`
+}
+
+type triggerJSON struct {
+	Name        string              `json:"Name"`
+	Type        string              `json:"Type"`
+	State       string              `json:"State"`
+	Description string              `json:"Description,omitempty"`
+	Schedule    string              `json:"Schedule,omitempty"`
+	Actions     []triggerActionJSON `json:"Actions,omitempty"`
+}
+
+func toTriggerJSON(t *Trigger) triggerJSON {
+	actions := make([]triggerActionJSON, len(t.Actions))
+	for i, a := range t.Actions {
+		actions[i] = triggerActionJSON{JobName: a.JobName, Arguments: a.Arguments}
+	}
+	return triggerJSON{
+		Name: t.Name, Type: t.Type, State: t.State,
+		Description: t.Description, Schedule: t.Schedule, Actions: actions,
+	}
+}
+
+func handleCreateTrigger(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createTriggerRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if req.Name == "" {
+		return jsonErr(service.ErrValidation("Trigger name is required."))
+	}
+	actions := make([]TriggerAction, len(req.Actions))
+	for i, a := range req.Actions {
+		actions[i] = TriggerAction{JobName: a.JobName, Arguments: a.Arguments}
+	}
+	t := &Trigger{
+		Name: req.Name, Type: req.Type, Description: req.Description,
+		Schedule: req.Schedule, Actions: actions, Tags: req.Tags,
+	}
+	if !store.CreateTrigger(t) {
+		return jsonErr(service.ErrAlreadyExists("Trigger", req.Name))
+	}
+	return jsonOK(map[string]string{"Name": req.Name})
+}
+
+type getTriggerRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleGetTrigger(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getTriggerRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, ok := store.GetTrigger(req.Name)
+	if !ok {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Trigger "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]any{"Trigger": toTriggerJSON(t)})
+}
+
+func handleGetTriggers(_ *service.RequestContext, store *Store) (*service.Response, error) {
+	triggers := store.ListTriggers()
+	list := make([]triggerJSON, 0, len(triggers))
+	for _, t := range triggers {
+		list = append(list, toTriggerJSON(t))
+	}
+	return jsonOK(map[string]any{"Triggers": list})
+}
+
+type updateTriggerRequest struct {
+	Name          string `json:"Name"`
+	TriggerUpdate struct {
+		Description string `json:"Description"`
+		Schedule    string `json:"Schedule"`
+	} `json:"TriggerUpdate"`
+}
+
+func handleUpdateTrigger(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req updateTriggerRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.UpdateTrigger(req.Name, req.TriggerUpdate.Description, req.TriggerUpdate.Schedule) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Trigger "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]string{"Name": req.Name})
+}
+
+type deleteTriggerRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleDeleteTrigger(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteTriggerRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.DeleteTrigger(req.Name) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Trigger "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(map[string]string{"Name": req.Name})
+}
+
+// ---- Classifier handlers ----
+
+type grokClassifierJSON struct {
+	Name           string `json:"Name"`
+	Classification string `json:"Classification"`
+	GrokPattern    string `json:"GrokPattern"`
+}
+
+type createClassifierRequest struct {
+	GrokClassifier *grokClassifierJSON `json:"GrokClassifier"`
+}
+
+type classifierJSON struct {
+	GrokClassifier *struct {
+		Name        string  `json:"Name"`
+		Type        string  `json:"Type"`
+		CreationTime float64 `json:"CreationTime"`
+		LastUpdated  float64 `json:"LastUpdated"`
+	} `json:"GrokClassifier,omitempty"`
+}
+
+func handleCreateClassifier(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req createClassifierRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := ""
+	classifierType := "GROK"
+	if req.GrokClassifier != nil {
+		name = req.GrokClassifier.Name
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("Classifier name is required."))
+	}
+	c := &Classifier{Name: name, Type: classifierType}
+	if req.GrokClassifier != nil {
+		c.GrokPattern = req.GrokClassifier.GrokPattern
+	}
+	if !store.CreateClassifier(c) {
+		return jsonErr(service.ErrAlreadyExists("Classifier", name))
+	}
+	return jsonOK(struct{}{})
+}
+
+type getClassifierRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleGetClassifier(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req getClassifierRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	c, ok := store.GetClassifier(req.Name)
+	if !ok {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Classifier "+req.Name+" not found.", http.StatusNotFound))
+	}
+	cj := classifierJSON{
+		GrokClassifier: &struct {
+			Name        string  `json:"Name"`
+			Type        string  `json:"Type"`
+			CreationTime float64 `json:"CreationTime"`
+			LastUpdated  float64 `json:"LastUpdated"`
+		}{
+			Name: c.Name, Type: c.Type,
+			CreationTime: float64(c.CreateTime.Unix()),
+			LastUpdated:  float64(c.LastUpdated.Unix()),
+		},
+	}
+	return jsonOK(map[string]any{"Classifier": cj})
+}
+
+func handleGetClassifiers(_ *service.RequestContext, store *Store) (*service.Response, error) {
+	classifiers := store.ListClassifiers()
+	list := make([]classifierJSON, 0, len(classifiers))
+	for _, c := range classifiers {
+		cj := classifierJSON{
+			GrokClassifier: &struct {
+				Name        string  `json:"Name"`
+				Type        string  `json:"Type"`
+				CreationTime float64 `json:"CreationTime"`
+				LastUpdated  float64 `json:"LastUpdated"`
+			}{
+				Name: c.Name, Type: c.Type,
+				CreationTime: float64(c.CreateTime.Unix()),
+				LastUpdated:  float64(c.LastUpdated.Unix()),
+			},
+		}
+		list = append(list, cj)
+	}
+	return jsonOK(map[string]any{"Classifiers": list})
+}
+
+type deleteClassifierRequest struct {
+	Name string `json:"Name"`
+}
+
+func handleDeleteClassifier(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req deleteClassifierRequest
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if !store.DeleteClassifier(req.Name) {
+		return jsonErr(service.NewAWSError("EntityNotFoundException", "Classifier "+req.Name+" not found.", http.StatusNotFound))
+	}
+	return jsonOK(struct{}{})
+}

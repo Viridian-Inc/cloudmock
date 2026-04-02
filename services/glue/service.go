@@ -36,22 +36,30 @@ func (s *GlueService) Actions() []service.Action {
 		{Name: "CreateDatabase", Method: http.MethodPost, IAMAction: "glue:CreateDatabase"},
 		{Name: "GetDatabase", Method: http.MethodPost, IAMAction: "glue:GetDatabase"},
 		{Name: "GetDatabases", Method: http.MethodPost, IAMAction: "glue:GetDatabases"},
+		{Name: "UpdateDatabase", Method: http.MethodPost, IAMAction: "glue:UpdateDatabase"},
 		{Name: "DeleteDatabase", Method: http.MethodPost, IAMAction: "glue:DeleteDatabase"},
 		{Name: "CreateTable", Method: http.MethodPost, IAMAction: "glue:CreateTable"},
 		{Name: "GetTable", Method: http.MethodPost, IAMAction: "glue:GetTable"},
 		{Name: "GetTables", Method: http.MethodPost, IAMAction: "glue:GetTables"},
 		{Name: "DeleteTable", Method: http.MethodPost, IAMAction: "glue:DeleteTable"},
 		{Name: "UpdateTable", Method: http.MethodPost, IAMAction: "glue:UpdateTable"},
+		{Name: "GetPartitions", Method: http.MethodPost, IAMAction: "glue:GetPartitions"},
+		{Name: "CreatePartition", Method: http.MethodPost, IAMAction: "glue:CreatePartition"},
+		{Name: "BatchCreatePartition", Method: http.MethodPost, IAMAction: "glue:BatchCreatePartition"},
+		{Name: "DeletePartition", Method: http.MethodPost, IAMAction: "glue:DeletePartition"},
 		{Name: "CreateCrawler", Method: http.MethodPost, IAMAction: "glue:CreateCrawler"},
 		{Name: "GetCrawler", Method: http.MethodPost, IAMAction: "glue:GetCrawler"},
 		{Name: "GetCrawlers", Method: http.MethodPost, IAMAction: "glue:GetCrawlers"},
 		{Name: "DeleteCrawler", Method: http.MethodPost, IAMAction: "glue:DeleteCrawler"},
 		{Name: "StartCrawler", Method: http.MethodPost, IAMAction: "glue:StartCrawler"},
 		{Name: "StopCrawler", Method: http.MethodPost, IAMAction: "glue:StopCrawler"},
+		{Name: "ListCrawlers", Method: http.MethodPost, IAMAction: "glue:ListCrawlers"},
+		{Name: "UpdateCrawler", Method: http.MethodPost, IAMAction: "glue:UpdateCrawler"},
 		{Name: "CreateJob", Method: http.MethodPost, IAMAction: "glue:CreateJob"},
 		{Name: "GetJob", Method: http.MethodPost, IAMAction: "glue:GetJob"},
 		{Name: "GetJobs", Method: http.MethodPost, IAMAction: "glue:GetJobs"},
 		{Name: "DeleteJob", Method: http.MethodPost, IAMAction: "glue:DeleteJob"},
+		{Name: "UpdateJob", Method: http.MethodPost, IAMAction: "glue:UpdateJob"},
 		{Name: "StartJobRun", Method: http.MethodPost, IAMAction: "glue:StartJobRun"},
 		{Name: "GetJobRun", Method: http.MethodPost, IAMAction: "glue:GetJobRun"},
 		{Name: "GetJobRuns", Method: http.MethodPost, IAMAction: "glue:GetJobRuns"},
@@ -60,6 +68,15 @@ func (s *GlueService) Actions() []service.Action {
 		{Name: "GetConnection", Method: http.MethodPost, IAMAction: "glue:GetConnection"},
 		{Name: "GetConnections", Method: http.MethodPost, IAMAction: "glue:GetConnections"},
 		{Name: "DeleteConnection", Method: http.MethodPost, IAMAction: "glue:DeleteConnection"},
+		{Name: "CreateTrigger", Method: http.MethodPost, IAMAction: "glue:CreateTrigger"},
+		{Name: "GetTrigger", Method: http.MethodPost, IAMAction: "glue:GetTrigger"},
+		{Name: "GetTriggers", Method: http.MethodPost, IAMAction: "glue:GetTriggers"},
+		{Name: "UpdateTrigger", Method: http.MethodPost, IAMAction: "glue:UpdateTrigger"},
+		{Name: "DeleteTrigger", Method: http.MethodPost, IAMAction: "glue:DeleteTrigger"},
+		{Name: "CreateClassifier", Method: http.MethodPost, IAMAction: "glue:CreateClassifier"},
+		{Name: "GetClassifier", Method: http.MethodPost, IAMAction: "glue:GetClassifier"},
+		{Name: "GetClassifiers", Method: http.MethodPost, IAMAction: "glue:GetClassifiers"},
+		{Name: "DeleteClassifier", Method: http.MethodPost, IAMAction: "glue:DeleteClassifier"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "glue:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "glue:UntagResource"},
 		{Name: "GetTags", Method: http.MethodPost, IAMAction: "glue:GetTags"},
@@ -78,6 +95,8 @@ func (s *GlueService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 		return handleGetDatabase(ctx, s.store)
 	case "GetDatabases":
 		return handleGetDatabases(ctx, s.store)
+	case "UpdateDatabase":
+		return handleUpdateDatabase(ctx, s.store)
 	case "DeleteDatabase":
 		return handleDeleteDatabase(ctx, s.store)
 	case "CreateTable":
@@ -90,6 +109,14 @@ func (s *GlueService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 		return handleDeleteTable(ctx, s.store)
 	case "UpdateTable":
 		return handleUpdateTable(ctx, s.store)
+	case "GetPartitions":
+		return handleGetPartitions(ctx, s.store)
+	case "CreatePartition":
+		return handleCreatePartition(ctx, s.store)
+	case "BatchCreatePartition":
+		return handleBatchCreatePartition(ctx, s.store)
+	case "DeletePartition":
+		return handleDeletePartition(ctx, s.store)
 	case "CreateCrawler":
 		return handleCreateCrawler(ctx, s.store)
 	case "GetCrawler":
@@ -102,6 +129,10 @@ func (s *GlueService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 		return handleStartCrawler(ctx, s.store)
 	case "StopCrawler":
 		return handleStopCrawler(ctx, s.store)
+	case "ListCrawlers":
+		return handleListCrawlers(ctx, s.store)
+	case "UpdateCrawler":
+		return handleUpdateCrawler(ctx, s.store)
 	case "CreateJob":
 		return handleCreateJob(ctx, s.store)
 	case "GetJob":
@@ -110,6 +141,8 @@ func (s *GlueService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 		return handleGetJobs(ctx, s.store)
 	case "DeleteJob":
 		return handleDeleteJob(ctx, s.store)
+	case "UpdateJob":
+		return handleUpdateJob(ctx, s.store)
 	case "StartJobRun":
 		return handleStartJobRun(ctx, s.store)
 	case "GetJobRun":
@@ -126,6 +159,24 @@ func (s *GlueService) HandleRequest(ctx *service.RequestContext) (*service.Respo
 		return handleGetConnections(ctx, s.store)
 	case "DeleteConnection":
 		return handleDeleteConnection(ctx, s.store)
+	case "CreateTrigger":
+		return handleCreateTrigger(ctx, s.store)
+	case "GetTrigger":
+		return handleGetTrigger(ctx, s.store)
+	case "GetTriggers":
+		return handleGetTriggers(ctx, s.store)
+	case "UpdateTrigger":
+		return handleUpdateTrigger(ctx, s.store)
+	case "DeleteTrigger":
+		return handleDeleteTrigger(ctx, s.store)
+	case "CreateClassifier":
+		return handleCreateClassifier(ctx, s.store)
+	case "GetClassifier":
+		return handleGetClassifier(ctx, s.store)
+	case "GetClassifiers":
+		return handleGetClassifiers(ctx, s.store)
+	case "DeleteClassifier":
+		return handleDeleteClassifier(ctx, s.store)
 	case "TagResource":
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":

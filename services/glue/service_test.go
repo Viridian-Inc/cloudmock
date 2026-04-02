@@ -371,6 +371,250 @@ func TestStartCrawler_AutoCreatesDatabase(t *testing.T) {
 	assert.Equal(t, "auto_db", db["Name"])
 }
 
+func TestUpdateDatabase(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDatabase", map[string]any{"DatabaseInput": map[string]any{"Name": "upd-db"}}))
+	resp, err := s.HandleRequest(jsonCtx("UpdateDatabase", map[string]any{
+		"Name":          "upd-db",
+		"DatabaseInput": map[string]any{"Description": "updated desc"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestUpdateDatabaseNotFound(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(jsonCtx("UpdateDatabase", map[string]any{
+		"Name": "ghost-db", "DatabaseInput": map[string]any{"Description": "x"},
+	}))
+	require.Error(t, err)
+}
+
+func TestCreatePartition(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDatabase", map[string]any{"DatabaseInput": map[string]any{"Name": "part-db"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateTable", map[string]any{
+		"DatabaseName": "part-db", "TableInput": map[string]any{"Name": "part-tbl"},
+	}))
+	resp, err := s.HandleRequest(jsonCtx("CreatePartition", map[string]any{
+		"DatabaseName": "part-db", "TableName": "part-tbl",
+		"PartitionInput": map[string]any{"Values": []string{"2024", "01"}},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestGetPartitions(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDatabase", map[string]any{"DatabaseInput": map[string]any{"Name": "gpart-db"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateTable", map[string]any{
+		"DatabaseName": "gpart-db", "TableInput": map[string]any{"Name": "gpart-tbl"},
+	}))
+	_, _ = s.HandleRequest(jsonCtx("CreatePartition", map[string]any{
+		"DatabaseName": "gpart-db", "TableName": "gpart-tbl",
+		"PartitionInput": map[string]any{"Values": []string{"2024"}},
+	}))
+	_, _ = s.HandleRequest(jsonCtx("CreatePartition", map[string]any{
+		"DatabaseName": "gpart-db", "TableName": "gpart-tbl",
+		"PartitionInput": map[string]any{"Values": []string{"2023"}},
+	}))
+	resp, err := s.HandleRequest(jsonCtx("GetPartitions", map[string]any{"DatabaseName": "gpart-db", "TableName": "gpart-tbl"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	parts := m["Partitions"].([]any)
+	assert.Len(t, parts, 2)
+}
+
+func TestBatchCreatePartition(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDatabase", map[string]any{"DatabaseInput": map[string]any{"Name": "bpart-db"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateTable", map[string]any{
+		"DatabaseName": "bpart-db", "TableInput": map[string]any{"Name": "bpart-tbl"},
+	}))
+	resp, err := s.HandleRequest(jsonCtx("BatchCreatePartition", map[string]any{
+		"DatabaseName": "bpart-db", "TableName": "bpart-tbl",
+		"PartitionInputList": []map[string]any{
+			{"Values": []string{"2024", "01"}},
+			{"Values": []string{"2024", "02"}},
+		},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	// Verify partitions were created
+	partResp, err := s.HandleRequest(jsonCtx("GetPartitions", map[string]any{"DatabaseName": "bpart-db", "TableName": "bpart-tbl"}))
+	require.NoError(t, err)
+	pm := respJSON(t, partResp)
+	parts := pm["Partitions"].([]any)
+	assert.Len(t, parts, 2)
+}
+
+func TestDeletePartition(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateDatabase", map[string]any{"DatabaseInput": map[string]any{"Name": "dpart-db"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateTable", map[string]any{
+		"DatabaseName": "dpart-db", "TableInput": map[string]any{"Name": "dpart-tbl"},
+	}))
+	_, _ = s.HandleRequest(jsonCtx("CreatePartition", map[string]any{
+		"DatabaseName": "dpart-db", "TableName": "dpart-tbl",
+		"PartitionInput": map[string]any{"Values": []string{"2024"}},
+	}))
+	resp, err := s.HandleRequest(jsonCtx("DeletePartition", map[string]any{
+		"DatabaseName": "dpart-db", "TableName": "dpart-tbl", "PartitionValues": []string{"2024"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestUpdateCrawler(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateCrawler", map[string]any{"Name": "upd-c", "Role": "r1"}))
+	resp, err := s.HandleRequest(jsonCtx("UpdateCrawler", map[string]any{
+		"Name": "upd-c", "Role": "r2", "Description": "new desc",
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestListCrawlers(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateCrawler", map[string]any{"Name": "lc1", "Role": "r"}))
+	_, _ = s.HandleRequest(jsonCtx("CreateCrawler", map[string]any{"Name": "lc2", "Role": "r"}))
+	resp, err := s.HandleRequest(jsonCtx("ListCrawlers", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	names := m["CrawlerNames"].([]any)
+	assert.Len(t, names, 2)
+}
+
+func TestUpdateJob(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateJob", map[string]any{"Name": "upd-job", "Role": "r", "Command": map[string]any{"Name": "glueetl"}}))
+	resp, err := s.HandleRequest(jsonCtx("UpdateJob", map[string]any{
+		"JobName": "upd-job", "JobUpdate": map[string]any{"Description": "updated", "MaxRetries": 2},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "upd-job", m["JobName"])
+}
+
+func TestGetJobs(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateJob", map[string]any{"Name": "gj-a", "Role": "r", "Command": map[string]any{"Name": "glueetl"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateJob", map[string]any{"Name": "gj-b", "Role": "r", "Command": map[string]any{"Name": "glueetl"}}))
+	resp, err := s.HandleRequest(jsonCtx("GetJobs", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	jobs := m["Jobs"].([]any)
+	assert.Len(t, jobs, 2)
+}
+
+func TestCreateTrigger(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{
+		"Name": "trig1", "Type": "SCHEDULED", "Schedule": "cron(0 * * * ? *)",
+		"Actions": []map[string]any{{"JobName": "job1"}},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "trig1", m["Name"])
+}
+
+func TestGetTrigger(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{"Name": "gt1", "Type": "ON_DEMAND"}))
+	resp, err := s.HandleRequest(jsonCtx("GetTrigger", map[string]any{"Name": "gt1"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	trig := m["Trigger"].(map[string]any)
+	assert.Equal(t, "gt1", trig["Name"])
+	assert.Equal(t, "CREATED", trig["State"])
+}
+
+func TestGetTriggers(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{"Name": "t1", "Type": "ON_DEMAND"}))
+	_, _ = s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{"Name": "t2", "Type": "SCHEDULED"}))
+	resp, err := s.HandleRequest(jsonCtx("GetTriggers", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	trigs := m["Triggers"].([]any)
+	assert.Len(t, trigs, 2)
+}
+
+func TestUpdateTrigger(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{"Name": "upd-t", "Type": "SCHEDULED"}))
+	resp, err := s.HandleRequest(jsonCtx("UpdateTrigger", map[string]any{
+		"Name": "upd-t", "TriggerUpdate": map[string]any{"Description": "updated"},
+	}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	assert.Equal(t, "upd-t", m["Name"])
+}
+
+func TestDeleteTrigger(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateTrigger", map[string]any{"Name": "del-t", "Type": "ON_DEMAND"}))
+	resp, err := s.HandleRequest(jsonCtx("DeleteTrigger", map[string]any{"Name": "del-t"}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	_, err = s.HandleRequest(jsonCtx("GetTrigger", map[string]any{"Name": "del-t"}))
+	require.Error(t, err)
+}
+
+func TestCreateClassifier(t *testing.T) {
+	s := newService()
+	resp, err := s.HandleRequest(jsonCtx("CreateClassifier", map[string]any{
+		"GrokClassifier": map[string]any{"Name": "cls1", "Classification": "json", "GrokPattern": "%{GREEDYDATA}"},
+	}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
+func TestGetClassifier(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateClassifier", map[string]any{
+		"GrokClassifier": map[string]any{"Name": "gcls1", "Classification": "csv"},
+	}))
+	resp, err := s.HandleRequest(jsonCtx("GetClassifier", map[string]any{"Name": "gcls1"}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	cls := m["Classifier"].(map[string]any)
+	assert.NotNil(t, cls["GrokClassifier"])
+}
+
+func TestGetClassifiers(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateClassifier", map[string]any{"GrokClassifier": map[string]any{"Name": "cls-a"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateClassifier", map[string]any{"GrokClassifier": map[string]any{"Name": "cls-b"}}))
+	resp, err := s.HandleRequest(jsonCtx("GetClassifiers", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	clss := m["Classifiers"].([]any)
+	assert.Len(t, clss, 2)
+}
+
+func TestDeleteClassifier(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateClassifier", map[string]any{"GrokClassifier": map[string]any{"Name": "del-cls"}}))
+	resp, err := s.HandleRequest(jsonCtx("DeleteClassifier", map[string]any{"Name": "del-cls"}))
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	_, err = s.HandleRequest(jsonCtx("GetClassifier", map[string]any{"Name": "del-cls"}))
+	require.Error(t, err)
+}
+
+func TestGetConnections(t *testing.T) {
+	s := newService()
+	_, _ = s.HandleRequest(jsonCtx("CreateConnection", map[string]any{"ConnectionInput": map[string]any{"Name": "conn-a", "ConnectionType": "JDBC"}}))
+	_, _ = s.HandleRequest(jsonCtx("CreateConnection", map[string]any{"ConnectionInput": map[string]any{"Name": "conn-b", "ConnectionType": "KAFKA"}}))
+	resp, err := s.HandleRequest(jsonCtx("GetConnections", map[string]any{}))
+	require.NoError(t, err)
+	m := respJSON(t, resp)
+	conns := m["ConnectionList"].([]any)
+	assert.Len(t, conns, 2)
+}
+
 func TestStartJobRun_NoLocator(t *testing.T) {
 	// Job runs should work even without a locator (graceful degradation for logging)
 	s := newService()

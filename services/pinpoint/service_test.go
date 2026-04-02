@@ -158,3 +158,73 @@ func TestPinpoint_AppNotFound(t *testing.T) {
 	_, err := s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/nonexistent", nil))
 	require.Error(t, err)
 }
+
+func TestPinpoint_GetCampaigns(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s, "camp-list-app")
+	s.HandleRequest(restCtx(http.MethodPost, "/v1/apps/"+appID+"/campaigns", map[string]any{
+		"WriteCampaignRequest": map[string]any{"Name": "camp-1", "SegmentId": "s1"},
+	}))
+	s.HandleRequest(restCtx(http.MethodPost, "/v1/apps/"+appID+"/campaigns", map[string]any{
+		"WriteCampaignRequest": map[string]any{"Name": "camp-2", "SegmentId": "s2"},
+	}))
+
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/"+appID+"/campaigns", nil))
+	require.NoError(t, err)
+	items := respJSON(t, resp)["CampaignsResponse"].(map[string]any)["Item"].([]any)
+	assert.Len(t, items, 2)
+}
+
+func TestPinpoint_GetSegments(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s, "seg-list-app")
+	s.HandleRequest(restCtx(http.MethodPost, "/v1/apps/"+appID+"/segments", map[string]any{
+		"WriteSegmentRequest": map[string]any{"Name": "seg-A"},
+	}))
+	s.HandleRequest(restCtx(http.MethodPost, "/v1/apps/"+appID+"/segments", map[string]any{
+		"WriteSegmentRequest": map[string]any{"Name": "seg-B"},
+	}))
+
+	resp, err := s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/"+appID+"/segments", nil))
+	require.NoError(t, err)
+	items := respJSON(t, resp)["SegmentsResponse"].(map[string]any)["Item"].([]any)
+	assert.Len(t, items, 2)
+}
+
+func TestPinpoint_DeleteCampaign(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s, "del-camp-app")
+	campResp, err := s.HandleRequest(restCtx(http.MethodPost, "/v1/apps/"+appID+"/campaigns", map[string]any{
+		"WriteCampaignRequest": map[string]any{"Name": "to-delete", "SegmentId": "s1"},
+	}))
+	require.NoError(t, err)
+	campID := respJSON(t, campResp)["CampaignResponse"].(map[string]any)["Id"].(string)
+
+	_, err = s.HandleRequest(restCtx(http.MethodDelete, "/v1/apps/"+appID+"/campaigns/"+campID, nil))
+	require.NoError(t, err)
+
+	_, err = s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/"+appID+"/campaigns/"+campID, nil))
+	require.Error(t, err)
+}
+
+func TestPinpoint_SegmentNotFound(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s, "notfound-app")
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/"+appID+"/segments/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestPinpoint_CampaignNotFound(t *testing.T) {
+	s := newService()
+	appID := createApp(t, s, "notfound-app2")
+	_, err := s.HandleRequest(restCtx(http.MethodGet, "/v1/apps/"+appID+"/campaigns/nonexistent", nil))
+	require.Error(t, err)
+}
+
+func TestPinpoint_CreateAppMissingName(t *testing.T) {
+	s := newService()
+	_, err := s.HandleRequest(restCtx(http.MethodPost, "/v1/apps", map[string]any{
+		"CreateApplicationRequest": map[string]any{},
+	}))
+	require.Error(t, err)
+}

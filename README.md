@@ -185,6 +185,25 @@ cloudmock record --output prod-traffic.json    # proxy mode: captures real AWS c
 cloudmock validate --input prod-traffic.json   # replay + compare, exit 0 = all match
 ```
 
+## CloudTrail Event Replay
+
+Recreate production AWS state from CloudTrail audit logs:
+
+```bash
+# Export CloudTrail events from AWS
+aws cloudtrail lookup-events --start-time 2026-03-01 --output json > trail.json
+
+# Replay write operations against CloudMock
+cloudmock cloudtrail replay --input trail.json --endpoint http://localhost:4566
+```
+
+Filter by service, control replay speed, or use the admin API:
+
+```bash
+cloudmock cloudtrail replay --input trail.json --services dynamodb,s3 --speed 0
+curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
+```
+
 ## Comparison
 
 | Feature | CloudMock | LocalStack (Free) | Moto |

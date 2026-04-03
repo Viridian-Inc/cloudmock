@@ -15,6 +15,7 @@ import (
 
 	"golang.org/x/crypto/bcrypt"
 
+	ctReplay "github.com/neureaux/cloudmock/pkg/cloudtrail"
 	"github.com/neureaux/cloudmock/pkg/annotations"
 	"github.com/neureaux/cloudmock/pkg/anomaly"
 	"github.com/neureaux/cloudmock/pkg/auth"
@@ -327,6 +328,9 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
 	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
 
+	// CloudTrail replay endpoint
+	a.mux.HandleFunc("/api/cloudtrail/replay", a.handleCloudTrailReplay)
+
 	a.seedDefaultDashboard()
 
 	return a
@@ -463,6 +467,9 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/state/export", a.handleStateExport)
 	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
 	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
+
+	// CloudTrail replay endpoint
+	a.mux.HandleFunc("/api/cloudtrail/replay", a.handleCloudTrailReplay)
 
 	a.seedDefaultDashboard()
 
@@ -4365,4 +4372,43 @@ func (a *API) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.stripeWebhook.HandleWebhook(w, r)
+}
+
+// handleCloudTrailReplay accepts a POST with CloudTrail JSON (Records array)
+// and replays the events against the local CloudMock gateway.
+func (a *API) handleCloudTrailReplay(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+	defer r.Body.Close()
+
+	events, err := ctReplay.ParseJSON(body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to parse CloudTrail JSON: "+err.Error())
+		return
+	}
+
+	endpoint := "http://localhost:4566"
+	if a.cfg != nil && a.cfg.Gateway.Port != 0 {
+		endpoint = fmt.Sprintf("http://localhost:%d", a.cfg.Gateway.Port)
+	}
+
+	result, err := ctReplay.Replay(events, ctReplay.ReplayConfig{
+		Endpoint:    endpoint,
+		Speed:       0,
+		FilterWrite: true,
+	})
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "replay failed: "+err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, result)
 }

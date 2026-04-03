@@ -28,6 +28,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | **Persistence** | Snapshot, DuckDB, PostgreSQL | Pro tier (persistence) | In-memory only | In-memory only |
 | **State snapshots** | Built-in — export/import JSON, commit to git, `--state` flag on startup | Cloud Pods (Pro tier only) | No equivalent | No equivalent |
 | **Traffic recording & replay** | Built-in (proxy + Go SDK interceptor, validate subcommand) | No | No | No |
+| **CloudTrail event replay** | Built-in (recreate state from audit logs) | No | No | No |
 | **Contract testing** | Built-in (dual-mode proxy compares real AWS vs CloudMock live) | No | No | No |
 | **GitHub Action** | `viridian-inc/cloudmock-action@v1` — one-line CI setup | Yes (localstack-action) | No | No |
 | **Scaffolding CLI** | `create-cloudmock-app` — 9 templates (Node/Python/Go/Java/Rust) | No | No | No |
@@ -38,6 +39,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | Feature | CloudMock | LocalStack | Moto |
 |---|---|---|---|
 | Traffic recording & replay | Built-in (proxy + SDK interceptor) | No | No |
+| CloudTrail event replay | Built-in (recreate state from audit logs) | No | No |
 
 ## IaC tool support
 

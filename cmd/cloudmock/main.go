@@ -13,7 +13,9 @@ import (
 	"os/signal"
 	"strings"
 	"text/tabwriter"
+	"time"
 
+	"github.com/neureaux/cloudmock/pkg/cloudtrail"
 	"github.com/neureaux/cloudmock/pkg/proxy"
 	"github.com/neureaux/cloudmock/pkg/traffic"
 )
@@ -54,6 +56,13 @@ func main() {
 		cmdValidate(adminAddr, os.Args[2:])
 	case "contract":
 		cmdContract(os.Args[2:])
+	case "cloudtrail":
+		if len(os.Args) > 2 && os.Args[2] == "replay" {
+			cmdCloudTrailReplay(os.Args[3:])
+		} else {
+			fmt.Fprintln(os.Stderr, "Usage: cloudmock cloudtrail replay [options]")
+			os.Exit(1)
+		}
 	case "version":
 		cmdVersion()
 	case "config":
@@ -71,18 +80,19 @@ func printUsage() {
 	fmt.Fprintln(os.Stderr, `Usage: cloudmock <command> [options]
 
 Commands:
-  start      Start the cloudmock gateway
-  stop       Stop the cloudmock gateway
-  status     Show health status of all services
-  reset      Reset service state (all or specific)
-  services   List registered services
-  record     Record real AWS traffic via proxy
-  replay     Replay a recording against CloudMock
-  validate   Replay + compare + exit code (CI mode)
-  contract   Dual-mode proxy: compare real AWS vs CloudMock live
-  config     Show current configuration
-  version    Print version information
-  help       Show this help message
+  start              Start the cloudmock gateway
+  stop               Stop the cloudmock gateway
+  status             Show health status of all services
+  reset              Reset service state (all or specific)
+  services           List registered services
+  record             Record real AWS traffic via proxy
+  replay             Replay a recording against CloudMock
+  validate           Replay + compare + exit code (CI mode)
+  contract           Dual-mode proxy: compare real AWS vs CloudMock live
+  cloudtrail replay  Replay CloudTrail events to recreate state
+  config             Show current configuration
+  version            Print version information
+  help               Show this help message
 
 Use "cloudmock <command> --help" for more information about a command.`)
 }
@@ -604,4 +614,71 @@ func printContractSummary(report *proxy.ContractReport, outputPath string) {
 	}
 
 	fmt.Printf("\nReport written to %s\n", outputPath)
+}
+
+func cmdCloudTrailReplay(args []string) {
+	fs := flag.NewFlagSet("cloudtrail replay", flag.ExitOnError)
+	input := fs.String("input", "", "path to CloudTrail JSON file (required)")
+	endpoint := fs.String("endpoint", "http://localhost:4566", "CloudMock gateway endpoint")
+	speed := fs.Float64("speed", 0, "replay speed (0 = instant, 1.0 = realtime)")
+	services := fs.String("services", "", "comma-separated list of services to replay")
+	output := fs.String("output", "", "path to write result JSON")
+	fs.Parse(args)
+
+	if *input == "" {
+		fmt.Fprintln(os.Stderr, "Error: --input is required")
+		os.Exit(1)
+	}
+
+	events, err := cloudtrail.ParseFile(*input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading CloudTrail file: %v\n", err)
+		os.Exit(1)
+	}
+
+	var svcFilter []string
+	if *services != "" {
+		for _, s := range strings.Split(*services, ",") {
+			s = strings.TrimSpace(s)
+			if s != "" {
+				svcFilter = append(svcFilter, s)
+			}
+		}
+	}
+
+	cfg := cloudtrail.ReplayConfig{
+		Endpoint:    *endpoint,
+		Speed:       *speed,
+		FilterWrite: true,
+		Services:    svcFilter,
+	}
+
+	fmt.Printf("Replaying %d CloudTrail events against %s\n", len(events), *endpoint)
+
+	result, err := cloudtrail.Replay(events, cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("\nCloudTrail Replay Results\n")
+	fmt.Printf("  Total events:  %d\n", result.TotalEvents)
+	fmt.Printf("  Replayed:      %d\n", result.Replayed)
+	fmt.Printf("  Skipped:       %d\n", result.Skipped)
+	fmt.Printf("  Succeeded:     %d\n", result.Succeeded)
+	fmt.Printf("  Failed:        %d\n", result.Failed)
+	fmt.Printf("  Duration:      %s\n", result.Duration.Round(time.Millisecond))
+
+	for _, e := range result.Errors {
+		fmt.Printf("  [FAIL] %s.%s: %s (status %d)\n", e.Service, e.EventName, e.Error, e.Status)
+	}
+
+	if *output != "" {
+		data, _ := json.MarshalIndent(result, "", "  ")
+		if err := os.WriteFile(*output, data, 0644); err != nil {
+			fmt.Fprintf(os.Stderr, "Error writing output: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("\nResults written to %s\n", *output)
+	}
 }

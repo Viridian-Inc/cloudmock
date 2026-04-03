@@ -14,6 +14,7 @@ export default defineConfig({
           href: "https://github.com/Viridian-Inc/cloudmock",
         },
       ],
+      favicon: "/favicon.svg",
       customCss: [],
       head: [
         {

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Dark background with rounded corners -->
+  <rect width="32" height="32" rx="6" fill="#1a2b23"/>
+  <!-- Green border -->
+  <rect x="1" y="1" width="30" height="30" rx="5" stroke="#52b788" stroke-width="1.5" fill="none"/>
+  <!-- C - geometric, squared -->
+  <path d="M13 10H7v12h6v-2.5H9.5v-7H13V10z" fill="#52b788"/>
+  <!-- M - geometric, squared -->
+  <path d="M15 10v12h2.5v-7.5L19.5 18l2-3.5V22H24V10h-2.5l-2 3.5-2-3.5H15z" fill="#52b788"/>
+</svg>

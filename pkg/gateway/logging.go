@@ -353,27 +353,39 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 
 		start := time.Now()
 
-		// Extract or generate trace ID. Span ID is only needed when a trace store
-		// or broadcaster/production mode is active; skip the random generation otherwise.
-		traceID := r.Header.Get("X-Cloudmock-Trace-Id")
+		// Parse W3C traceparent header for trace context propagation.
+		// Format: "00-{32hex traceId}-{16hex parentSpanId}-{2hex flags}"
+		var traceID string
+		var parentSpanID string
+		if tp := r.Header.Get("traceparent"); tp != "" {
+			parts := strings.Split(tp, "-")
+			if len(parts) == 4 && parts[0] == "00" && len(parts[1]) == 32 && len(parts[2]) == 16 {
+				traceID = parts[1]
+				parentSpanID = parts[2]
+			}
+		}
+
+		// Fall back to CloudMock/AWS trace headers if no valid traceparent.
+		if traceID == "" {
+			traceID = r.Header.Get("X-Cloudmock-Trace-Id")
+		}
 		if traceID == "" {
 			traceID = r.Header.Get("X-Amz-Trace-Id")
 		}
 		if traceID == "" {
 			traceID = GenerateTraceID()
 		}
-		var spanID string
-		var parentSpanID string
-		if hasTraceStore || hasBroadcaster || productionMode {
-			spanID = GenerateSpanID()
+
+		// Always generate a span ID for every request.
+		spanID := GenerateSpanID()
+		if parentSpanID == "" {
 			parentSpanID = r.Header.Get("X-Cloudmock-Parent-Span-Id")
 		}
 
 		// Set trace headers on the response so callers can correlate.
 		w.Header().Set("X-Cloudmock-Trace-Id", traceID)
-		if spanID != "" {
-			w.Header().Set("X-Cloudmock-Span-Id", spanID)
-		}
+		w.Header().Set("X-Cloudmock-Span-Id", spanID)
+		w.Header().Set("traceparent", fmt.Sprintf("00-%s-%s-01", traceID, spanID))
 
 		// Capture request headers — only when we have subscribers that need them.
 		var reqHeaders map[string]string
@@ -470,7 +482,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				_ = opts.DataPlane.RequestW.Write(r.Context(), dpEntry)
 			}
 
-			// Emit an OTel span for each request.
+			// Emit an OTel span for each request (production only).
 			tracer := otel.Tracer("cloudmock-gateway")
 			_, span := tracer.Start(r.Context(), fmt.Sprintf("%s %s", r.Method, svcName))
 			span.SetAttributes(
@@ -497,46 +509,46 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				stats.Increment(svcName)
 			}
 
-			// Store trace context.
-			if hasTraceStore {
-				endTime := time.Now()
-				// Capture distributed context from headers
-				metadata := extractTraceMetadata(r)
-
-				// Capture call stacks only when explicitly enabled — it's expensive
-				// (~15μs: runtime.Callers + frame iteration + json.Marshal per request).
-				if captureStacks {
-					stacks := []profiling.SpanStack{profiling.CaptureStack("handler_entry", 2)}
-					stackJSON, _ := json.Marshal(stacks)
-					if metadata == nil {
-						metadata = make(map[string]string)
-					}
-					metadata["stacks"] = string(stackJSON)
-				}
-
-				trace := &TraceContext{
-					TraceID:      traceID,
-					SpanID:       spanID,
-					ParentSpanID: parentSpanID,
-					Service:      svcName,
-					Action:       action,
-					Method:       r.Method,
-					Path:         r.URL.Path,
-					StartTime:    start,
-					EndTime:      endTime,
-					Duration:     latency,
-					DurationMs:   latencyMs,
-					StatusCode:   rec.statusCode,
-					Error:        errMsg,
-					Metadata:     metadata,
-				}
-				opts.TraceStore.Add(trace)
-			}
-
 			// Record SLO metrics.
 			if hasSLO {
 				opts.SLOEngine.Record(svcName, action, latencyMs, rec.statusCode)
 			}
+		}
+
+		// Always store trace context when a trace store is available.
+		if hasTraceStore {
+			endTime := time.Now()
+			// Capture distributed context from headers
+			metadata := extractTraceMetadata(r)
+
+			// Capture call stacks only when explicitly enabled — it's expensive
+			// (~15μs: runtime.Callers + frame iteration + json.Marshal per request).
+			if captureStacks {
+				stacks := []profiling.SpanStack{profiling.CaptureStack("handler_entry", 2)}
+				stackJSON, _ := json.Marshal(stacks)
+				if metadata == nil {
+					metadata = make(map[string]string)
+				}
+				metadata["stacks"] = string(stackJSON)
+			}
+
+			trace := &TraceContext{
+				TraceID:      traceID,
+				SpanID:       spanID,
+				ParentSpanID: parentSpanID,
+				Service:      svcName,
+				Action:       action,
+				Method:       r.Method,
+				Path:         r.URL.Path,
+				StartTime:    start,
+				EndTime:      endTime,
+				Duration:     latency,
+				DurationMs:   latencyMs,
+				StatusCode:   rec.statusCode,
+				Error:        errMsg,
+				Metadata:     metadata,
+			}
+			opts.TraceStore.Add(trace)
 		}
 
 		// Broadcast request event for SSE clients — always runs regardless of mode.

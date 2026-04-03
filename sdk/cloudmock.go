@@ -35,6 +35,7 @@ type options struct {
 	iamMode   string
 	region    string
 	accountID string
+	tracing   bool
 }
 
 // WithProfile sets the service profile ("minimal" or "standard").
@@ -49,6 +50,11 @@ func WithRegion(r string) Option { return func(o *options) { o.region = r } }
 // WithAccountID sets the AWS account ID for the mock.
 func WithAccountID(id string) Option { return func(o *options) { o.accountID = id } }
 
+// WithTracing enables always-on distributed tracing with W3C traceparent propagation.
+// When enabled, a TraceStore is created and wired to the gateway, and the in-process
+// transport propagates trace context from the Go context as traceparent headers.
+func WithTracing() Option { return func(o *options) { o.tracing = true } }
+
 // CloudMock is an in-process AWS mock. All AWS SDK calls routed through its
 // Config() go directly to the gateway handler with zero network overhead.
 type CloudMock struct {
@@ -56,6 +62,7 @@ type CloudMock struct {
 	transport    *inProcessTransport
 	cfg          aws.Config
 	chaosEngine  *gateway.ChaosEngine
+	traceStore   *gateway.TraceStore
 }
 
 // New creates a new in-process CloudMock instance. By default it uses a
@@ -108,6 +115,15 @@ func New(opts ...Option) *CloudMock {
 	chaosEngine := gateway.NewChaosEngine()
 	var handler http.Handler = gateway.ChaosMiddleware(gw, chaosEngine)
 
+	// When tracing is enabled, wrap with logging middleware that populates the trace store.
+	var traceStore *gateway.TraceStore
+	if o.tracing {
+		traceStore = gateway.NewTraceStore(500)
+		handler = gateway.LoggingMiddlewareWithOpts(handler, nil, nil, gateway.LoggingMiddlewareOpts{
+			TraceStore: traceStore,
+		})
+	}
+
 	transport := newInProcessTransport(handler)
 
 	// Build the aws.Config that the caller will pass to SDK clients.
@@ -134,12 +150,18 @@ func New(opts ...Option) *CloudMock {
 		transport:   transport,
 		cfg:         awsConfig,
 		chaosEngine: chaosEngine,
+		traceStore:  traceStore,
 	}
 }
 
 // Config returns an aws.Config that routes all SDK calls through CloudMock in-process.
 func (cm *CloudMock) Config() aws.Config {
 	return cm.cfg
+}
+
+// TraceStore returns the trace store if tracing is enabled, or nil otherwise.
+func (cm *CloudMock) TraceStore() *gateway.TraceStore {
+	return cm.traceStore
 }
 
 // Close releases resources held by this CloudMock instance.

@@ -19,7 +19,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | **Docker required** | No (optional) | Yes (for many services) | No | Yes (for Lambda) |
 | **In-process mode** | Yes (Go only, ~20 μs/op) | No | Yes (Python only) | No |
 | **Devtools UI** | Yes -- 12-view desktop app (topology, traces, metrics, chaos, etc.) | Yes -- web dashboard (Pro) | No | No |
-| **Distributed tracing** | Built-in (waterfall + flamegraph) | Pro tier only | No | Limited (X-Ray local) |
+| **Distributed tracing** | Built-in always-on (W3C traceparent, waterfall + flamegraph) | Pro tier only | No | Limited (X-Ray local) |
 | **Chaos engineering** | Built-in (latency, errors, throttling) | No | No | No |
 | **IAM emulation** | Full policy evaluation with enforce/authenticate/none modes | Pro tier only | Partial | No |
 | **Pricing** | Free and open source | Free tier + Pro ($35/mo) + Team + Enterprise | Free and open source | Free and open source |

@@ -31,6 +31,10 @@ npx cloudmock
 aws --endpoint-url=http://localhost:4566 s3 ls
 ```
 
+## Distributed Tracing
+
+Every request is automatically traced with W3C-compatible trace and span IDs. Incoming `traceparent` headers are propagated, and responses include `traceparent`, `X-Cloudmock-Trace-Id`, and `X-Cloudmock-Span-Id` headers. View traces in the DevTools UI at `http://localhost:4500`.
+
 ## SDKs
 
 Native SDK adapters for Go, Node.js, Python, Java, Rust, and Ruby with trace propagation and devtools integration. Any language works via HTTP.

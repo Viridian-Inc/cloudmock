@@ -755,6 +755,58 @@ func BenchmarkInProcess_S3_PutObject(b *testing.B) {
 	}
 }
 
+// ---------------------------------------------------------------------------
+// Tracing tests
+// ---------------------------------------------------------------------------
+
+func TestSDK_WithTracing(t *testing.T) {
+	cm := New(WithTracing())
+	defer cm.Close()
+
+	require.NotNil(t, cm.TraceStore(), "TraceStore should be non-nil when tracing is enabled")
+
+	client := s3.NewFromConfig(cm.Config(), func(o *s3.Options) { o.UsePathStyle = true })
+
+	// Make an S3 call.
+	_, _ = client.ListBuckets(ctx, &s3.ListBucketsInput{})
+
+	// The trace store should have at least one entry.
+	recent := cm.TraceStore().Recent("", nil, 10)
+	require.NotEmpty(t, recent, "trace store should have entries after S3 call")
+
+	// Verify the trace has S3 service.
+	found := false
+	for _, tr := range recent {
+		if tr.RootService == "s3" {
+			found = true
+			break
+		}
+	}
+	assert.True(t, found, "expected at least one S3 trace")
+}
+
+func TestSDK_WithTracing_Disabled(t *testing.T) {
+	cm := New() // no WithTracing
+	defer cm.Close()
+
+	assert.Nil(t, cm.TraceStore(), "TraceStore should be nil when tracing is not enabled")
+}
+
+func TestSDK_WithTracing_MultipleRequests(t *testing.T) {
+	cm := New(WithTracing())
+	defer cm.Close()
+
+	client := s3.NewFromConfig(cm.Config(), func(o *s3.Options) { o.UsePathStyle = true })
+
+	// Make a few calls.
+	_, _ = client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	_, _ = client.CreateBucket(ctx, &s3.CreateBucketInput{Bucket: aws.String("trace-test-bucket")})
+	_, _ = client.ListBuckets(ctx, &s3.ListBucketsInput{})
+
+	recent := cm.TraceStore().Recent("", nil, 10)
+	assert.GreaterOrEqual(t, len(recent), 3, "trace store should have at least 3 entries")
+}
+
 func BenchmarkInProcess_SQS_SendMessage(b *testing.B) {
 	cm := New()
 	defer cm.Close()

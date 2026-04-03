@@ -33,6 +33,7 @@ func (s *DynamoDBService) Actions() []service.Action {
 		{Name: "CreateTable", Method: http.MethodPost, IAMAction: "dynamodb:CreateTable"},
 		{Name: "DeleteTable", Method: http.MethodPost, IAMAction: "dynamodb:DeleteTable"},
 		{Name: "DescribeTable", Method: http.MethodPost, IAMAction: "dynamodb:DescribeTable"},
+		{Name: "UpdateTable", Method: http.MethodPost, IAMAction: "dynamodb:UpdateTable"},
 		{Name: "ListTables", Method: http.MethodPost, IAMAction: "dynamodb:ListTables"},
 		{Name: "PutItem", Method: http.MethodPost, IAMAction: "dynamodb:PutItem"},
 		{Name: "GetItem", Method: http.MethodPost, IAMAction: "dynamodb:GetItem"},
@@ -49,6 +50,14 @@ func (s *DynamoDBService) Actions() []service.Action {
 		{Name: "GetRecords", Method: http.MethodPost, IAMAction: "dynamodb:GetRecords"},
 		{Name: "UpdateTimeToLive", Method: http.MethodPost, IAMAction: "dynamodb:UpdateTimeToLive"},
 		{Name: "DescribeTimeToLive", Method: http.MethodPost, IAMAction: "dynamodb:DescribeTimeToLive"},
+		{Name: "PutResourcePolicy", Method: http.MethodPost, IAMAction: "dynamodb:PutResourcePolicy"},
+		{Name: "GetResourcePolicy", Method: http.MethodPost, IAMAction: "dynamodb:GetResourcePolicy"},
+		{Name: "DeleteResourcePolicy", Method: http.MethodPost, IAMAction: "dynamodb:DeleteResourcePolicy"},
+		{Name: "DescribeContinuousBackups", Method: http.MethodPost, IAMAction: "dynamodb:DescribeContinuousBackups"},
+		{Name: "UpdateContinuousBackups", Method: http.MethodPost, IAMAction: "dynamodb:UpdateContinuousBackups"},
+		{Name: "ListTagsOfResource", Method: http.MethodPost, IAMAction: "dynamodb:ListTagsOfResource"},
+		{Name: "TagResource", Method: http.MethodPost, IAMAction: "dynamodb:TagResource"},
+		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "dynamodb:UntagResource"},
 	}
 }
 
@@ -97,6 +106,8 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleDeleteTable(ctx, s.store)
 	case "DescribeTable":
 		return handleDescribeTable(ctx, s.store)
+	case "UpdateTable":
+		return handleUpdateTable(ctx, s.store)
 	case "ListTables":
 		return handleListTables(ctx, s.store)
 	case "PutItem":
@@ -129,6 +140,22 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleUpdateTimeToLive(ctx, s.store)
 	case "DescribeTimeToLive":
 		return handleDescribeTimeToLive(ctx, s.store)
+	case "PutResourcePolicy":
+		return handlePutResourcePolicy(ctx, s.store)
+	case "GetResourcePolicy":
+		return handleGetResourcePolicy(ctx, s.store)
+	case "DeleteResourcePolicy":
+		return handleDeleteResourcePolicy(ctx, s.store)
+	case "DescribeContinuousBackups":
+		return handleDescribeContinuousBackups(ctx, s.store)
+	case "UpdateContinuousBackups":
+		return handleUpdateContinuousBackups(ctx, s.store)
+	case "ListTagsOfResource":
+		return handleListTagsOfResource(ctx, s.store)
+	case "TagResource":
+		return handleTagResource(ctx, s.store)
+	case "UntagResource":
+		return handleUntagResource(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

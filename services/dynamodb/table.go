@@ -62,6 +62,13 @@ type Table struct {
 	Stream                *Stream           // nil if streams not enabled
 	TTL                   *TTLSpecification // nil if TTL not configured
 
+	// ResourcePolicy holds the table's resource-based policy JSON (set via PutResourcePolicy).
+	ResourcePolicy           string
+	ResourcePolicyRevisionID string
+
+	// Tags holds the table's resource tags (key/value pairs).
+	Tags map[string]string
+
 	// --- New partition-based storage ---
 	partitions map[string]*Partition  // pkValue → partition
 	gsiStores  map[string]*IndexStore // indexName → index store

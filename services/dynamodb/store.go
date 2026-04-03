@@ -108,6 +108,110 @@ func (s *TableStore) DescribeTable(name string) (*Table, *service.AWSError) {
 	return table, nil
 }
 
+// UpdateTable updates mutable table properties: BillingMode, ProvisionedThroughput,
+// AttributeDefinitions (for new GSIs), and GlobalSecondaryIndexUpdates.
+// All fields are optional; only non-zero values are applied.
+// The table stays ACTIVE throughout (no async state transition in CloudMock).
+func (s *TableStore) UpdateTable(name, billingMode string, pt *ProvisionedThroughput, attrDefs []AttributeDefinition) (*Table, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	table, ok := s.tables[name]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
+	}
+
+	if billingMode != "" {
+		table.BillingMode = billingMode
+	}
+	if pt != nil {
+		table.ProvisionedThroughput = pt
+	}
+	if len(attrDefs) > 0 {
+		// Merge new attribute definitions (don't duplicate existing ones).
+		existing := make(map[string]bool)
+		for _, a := range table.AttributeDefinitions {
+			existing[a.AttributeName] = true
+		}
+		for _, a := range attrDefs {
+			if !existing[a.AttributeName] {
+				table.AttributeDefinitions = append(table.AttributeDefinitions, a)
+			}
+		}
+	}
+
+	return table, nil
+}
+
+// PutResourcePolicy sets a resource-based policy on a table.
+func (s *TableStore) PutResourcePolicy(resourceARN, policy string) (*Table, *service.AWSError) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	// Extract table name from ARN (arn:aws:dynamodb:region:account:table/name)
+	tableName := resourceARN
+	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
+		tableName = resourceARN[idx+1:]
+	}
+
+	table, ok := s.tables[tableName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
+	}
+	table.ResourcePolicy = policy
+	table.ResourcePolicyRevisionID = fmt.Sprintf("rev-%d", time.Now().UnixNano())
+	return table, nil
+}
+
+// GetResourcePolicy returns the resource policy for a table.
+func (s *TableStore) GetResourcePolicy(resourceARN string) (*Table, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	tableName := resourceARN
+	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
+		tableName = resourceARN[idx+1:]
+	}
+
+	table, ok := s.tables[tableName]
+	if !ok {
+		return nil, service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
+	}
+	return table, nil
+}
+
+// DeleteResourcePolicy removes the resource policy from a table.
+func (s *TableStore) DeleteResourcePolicy(resourceARN string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	tableName := resourceARN
+	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
+		tableName = resourceARN[idx+1:]
+	}
+
+	table, ok := s.tables[tableName]
+	if !ok {
+		return service.NewAWSError("ResourceNotFoundException",
+			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
+	}
+	table.ResourcePolicy = ""
+	table.ResourcePolicyRevisionID = ""
+	return nil
+}
+
+func lastIndexByte(s string, b byte) int {
+	for i := len(s) - 1; i >= 0; i-- {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
+}
+
 // ListTables returns the names of all tables.
 func (s *TableStore) ListTables() []string {
 	s.mu.RLock()

@@ -25,6 +25,7 @@ export default defineConfig({
         },
       ],
       sidebar: [
+        { slug: "docs/guides/about", label: "What is CloudMock?" },
         {
           label: "Getting Started",
           items: [

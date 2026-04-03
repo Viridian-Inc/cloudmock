@@ -1,6 +1,6 @@
 # Compatibility Matrix
 
-All 98 services supported by cloudmock, grouped by tier.
+All 99 services supported by cloudmock, grouped by tier.
 
 ---
 

@@ -232,7 +232,7 @@ Optional: cloudmock-kotlin → OTel Android SDK + OkHttp hooks + mobile RUM
 **Description:** Starlight/Astro-based docs site. Must have: 5-minute quickstart, service compatibility matrix, API reference (all 55+ endpoints), SDK setup guides, FAQ.
 **Acceptance Criteria:**
 - [ ] Getting started guide (< 5 minutes to first request)
-- [ ] Service compatibility matrix (98 services)
+- [ ] Service compatibility matrix (99 services)
 - [ ] API reference (auto-generated from code)
 - [ ] Node.js SDK guide
 - [ ] Deployment guide (Docker, npm, brew)

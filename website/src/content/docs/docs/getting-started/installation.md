@@ -70,14 +70,14 @@ cloudmock start
 ## apt (Debian / Ubuntu)
 
 ```bash
-curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.1.0/cloudmock_1.1.0_amd64.deb && sudo apt install cloudmock_1.1.0_amd64.deb
+curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.4.0/cloudmock_1.4.0_amd64.deb && sudo apt install cloudmock_1.4.0_amd64.deb
 cloudmock start
 ```
 
 ARM64:
 
 ```bash
-curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.1.0/cloudmock_1.1.0_arm64.deb && sudo apt install cloudmock_1.1.0_arm64.deb
+curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.4.0/cloudmock_1.4.0_arm64.deb && sudo apt install cloudmock_1.4.0_arm64.deb
 ```
 
 ## go install (from source)

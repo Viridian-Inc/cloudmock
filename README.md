@@ -71,7 +71,7 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 | **Homebrew** | `brew install viridian-inc/tap/cloudmock` |
 | **Snap** | `sudo snap install cloudmock` |
 | **Docker** | `docker run -p 4566:4566 -p 4500:4500 ghcr.io/viridian-inc/cloudmock:latest` |
-| **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.4/cloudmock_1.0.4_amd64.deb && sudo apt install cloudmock_1.0.4_amd64.deb` |
+| **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.4.0/cloudmock_1.4.0_amd64.deb && sudo apt install cloudmock_1.4.0_amd64.deb` |
 | **Shell** | `curl -fsSL https://cloudmock.app/install.sh \| bash` |
 
 ## Services

@@ -203,13 +203,13 @@ import (
 	xraysvc "github.com/neureaux/cloudmock/services/xray"
 )
 
-// cleanLabel strips common IaC prefixes (e.g. "autotend-") and environment
+// cleanLabel strips common IaC prefixes (e.g. "") and environment
 // suffixes (e.g. "-dev", "-prod") from resource names for display.
 // It avoids stripping if the result would be empty or a single generic word.
 func cleanLabel(name string) string {
 	cleaned := name
 	// Strip known project prefixes
-	for _, prefix := range []string{"autotend-", "autotend_"} {
+	for _, prefix := range []string{"", "cloudmock_"} {
 		cleaned = strings.TrimPrefix(cleaned, prefix)
 	}
 	// Strip environment suffixes
@@ -1888,17 +1888,17 @@ func main() {
 	// Proxy mode: start the virtual-host reverse proxy and DNS servers.
 	// Domains are read from env vars set by the orchestrator (sourced from Pulumi config).
 	if os.Getenv("CLOUDMOCK_PROXY") == "true" || os.Getenv("CLOUDMOCK_PROXY") == "1" {
-		autotendDomain := os.Getenv("CLOUDMOCK_DOMAIN_AUTOTEND")
-		if autotendDomain == "" {
-			autotendDomain = "autotend.io"
+		primaryDomain := os.Getenv("CLOUDMOCK_DOMAIN_PRIMARY")
+		if primaryDomain == "" {
+			primaryDomain = "cloudmock.app"
 		}
 		cloudmockDomain := os.Getenv("CLOUDMOCK_DOMAIN_CLOUDMOCK")
 		if cloudmockDomain == "" {
 			cloudmockDomain = "cloudmock.io"
 		}
 
-		routes := gateway.BuildRoutes(autotendDomain, cloudmockDomain)
-		certs, certsErr := gateway.EnsureCerts(autotendDomain, cloudmockDomain)
+		routes := gateway.BuildRoutes(primaryDomain, cloudmockDomain)
+		certs, certsErr := gateway.EnsureCerts(primaryDomain, cloudmockDomain)
 		if certsErr != nil {
 			slog.Warn("proxy: TLS certs unavailable, starting HTTP only", "error", certsErr)
 			certs = nil
@@ -1910,7 +1910,7 @@ func main() {
 		})
 
 		// DNS servers resolve *.localhost.<domain> → 127.0.0.1
-		go gateway.StartDNSServer(15353, "localhost."+autotendDomain)
+		go gateway.StartDNSServer(15353, "localhost."+primaryDomain)
 		go gateway.StartDNSServer(15354, "localhost."+cloudmockDomain)
 	}
 

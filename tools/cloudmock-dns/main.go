@@ -26,7 +26,7 @@ type domainConfig struct {
 }
 
 var defaultDomains = domainConfig{
-	Autotend:  "autotend.io",
+	Autotend:  "cloudmock.app",
 	Cloudmock: "cloudmock.io",
 }
 
@@ -41,16 +41,16 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 	if err := yaml.Unmarshal(data, &raw); err != nil {
 		return defaultDomains, fmt.Errorf("parse %s: %w", path, err)
 	}
-	domainsRaw, ok := raw.Config["autotend-backend:domains"]
+	domainsRaw, ok := raw.Config["backend:domains"]
 	if !ok {
-		return defaultDomains, fmt.Errorf("no autotend-backend:domains in %s", path)
+		return defaultDomains, fmt.Errorf("no backend:domains in %s", path)
 	}
 	domainsMap, ok := domainsRaw.(map[string]any)
 	if !ok {
 		return defaultDomains, fmt.Errorf("domains is not a map in %s", path)
 	}
 	dc := defaultDomains
-	if v, ok := domainsMap["autotend"].(string); ok {
+	if v, ok := domainsMap["cloudmock"].(string); ok {
 		dc.Autotend = v
 	}
 	if v, ok := domainsMap["cloudmock"].(string); ok {
@@ -61,7 +61,7 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 
 func (dc domainConfig) sortedDomains() []struct{ key, domain string } {
 	pairs := []struct{ key, domain string }{
-		{"autotend", dc.Autotend},
+		{"cloudmock", dc.Autotend},
 		{"cloudmock", dc.Cloudmock},
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].key < pairs[j].key })
@@ -85,7 +85,7 @@ func (dc domainConfig) hostsEntries() []string {
 	cm := "localhost." + dc.Cloudmock
 	return []string{
 		"127.0.0.1  " + at,
-		"127.0.0.1  autotend-app." + at,
+		"127.0.0.1  app." + at,
 		"127.0.0.1  bff." + at,
 		"127.0.0.1  api." + at,
 		"127.0.0.1  auth." + at,
@@ -148,10 +148,10 @@ func printUsage() {
 	fmt.Println("  --config <path>  Path to Pulumi stack YAML config file for domain config")
 }
 
-// autoSetup configures the OS resolver so that *.localhost.autotend.io queries
+// autoSetup configures the OS resolver so that *.localhost.cloudmock.app queries
 // are answered by cloudmock's built-in DNS server on :15353.
 //
-// On macOS this writes /etc/resolver/autotend.io (needs sudo once).
+// On macOS this writes /etc/resolver/cloudmock.app (needs sudo once).
 // On Linux it prints manual instructions for systemd-resolved or NetworkManager.
 //
 // This only needs to be done ONCE — the config persists across reboots.
@@ -267,14 +267,14 @@ func printLocalDomains(dc domainConfig) {
 	cm := dc.Cloudmock
 	fmt.Println()
 	fmt.Println("  Zero-config (works immediately, no setup needed):")
-	fmt.Println("    http://autotend-app.localhost")
+	fmt.Println("    http://app.localhost")
 	fmt.Println("    http://cloudmock.localhost")
 	fmt.Println("    http://bff.localhost")
 	fmt.Println("    http://api.localhost")
 	fmt.Println("    http://auth.localhost")
 	fmt.Println()
 	fmt.Println("  Custom domains (now configured via DNS resolver):")
-	fmt.Printf("    https://localhost.%s          ← autotend app\n", at)
+	fmt.Printf("    https://localhost.%s          ← cloudmock app\n", at)
 	fmt.Printf("    https://bff.localhost.%s\n", at)
 	fmt.Printf("    https://api.localhost.%s\n", at)
 	fmt.Printf("    https://auth.localhost.%s\n", at)
@@ -417,7 +417,7 @@ func status(dc domainConfig) {
 
 	fmt.Println()
 	fmt.Println("  Zero-config (always works):")
-	fmt.Println("    http://autotend-app.localhost  ← Expo app (no setup needed)")
+	fmt.Println("    http://app.localhost  ← Expo app (no setup needed)")
 	fmt.Println("    http://cloudmock.localhost     ← cloudmock dashboard")
 	fmt.Println()
 	fmt.Println("  To configure custom domain: sudo cloudmock-dns auto")

@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a Go benchmark harness that compares CloudMock vs LocalStack across all 98 AWS services, measuring latency, correctness, resource usage, and feature coverage, outputting JSON + markdown + MDX website page.
+**Goal:** Build a Go benchmark harness that compares CloudMock vs LocalStack across all 99 AWS services, measuring latency, correctness, resource usage, and feature coverage, outputting JSON + markdown + MDX website page.
 
 **Architecture:** Single Go binary under `benchmarks/` that boots targets via Docker/native, runs per-service test suites through the AWS SDK, captures metrics, and generates reports. Tier 2 stub suites are generated from the existing stub catalog.
 
@@ -3331,7 +3331,7 @@ Create `website/src/content/docs/docs/reference/benchmarks.mdx`:
 ```mdx
 ---
 title: Benchmarks
-description: Performance comparison of CloudMock vs LocalStack across all 98 AWS services.
+description: Performance comparison of CloudMock vs LocalStack across all 99 AWS services.
 ---
 
 import { Tabs, TabItem } from '@astrojs/starlight/components';

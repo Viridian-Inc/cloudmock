@@ -29,7 +29,7 @@ Five tools, five contexts, and none of them talked to each other.
 
 **What CloudMock does differently:**
 
-1. **98 AWS services emulated** — not just CRUD stubs. Services have behavioral emulation: CodePipeline triggers CodeBuild, AutoScaling creates EC2 instances, Glue crawlers inspect S3 buckets. Cross-service integration works like real AWS.
+1. **99 AWS services emulated** — not just CRUD stubs. Services have behavioral emulation: CodePipeline triggers CodeBuild, AutoScaling creates EC2 instances, Glue crawlers inspect S3 buckets. Cross-service integration works like real AWS.
 
 2. **OpenTelemetry-native** — any language works. Point your OTel SDK at `localhost:4318` and traces, metrics, and logs flow into the dashboard. Go, Python, Java, Node, Rust — no proprietary SDK required.
 

@@ -17,7 +17,7 @@ account_id: "000000000000"
 # - minimal:  iam, sts, s3, dynamodb, sqs, sns, lambda, cloudwatch-logs
 # - standard: all minimal services + rds, cloudformation, ec2, ecr, ecs,
 #             secretsmanager, ssm, kinesis, firehose, events, stepfunctions, apigateway
-# - full:     all supported services (98 total)
+# - full:     all supported services (99 total)
 # - custom:   only the services listed under the `services` key below
 profile: minimal
 

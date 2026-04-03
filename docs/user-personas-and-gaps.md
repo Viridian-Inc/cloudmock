@@ -158,7 +158,7 @@
 
 | Advantage | Value | Who Cares Most |
 |-----------|-------|---------------|
-| **Local AWS emulation (98 services)** | No competitor offers this | All — eliminates need for AWS account in dev |
+| **Local AWS emulation (99 services)** | No competitor offers this | All — eliminates need for AWS account in dev |
 | **Desktop devtools (Flipper replacement)** | No equivalent exists | Persona 2 — mobile developers |
 | **Built-in chaos engineering** | Competitors need separate tools | Personas 3,4 — reliability & testing |
 | **IaC-driven topology** | Automatic architecture visualization from Pulumi/Terraform | Personas 3,5 — infrastructure visibility |

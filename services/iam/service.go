@@ -5,6 +5,7 @@ import (
 	"net/url"
 
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -28,6 +29,68 @@ func (s *IAMService) Name() string { return "iam" }
 
 // HealthCheck always returns nil.
 func (s *IAMService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for IAM resource types.
+func (s *IAMService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "iam",
+			ResourceType:  "aws_iam_role",
+			TerraformType: "cloudmock_iam_role",
+			AWSType:       "AWS::IAM::Role",
+			CreateAction:  "CreateRole",
+			ReadAction:    "GetRole",
+			DeleteAction:  "DeleteRole",
+			ListAction:    "ListRoles",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "assume_role_policy", Type: "string", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "unique_id", Type: "string", Computed: true},
+				{Name: "path", Type: "string", Default: "/"},
+				{Name: "description", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "iam",
+			ResourceType:  "aws_iam_policy",
+			TerraformType: "cloudmock_iam_policy",
+			AWSType:       "AWS::IAM::ManagedPolicy",
+			CreateAction:  "CreatePolicy",
+			ReadAction:    "GetPolicy",
+			DeleteAction:  "DeletePolicy",
+			ListAction:    "ListPolicies",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "policy", Type: "string", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "path", Type: "string", Default: "/"},
+				{Name: "description", Type: "string"},
+			},
+		},
+		{
+			ServiceName:   "iam",
+			ResourceType:  "aws_iam_user",
+			TerraformType: "cloudmock_iam_user",
+			AWSType:       "AWS::IAM::User",
+			CreateAction:  "CreateUser",
+			ReadAction:    "GetUser",
+			DeleteAction:  "DeleteUser",
+			ListAction:    "ListUsers",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "unique_id", Type: "string", Computed: true},
+				{Name: "path", Type: "string", Default: "/"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // Actions returns all IAM API actions this service supports.
 func (s *IAMService) Actions() []service.Action {

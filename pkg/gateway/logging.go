@@ -23,10 +23,10 @@ import (
 // memStatsCache caches runtime.MemStats to avoid calling ReadMemStats on every request.
 // ReadMemStats is expensive (~1ms) and triggers a STW pause; sampling every N seconds is sufficient.
 var (
-	memStatsMu        sync.Mutex
-	memStatsCache     runtime.MemStats
-	memStatsLastRead  time.Time
-	memStatsInterval  = 5 * time.Second
+	memStatsMu       sync.Mutex
+	memStatsCache    runtime.MemStats
+	memStatsLastRead time.Time
+	memStatsInterval = 5 * time.Second
 )
 
 func cachedMemAllocKB() int64 {
@@ -38,6 +38,25 @@ func cachedMemAllocKB() int64 {
 	alloc := int64(memStatsCache.Alloc / 1024)
 	memStatsMu.Unlock()
 	return alloc
+}
+
+// goroutineCountCache caches runtime.NumGoroutine() to avoid the scheduler scan on every request.
+var (
+	goroutineCountMu       sync.Mutex
+	goroutineCountCached   int
+	goroutineCountLastRead time.Time
+	goroutineCountInterval = 2 * time.Second
+)
+
+func cachedNumGoroutine() int {
+	goroutineCountMu.Lock()
+	if time.Since(goroutineCountLastRead) > goroutineCountInterval {
+		goroutineCountCached = runtime.NumGoroutine()
+		goroutineCountLastRead = time.Now()
+	}
+	n := goroutineCountCached
+	goroutineCountMu.Unlock()
+	return n
 }
 
 // maxBodyCapture is the maximum number of bytes captured for request/response bodies.
@@ -251,8 +270,9 @@ func (rs *RequestStats) Snapshot() map[string]int64 {
 // responseRecorder wraps http.ResponseWriter to capture the status code and response body.
 type responseRecorder struct {
 	http.ResponseWriter
-	statusCode int
-	body       bytes.Buffer
+	statusCode  int
+	body        bytes.Buffer
+	captureBody bool
 }
 
 func (rr *responseRecorder) WriteHeader(code int) {
@@ -261,7 +281,7 @@ func (rr *responseRecorder) WriteHeader(code int) {
 }
 
 func (rr *responseRecorder) Write(b []byte) (int, error) {
-	if rr.body.Len() < maxBodyCapture {
+	if rr.captureBody && rr.body.Len() < maxBodyCapture {
 		remaining := maxBodyCapture - rr.body.Len()
 		if len(b) > remaining {
 			rr.body.Write(b[:remaining])
@@ -283,11 +303,12 @@ type RequestBroadcaster interface {
 type OnRequestFunc func(service string, latencyMs float64, statusCode int)
 
 type LoggingMiddlewareOpts struct {
-	Broadcaster RequestBroadcaster
-	TraceStore  *TraceStore
-	SLOEngine   *SLOEngine
-	DataPlane   *dataplane.DataPlane
-	OnRequest   OnRequestFunc
+	Broadcaster   RequestBroadcaster
+	TraceStore    *TraceStore
+	SLOEngine     *SLOEngine
+	DataPlane     *dataplane.DataPlane
+	OnRequest     OnRequestFunc
+	CaptureStacks bool // if true, capture call stacks per-request into trace store (expensive)
 }
 
 // LoggingMiddleware wraps a gateway handler and records request data.
@@ -308,6 +329,7 @@ func firstBroadcaster(bb []RequestBroadcaster) RequestBroadcaster {
 func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *RequestStats, opts LoggingMiddlewareOpts) http.Handler {
 	productionMode := opts.DataPlane != nil && opts.DataPlane.Mode == "production"
 	hasTraceStore := opts.TraceStore != nil
+	captureStacks := opts.CaptureStacks
 	hasSLO := opts.SLOEngine != nil
 	hasBroadcaster := opts.Broadcaster != nil
 	hasOnRequest := opts.OnRequest != nil
@@ -331,7 +353,8 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 
 		start := time.Now()
 
-		// Extract or generate trace ID.
+		// Extract or generate trace ID. Span ID is only needed when a trace store
+		// or broadcaster/production mode is active; skip the random generation otherwise.
 		traceID := r.Header.Get("X-Cloudmock-Trace-Id")
 		if traceID == "" {
 			traceID = r.Header.Get("X-Amz-Trace-Id")
@@ -339,12 +362,18 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		if traceID == "" {
 			traceID = GenerateTraceID()
 		}
-		spanID := GenerateSpanID()
-		parentSpanID := r.Header.Get("X-Cloudmock-Parent-Span-Id")
+		var spanID string
+		var parentSpanID string
+		if hasTraceStore || hasBroadcaster || productionMode {
+			spanID = GenerateSpanID()
+			parentSpanID = r.Header.Get("X-Cloudmock-Parent-Span-Id")
+		}
 
 		// Set trace headers on the response so callers can correlate.
 		w.Header().Set("X-Cloudmock-Trace-Id", traceID)
-		w.Header().Set("X-Cloudmock-Span-Id", spanID)
+		if spanID != "" {
+			w.Header().Set("X-Cloudmock-Span-Id", spanID)
+		}
 
 		// Capture request headers — only when we have subscribers that need them.
 		var reqHeaders map[string]string
@@ -372,7 +401,11 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			}
 		}
 
-		rec := &responseRecorder{ResponseWriter: w, statusCode: http.StatusOK}
+		rec := &responseRecorder{
+			ResponseWriter: w,
+			statusCode:     http.StatusOK,
+			captureBody:    hasBroadcaster || productionMode,
+		}
 		next.ServeHTTP(rec, r)
 
 		svcName := detectServiceFromRequest(r)
@@ -381,7 +414,6 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		latency := time.Since(start)
 		latencyMs := float64(latency.Nanoseconds()) / 1e6
 
-		id := time.Now().UnixNano()
 		counter := requestIDCounter.Add(1)
 
 		var errMsg string
@@ -390,7 +422,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 		}
 
 		entry := RequestEntry{
-			ID:             fmt.Sprintf("%d-%d", id, counter),
+			ID:             fmt.Sprintf("%d-%d", start.UnixNano(), counter),
 			TraceID:        traceID,
 			SpanID:         spanID,
 			Timestamp:      start,
@@ -405,7 +437,7 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			Error:          errMsg,
 			Level:          "infra", // AWS SDK calls to cloudmock gateway
 			MemAllocKB:     cachedMemAllocKB(),
-			Goroutines:     runtime.NumGoroutine(),
+			Goroutines:     cachedNumGoroutine(),
 			RequestHeaders: reqHeaders,
 			RequestBody:    reqBody,
 			ResponseBody:   rec.body.String(),
@@ -471,13 +503,16 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				// Capture distributed context from headers
 				metadata := extractTraceMetadata(r)
 
-				// Capture call stack at handler entry for profiling.
-				stacks := []profiling.SpanStack{profiling.CaptureStack("handler_entry", 2)}
-				stackJSON, _ := json.Marshal(stacks)
-				if metadata == nil {
-					metadata = make(map[string]string)
+				// Capture call stacks only when explicitly enabled — it's expensive
+				// (~15μs: runtime.Callers + frame iteration + json.Marshal per request).
+				if captureStacks {
+					stacks := []profiling.SpanStack{profiling.CaptureStack("handler_entry", 2)}
+					stackJSON, _ := json.Marshal(stacks)
+					if metadata == nil {
+						metadata = make(map[string]string)
+					}
+					metadata["stacks"] = string(stackJSON)
 				}
-				metadata["stacks"] = string(stackJSON)
 
 				trace := &TraceContext{
 					TraceID:      traceID,

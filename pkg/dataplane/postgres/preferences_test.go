@@ -3,11 +3,24 @@ package postgres_test
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"github.com/neureaux/cloudmock/pkg/dataplane"
 	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
 )
+
+// jsonEqual compares two JSON values semantically (ignoring whitespace differences).
+func jsonEqual(a, b json.RawMessage) bool {
+	var va, vb any
+	if err := json.Unmarshal(a, &va); err != nil {
+		return false
+	}
+	if err := json.Unmarshal(b, &vb); err != nil {
+		return false
+	}
+	return reflect.DeepEqual(va, vb)
+}
 
 func TestPreferenceStore(t *testing.T) {
 	if testing.Short() {
@@ -37,7 +50,7 @@ func TestPreferenceStore(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}
-	if string(got) != string(value) {
+	if !jsonEqual(got, value) {
 		t.Errorf("got %s, want %s", got, value)
 	}
 
@@ -47,7 +60,7 @@ func TestPreferenceStore(t *testing.T) {
 		t.Fatalf("Set upsert: %v", err)
 	}
 	got, _ = s.Get(ctx, "ui", "theme")
-	if string(got) != string(value2) {
+	if !jsonEqual(got, value2) {
 		t.Errorf("after upsert got %s, want %s", got, value2)
 	}
 

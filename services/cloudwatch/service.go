@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -70,6 +71,37 @@ func (s *CloudWatchService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *CloudWatchService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for CloudWatch resource types.
+func (s *CloudWatchService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "cloudwatch",
+			ResourceType:  "aws_cloudwatch_metric_alarm",
+			TerraformType: "cloudmock_cloudwatch_metric_alarm",
+			AWSType:       "AWS::CloudWatch::Alarm",
+			CreateAction:  "PutMetricAlarm",
+			ReadAction:    "DescribeAlarms",
+			DeleteAction:  "DeleteAlarms",
+			ImportID:      "alarm_name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "alarm_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "comparison_operator", Type: "string", Required: true},
+				{Name: "evaluation_periods", Type: "int", Required: true},
+				{Name: "metric_name", Type: "string"},
+				{Name: "namespace", Type: "string"},
+				{Name: "period", Type: "int"},
+				{Name: "statistic", Type: "string"},
+				{Name: "threshold", Type: "float"},
+				{Name: "alarm_description", Type: "string"},
+				{Name: "alarm_actions", Type: "list"},
+				{Name: "ok_actions", Type: "list"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming CloudWatch request to the appropriate handler.
 // CloudWatch uses form-encoded POST bodies; the Action is found in the form body.

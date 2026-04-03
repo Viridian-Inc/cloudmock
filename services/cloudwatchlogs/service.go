@@ -3,6 +3,7 @@ package cloudwatchlogs
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -44,6 +45,45 @@ func (s *CloudWatchLogsService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *CloudWatchLogsService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for CloudWatch Logs resource types.
+func (s *CloudWatchLogsService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "cloudwatchlogs",
+			ResourceType:  "aws_cloudwatch_log_group",
+			TerraformType: "cloudmock_cloudwatch_log_group",
+			AWSType:       "AWS::Logs::LogGroup",
+			CreateAction:  "CreateLogGroup",
+			ReadAction:    "DescribeLogGroups",
+			DeleteAction:  "DeleteLogGroup",
+			ListAction:    "DescribeLogGroups",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "retention_in_days", Type: "int"},
+				{Name: "kms_key_id", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "cloudwatchlogs",
+			ResourceType:  "aws_cloudwatch_log_stream",
+			TerraformType: "cloudmock_cloudwatch_log_stream",
+			AWSType:       "AWS::Logs::LogStream",
+			CreateAction:  "CreateLogStream",
+			ReadAction:    "DescribeLogStreams",
+			DeleteAction:  "DeleteLogStream",
+			ImportID:      "log_group_name:name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "log_group_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming CloudWatch Logs request to the appropriate handler.
 // CloudWatch Logs uses the JSON protocol with X-Amz-Target: Logs_20140328.<Action>.

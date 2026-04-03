@@ -1,0 +1,3 @@
+name: cloudmock-example
+runtime: nodejs
+description: Example Pulumi project using CloudMock

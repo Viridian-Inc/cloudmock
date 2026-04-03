@@ -279,14 +279,20 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 		maxKeys = 1000
 	}
 
-	// Acquire the lock once for the entire operation: collect keys and object
-	// references in a single critical section instead of locking per-object.
+	// Snapshot keys and object references under lock, then release before sorting.
 	os.mu.RLock()
 	keys := make([]string, 0, len(os.objects))
 	for k := range os.objects {
 		keys = append(keys, k)
 	}
-	// Sort while still holding the read lock so the map snapshot is consistent.
+	// Snapshot object pointers so we can access them after releasing the lock.
+	snapshot := make(map[string]*Object, len(os.objects))
+	for k, v := range os.objects {
+		snapshot[k] = v
+	}
+	os.mu.RUnlock()
+
+	// Sort outside the critical section — this is O(n log n) and doesn't need the lock.
 	sort.Strings(keys)
 
 	out := &ListObjectsOutput{}
@@ -317,7 +323,6 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 					count++
 					if count >= maxKeys {
 						out.IsTruncated = true
-						// Use the key that caused truncation as next token.
 						out.NextContinuationToken = k
 						break
 					}
@@ -332,14 +337,12 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 			break
 		}
 
-		// Direct map access — no per-object lock needed.
-		obj := os.objects[k]
+		obj := snapshot[k]
 		if obj != nil {
 			out.Objects = append(out.Objects, obj)
 		}
 		count++
 	}
-	os.mu.RUnlock()
 
 	sort.Strings(out.CommonPrefixes)
 	return out

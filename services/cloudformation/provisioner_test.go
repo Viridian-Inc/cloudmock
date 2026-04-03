@@ -14,11 +14,16 @@ import (
 	"github.com/neureaux/cloudmock/pkg/routing"
 	cfnsvc "github.com/neureaux/cloudmock/services/cloudformation"
 	dynamodbsvc "github.com/neureaux/cloudmock/services/dynamodb"
+	ecssvc "github.com/neureaux/cloudmock/services/ecs"
 	iamsvc "github.com/neureaux/cloudmock/services/iam"
+	kmssvc "github.com/neureaux/cloudmock/services/kms"
 	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
+	rdssvc "github.com/neureaux/cloudmock/services/rds"
+	route53svc "github.com/neureaux/cloudmock/services/route53"
 	s3svc "github.com/neureaux/cloudmock/services/s3"
 	snssvc "github.com/neureaux/cloudmock/services/sns"
 	sqssvc "github.com/neureaux/cloudmock/services/sqs"
+	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
 )
 
 // newMultiServiceGateway creates a gateway with S3, DynamoDB, SQS, SNS, IAM, Lambda, and
@@ -37,6 +42,12 @@ func newMultiServiceGateway(t *testing.T) (http.Handler, *routing.Registry) {
 	reg.Register(sqssvc.New(cfg.AccountID, cfg.Region))
 	reg.Register(snssvc.New(cfg.AccountID, cfg.Region))
 	reg.Register(iamsvc.New(cfg.AccountID, iamEngine, iamStore))
+
+	reg.Register(rdssvc.New(cfg.AccountID, cfg.Region))
+	reg.Register(ecssvc.New(cfg.AccountID, cfg.Region))
+	reg.Register(route53svc.New(cfg.AccountID, cfg.Region))
+	reg.Register(kmssvc.New(cfg.AccountID, cfg.Region))
+	reg.Register(ssmsvc.New(cfg.AccountID, cfg.Region))
 
 	lambdaSvc := lambdasvc.New(cfg.AccountID, cfg.Region)
 	reg.Register(lambdaSvc)
@@ -487,5 +498,224 @@ func TestCFN_WithoutProvisioner_BackwardCompat(t *testing.T) {
 	body := wres.Body.String()
 	if !strings.Contains(body, "MyBucket") {
 		t.Errorf("expected MyBucket in response\nbody: %s", body)
+	}
+}
+
+// ---- Test 10: RDS DBInstance ----
+
+func TestProvisioner_RDSDBInstance(t *testing.T) {
+	handler, _ := newMultiServiceGateway(t)
+
+	template := `{
+		"Resources": {
+			"MyDB": {
+				"Type": "AWS::RDS::DBInstance",
+				"Properties": {
+					"DBInstanceIdentifier": "cfn-test-db",
+					"Engine": "mysql",
+					"DBInstanceClass": "db.t3.micro",
+					"MasterUsername": "admin",
+					"MasterUserPassword": "secret123",
+					"AllocatedStorage": "20"
+				}
+			}
+		}
+	}`
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnProvisionReq(t, "CreateStack", url.Values{
+		"StackName":    {"rds-stack"},
+		"TemplateBody": {template},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateStack: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify DescribeStackResources shows the DB instance.
+	wres := httptest.NewRecorder()
+	handler.ServeHTTP(wres, cfnProvisionReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"rds-stack"},
+	}))
+	if wres.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d", wres.Code)
+	}
+	resBody := wres.Body.String()
+	if !strings.Contains(resBody, "cfn-test-db") {
+		t.Errorf("DescribeStackResources: expected PhysicalResourceId 'cfn-test-db'\nbody: %s", resBody)
+	}
+	if !strings.Contains(resBody, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", resBody)
+	}
+}
+
+// ---- Test 11: ECS Cluster ----
+
+func TestProvisioner_ECSCluster(t *testing.T) {
+	handler, _ := newMultiServiceGateway(t)
+
+	template := `{
+		"Resources": {
+			"MyCluster": {
+				"Type": "AWS::ECS::Cluster",
+				"Properties": {
+					"ClusterName": "cfn-test-cluster"
+				}
+			}
+		}
+	}`
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnProvisionReq(t, "CreateStack", url.Values{
+		"StackName":    {"ecs-stack"},
+		"TemplateBody": {template},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateStack: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify DescribeStackResources shows the cluster.
+	wres := httptest.NewRecorder()
+	handler.ServeHTTP(wres, cfnProvisionReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"ecs-stack"},
+	}))
+	if wres.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d", wres.Code)
+	}
+	resBody := wres.Body.String()
+	if !strings.Contains(resBody, "cfn-test-cluster") {
+		t.Errorf("DescribeStackResources: expected PhysicalResourceId containing 'cfn-test-cluster'\nbody: %s", resBody)
+	}
+	if !strings.Contains(resBody, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", resBody)
+	}
+}
+
+// ---- Test 12: Route53 HostedZone ----
+
+func TestProvisioner_Route53HostedZone(t *testing.T) {
+	handler, _ := newMultiServiceGateway(t)
+
+	template := `{
+		"Resources": {
+			"MyZone": {
+				"Type": "AWS::Route53::HostedZone",
+				"Properties": {
+					"Name": "example.com"
+				}
+			}
+		}
+	}`
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnProvisionReq(t, "CreateStack", url.Values{
+		"StackName":    {"route53-stack"},
+		"TemplateBody": {template},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateStack: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify DescribeStackResources shows the hosted zone.
+	wres := httptest.NewRecorder()
+	handler.ServeHTTP(wres, cfnProvisionReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"route53-stack"},
+	}))
+	if wres.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d", wres.Code)
+	}
+	resBody := wres.Body.String()
+	// The physical ID should be a zone ID starting with Z.
+	if !strings.Contains(resBody, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", resBody)
+	}
+	if !strings.Contains(resBody, "AWS::Route53::HostedZone") {
+		t.Errorf("DescribeStackResources: expected resource type AWS::Route53::HostedZone\nbody: %s", resBody)
+	}
+}
+
+// ---- Test 13: KMS Key ----
+
+func TestProvisioner_KMSKey(t *testing.T) {
+	handler, _ := newMultiServiceGateway(t)
+
+	template := `{
+		"Resources": {
+			"MyKey": {
+				"Type": "AWS::KMS::Key",
+				"Properties": {
+					"Description": "Test encryption key",
+					"KeyUsage": "ENCRYPT_DECRYPT"
+				}
+			}
+		}
+	}`
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnProvisionReq(t, "CreateStack", url.Values{
+		"StackName":    {"kms-stack"},
+		"TemplateBody": {template},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateStack: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify DescribeStackResources shows the KMS key.
+	wres := httptest.NewRecorder()
+	handler.ServeHTTP(wres, cfnProvisionReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"kms-stack"},
+	}))
+	if wres.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d", wres.Code)
+	}
+	resBody := wres.Body.String()
+	if !strings.Contains(resBody, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", resBody)
+	}
+	if !strings.Contains(resBody, "AWS::KMS::Key") {
+		t.Errorf("DescribeStackResources: expected resource type AWS::KMS::Key\nbody: %s", resBody)
+	}
+}
+
+// ---- Test 14: SSM Parameter ----
+
+func TestProvisioner_SSMParameter(t *testing.T) {
+	handler, _ := newMultiServiceGateway(t)
+
+	template := `{
+		"Resources": {
+			"MyParam": {
+				"Type": "AWS::SSM::Parameter",
+				"Properties": {
+					"Name": "/cfn/test/param",
+					"Type": "String",
+					"Value": "hello-world"
+				}
+			}
+		}
+	}`
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, cfnProvisionReq(t, "CreateStack", url.Values{
+		"StackName":    {"ssm-stack"},
+		"TemplateBody": {template},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateStack: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+
+	// Verify DescribeStackResources shows the SSM parameter.
+	wres := httptest.NewRecorder()
+	handler.ServeHTTP(wres, cfnProvisionReq(t, "DescribeStackResources", url.Values{
+		"StackName": {"ssm-stack"},
+	}))
+	if wres.Code != http.StatusOK {
+		t.Fatalf("DescribeStackResources: expected 200, got %d", wres.Code)
+	}
+	resBody := wres.Body.String()
+	if !strings.Contains(resBody, "/cfn/test/param") {
+		t.Errorf("DescribeStackResources: expected PhysicalResourceId '/cfn/test/param'\nbody: %s", resBody)
+	}
+	if !strings.Contains(resBody, "CREATE_COMPLETE") {
+		t.Errorf("DescribeStackResources: expected CREATE_COMPLETE\nbody: %s", resBody)
 	}
 }

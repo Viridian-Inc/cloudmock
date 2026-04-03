@@ -2,7 +2,6 @@ package s3
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/eventbus"
@@ -99,141 +98,133 @@ func (s *S3Service) ResourceSchemas() []schema.ResourceSchema {
 	}
 }
 
+// routeKey identifies a unique S3 route by HTTP method and subresource.
+type routeKey struct {
+	method string
+	scope  routeScope
+	sub    string // query parameter subresource: "uploads", "versioning", etc.
+}
+
+// routeScope distinguishes root, bucket-level, and object-level paths.
+type routeScope int
+
+const (
+	scopeRoot   routeScope = iota
+	scopeBucket routeScope = iota
+	scopeObject routeScope = iota
+)
+
+// s3Handler is a handler function for an S3 route.
+type s3Handler func(store *Store, ctx *service.RequestContext) (*service.Response, error)
+
+// routes maps (method, scope, subresource) → handler for O(1) dispatch.
+var routes = map[routeKey]s3Handler{
+	// GET routes
+	{http.MethodGet, scopeRoot, ""}:            handleListBuckets,
+	{http.MethodGet, scopeBucket, ""}:           handleListObjectsV2,
+	{http.MethodGet, scopeBucket, "uploads"}:    handleListMultipartUploads,
+	{http.MethodGet, scopeBucket, "versioning"}: handleGetBucketVersioning,
+	{http.MethodGet, scopeBucket, "versions"}:   handleListObjectVersions,
+	{http.MethodGet, scopeBucket, "policy"}:     handleGetBucketPolicy,
+	{http.MethodGet, scopeObject, ""}:           handleGetObject,
+	{http.MethodGet, scopeObject, "uploadId"}:   handleListParts,
+	// POST routes
+	{http.MethodPost, scopeObject, "uploads"}:   handleCreateMultipartUpload,
+	// PUT routes
+	{http.MethodPut, scopeBucket, ""}:            handleCreateBucket,
+	{http.MethodPut, scopeBucket, "versioning"}:  handlePutBucketVersioning,
+	{http.MethodPut, scopeBucket, "policy"}:      handlePutBucketPolicy,
+	// DELETE routes
+	{http.MethodDelete, scopeBucket, ""}:         handleDeleteBucket,
+	{http.MethodDelete, scopeBucket, "policy"}:   handleDeleteBucketPolicy,
+	// HEAD routes
+	{http.MethodHead, scopeBucket, ""}:  handleHeadBucket,
+	{http.MethodHead, scopeObject, ""}: handleHeadObject,
+}
+
 // HandleRequest routes an incoming S3 request to the appropriate handler.
 func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
 	r := ctx.RawRequest
-	path := r.URL.Path
 
-	// Normalise path: strip trailing slash for non-root paths.
-	if path != "/" {
-		path = strings.TrimRight(path, "/")
-	}
-
-	// Determine path segments to distinguish bucket vs object paths.
 	bucketName := extractBucketName(ctx)
-	isBucketPath := bucketName != ""
 	objectKey := extractObjectKey(ctx)
-	isObjectPath := objectKey != ""
 
 	q := r.URL.Query()
-	_, hasUploads := q["uploads"]
-	_, hasVersioning := q["versioning"]
-	_, hasVersions := q["versions"]
-	_, hasPolicy := q["policy"]
-	uploadId := q.Get("uploadId")
-	partNumber := q.Get("partNumber")
 
-	switch r.Method {
-	case http.MethodGet:
-		// GET /bucket?uploads → ListMultipartUploads
-		if isBucketPath && hasUploads {
-			return handleListMultipartUploads(s.store, ctx)
-		}
-		// GET /bucket?versioning → GetBucketVersioning
-		if isBucketPath && !isObjectPath && hasVersioning {
-			return handleGetBucketVersioning(s.store, ctx)
-		}
-		// GET /bucket?versions → ListObjectVersions
-		if isBucketPath && !isObjectPath && hasVersions {
-			return handleListObjectVersions(s.store, ctx)
-		}
-		// GET /bucket?policy → GetBucketPolicy
-		if isBucketPath && !isObjectPath && hasPolicy {
-			return handleGetBucketPolicy(s.store, ctx)
-		}
-		// GET /bucket/key?uploadId=X → ListParts
-		if isObjectPath && uploadId != "" {
-			return handleListParts(s.store, ctx)
-		}
-		if !isBucketPath {
-			// GET / → ListBuckets
-			return handleListBuckets(s.store, ctx)
-		}
-		if isObjectPath {
-			// GET /bucket/key → GetObject (with optional ?versionId=X)
-			return handleGetObject(s.store, ctx)
-		}
-		// GET /bucket or GET /bucket?list-type=2 → ListObjectsV2
-		return handleListObjectsV2(s.store, ctx)
-
-	case http.MethodPost:
-		// POST /bucket/key?uploads → CreateMultipartUpload
-		if isObjectPath && hasUploads {
-			return handleCreateMultipartUpload(s.store, ctx)
-		}
-		// POST /bucket/key?uploadId=X → CompleteMultipartUpload
-		if isObjectPath && uploadId != "" {
-			resp, err := handleCompleteMultipartUpload(s.store, ctx)
-			if err == nil && s.bus != nil {
-				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:CompleteMultipartUpload")
-			}
-			return resp, err
-		}
-
-	case http.MethodPut:
-		// PUT /bucket?versioning → PutBucketVersioning
-		if isBucketPath && !isObjectPath && hasVersioning {
-			return handlePutBucketVersioning(s.store, ctx)
-		}
-		// PUT /bucket?policy → PutBucketPolicy
-		if isBucketPath && !isObjectPath && hasPolicy {
-			return handlePutBucketPolicy(s.store, ctx)
-		}
-		// PUT /bucket/key?partNumber=N&uploadId=X → UploadPart
-		if isObjectPath && uploadId != "" && partNumber != "" {
-			return handleUploadPart(s.store, ctx)
-		}
-		if isBucketPath && isObjectPath {
-			// PUT /bucket/key with copy-source → CopyObject
-			if r.Header.Get("x-amz-copy-source") != "" || r.Header.Get("X-Amz-Copy-Source") != "" {
-				return handleCopyObject(s.store, ctx)
-			}
-			// PUT /bucket/key → PutObject
-			resp, err := handlePutObject(s.store, ctx)
-			if err == nil && s.bus != nil {
-				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:Put")
-			}
-			return resp, err
-		}
-		if isBucketPath {
-			// PUT /bucket → CreateBucket
-			return handleCreateBucket(s.store, ctx)
-		}
-
-	case http.MethodDelete:
-		// DELETE /bucket?policy → DeleteBucketPolicy
-		if isBucketPath && !isObjectPath && hasPolicy {
-			return handleDeleteBucketPolicy(s.store, ctx)
-		}
-		// DELETE /bucket/key?uploadId=X → AbortMultipartUpload
-		if isObjectPath && uploadId != "" {
-			return handleAbortMultipartUpload(s.store, ctx)
-		}
-		if isBucketPath && isObjectPath {
-			// DELETE /bucket/key → DeleteObject
-			resp, err := handleDeleteObject(s.store, ctx)
-			if err == nil && s.bus != nil {
-				s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectRemoved:Delete")
-			}
-			return resp, err
-		}
-		if isBucketPath {
-			// DELETE /bucket → DeleteBucket
-			return handleDeleteBucket(s.store, ctx)
-		}
-
-	case http.MethodHead:
-		if isBucketPath && isObjectPath {
-			// HEAD /bucket/key → HeadObject
-			return handleHeadObject(s.store, ctx)
-		}
-		if isBucketPath {
-			// HEAD /bucket → HeadBucket
-			return handleHeadBucket(s.store, ctx)
+	// Determine the scope of the request.
+	scope := scopeRoot
+	if bucketName != "" {
+		if objectKey != "" {
+			scope = scopeObject
+		} else {
+			scope = scopeBucket
 		}
 	}
 
-	// Anything else is not implemented.
+	// Determine the subresource for map lookup.
+	sub := ""
+	switch {
+	case q.Has("uploads"):
+		sub = "uploads"
+	case q.Has("versioning"):
+		sub = "versioning"
+	case q.Has("versions"):
+		sub = "versions"
+	case q.Has("policy"):
+		sub = "policy"
+	case q.Get("uploadId") != "":
+		sub = "uploadId"
+	case q.Get("partNumber") != "":
+		sub = "partNumber"
+	}
+
+	// --- Special cases that can't be expressed as simple map lookups ---
+
+	// POST /bucket/key?uploadId=X → CompleteMultipartUpload (has event bus side-effect)
+	if r.Method == http.MethodPost && scope == scopeObject && sub == "uploadId" {
+		resp, err := handleCompleteMultipartUpload(s.store, ctx)
+		if err == nil && s.bus != nil {
+			s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:CompleteMultipartUpload")
+		}
+		return resp, err
+	}
+
+	// PUT /bucket/key?partNumber=N&uploadId=X → UploadPart
+	if r.Method == http.MethodPut && scope == scopeObject && q.Get("uploadId") != "" && q.Get("partNumber") != "" {
+		return handleUploadPart(s.store, ctx)
+	}
+
+	// PUT /bucket/key → PutObject or CopyObject (with event bus side-effect)
+	if r.Method == http.MethodPut && scope == scopeObject && sub == "" {
+		if r.Header.Get("x-amz-copy-source") != "" || r.Header.Get("X-Amz-Copy-Source") != "" {
+			return handleCopyObject(s.store, ctx)
+		}
+		resp, err := handlePutObject(s.store, ctx)
+		if err == nil && s.bus != nil {
+			s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectCreated:Put")
+		}
+		return resp, err
+	}
+
+	// DELETE /bucket/key?uploadId=X → AbortMultipartUpload
+	if r.Method == http.MethodDelete && scope == scopeObject && sub == "uploadId" {
+		return handleAbortMultipartUpload(s.store, ctx)
+	}
+
+	// DELETE /bucket/key → DeleteObject (with event bus side-effect)
+	if r.Method == http.MethodDelete && scope == scopeObject && sub == "" {
+		resp, err := handleDeleteObject(s.store, ctx)
+		if err == nil && s.bus != nil {
+			s.publishObjectEvent(ctx, bucketName, objectKey, "s3:ObjectRemoved:Delete")
+		}
+		return resp, err
+	}
+
+	// --- Map-based dispatch for all other routes ---
+	if handler, ok := routes[routeKey{r.Method, scope, sub}]; ok {
+		return handler(s.store, ctx)
+	}
+
 	awsErr := service.NewAWSError(
 		"NotImplemented",
 		"This operation is not implemented by cloudmock.",

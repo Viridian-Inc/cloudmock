@@ -3,6 +3,7 @@ package secretsmanager
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -39,6 +40,50 @@ func (s *SecretsManagerService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *SecretsManagerService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Secrets Manager resource types.
+func (s *SecretsManagerService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "secretsmanager",
+			ResourceType:  "aws_secretsmanager_secret",
+			TerraformType: "cloudmock_secretsmanager_secret",
+			AWSType:       "AWS::SecretsManager::Secret",
+			CreateAction:  "CreateSecret",
+			ReadAction:    "DescribeSecret",
+			UpdateAction:  "UpdateSecret",
+			DeleteAction:  "DeleteSecret",
+			ListAction:    "ListSecrets",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "description", Type: "string"},
+				{Name: "kms_key_id", Type: "string"},
+				{Name: "recovery_window_in_days", Type: "int", Default: 30},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "secretsmanager",
+			ResourceType:  "aws_secretsmanager_secret_version",
+			TerraformType: "cloudmock_secretsmanager_secret_version",
+			AWSType:       "AWS::SecretsManager::SecretTargetAttachment",
+			CreateAction:  "PutSecretValue",
+			ReadAction:    "GetSecretValue",
+			DeleteAction:  "DeleteSecret",
+			ImportID:      "secret_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "secret_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "secret_string", Type: "string"},
+				{Name: "secret_binary", Type: "string"},
+				{Name: "version_id", Type: "string", Computed: true},
+				{Name: "version_stages", Type: "list", Computed: true},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming Secrets Manager request to the appropriate handler.
 // Secrets Manager uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway

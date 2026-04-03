@@ -3,6 +3,7 @@ package cloudfront
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -82,6 +83,38 @@ func (s *CloudFrontService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *CloudFrontService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for CloudFront resource types.
+func (s *CloudFrontService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "cloudfront",
+			ResourceType:  "aws_cloudfront_distribution",
+			TerraformType: "cloudmock_cloudfront_distribution",
+			AWSType:       "AWS::CloudFront::Distribution",
+			CreateAction:  "CreateDistribution",
+			ReadAction:    "GetDistribution",
+			UpdateAction:  "UpdateDistribution",
+			DeleteAction:  "DeleteDistribution",
+			ListAction:    "ListDistributions",
+			ImportID:      "id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "enabled", Type: "bool", Required: true},
+				{Name: "origins", Type: "list", Required: true},
+				{Name: "default_cache_behavior", Type: "map", Required: true},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "domain_name", Type: "string", Computed: true},
+				{Name: "hosted_zone_id", Type: "string", Computed: true},
+				{Name: "status", Type: "string", Computed: true},
+				{Name: "price_class", Type: "string", Default: "PriceClass_All"},
+				{Name: "aliases", Type: "list"},
+				{Name: "comment", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming CloudFront request to the appropriate handler.
 // CloudFront uses REST-XML path-based routing.

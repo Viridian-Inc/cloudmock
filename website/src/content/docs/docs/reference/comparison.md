@@ -28,6 +28,15 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | **Persistence** | Snapshot, DuckDB, PostgreSQL | Pro tier (persistence) | In-memory only | In-memory only |
 | **Multi-account** | Single account (configurable ID) | Pro tier | In-process mocking | Single account |
 
+## IaC tool support
+
+| Feature | CloudMock | LocalStack (Free) | Moto |
+|---|---|---|---|
+| Terraform wrapper | `cloudmock-terraform` | `tflocal` (Pro) | No |
+| CDK support | `cloudmock-cdk` | Yes | No |
+| Pulumi support | `cloudmock-pulumi` + native provider | No | No |
+| CloudFormation resources | 30 types | Full (Pro) | No |
+
 ## Benchmarks
 
 CloudMock wins **31/31 operations** tested against Moto and LocalStack in a standard benchmark covering S3, DynamoDB, SQS, SNS, and IAM operations.

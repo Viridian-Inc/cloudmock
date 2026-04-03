@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -43,6 +44,35 @@ func (s *SQSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *SQSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for SQS queue resources.
+func (s *SQSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "sqs",
+			ResourceType:  "aws_sqs_queue",
+			TerraformType: "cloudmock_sqs_queue",
+			AWSType:       "AWS::SQS::Queue",
+			CreateAction:  "CreateQueue",
+			ReadAction:    "GetQueueAttributes",
+			DeleteAction:  "DeleteQueue",
+			ListAction:    "ListQueues",
+			ImportID:      "url",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", ForceNew: true},
+				{Name: "url", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "fifo_queue", Type: "bool", Default: false, ForceNew: true},
+				{Name: "visibility_timeout_seconds", Type: "int", Default: 30},
+				{Name: "message_retention_seconds", Type: "int", Default: 345600},
+				{Name: "max_message_size", Type: "int", Default: 262144},
+				{Name: "delay_seconds", Type: "int", Default: 0},
+				{Name: "receive_wait_time_seconds", Type: "int", Default: 0},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // GetQueueNames returns all queue names for topology queries.
 func (s *SQSService) GetQueueNames() []string {

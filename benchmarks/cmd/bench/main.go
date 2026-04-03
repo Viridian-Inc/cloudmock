@@ -249,7 +249,7 @@ func selectSuites(reg *suites.Registry, cfg harness.Config) []harness.Suite {
 		all = reg.List()
 	}
 
-	if len(cfg.Services) == 0 {
+	if len(cfg.Services) == 0 || (len(cfg.Services) == 1 && cfg.Services[0] == "*") {
 		return all
 	}
 

@@ -67,14 +67,14 @@ func TestConfigStore_Deploys(t *testing.T) {
 	now := time.Now().Truncate(time.Microsecond)
 
 	require.NoError(t, store.AddDeploy(ctx, dataplane.DeployEvent{
-		ID: "d1", Service: "api", Version: "v1.0.0", DeployedAt: now,
+		ID: "00000000-0000-0000-0000-000000000001", Service: "api", Version: "v1.0.0", DeployedAt: now,
 		Author: "alice", CommitSHA: "abc123",
 	}))
 	require.NoError(t, store.AddDeploy(ctx, dataplane.DeployEvent{
-		ID: "d2", Service: "worker", Version: "v2.0.0", DeployedAt: now.Add(time.Second),
+		ID: "00000000-0000-0000-0000-000000000003", Service: "worker", Version: "v2.0.0", DeployedAt: now.Add(time.Second),
 	}))
 	require.NoError(t, store.AddDeploy(ctx, dataplane.DeployEvent{
-		ID: "d3", Service: "api", Version: "v1.1.0", DeployedAt: now.Add(2 * time.Second),
+		ID: "00000000-0000-0000-0000-000000000004", Service: "api", Version: "v1.1.0", DeployedAt: now.Add(2 * time.Second),
 	}))
 
 	// List all.
@@ -104,7 +104,7 @@ func TestConfigStore_DeployAutoCreatesService(t *testing.T) {
 
 	// AddDeploy should auto-create the service for FK.
 	require.NoError(t, store.AddDeploy(ctx, dataplane.DeployEvent{
-		ID: "d1", Service: "new-svc", Version: "v1.0.0", DeployedAt: time.Now(),
+		ID: "00000000-0000-0000-0000-000000000002", Service: "new-svc", Version: "v1.0.0", DeployedAt: time.Now(),
 	}))
 
 	deploys, err := store.ListDeploys(ctx, dataplane.DeployFilter{Service: "new-svc"})

@@ -3,6 +3,7 @@ package kms
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -39,6 +40,51 @@ func (s *KMSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *KMSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for KMS resource types.
+func (s *KMSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "kms",
+			ResourceType:  "aws_kms_key",
+			TerraformType: "cloudmock_kms_key",
+			AWSType:       "AWS::KMS::Key",
+			CreateAction:  "CreateKey",
+			ReadAction:    "DescribeKey",
+			DeleteAction:  "ScheduleKeyDeletion",
+			ListAction:    "ListKeys",
+			ImportID:      "key_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "description", Type: "string"},
+				{Name: "key_usage", Type: "string", Default: "ENCRYPT_DECRYPT"},
+				{Name: "policy", Type: "string"},
+				{Name: "enable_key_rotation", Type: "bool", Default: false},
+				{Name: "is_enabled", Type: "bool", Default: true},
+				{Name: "deletion_window_in_days", Type: "int", Default: 30},
+				{Name: "key_id", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "kms",
+			ResourceType:  "aws_kms_alias",
+			TerraformType: "cloudmock_kms_alias",
+			AWSType:       "AWS::KMS::Alias",
+			CreateAction:  "CreateAlias",
+			ReadAction:    "ListAliases",
+			DeleteAction:  "DeleteAlias",
+			ListAction:    "ListAliases",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "target_key_id", Type: "string", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "target_key_arn", Type: "string", Computed: true},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming KMS request to the appropriate handler.
 // KMS uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway

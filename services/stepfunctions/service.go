@@ -3,6 +3,7 @@ package stepfunctions
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -43,6 +44,34 @@ func (s *StepFunctionsService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *StepFunctionsService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Step Functions resource types.
+func (s *StepFunctionsService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "stepfunctions",
+			ResourceType:  "aws_sfn_state_machine",
+			TerraformType: "cloudmock_sfn_state_machine",
+			AWSType:       "AWS::StepFunctions::StateMachine",
+			CreateAction:  "CreateStateMachine",
+			ReadAction:    "DescribeStateMachine",
+			UpdateAction:  "UpdateStateMachine",
+			DeleteAction:  "DeleteStateMachine",
+			ListAction:    "ListStateMachines",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "definition", Type: "string", Required: true},
+				{Name: "role_arn", Type: "string", Required: true},
+				{Name: "type", Type: "string", Default: "STANDARD", ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "creation_date", Type: "string", Computed: true},
+				{Name: "status", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming Step Functions request to the appropriate handler.
 // Step Functions uses the JSON protocol; the action is parsed from X-Amz-Target by the

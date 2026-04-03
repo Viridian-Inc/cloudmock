@@ -140,7 +140,7 @@ func (s *TableStore) acquireTable(name string) (*Table, *service.AWSError) {
 }
 
 // PutItem adds or replaces an item in the specified table.
-func (s *TableStore) PutItem(tableName string, item Item) *service.AWSError {
+func (s *TableStore) PutItem(tableName string, item Item, condExpr ...string) *service.AWSError {
 	table, awsErr := s.acquireTable(tableName)
 	if awsErr != nil {
 		return awsErr
@@ -148,6 +148,20 @@ func (s *TableStore) PutItem(tableName string, item Item) *service.AWSError {
 
 	table.mu.Lock()
 	defer table.mu.Unlock()
+
+	// Evaluate condition expression if provided.
+	if len(condExpr) > 0 && condExpr[0] != "" {
+		key := make(Item)
+		key[table.hashKeyName()] = item[table.hashKeyName()]
+		if table.rangeKeyName() != "" {
+			key[table.rangeKeyName()] = item[table.rangeKeyName()]
+		}
+		existing, _ := table.getItem(key)
+		if !evaluateCondition(condExpr[0], existing, nil, nil) {
+			return service.NewAWSError("ConditionalCheckFailedException",
+				"The conditional request failed.", 400)
+		}
+	}
 
 	old := table.putItem(item)
 	if old != nil {
@@ -188,7 +202,7 @@ func (s *TableStore) GetItem(tableName string, key Item, projExpr string, exprNa
 }
 
 // DeleteItem removes an item by key from the specified table.
-func (s *TableStore) DeleteItem(tableName string, key Item) *service.AWSError {
+func (s *TableStore) DeleteItem(tableName string, key Item, condExpr ...string) *service.AWSError {
 	table, awsErr := s.acquireTable(tableName)
 	if awsErr != nil {
 		return awsErr
@@ -196,6 +210,15 @@ func (s *TableStore) DeleteItem(tableName string, key Item) *service.AWSError {
 
 	table.mu.Lock()
 	defer table.mu.Unlock()
+
+	// Evaluate condition expression if provided.
+	if len(condExpr) > 0 && condExpr[0] != "" {
+		existing, _ := table.getItem(key)
+		if !evaluateCondition(condExpr[0], existing, nil, nil) {
+			return service.NewAWSError("ConditionalCheckFailedException",
+				"The conditional request failed.", 400)
+		}
+	}
 
 	return s.deleteFromTable(table, key)
 }

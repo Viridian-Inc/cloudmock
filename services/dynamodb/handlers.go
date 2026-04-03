@@ -86,8 +86,11 @@ type listTablesResponse struct {
 }
 
 type putItemRequest struct {
-	TableName string `json:"TableName"`
-	Item      Item   `json:"Item"`
+	TableName                 string                    `json:"TableName"`
+	Item                      Item                      `json:"Item"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
 }
 
 type getItemRequest struct {
@@ -102,8 +105,11 @@ type getItemResponse struct {
 }
 
 type deleteItemRequest struct {
-	TableName string `json:"TableName"`
-	Key       Item   `json:"Key"`
+	TableName                 string                    `json:"TableName"`
+	Key                       Item                      `json:"Key"`
+	ConditionExpression       string                    `json:"ConditionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
 }
 
 type updateItemRequest struct {
@@ -420,7 +426,7 @@ func handlePutItem(ctx *service.RequestContext, store *TableStore) (*service.Res
 			"TableName is required.", http.StatusBadRequest))
 	}
 
-	if awsErr := store.PutItem(req.TableName, req.Item); awsErr != nil {
+	if awsErr := store.PutItem(req.TableName, req.Item, req.ConditionExpression); awsErr != nil {
 		return jsonErr(awsErr)
 	}
 
@@ -455,7 +461,7 @@ func handleDeleteItem(ctx *service.RequestContext, store *TableStore) (*service.
 			"TableName is required.", http.StatusBadRequest))
 	}
 
-	if awsErr := store.DeleteItem(req.TableName, req.Key); awsErr != nil {
+	if awsErr := store.DeleteItem(req.TableName, req.Key, req.ConditionExpression); awsErr != nil {
 		return jsonErr(awsErr)
 	}
 

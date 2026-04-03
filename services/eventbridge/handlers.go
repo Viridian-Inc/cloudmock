@@ -521,7 +521,7 @@ type putEventEntry struct {
 	Detail       string   `json:"Detail"`
 	EventBusName string   `json:"EventBusName"`
 	Resources    []string `json:"Resources"`
-	Time         string   `json:"Time,omitempty"` // ISO8601
+	Time         any      `json:"Time,omitempty"` // string (ISO8601) or number (epoch seconds)
 }
 
 type putEventsRequest struct {
@@ -553,10 +553,17 @@ func handlePutEvents(ctx *service.RequestContext, store *Store, locator ServiceL
 			busName = "default"
 		}
 		var t time.Time
-		if e.Time != "" {
-			if parsed, err := time.Parse(time.RFC3339, e.Time); err == nil {
-				t = parsed
+		switch v := e.Time.(type) {
+		case string:
+			if v != "" {
+				if parsed, err := time.Parse(time.RFC3339, v); err == nil {
+					t = parsed
+				}
 			}
+		case float64:
+			sec := int64(v)
+			nsec := int64((v - float64(sec)) * 1e9)
+			t = time.Unix(sec, nsec)
 		}
 		storeEntries = append(storeEntries, PutEvent{
 			Source:       e.Source,

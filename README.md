@@ -1,6 +1,8 @@
 # CloudMock
 
 ![AWS Compatibility](https://img.shields.io/badge/AWS_Compatibility-100%25-brightgreen)
+![Compat Tests](https://github.com/Viridian-Inc/cloudmock/actions/workflows/compat.yml/badge.svg)
+![CI](https://github.com/Viridian-Inc/cloudmock/actions/workflows/ci.yml/badge.svg)
 
 **Local AWS emulation with built-in observability.**
 

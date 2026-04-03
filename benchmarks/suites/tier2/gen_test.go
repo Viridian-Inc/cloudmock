@@ -9,7 +9,7 @@ import (
 
 func TestGenerateSuites_Count(t *testing.T) {
 	suites := GenerateAll()
-	assert.GreaterOrEqual(t, len(suites), 40)
+	assert.GreaterOrEqual(t, len(suites), 73)
 }
 
 func TestGenerateSuites_Tier(t *testing.T) {

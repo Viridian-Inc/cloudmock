@@ -7,54 +7,78 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/account"
 	"github.com/aws/aws-sdk-go-v2/service/acm"
+	"github.com/aws/aws-sdk-go-v2/service/acmpca"
 	"github.com/aws/aws-sdk-go-v2/service/amplify"
+	"github.com/aws/aws-sdk-go-v2/service/appconfig"
 	"github.com/aws/aws-sdk-go-v2/service/applicationautoscaling"
+	"github.com/aws/aws-sdk-go-v2/service/apprunner"
 	"github.com/aws/aws-sdk-go-v2/service/appsync"
 	"github.com/aws/aws-sdk-go-v2/service/athena"
 	"github.com/aws/aws-sdk-go-v2/service/autoscaling"
 	"github.com/aws/aws-sdk-go-v2/service/backup"
 	"github.com/aws/aws-sdk-go-v2/service/batch"
+	"github.com/aws/aws-sdk-go-v2/service/bedrock"
 	"github.com/aws/aws-sdk-go-v2/service/cloudcontrol"
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	"github.com/aws/aws-sdk-go-v2/service/codeartifact"
 	"github.com/aws/aws-sdk-go-v2/service/codecommit"
+	"github.com/aws/aws-sdk-go-v2/service/codeconnections"
 	"github.com/aws/aws-sdk-go-v2/service/codedeploy"
 	"github.com/aws/aws-sdk-go-v2/service/costexplorer"
 	cetypes "github.com/aws/aws-sdk-go-v2/service/costexplorer/types"
 	"github.com/aws/aws-sdk-go-v2/service/databasemigrationservice"
 	"github.com/aws/aws-sdk-go-v2/service/datasync"
+	"github.com/aws/aws-sdk-go-v2/service/dax"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
+	"github.com/aws/aws-sdk-go-v2/service/elasticsearchservice"
 	"github.com/aws/aws-sdk-go-v2/service/emr"
+	"github.com/aws/aws-sdk-go-v2/service/fis"
 	"github.com/aws/aws-sdk-go-v2/service/glacier"
 	"github.com/aws/aws-sdk-go-v2/service/glue"
+	"github.com/aws/aws-sdk-go-v2/service/identitystore"
 	"github.com/aws/aws-sdk-go-v2/service/iot"
+	"github.com/aws/aws-sdk-go-v2/service/iotdataplane"
+	"github.com/aws/aws-sdk-go-v2/service/iotwireless"
 	"github.com/aws/aws-sdk-go-v2/service/kafka"
+	"github.com/aws/aws-sdk-go-v2/service/kinesisanalytics"
+	"github.com/aws/aws-sdk-go-v2/service/lakeformation"
+	"github.com/aws/aws-sdk-go-v2/service/managedblockchain"
+	"github.com/aws/aws-sdk-go-v2/service/mediaconvert"
 	"github.com/aws/aws-sdk-go-v2/service/memorydb"
 	"github.com/aws/aws-sdk-go-v2/service/mq"
 	"github.com/aws/aws-sdk-go-v2/service/neptune"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
+	"github.com/aws/aws-sdk-go-v2/service/pinpoint"
 	"github.com/aws/aws-sdk-go-v2/service/pipes"
 	"github.com/aws/aws-sdk-go-v2/service/ram"
 	"github.com/aws/aws-sdk-go-v2/service/redshift"
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroups"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
+	"github.com/aws/aws-sdk-go-v2/service/route53resolver"
 	"github.com/aws/aws-sdk-go-v2/service/sagemaker"
 	"github.com/aws/aws-sdk-go-v2/service/scheduler"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	"github.com/aws/aws-sdk-go-v2/service/serverlessapplicationrepository"
 	"github.com/aws/aws-sdk-go-v2/service/servicediscovery"
+	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
 	"github.com/aws/aws-sdk-go-v2/service/shield"
 	"github.com/aws/aws-sdk-go-v2/service/ssoadmin"
 	"github.com/aws/aws-sdk-go-v2/service/support"
 	"github.com/aws/aws-sdk-go-v2/service/swf"
+	"github.com/aws/aws-sdk-go-v2/service/textract"
 	"github.com/aws/aws-sdk-go-v2/service/timestreamwrite"
 	"github.com/aws/aws-sdk-go-v2/service/transcribe"
 	"github.com/aws/aws-sdk-go-v2/service/transfer"
+	"github.com/aws/aws-sdk-go-v2/service/verifiedpermissions"
+	"github.com/aws/aws-sdk-go-v2/service/wafregional"
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/xray"
@@ -112,56 +136,101 @@ func (c *clientCache[T]) get(endpoint string) (*T, error) {
 // clients for correct protocol serialization.
 func GenerateAll() []harness.Suite {
 	return []harness.Suite{
+		accountSuite(),
 		acmSuite(),
+		acmpcaSuite(),
 		amplifySuite(),
+		appconfigSuite(),
 		applicationAutoscalingSuite(),
+		apprunnerSuite(),
 		appsyncSuite(),
 		athenaSuite(),
 		autoscalingSuite(),
 		backupSuite(),
 		batchSuite(),
+		bedrockSuite(),
 		cloudcontrolSuite(),
 		cloudfrontSuite(),
+		codeartifactSuite(),
 		codecommitSuite(),
+		codeconnectionsSuite(),
 		codedeploySuite(),
 		costexplorerSuite(),
 		databasemigrationSuite(),
 		datasyncSuite(),
+		daxSuite(),
 		docdbSuite(),
 		elasticacheSuite(),
 		elasticbeanstalkSuite(),
 		elasticloadbalancingSuite(),
+		elasticsearchSuite(),
 		emrSuite(),
+		fisSuite(),
 		glacierSuite(),
 		glueSuite(),
+		identitystoreSuite(),
 		iotSuite(),
+		iotdataSuite(),
+		iotwirelessSuite(),
 		kafkaSuite(),
+		kinesisanalyticsSuite(),
+		lakeformationSuite(),
+		managedblockchainSuite(),
+		mediaconvertSuite(),
 		memorydbSuite(),
 		mqSuite(),
 		neptuneSuite(),
 		opensearchSuite(),
 		organizationsSuite(),
+		pinpointSuite(),
 		pipesSuite(),
 		ramSuite(),
 		redshiftSuite(),
 		rekognitionSuite(),
 		resourcegroupsSuite(),
 		resourcegroupstaggingapiSuite(),
+		route53resolverSuite(),
 		sagemakerSuite(),
 		schedulerSuite(),
 		secretsmanagerSuite(),
+		serverlessrepoSuite(),
 		servicediscoverySuite(),
+		sesSuite(),
 		sfnSuite(),
 		shieldSuite(),
 		ssoadminSuite(),
 		supportSuite(),
 		swfSuite(),
+		textractSuite(),
 		timestreamwriteSuite(),
 		transcribeSuite(),
 		transferSuite(),
+		verifiedpermissionsSuite(),
+		wafregionalSuite(),
 		wafv2Suite(),
 		xraySuite(),
 	}
+}
+
+// ─── Account ───────────────────────────────────────────────────────────────────
+
+func accountSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*account.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return account.NewFromConfig(cfg, func(o *account.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "account", ops: []harness.Operation{
+		op("ListRegions", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListRegions(ctx, &account.ListRegionsInput{})
+		}),
+	}}
 }
 
 // ─── ACM ────────────────────────────────────────────────────────────────────────
@@ -203,6 +272,27 @@ func acmSuite() harness.Suite {
 	}}
 }
 
+// ─── ACM PCA ───────────────────────────────────────────────────────────────────
+
+func acmpcaSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*acmpca.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return acmpca.NewFromConfig(cfg, func(o *acmpca.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "acm-pca", ops: []harness.Operation{
+		op("ListCertificateAuthorities", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListCertificateAuthorities(ctx, &acmpca.ListCertificateAuthoritiesInput{})
+		}),
+	}}
+}
+
 // ─── Amplify ────────────────────────────────────────────────────────────────────
 
 func amplifySuite() harness.Suite {
@@ -233,6 +323,36 @@ func amplifySuite() harness.Suite {
 	}}
 }
 
+// ─── AppConfig ─────────────────────────────────────────────────────────────────
+
+func appconfigSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*appconfig.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return appconfig.NewFromConfig(cfg, func(o *appconfig.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "appconfig", ops: []harness.Operation{
+		op("ListApplications", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListApplications(ctx, &appconfig.ListApplicationsInput{})
+		}),
+		op("ListEnvironments", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListEnvironments(ctx, &appconfig.ListEnvironmentsInput{
+				ApplicationId: aws.String("bench-app-id"),
+			})
+		}),
+	}}
+}
+
 // ─── Application Auto Scaling ───────────────────────────────────────────────────
 
 func applicationAutoscalingSuite() harness.Suite {
@@ -252,6 +372,34 @@ func applicationAutoscalingSuite() harness.Suite {
 			return cl.DescribeScalableTargets(ctx, &applicationautoscaling.DescribeScalableTargetsInput{
 				ServiceNamespace: "ecs",
 			})
+		}),
+	}}
+}
+
+// ─── App Runner ────────────────────────────────────────────────────────────────
+
+func apprunnerSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*apprunner.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return apprunner.NewFromConfig(cfg, func(o *apprunner.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "apprunner", ops: []harness.Operation{
+		op("ListServices", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListServices(ctx, &apprunner.ListServicesInput{})
+		}),
+		op("ListAutoScalingConfigurations", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListAutoScalingConfigurations(ctx, &apprunner.ListAutoScalingConfigurationsInput{})
 		}),
 	}}
 }
@@ -408,6 +556,34 @@ func batchSuite() harness.Suite {
 	}}
 }
 
+// ─── Bedrock ───────────────────────────────────────────────────────────────────
+
+func bedrockSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*bedrock.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return bedrock.NewFromConfig(cfg, func(o *bedrock.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "bedrock", ops: []harness.Operation{
+		op("ListFoundationModels", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListFoundationModels(ctx, &bedrock.ListFoundationModelsInput{})
+		}),
+		op("ListCustomModels", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListCustomModels(ctx, &bedrock.ListCustomModelsInput{})
+		}),
+	}}
+}
+
 // ─── Cloud Control ──────────────────────────────────────────────────────────────
 
 func cloudcontrolSuite() harness.Suite {
@@ -452,6 +628,34 @@ func cloudfrontSuite() harness.Suite {
 	}}
 }
 
+// ─── CodeArtifact ──────────────────────────────────────────────────────────────
+
+func codeartifactSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*codeartifact.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return codeartifact.NewFromConfig(cfg, func(o *codeartifact.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "codeartifact", ops: []harness.Operation{
+		op("ListDomains", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListDomains(ctx, &codeartifact.ListDomainsInput{})
+		}),
+		op("ListRepositories", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListRepositories(ctx, &codeartifact.ListRepositoriesInput{})
+		}),
+	}}
+}
+
 // ─── CodeCommit ─────────────────────────────────────────────────────────────────
 
 func codecommitSuite() harness.Suite {
@@ -478,6 +682,34 @@ func codecommitSuite() harness.Suite {
 				return nil, err
 			}
 			return cl.ListRepositories(ctx, &codecommit.ListRepositoriesInput{})
+		}),
+	}}
+}
+
+// ─── CodeConnections ───────────────────────────────────────────────────────────
+
+func codeconnectionsSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*codeconnections.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return codeconnections.NewFromConfig(cfg, func(o *codeconnections.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "codeconnections", ops: []harness.Operation{
+		op("ListConnections", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListConnections(ctx, &codeconnections.ListConnectionsInput{})
+		}),
+		op("ListHosts", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListHosts(ctx, &codeconnections.ListHostsInput{})
 		}),
 	}}
 }
@@ -596,6 +828,34 @@ func datasyncSuite() harness.Suite {
 	}}
 }
 
+// ─── DAX ───────────────────────────────────────────────────────────────────────
+
+func daxSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*dax.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return dax.NewFromConfig(cfg, func(o *dax.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "dax", ops: []harness.Operation{
+		op("DescribeClusters", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.DescribeClusters(ctx, &dax.DescribeClustersInput{})
+		}),
+		op("DescribeSubnetGroups", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.DescribeSubnetGroups(ctx, &dax.DescribeSubnetGroupsInput{})
+		}),
+	}}
+}
+
 // ─── DocumentDB ─────────────────────────────────────────────────────────────────
 
 func docdbSuite() harness.Suite {
@@ -710,6 +970,27 @@ func elasticloadbalancingSuite() harness.Suite {
 	}}
 }
 
+// ─── Elasticsearch Service ─────────────────────────────────────────────────────
+
+func elasticsearchSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*elasticsearchservice.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return elasticsearchservice.NewFromConfig(cfg, func(o *elasticsearchservice.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "es", ops: []harness.Operation{
+		op("ListDomainNames", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListDomainNames(ctx, &elasticsearchservice.ListDomainNamesInput{})
+		}),
+	}}
+}
+
 // ─── EMR ────────────────────────────────────────────────────────────────────────
 
 func emrSuite() harness.Suite {
@@ -736,6 +1017,34 @@ func emrSuite() harness.Suite {
 			return cl.ListSteps(ctx, &emr.ListStepsInput{
 				ClusterId: aws.String("j-BENCHCLUSTER"),
 			})
+		}),
+	}}
+}
+
+// ─── FIS ───────────────────────────────────────────────────────────────────────
+
+func fisSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*fis.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return fis.NewFromConfig(cfg, func(o *fis.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "fis", ops: []harness.Operation{
+		op("ListExperimentTemplates", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListExperimentTemplates(ctx, &fis.ListExperimentTemplatesInput{})
+		}),
+		op("ListExperiments", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListExperiments(ctx, &fis.ListExperimentsInput{})
 		}),
 	}}
 }
@@ -808,6 +1117,38 @@ func glueSuite() harness.Suite {
 	}}
 }
 
+// ─── Identity Store ────────────────────────────────────────────────────────────
+
+func identitystoreSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*identitystore.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return identitystore.NewFromConfig(cfg, func(o *identitystore.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "identitystore", ops: []harness.Operation{
+		op("ListUsers", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListUsers(ctx, &identitystore.ListUsersInput{
+				IdentityStoreId: aws.String("d-0000000000"),
+			})
+		}),
+		op("ListGroups", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListGroups(ctx, &identitystore.ListGroupsInput{
+				IdentityStoreId: aws.String("d-0000000000"),
+			})
+		}),
+	}}
+}
+
 // ─── IoT ────────────────────────────────────────────────────────────────────────
 
 func iotSuite() harness.Suite {
@@ -838,6 +1179,55 @@ func iotSuite() harness.Suite {
 	}}
 }
 
+// ─── IoT Data Plane ────────────────────────────────────────────────────────────
+
+func iotdataSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*iotdataplane.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return iotdataplane.NewFromConfig(cfg, func(o *iotdataplane.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "iot-data", ops: []harness.Operation{
+		op("ListRetainedMessages", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListRetainedMessages(ctx, &iotdataplane.ListRetainedMessagesInput{})
+		}),
+	}}
+}
+
+// ─── IoT Wireless ──────────────────────────────────────────────────────────────
+
+func iotwirelessSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*iotwireless.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return iotwireless.NewFromConfig(cfg, func(o *iotwireless.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "iotwireless", ops: []harness.Operation{
+		op("ListWirelessDevices", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListWirelessDevices(ctx, &iotwireless.ListWirelessDevicesInput{})
+		}),
+		op("ListWirelessGateways", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListWirelessGateways(ctx, &iotwireless.ListWirelessGatewaysInput{})
+		}),
+	}}
+}
+
 // ─── MSK (Kafka) ────────────────────────────────────────────────────────────────
 
 func kafkaSuite() harness.Suite {
@@ -855,6 +1245,104 @@ func kafkaSuite() harness.Suite {
 				return nil, err
 			}
 			return cl.ListClustersV2(ctx, &kafka.ListClustersV2Input{})
+		}),
+	}}
+}
+
+// ─── Kinesis Analytics ─────────────────────────────────────────────────────────
+
+func kinesisanalyticsSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*kinesisanalytics.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return kinesisanalytics.NewFromConfig(cfg, func(o *kinesisanalytics.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "kinesisanalytics", ops: []harness.Operation{
+		op("ListApplications", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListApplications(ctx, &kinesisanalytics.ListApplicationsInput{})
+		}),
+	}}
+}
+
+// ─── Lake Formation ────────────────────────────────────────────────────────────
+
+func lakeformationSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*lakeformation.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return lakeformation.NewFromConfig(cfg, func(o *lakeformation.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "lakeformation", ops: []harness.Operation{
+		op("ListResources", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListResources(ctx, &lakeformation.ListResourcesInput{})
+		}),
+		op("ListPermissions", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListPermissions(ctx, &lakeformation.ListPermissionsInput{})
+		}),
+	}}
+}
+
+// ─── Managed Blockchain ────────────────────────────────────────────────────────
+
+func managedblockchainSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*managedblockchain.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return managedblockchain.NewFromConfig(cfg, func(o *managedblockchain.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "managedblockchain", ops: []harness.Operation{
+		op("ListNetworks", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListNetworks(ctx, &managedblockchain.ListNetworksInput{})
+		}),
+	}}
+}
+
+// ─── MediaConvert ──────────────────────────────────────────────────────────────
+
+func mediaconvertSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*mediaconvert.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return mediaconvert.NewFromConfig(cfg, func(o *mediaconvert.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "mediaconvert", ops: []harness.Operation{
+		op("ListJobs", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListJobs(ctx, &mediaconvert.ListJobsInput{})
+		}),
+		op("ListQueues", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListQueues(ctx, &mediaconvert.ListQueuesInput{})
 		}),
 	}}
 }
@@ -974,6 +1462,27 @@ func organizationsSuite() harness.Suite {
 				return nil, err
 			}
 			return cl.DescribeOrganization(ctx, &organizations.DescribeOrganizationInput{})
+		}),
+	}}
+}
+
+// ─── Pinpoint ──────────────────────────────────────────────────────────────────
+
+func pinpointSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*pinpoint.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return pinpoint.NewFromConfig(cfg, func(o *pinpoint.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "pinpoint", ops: []harness.Operation{
+		op("GetApps", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.GetApps(ctx, &pinpoint.GetAppsInput{})
 		}),
 	}}
 }
@@ -1115,6 +1624,34 @@ func resourcegroupstaggingapiSuite() harness.Suite {
 	}}
 }
 
+// ─── Route 53 Resolver ─────────────────────────────────────────────────────────
+
+func route53resolverSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*route53resolver.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return route53resolver.NewFromConfig(cfg, func(o *route53resolver.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "route53resolver", ops: []harness.Operation{
+		op("ListResolverEndpoints", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListResolverEndpoints(ctx, &route53resolver.ListResolverEndpointsInput{})
+		}),
+		op("ListResolverRules", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListResolverRules(ctx, &route53resolver.ListResolverRulesInput{})
+		}),
+	}}
+}
+
 // ─── SageMaker ──────────────────────────────────────────────────────────────────
 
 func sagemakerSuite() harness.Suite {
@@ -1202,6 +1739,27 @@ func secretsmanagerSuite() harness.Suite {
 	}}
 }
 
+// ─── Serverless Application Repository ─────────────────────────────────────────
+
+func serverlessrepoSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*serverlessapplicationrepository.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return serverlessapplicationrepository.NewFromConfig(cfg, func(o *serverlessapplicationrepository.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "serverlessrepo", ops: []harness.Operation{
+		op("ListApplications", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListApplications(ctx, &serverlessapplicationrepository.ListApplicationsInput{})
+		}),
+	}}
+}
+
 // ─── Service Discovery (Cloud Map) ──────────────────────────────────────────────
 
 func servicediscoverySuite() harness.Suite {
@@ -1226,6 +1784,34 @@ func servicediscoverySuite() harness.Suite {
 				return nil, err
 			}
 			return cl.ListServices(ctx, &servicediscovery.ListServicesInput{})
+		}),
+	}}
+}
+
+// ─── SES ───────────────────────────────────────────────────────────────────────
+
+func sesSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*ses.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return ses.NewFromConfig(cfg, func(o *ses.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "ses", ops: []harness.Operation{
+		op("ListIdentities", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListIdentities(ctx, &ses.ListIdentitiesInput{})
+		}),
+		op("ListVerifiedEmailAddresses", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListVerifiedEmailAddresses(ctx, &ses.ListVerifiedEmailAddressesInput{})
 		}),
 	}}
 }
@@ -1346,6 +1932,34 @@ func swfSuite() harness.Suite {
 	}}
 }
 
+// ─── Textract ──────────────────────────────────────────────────────────────────
+
+func textractSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*textract.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return textract.NewFromConfig(cfg, func(o *textract.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "textract", ops: []harness.Operation{
+		op("ListAdapterVersions", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListAdapterVersions(ctx, &textract.ListAdapterVersionsInput{})
+		}),
+		op("ListAdapters", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListAdapters(ctx, &textract.ListAdaptersInput{})
+		}),
+	}}
+}
+
 // ─── Timestream Write ───────────────────────────────────────────────────────────
 
 func timestreamwriteSuite() harness.Suite {
@@ -1405,6 +2019,55 @@ func transferSuite() harness.Suite {
 				return nil, err
 			}
 			return cl.ListServers(ctx, &transfer.ListServersInput{})
+		}),
+	}}
+}
+
+// ─── Verified Permissions ──────────────────────────────────────────────────────
+
+func verifiedpermissionsSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*verifiedpermissions.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return verifiedpermissions.NewFromConfig(cfg, func(o *verifiedpermissions.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "verifiedpermissions", ops: []harness.Operation{
+		op("ListPolicyStores", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListPolicyStores(ctx, &verifiedpermissions.ListPolicyStoresInput{})
+		}),
+	}}
+}
+
+// ─── WAF Regional ──────────────────────────────────────────────────────────────
+
+func wafregionalSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*wafregional.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return wafregional.NewFromConfig(cfg, func(o *wafregional.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "waf-regional", ops: []harness.Operation{
+		op("ListWebACLs", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListWebACLs(ctx, &wafregional.ListWebACLsInput{})
+		}),
+		op("ListRules", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListRules(ctx, &wafregional.ListRulesInput{})
 		}),
 	}}
 }

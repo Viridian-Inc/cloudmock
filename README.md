@@ -178,6 +178,28 @@ npx create-cloudmock-app my-app
 
 Generates a complete project with CloudMock pre-configured for your stack. Supports Node.js, Python, Go, Java, and Rust with S3, DynamoDB, and SQS templates.
 
+## Docker Compose Stacks
+
+Eight ready-to-run stacks in [`docker/stacks/`](docker/stacks/):
+
+| Stack | What it includes |
+|-------|-----------------|
+| `minimal/` | CloudMock only — point any SDK at localhost:4566 |
+| `serverless/` | Express API + DynamoDB + SQS |
+| `microservices/` | Node.js + Python + Go services via SNS fan-out |
+| `data-pipeline/` | S3 ingest → SQS → worker → DynamoDB |
+| `webapp-postgres/` | Node API + Postgres + S3 + SQS |
+| `fullstack/` | nginx frontend + Node API + DynamoDB |
+| `terraform/` | CloudMock + Terraform IaC validation |
+| `monitoring/` | CloudMock + Prometheus + Grafana |
+
+```bash
+cd docker/stacks/minimal
+docker compose up
+```
+
+See the [Docker Compose guide](https://cloudmock.app/docs/guides/docker-compose) for quick starts, customization, and how to add your own services.
+
 ## Traffic Recording & Replay
 
 Record real AWS traffic and replay against CloudMock to validate compatibility:

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudMock Notes</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, sans-serif; background: #f5f5f5; color: #333; }
+    header { background: #1a1a2e; color: white; padding: 1rem 2rem; }
+    header h1 { font-size: 1.25rem; }
+    header small { opacity: 0.7; font-size: 0.8rem; }
+    main { max-width: 700px; margin: 2rem auto; padding: 0 1rem; }
+    .card { background: white; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+    h2 { font-size: 1rem; margin-bottom: 1rem; color: #555; text-transform: uppercase; letter-spacing: .05em; }
+    input, textarea { width: 100%; padding: .6rem; border: 1px solid #ddd; border-radius: 4px; font-size: .9rem; margin-bottom: .6rem; }
+    textarea { height: 80px; resize: vertical; }
+    button { background: #4f46e5; color: white; border: none; padding: .6rem 1.2rem; border-radius: 4px; cursor: pointer; font-size: .9rem; }
+    button:hover { background: #4338ca; }
+    .note { border-left: 3px solid #4f46e5; padding-left: 1rem; margin-bottom: .8rem; }
+    .note-title { font-size: .95rem; font-weight: 600; }
+    .note-body { font-size: .85rem; color: #666; margin-top: .25rem; }
+    .note-time { font-size: .75rem; color: #999; display: block; margin-top: .2rem; }
+    #status { font-size: .8rem; color: #888; margin-top: .5rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>CloudMock Notes</h1>
+    <small>Full-stack demo — no build step required</small>
+  </header>
+  <main>
+    <div class="card">
+      <h2>New Note</h2>
+      <input id="title" type="text" placeholder="Title">
+      <textarea id="body" placeholder="Write something..."></textarea>
+      <button onclick="createNote()">Save Note</button>
+      <div id="status"></div>
+    </div>
+    <div class="card">
+      <h2>Notes</h2>
+      <div id="notes-list"><em style="color:#999">Loading...</em></div>
+    </div>
+  </main>
+  <script>
+    const API = "http://localhost:3000";
+
+    function renderNotes(notes) {
+      const list = document.getElementById("notes-list");
+      list.textContent = "";
+      if (!notes.length) {
+        const em = document.createElement("em");
+        em.style.color = "#999";
+        em.textContent = "No notes yet.";
+        list.appendChild(em);
+        return;
+      }
+      notes.sort((a, b) => b.createdAt.localeCompare(a.createdAt)).forEach(n => {
+        const div = document.createElement("div");
+        div.className = "note";
+
+        const titleEl = document.createElement("div");
+        titleEl.className = "note-title";
+        titleEl.textContent = n.title;
+
+        const bodyEl = document.createElement("div");
+        bodyEl.className = "note-body";
+        bodyEl.textContent = n.body;
+
+        const timeEl = document.createElement("span");
+        timeEl.className = "note-time";
+        timeEl.textContent = new Date(n.createdAt).toLocaleString();
+
+        div.appendChild(titleEl);
+        div.appendChild(bodyEl);
+        div.appendChild(timeEl);
+        list.appendChild(div);
+      });
+    }
+
+    async function loadNotes() {
+      const res = await fetch(`${API}/notes`);
+      renderNotes(await res.json());
+    }
+
+    async function createNote() {
+      const title = document.getElementById("title").value.trim();
+      const body = document.getElementById("body").value.trim();
+      if (!title) { setStatus("Title is required"); return; }
+      setStatus("Saving...");
+      await fetch(`${API}/notes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title, body }),
+      });
+      document.getElementById("title").value = "";
+      document.getElementById("body").value = "";
+      setStatus("Saved!");
+      setTimeout(() => setStatus(""), 2000);
+      loadNotes();
+    }
+
+    function setStatus(msg) { document.getElementById("status").textContent = msg; }
+
+    loadNotes();
+  </script>
+</body>
+</html>

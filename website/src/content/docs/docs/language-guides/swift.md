@@ -230,7 +230,7 @@ The `NSAllowsLocalNetworking` key permits HTTP connections to localhost and `.lo
 
 ## Supported services
 
-All 98 AWS services emulated by CloudMock are accessible from Swift. The most commonly used from iOS/macOS apps:
+All 99 AWS services emulated by CloudMock are accessible from Swift. The most commonly used from iOS/macOS apps:
 
 - **S3** -- File uploads, downloads, presigned URLs
 - **DynamoDB** -- NoSQL database operations

@@ -256,3 +256,66 @@ let s3 = aws_sdk_s3::Client::new(&config);
 **All 98 services use the same endpoint.** CloudMock routes requests to the correct service based on the AWS service headers. You do not need per-service ports or endpoints.
 
 **See it in practice.** The [todo demo project](https://github.com/Viridian-Inc/cloudmock-todo-demo) shows complete working examples of S3, DynamoDB, SQS, and SNS in Node.js, Python, and Go.
+
+## Infrastructure as Code
+
+CloudMock works with your existing IaC tools — no code changes needed. Because all services share one endpoint (`http://localhost:4566`), redirecting any IaC tool to CloudMock is a one-line change.
+
+### Terraform
+
+Install the wrapper and use your existing `.tf` files without modification:
+
+```bash
+go install github.com/neureaux/cloudmock/tools/cloudmock-terraform@latest
+
+cloudmock-terraform init
+cloudmock-terraform plan
+cloudmock-terraform apply
+```
+
+Or point the official AWS provider at CloudMock manually:
+
+```hcl
+provider "aws" {
+  endpoints {
+    s3       = "http://localhost:4566"
+    dynamodb = "http://localhost:4566"
+    # ... all services use the same endpoint
+  }
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+}
+```
+
+See the [Terraform guide](/docs/guides/terraform/) for full details.
+
+### CDK
+
+Install the CDK wrapper and deploy your existing CDK apps:
+
+```bash
+go install github.com/neureaux/cloudmock/tools/cloudmock-cdk@latest
+
+cloudmock-cdk deploy --all
+cloudmock-cdk destroy --all
+```
+
+30 CloudFormation resource types are fully provisioned, including S3, DynamoDB, Lambda, IAM, EC2, SQS, SNS, RDS, ECS, Route53, KMS, and more.
+
+See the [CDK guide](/docs/guides/cdk/) for full details.
+
+### Pulumi
+
+Install the Pulumi wrapper and run your existing Pulumi programs:
+
+```bash
+go install github.com/neureaux/cloudmock/tools/cloudmock-pulumi@latest
+
+cloudmock-pulumi up
+cloudmock-pulumi destroy
+```
+
+Works with the official `@pulumi/aws` provider. CloudMock also ships a native Pulumi provider with 44 resource types for tighter integration.
+
+See the [Pulumi guide](/docs/guides/pulumi/) for full details.

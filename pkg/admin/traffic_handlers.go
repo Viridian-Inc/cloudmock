@@ -277,6 +277,42 @@ func (a *API) handleTrafficSynthetic(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, rec)
 }
 
+// --- handler: POST /api/traffic/entries ---
+
+func (a *API) handleInjectEntries(w http.ResponseWriter, r *http.Request) {
+	if a.trafficEngine == nil {
+		writeError(w, http.StatusServiceUnavailable, "traffic engine not configured")
+		return
+	}
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	var entries []traffic.CapturedEntry
+	if err := json.NewDecoder(r.Body).Decode(&entries); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	// Create an ad-hoc recording with the injected entries.
+	rec := &traffic.Recording{
+		Name:       "injected",
+		Status:     traffic.RecordingCompleted,
+		EntryCount: len(entries),
+		Entries:    entries,
+	}
+	if err := a.trafficEngine.Store().SaveRecording(r.Context(), rec); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusCreated, map[string]any{
+		"recording_id": rec.ID,
+		"entry_count":  len(entries),
+	})
+}
+
 // --- handler: GET /api/traffic/compare?run_a=X&run_b=Y ---
 
 func (a *API) handleTrafficCompare(w http.ResponseWriter, r *http.Request) {

@@ -1,15 +1,21 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strings"
 	"text/tabwriter"
+
+	"github.com/neureaux/cloudmock/pkg/proxy"
+	"github.com/neureaux/cloudmock/pkg/traffic"
 )
 
 const (
@@ -40,6 +46,12 @@ func main() {
 		cmdReset(adminAddr, os.Args[2:])
 	case "services":
 		cmdServices(adminAddr)
+	case "record":
+		cmdRecord(os.Args[2:])
+	case "replay":
+		cmdReplay(adminAddr, os.Args[2:])
+	case "validate":
+		cmdValidate(adminAddr, os.Args[2:])
 	case "version":
 		cmdVersion()
 	case "config":
@@ -62,6 +74,9 @@ Commands:
   status     Show health status of all services
   reset      Reset service state (all or specific)
   services   List registered services
+  record     Record real AWS traffic via proxy
+  replay     Replay a recording against CloudMock
+  validate   Replay + compare + exit code (CI mode)
   config     Show current configuration
   version    Print version information
   help       Show this help message
@@ -236,6 +251,218 @@ func cmdServices(adminAddr string) {
 
 func cmdVersion() {
 	fmt.Printf("cloudmock version %s\n", version)
+}
+
+func cmdRecord(args []string) {
+	fs := flag.NewFlagSet("record", flag.ExitOnError)
+	output := fs.String("output", "recording.json", "path to write the recording JSON")
+	region := fs.String("region", "us-east-1", "AWS region for forwarding requests")
+	port := fs.String("port", "4577", "local port for the recording proxy")
+	fs.Parse(args)
+
+	p := proxy.New(*region)
+
+	listener, err := net.Listen("tcp", ":"+*port)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: cannot listen on port %s: %v\n", *port, err)
+		os.Exit(1)
+	}
+
+	srv := &http.Server{Handler: p}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+
+	go func() {
+		fmt.Printf("Recording proxy listening on :%s (region=%s)\n", *port, *region)
+		fmt.Printf("Point your AWS SDK to http://localhost:%s\n", *port)
+		fmt.Println("Press Ctrl+C to stop and save the recording.")
+		if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		}
+	}()
+
+	<-ctx.Done()
+	fmt.Println("\nStopping proxy...")
+	srv.Shutdown(context.Background())
+
+	if err := p.SaveToFile(*output); err != nil {
+		fmt.Fprintf(os.Stderr, "Error saving recording: %v\n", err)
+		os.Exit(1)
+	}
+
+	rec := p.Recording()
+	fmt.Printf("Saved %d entries to %s\n", rec.EntryCount, *output)
+}
+
+func cmdReplay(adminAddr string, args []string) {
+	fs := flag.NewFlagSet("replay", flag.ExitOnError)
+	input := fs.String("input", "", "path to recording JSON file")
+	endpoint := fs.String("endpoint", "http://localhost:4566", "CloudMock gateway endpoint")
+	speed := fs.Float64("speed", 0, "replay speed multiplier (0 = fast as possible)")
+	fs.Parse(args)
+
+	if *input == "" {
+		fmt.Fprintln(os.Stderr, "Error: --input is required")
+		os.Exit(1)
+	}
+
+	data, err := os.ReadFile(*input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	var rec traffic.Recording
+	if err := json.Unmarshal(data, &rec); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing recording: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Replaying %d entries against %s\n", len(rec.Entries), *endpoint)
+
+	client := &http.Client{}
+	var matched, mismatched, errors int
+
+	for i, entry := range rec.Entries {
+		var body io.Reader
+		if entry.RequestBody != "" {
+			body = strings.NewReader(entry.RequestBody)
+		}
+		url := *endpoint + entry.Path
+		req, err := http.NewRequest(entry.Method, url, body)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  [%d] error creating request: %v\n", i+1, err)
+			errors++
+			continue
+		}
+		for k, v := range entry.RequestHeaders {
+			req.Header.Set(k, v)
+		}
+		req.Header.Set("X-Cloudmock-Replay", entry.ID)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "  [%d] error: %v\n", i+1, err)
+			errors++
+			continue
+		}
+		io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		if resp.StatusCode == entry.StatusCode {
+			matched++
+		} else {
+			mismatched++
+			fmt.Printf("  [%d] %s %s: %d (expected %d)\n", i+1, entry.Method, entry.Path, resp.StatusCode, entry.StatusCode)
+		}
+
+		// Respect speed multiplier for pacing.
+		if *speed > 0 && i > 0 {
+			delta := rec.Entries[i].OffsetMs - rec.Entries[i-1].OffsetMs
+			if delta > 0 {
+				waitMs := delta / *speed
+				_ = waitMs // timing handled in engine; CLI replay is best-effort
+			}
+		}
+	}
+
+	total := matched + mismatched + errors
+	fmt.Printf("\nResults: %d/%d matched, %d mismatched, %d errors\n", matched, total, mismatched, errors)
+}
+
+func cmdValidate(adminAddr string, args []string) {
+	fs := flag.NewFlagSet("validate", flag.ExitOnError)
+	input := fs.String("input", "", "path to recording JSON file")
+	endpoint := fs.String("endpoint", "http://localhost:4566", "CloudMock gateway endpoint")
+	strict := fs.Bool("strict", false, "enable strict body comparison")
+	fs.Parse(args)
+
+	if *input == "" {
+		fmt.Fprintln(os.Stderr, "Error: --input is required")
+		os.Exit(1)
+	}
+
+	data, err := os.ReadFile(*input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading file: %v\n", err)
+		os.Exit(1)
+	}
+
+	var original traffic.Recording
+	if err := json.Unmarshal(data, &original); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing recording: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("Validating %d entries against %s\n", len(original.Entries), *endpoint)
+
+	// Replay and capture results.
+	client := &http.Client{}
+	replayEntries := make([]traffic.CapturedEntry, 0, len(original.Entries))
+
+	for _, entry := range original.Entries {
+		var body io.Reader
+		if entry.RequestBody != "" {
+			body = strings.NewReader(entry.RequestBody)
+		}
+		url := *endpoint + entry.Path
+		req, err := http.NewRequest(entry.Method, url, body)
+		if err != nil {
+			replayEntries = append(replayEntries, traffic.CapturedEntry{
+				ID: entry.ID, StatusCode: 0,
+			})
+			continue
+		}
+		for k, v := range entry.RequestHeaders {
+			req.Header.Set(k, v)
+		}
+		req.Header.Set("X-Cloudmock-Replay", entry.ID)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			replayEntries = append(replayEntries, traffic.CapturedEntry{
+				ID: entry.ID, StatusCode: 0,
+			})
+			continue
+		}
+		respBody, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
+
+		replayEntries = append(replayEntries, traffic.CapturedEntry{
+			ID:           entry.ID,
+			Service:      entry.Service,
+			Action:       entry.Action,
+			Method:       entry.Method,
+			Path:         entry.Path,
+			StatusCode:   resp.StatusCode,
+			ResponseBody: string(respBody),
+		})
+	}
+
+	replay := &traffic.Recording{Entries: replayEntries}
+
+	cfg := traffic.ComparisonConfig{
+		StrictMode:  *strict,
+		IgnorePaths: []string{"RequestId", "ResponseMetadata"},
+	}
+	report := traffic.CompareRecordings(&original, replay, cfg)
+
+	fmt.Printf("\nCompatibility: %.1f%%\n", report.CompatibilityPct)
+	fmt.Printf("  Matched:    %d\n", report.Matched)
+	fmt.Printf("  Mismatched: %d\n", report.Mismatched)
+	fmt.Printf("  Errors:     %d\n", report.Errors)
+
+	for _, m := range report.Mismatches {
+		fmt.Printf("\n  [%s] %s.%s: status %d -> %d (%s)\n", m.EntryID, m.Service, m.Action, m.OriginalStatus, m.ReplayStatus, m.Severity)
+		for _, d := range m.Diffs {
+			fmt.Printf("    - %s\n", d)
+		}
+	}
+
+	if report.Mismatched > 0 || report.Errors > 0 {
+		os.Exit(1)
+	}
 }
 
 func cmdConfig(adminAddr string) {

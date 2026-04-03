@@ -8,6 +8,33 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
+// unauthenticatedActions lists AWS API actions that do not require an
+// Authorization header. These are client-side Cognito operations that
+// are performed by end-users (browsers/mobile apps) without AWS credentials.
+var unauthenticatedActions = map[string]map[string]bool{
+	"cognito-idp": {
+		"SignUp":                     true,
+		"ConfirmSignUp":             true,
+		"InitiateAuth":              true,
+		"RespondToAuthChallenge":    true,
+		"ForgotPassword":            true,
+		"ConfirmForgotPassword":     true,
+		"GetUser":                   true,
+		"ChangePassword":            true,
+		"GlobalSignOut":             true,
+		"RevokeToken":               true,
+	},
+}
+
+// isUnauthenticatedAction returns true if the given service + action
+// combination is a known unauthenticated API call (no Authorization header).
+func isUnauthenticatedAction(svcName, action string) bool {
+	if actions, ok := unauthenticatedActions[svcName]; ok {
+		return actions[action]
+	}
+	return false
+}
+
 // authenticateRequest extracts and validates the caller's identity.
 // When IAM mode is "none" it returns a root identity without checking credentials.
 // Otherwise it looks up the access key from the store; missing keys yield a 403.

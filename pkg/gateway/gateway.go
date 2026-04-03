@@ -219,6 +219,17 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	var identity *service.CallerIdentity
 	if g.rootIdentity != nil {
 		identity = g.rootIdentity
+	} else if isUnauthenticatedAction(svcName, routing.DetectAction(r)) {
+		// Some Cognito operations (SignUp, InitiateAuth, etc.) are client-side
+		// calls that do not carry an Authorization header. Allow them through
+		// with a synthetic root identity.
+		identity = &service.CallerIdentity{
+			AccountID:   g.cfg.AccountID,
+			ARN:         fmt.Sprintf("arn:aws:iam::%s:root", g.cfg.AccountID),
+			UserID:      g.cfg.AccountID,
+			AccessKeyID: "unauthenticated",
+			IsRoot:      true,
+		}
 	} else {
 		var authErr *service.AWSError
 		identity, authErr = g.authenticateRequest(r)

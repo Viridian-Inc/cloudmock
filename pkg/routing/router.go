@@ -105,9 +105,31 @@ func serviceFromAuthorization(auth string) string {
 	return strings.ToLower(parts[3])
 }
 
+// targetToService maps the lowercased X-Amz-Target service prefix to the
+// canonical CloudMock service name. This handles services whose target
+// prefix doesn't match their SigV4 signing name (e.g. Cognito uses
+// "AWSCognitoIdentityProviderService" in X-Amz-Target but "cognito-idp"
+// in the credential scope).
+var targetToService = map[string]string{
+	"dynamodb":                              "dynamodb",
+	"dax":                                   "dynamodb",
+	"amazonsqs":                             "sqs",
+	"amazonses":                             "ses",
+	"amazonsns":                             "sns",
+	"awskms":                                "kms",
+	"amazonkinesis":                         "kinesis",
+	"tagging":                               "tagging",
+	"logs":                                  "logs",
+	"awslambda":                             "lambda",
+	"awscognitoidentityproviderservice":     "cognito-idp",
+	"secretsmanager":                        "secretsmanager",
+}
+
 // serviceFromTarget extracts the service name from an X-Amz-Target value like
 // "DynamoDB_20120810.CreateTable". The service portion is the part before the
 // dot, with any underscore-delimited version suffix stripped, lowercased.
+// If the resulting name appears in targetToService, the mapped canonical
+// name is returned instead.
 func serviceFromTarget(target string) string {
 	// Take the part before the dot.
 	svc := target
@@ -120,5 +142,12 @@ func serviceFromTarget(target string) string {
 		svc = svc[:under]
 	}
 
-	return strings.ToLower(svc)
+	lower := strings.ToLower(svc)
+
+	// Check for a known mapping (e.g. "awscognitoidentityproviderservice" → "cognito-idp").
+	if mapped, ok := targetToService[lower]; ok {
+		return mapped
+	}
+
+	return lower
 }

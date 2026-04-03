@@ -166,7 +166,13 @@ func handleGetBucketPolicy(store *Store, ctx *service.RequestContext) (*service.
 
 	policy, err := store.GetBucketPolicy(bucket)
 	if err != nil {
-		return &service.Response{Format: service.FormatXML}, err
+		// Return proper S3 XML error with BucketName for Terraform/Pulumi compatibility.
+		xml := `<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchBucketPolicy</Code><Message>The bucket policy does not exist</Message><BucketName>` + xmlEscape(bucket) + `</BucketName><RequestId>cloudmock</RequestId><HostId>cloudmock</HostId></Error>`
+		return &service.Response{
+			StatusCode:     http.StatusNotFound,
+			RawBody:        []byte(xml),
+			RawContentType: "application/xml",
+		}, nil
 	}
 
 	return &service.Response{

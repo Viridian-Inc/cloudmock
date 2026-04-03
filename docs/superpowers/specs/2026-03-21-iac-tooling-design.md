@@ -11,7 +11,7 @@ Extend cloudmock with Infrastructure-as-Code provider support (Terraform, Pulumi
 ## Goals
 
 - Code-generated providers from a unified schema registry — add a service once, all providers update
-- Terraform provider covering all 98 services with ~200+ resources + data sources (services like EC2 and S3 have multiple resource types each)
+- Terraform provider covering all 100 services with ~200+ resources + data sources (services like EC2 and S3 have multiple resource types each)
 - Pulumi provider bridging Terraform for TypeScript, Python, Go, C#, Java, YAML
 - Crossplane provider via upjet + AWS provider endpoint configuration
 - Full EC2/VPC networking promoted to Tier 1 with 50+ actions and referential integrity
@@ -26,7 +26,7 @@ Extend cloudmock with Infrastructure-as-Code provider support (Terraform, Pulumi
 ### Code Generation Pipeline
 
 ```
-pkg/schema/registry.go (unified schemas for 98 services)
+pkg/schema/registry.go (unified schemas for 100 services)
         │
         ▼
 codegen/main.go (reads schemas, emits code)
@@ -173,7 +173,7 @@ provider "cloudmock" {
 ### Resource Naming
 `cloudmock_<service>_<resource>` — e.g., `cloudmock_s3_bucket`, `cloudmock_vpc`, `cloudmock_dynamodb_table`
 
-### Generated Per Resource (~200+ total, one per resource type across 98 services)
+### Generated Per Resource (~200+ total, one per resource type across 100 services)
 EC2 alone has 14 resource types (VPC, Subnet, SecurityGroup, etc.). S3 has bucket + bucket_policy + bucket_notification. Most services have 1-3 resource types. Total estimated: ~200 resources.
 - Schema definition (attributes with types, required/computed/optional)
 - CRUD handlers mapping to cloudmock API calls

@@ -171,7 +171,7 @@ services:
 |---------|----------|-------------|
 | `minimal` | iam, sts, s3, dynamodb, sqs, sns, lambda, cloudwatch-logs | ~1s |
 | `standard` | minimal + rds, cloudformation, ec2, ecr, ecs, secretsmanager, ssm, kinesis, firehose, events, stepfunctions, apigateway | ~2s |
-| `full` | All 99 services | ~3s |
+| `full` | All 100 services | ~3s |
 | `custom` | Only services listed in `services:` block | varies |
 
 ## Environment Variables

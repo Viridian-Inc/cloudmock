@@ -1,6 +1,6 @@
 # AWS Service Compatibility
 
-CloudMock supports 99 AWS services across two implementation tiers.
+CloudMock supports 100 AWS services across two implementation tiers.
 
 ## Tier 1: Full Implementation (25 services)
 

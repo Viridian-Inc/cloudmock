@@ -1,6 +1,6 @@
 # cloudmock
 
-Local AWS emulation. 99 services. One command.
+Local AWS emulation. 100 services. One command.
 
 ## Install
 

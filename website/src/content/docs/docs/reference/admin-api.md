@@ -1,6 +1,6 @@
 ---
 title: Admin API
-description: Complete reference for the CloudMock admin API (46+ endpoints)
+description: Complete reference for the CloudMock admin API (119 endpoints)
 ---
 
 The CloudMock admin API runs on port **4599** by default (`CLOUDMOCK_ADMIN_PORT`). All endpoints return JSON unless otherwise noted.

@@ -10,7 +10,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | Feature | CloudMock | LocalStack | Moto | SAM Local |
 |---------|-----------|------------|------|-----------|
 | **AWS API Compatibility** | [Live dashboard](/docs/reference/compatibility/) — per-service pass/fail breakdown | No public dashboard | No public dashboard | No public dashboard |
-| **Service count** | 99 fully emulated services | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
+| **Service count** | 100 fully emulated services | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
 | **Protocol fidelity** | High -- implements actual AWS wire protocols (Query, JSON, REST-JSON, REST-XML) | High -- aims for API compatibility | Medium -- Python mocks, some protocol gaps | Medium -- focused on SAM/CloudFormation |
 | **Implementation language** | Go | Python | Python | Python / Go (Lambda runtime) |
 | **Startup time** | < 1 second | 5-15 seconds | N/A (library) | 3-10 seconds |
@@ -123,7 +123,7 @@ Where Moto is stronger:
 **SAM Local** (`sam local`) is AWS's official tool for running Lambda functions and API Gateway locally.
 
 Where CloudMock is stronger:
-- **Service coverage**: CloudMock emulates 99 services. SAM Local supports Lambda, API Gateway, DynamoDB (via DynamoDB Local), and S3.
+- **Service coverage**: CloudMock emulates 100 services. SAM Local supports Lambda, API Gateway, DynamoDB (via DynamoDB Local), and S3.
 - **Devtools**: CloudMock includes topology maps, tracing, metrics, and chaos engineering. SAM Local has no equivalent.
 - **Startup speed**: CloudMock starts in under 1 second. SAM Local takes 3-10 seconds, longer when building containers.
 - **Protocol coverage**: CloudMock covers all 4 AWS wire protocols. SAM Local focuses on Lambda invocation and API Gateway routing.

@@ -68,7 +68,7 @@ A **Tauri v2** desktop application with a purpose-built **Preact + Vite + TypeSc
 
 On first launch, the app presents a connection picker:
 
-1. **Local Instance** — starts the cloudmock Go binary on the user's machine. Free, no account needed, full 98 services. Auto-starts on next launch.
+1. **Local Instance** — starts the cloudmock Go binary on the user's machine. Free, no account needed, full 100 services. Auto-starts on next launch.
 2. **cloudmock.io** — connects to a hosted instance. Requires API key from the web console. Team sharing, persistent state, CI integration.
 3. **Custom Endpoint** — any cloudmock instance by URL (self-hosted, teammate's machine, etc.).
 

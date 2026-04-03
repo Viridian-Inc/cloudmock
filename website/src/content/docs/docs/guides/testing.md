@@ -732,7 +732,7 @@ The action automatically sets `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECR
 ```yaml
 - uses: viridian-inc/cloudmock-action@v1
   with:
-    profile: full            # minimal (default), standard, or full (all 99 services)
+    profile: full            # minimal (default), standard, or full (all 100 services)
     state: fixtures/state.json  # pre-load a state snapshot
     iam-mode: enforce        # none (default), log, or enforce
 ```

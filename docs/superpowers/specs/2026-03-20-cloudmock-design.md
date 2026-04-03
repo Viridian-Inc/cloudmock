@@ -6,13 +6,13 @@
 
 ## Overview
 
-cloudmock is a standalone, open-source local AWS emulator that provides API-compatible emulation of 99 AWS services. It runs as a Docker-based microservice mesh where each AWS service is an isolated container behind a unified gateway. 24 core services receive full functional emulation; the remaining ~74 get auto-generated CRUD-capable stubs that can be deepened over time.
+cloudmock is a standalone, open-source local AWS emulator that provides API-compatible emulation of 100 AWS services. It runs as a Docker-based microservice mesh where each AWS service is an isolated container behind a unified gateway. 24 core services receive full functional emulation; the remaining ~74 get auto-generated CRUD-capable stubs that can be deepened over time.
 
 cloudmock is designed to be a complete LocalStack replacement for any AWS user — not tied to any specific project or stack.
 
 ## Goals
 
-- Full API compatibility with AWS SDKs and CLI across 99 services
+- Full API compatibility with AWS SDKs and CLI across 100 services
 - Real functional emulation for 24 core services (storage, compute, messaging, auth, infrastructure)
 - API-compatible stubs for ~74 additional services with realistic responses and CRUD lifecycle
 - IAM policy evaluation enforced by default (with configurable modes: enforce, authenticate, none)

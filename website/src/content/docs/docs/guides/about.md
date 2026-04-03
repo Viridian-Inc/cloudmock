@@ -5,16 +5,16 @@ description: How CloudMock works — architecture, performance modes, and the fu
 
 ## What is CloudMock?
 
-CloudMock is a local AWS emulator that runs 99 fully implemented AWS services in a single binary. Point any AWS SDK at `localhost:4566` and your code works as if it's talking to real AWS — but everything runs on your laptop, costs nothing, and starts in under a second.
+CloudMock is a local AWS emulator that runs 100 fully implemented AWS services in a single binary. Point any AWS SDK at `localhost:4566` and your code works as if it's talking to real AWS — but everything runs on your laptop, costs nothing, and starts in under a second.
 
 ## Why CloudMock?
 
-**LocalStack** charges for Pro features (chaos testing, CI, Cloud Pods) and uses 583MB of RAM. **Moto** only works in-process for Python and has no DevTools. CloudMock gives you everything — 99 services, chaos engineering, state snapshots, traffic replay, distributed tracing, IaC support, and 10 language SDKs — in one free binary that uses 67MB.
+**LocalStack** charges for Pro features (chaos testing, CI, Cloud Pods) and uses 583MB of RAM. **Moto** only works in-process for Python and has no DevTools. CloudMock gives you everything — 100 services, chaos engineering, state snapshots, traffic replay, distributed tracing, IaC support, and 10 language SDKs — in one free binary that uses 67MB.
 
 ## How it works
 
 ```
-Your Code → AWS SDK → localhost:4566 → CloudMock Gateway → 99 AWS Services
+Your Code → AWS SDK → localhost:4566 → CloudMock Gateway → 100 AWS Services
                                             ↓
                                        DevTools (localhost:4500)
                                        ├── Topology map
@@ -36,7 +36,7 @@ Every request flows through the gateway, which routes to the correct service bas
 
 CloudMock isn't just a mock — it's a complete local AWS development platform:
 
-- **99 AWS services** with proper error codes, pagination, and state machines
+- **100 AWS services** with proper error codes, pagination, and state machines
 - **10 language SDKs** (Go, Python, Node, Java, Kotlin, Rust, C/C++, Ruby, C#, Swift)
 - **IaC support** (Terraform, CDK, Pulumi — use your existing files)
 - **State snapshots** — export to JSON, commit to git, restore on startup

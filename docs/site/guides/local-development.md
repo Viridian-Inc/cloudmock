@@ -108,7 +108,7 @@ cmk start --profile minimal
 # Includes EC2, ECS, RDS, and other common services
 cmk start --profile standard
 
-# Everything -- all 99 services
+# Everything -- all 100 services
 cmk start --profile full
 ```
 

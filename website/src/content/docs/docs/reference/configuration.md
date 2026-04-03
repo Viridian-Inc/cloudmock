@@ -95,7 +95,7 @@ kinesis, firehose, events, stepfunctions, apigateway
 
 ### full
 
-Starts all 99 fully emulated AWS services. Use this when your application depends on less common services, or when you want full coverage without listing services individually.
+Starts all 100 fully emulated AWS services. Use this when your application depends on less common services, or when you want full coverage without listing services individually.
 
 ### custom
 

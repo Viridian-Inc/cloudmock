@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a comprehensive benchmark harness that compares CloudMock and LocalStack across all 98 AWS services, measuring performance (latency, startup, resource usage), correctness (response fidelity), and feature coverage. Results serve three purposes:
+Build a comprehensive benchmark harness that compares CloudMock and LocalStack across all 100 AWS services, measuring performance (latency, startup, resource usage), correctness (response fidelity), and feature coverage. Results serve three purposes:
 
 1. **Marketing** — publishable competitive data for website/README
 2. **QA** — validate CloudMock meets its own SLO targets

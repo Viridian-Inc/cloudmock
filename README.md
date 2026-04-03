@@ -6,7 +6,7 @@
 
 **Local AWS emulation with built-in observability.**
 
-99 AWS services + distributed tracing + error tracking + alerting — in one binary. Language-agnostic via OpenTelemetry.
+100 AWS services + distributed tracing + error tracking + alerting — in one binary. Language-agnostic via OpenTelemetry.
 
 ![CloudMock DevTools — Topology View](docs/devtools-topology.jpg)
 
@@ -32,7 +32,7 @@ Open DevTools at [http://localhost:4500](http://localhost:4500)
 
 ## Why CloudMock?
 
-- **99 AWS services** emulated locally — no AWS account needed
+- **100 AWS services** emulated locally — no AWS account needed
 - **Full observability** — traces, metrics, logs, and errors in one dashboard
 - **Language-agnostic** — works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
 - **Built-in DevTools** — topology maps, request tracing, chaos engineering
@@ -78,7 +78,7 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 
 ## Services
 
-99 AWS services including S3, DynamoDB, SQS, SNS, Lambda, API Gateway, Cognito, EC2, ECS, EKS, EventBridge, IAM, KMS, RDS, Route 53, Step Functions, and many more.
+100 AWS services including S3, DynamoDB, SQS, SNS, Lambda, API Gateway, Cognito, EC2, ECS, EKS, EventBridge, IAM, KMS, RDS, Route 53, Step Functions, and many more.
 
 See the full list at [cloudmock.app/docs/services](https://cloudmock.app/docs/).
 

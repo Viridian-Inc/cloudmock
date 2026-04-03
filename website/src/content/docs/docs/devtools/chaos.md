@@ -7,13 +7,15 @@ The Chaos view lets you inject faults into any AWS service emulated by CloudMock
 
 ## Fault types
 
-CloudMock supports three types of fault injection:
+CloudMock supports five types of fault injection:
 
 | Type | Effect | Value |
 |------|--------|-------|
 | **Latency** | Adds artificial delay before responding | Milliseconds to add (e.g., 2000 for 2 seconds) |
 | **Error** | Returns an HTTP error status code instead of the real response | HTTP status code (e.g., 503 for Service Unavailable) |
-| **Throttle** | Randomly fails a percentage of requests with a throttling error | Percentage of requests to fail (e.g., 50 for 50%) |
+| **Throttle** | Returns HTTP 429 with a `ThrottlingException` body | Percentage of requests to throttle (e.g., 50 for 50%) |
+| **Timeout** | Holds the connection for 30 seconds then returns 504 | — |
+| **Blackhole** | Closes the connection without sending any response | — |
 
 ## Creating rules
 
@@ -109,6 +111,81 @@ curl -X PUT http://localhost:4599/api/chaos/RULE_ID \
 
 ```bash
 curl -X DELETE http://localhost:4599/api/chaos/RULE_ID
+```
+
+## Config file support
+
+You can define chaos rules in `cloudmock.yaml` so they are active at startup. Config-file rules are always enabled and supplement rules managed through the UI or API.
+
+```yaml
+chaos:
+  rules:
+    - service: dynamodb
+      action: "*"
+      type: latency
+      latency_ms: 200
+      percentage: 100
+
+    - service: s3
+      action: GetObject
+      type: error
+      error_code: 503
+      error_msg: "Injected read failure"
+      percentage: 25
+
+    - service: sqs
+      action: "*"
+      type: throttle
+      percentage: 10
+```
+
+| Field | Description |
+|-------|-------------|
+| `service` | Target service (`"s3"`, `"dynamodb"`, `"*"` for all) |
+| `action` | Target API action or `"*"` for all |
+| `type` | `error`, `latency`, `timeout`, `blackhole`, or `throttle` |
+| `error_code` | HTTP status code for `error` faults |
+| `error_msg` | Error message body |
+| `latency_ms` | Milliseconds of added latency |
+| `percentage` | 0–100 probability the fault fires per request |
+
+## SDK helpers
+
+### Go (in-process)
+
+```go
+cm := sdk.New()
+defer cm.Close()
+
+// Inject a throttle on DynamoDB.
+cm.InjectFault("dynamodb", "*", "throttle")
+
+// Inject a 503 on 50% of S3 GetObject calls.
+cm.InjectFault("s3", "GetObject", "error",
+    sdk.WithStatusCode(503),
+    sdk.WithPercentage(50),
+)
+
+// Remove all active faults.
+cm.ClearFaults()
+```
+
+See the [Chaos Testing guide](/docs/guides/chaos-testing) for full examples covering retries, circuit breakers, and timeout handling.
+
+### Python
+
+```python
+with CloudMock() as cm:
+    cm.inject_fault("dynamodb", "*", "throttle", percentage=100)
+    cm.clear_faults()
+```
+
+### Node.js
+
+```javascript
+const cm = await mockAWS();
+await cm.injectFault("s3", "*", "error", { statusCode: 503 });
+await cm.clearFaults();
 ```
 
 ## Admin API endpoints

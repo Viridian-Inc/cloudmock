@@ -553,6 +553,10 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 
 // detectServiceFromRequest extracts the service name without importing routing to avoid a cycle.
 func detectServiceFromRequest(r *http.Request) string {
+	// Fast path: in-process SDK sets this header during transport to avoid SigV4 parsing.
+	if svc := r.Header.Get("X-Cloudmock-Service"); svc != "" {
+		return svc
+	}
 	// Use the same logic as routing.DetectService but inline to avoid circular imports.
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if svc := serviceFromAuth(auth); svc != "" {

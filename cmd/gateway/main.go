@@ -1025,6 +1025,20 @@ func main() {
 		}
 	}
 
+	// Load chaos rules from config file (these supplement any file-persisted rules).
+	for _, r := range cfg.Chaos.Rules {
+		chaosEngine.AddRule(gateway.ChaosRule{
+			Service:    r.Service,
+			Action:     r.Action,
+			Enabled:    true,
+			Type:       r.Type,
+			ErrorCode:  r.ErrorCode,
+			ErrorMsg:   r.ErrorMsg,
+			LatencyMs:  r.LatencyMs,
+			Percentage: r.Percentage,
+		})
+	}
+
 	// Admin API (with CORS for dashboard cross-origin access)
 	adminAPI := admin.NewWithDataPlane(cfg, registry, dp)
 	// Persistence for dashboards, saved views, and deploy events.

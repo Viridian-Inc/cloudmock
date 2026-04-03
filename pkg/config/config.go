@@ -199,6 +199,22 @@ func DefaultPricingConfig() PricingConfig {
 	}
 }
 
+// ChaosRule defines a fault injection rule loaded from the config file.
+type ChaosRule struct {
+	Service    string `yaml:"service"`
+	Action     string `yaml:"action"`
+	Type       string `yaml:"type"`
+	ErrorCode  int    `yaml:"error_code"`
+	ErrorMsg   string `yaml:"error_msg"`
+	LatencyMs  int    `yaml:"latency_ms"`
+	Percentage int    `yaml:"percentage"`
+}
+
+// ChaosConfig holds chaos/fault injection configuration.
+type ChaosConfig struct {
+	Rules []ChaosRule `yaml:"rules"`
+}
+
 // RateLimitConfig holds rate limiting configuration.
 type RateLimitConfig struct {
 	Enabled           bool    `yaml:"enabled" json:"enabled"`
@@ -286,6 +302,7 @@ type Config struct {
 	RateLimit   RateLimitConfig          `yaml:"rate_limit" json:"rate_limit"`
 	RUM         RUMConfig                `yaml:"rum" json:"rum"`
 	OTLP        OTLPConfig               `yaml:"otlp" json:"otlp"`
+	Chaos          ChaosConfig              `yaml:"chaos" json:"chaos"`
 	IaCDir         string                   `yaml:"iac_dir" json:"iac_dir"` // Path to Pulumi/Terraform project
 	IaCEnv         string                   `yaml:"iac_env" json:"iac_env"` // Environment name (dev/stage/prod)
 	SaaS           SaaSConfig               `yaml:"saas"`

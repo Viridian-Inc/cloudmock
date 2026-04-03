@@ -623,6 +623,65 @@ func TestInProcess_StateSnapshot(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// Chaos injection tests
+// ---------------------------------------------------------------------------
+
+func TestChaos_InjectError(t *testing.T) {
+	cm := New()
+	defer cm.Close()
+
+	// Inject a 503 error on all S3 actions.
+	err := cm.InjectFault("s3", "*", "error", WithStatusCode(503), WithMessage("injected service unavailable"))
+	require.NoError(t, err)
+
+	client := newS3Client(cm)
+
+	// Create a bucket first (pre-fault for comparison).
+	// Now that the fault is active, any S3 call should return 503.
+	_, callErr := client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	require.Error(t, callErr, "expected S3 call to fail with injected 503 fault")
+}
+
+func TestChaos_InjectThrottle(t *testing.T) {
+	cm := New()
+	defer cm.Close()
+
+	// Inject a throttle fault on DynamoDB.
+	err := cm.InjectFault("dynamodb", "*", "throttle", WithMessage("too many requests"))
+	require.NoError(t, err)
+
+	client := dynamodb.NewFromConfig(cm.Config())
+
+	// Any DynamoDB call should return 429 ThrottlingException.
+	_, callErr := client.ListTables(ctx, &dynamodb.ListTablesInput{})
+	require.Error(t, callErr, "expected DynamoDB call to fail with throttle fault")
+	assert.Contains(t, callErr.Error(), "429", "expected 429 status in error")
+}
+
+func TestChaos_ClearFaults(t *testing.T) {
+	cm := New()
+	defer cm.Close()
+
+	// Inject an S3 fault.
+	err := cm.InjectFault("s3", "*", "error", WithStatusCode(503))
+	require.NoError(t, err)
+
+	client := newS3Client(cm)
+
+	// Verify the fault is active.
+	_, callErr := client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	require.Error(t, callErr, "fault should be active before clearing")
+
+	// Clear all faults.
+	err = cm.ClearFaults()
+	require.NoError(t, err)
+
+	// Now S3 calls should succeed.
+	_, callErr = client.ListBuckets(ctx, &s3.ListBucketsInput{})
+	require.NoError(t, callErr, "S3 should work normally after clearing faults")
+}
+
+// ---------------------------------------------------------------------------
 // Benchmarks
 // ---------------------------------------------------------------------------
 

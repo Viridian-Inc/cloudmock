@@ -2,11 +2,15 @@ package sdk
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 // serviceFromTarget extracts the service name from the X-Amz-Target header.
@@ -166,6 +170,13 @@ func (t *inProcessTransport) RoundTrip(req *http.Request) (*http.Response, error
 		}
 	}
 
+	// Propagate W3C traceparent from Go context if present (set by OTel SDK).
+	if req.Header.Get("traceparent") == "" {
+		if tp := extractTraceparentFromContext(req.Context()); tp != "" {
+			req.Header.Set("traceparent", tp)
+		}
+	}
+
 	// Get a pooled recorder and reset it for reuse.
 	rec := t.recorderPool.Get().(*httptest.ResponseRecorder)
 	rec.Body.Reset()
@@ -239,3 +250,13 @@ type nopReadCloser struct {
 }
 
 func (nopReadCloser) Close() error { return nil }
+
+// extractTraceparentFromContext checks for an OTel span in the context and
+// returns a W3C traceparent string if one is active, or empty string otherwise.
+func extractTraceparentFromContext(ctx context.Context) string {
+	// Use the OTel propagation API to extract trace context.
+	// This avoids a direct dependency on the OTel trace package internals.
+	carrier := make(propagation.HeaderCarrier)
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+	return carrier.Get("traceparent")
+}

@@ -234,12 +234,12 @@ func flattenSpans(t *TraceContext, traceStart time.Time, depth int, out *[]Timel
 	}
 }
 
-// GenerateTraceID returns a new unique trace ID.
+// GenerateTraceID returns a new unique W3C-compatible trace ID (32 hex chars).
 func GenerateTraceID() string {
-	return traceid.New()
+	return traceid.GenerateW3CTraceID()
 }
 
-// GenerateSpanID returns a new unique span ID.
+// GenerateSpanID returns a new unique W3C-compatible span ID (16 hex chars).
 func GenerateSpanID() string {
-	return traceid.New()
+	return traceid.GenerateW3CSpanID()
 }

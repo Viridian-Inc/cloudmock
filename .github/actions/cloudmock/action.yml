@@ -53,17 +53,10 @@ runs:
     - id: start
       shell: bash
       run: |
-        ARGS="--port ${{ inputs.port }}"
-        if [ -n "${{ inputs.services }}" ]; then
-          ARGS="$ARGS --services ${{ inputs.services }}"
-        fi
-        if [ -n "${{ inputs.state }}" ]; then
-          ARGS="$ARGS --state ${{ inputs.state }}"
-        fi
-
         CLOUDMOCK_PROFILE=${{ inputs.profile }} \
         CLOUDMOCK_IAM_MODE=${{ inputs.iam-mode }} \
-        nohup cloudmock $ARGS > /tmp/cloudmock.log 2>&1 &
+        CLOUDMOCK_PORT=${{ inputs.port }} \
+        nohup cloudmock > /tmp/cloudmock.log 2>&1 &
         echo $! > /tmp/cloudmock.pid
 
         # Health check with 30s timeout

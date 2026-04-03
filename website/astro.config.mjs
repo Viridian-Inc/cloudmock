@@ -9,6 +9,7 @@ export default defineConfig({
       logo: {
         src: "./public/favicon.svg",
         alt: "CloudMock",
+        replacesTitle: false,
       },
       description: "Local AWS emulation for developers",
       social: [

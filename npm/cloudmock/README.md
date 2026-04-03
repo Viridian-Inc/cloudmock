@@ -87,6 +87,21 @@ cloudmock-pulumi destroy
 
 Works with the official `@pulumi/aws` provider. Also ships a native CloudMock Pulumi provider with 44 resource types.
 
+## Multi-Account Support
+
+Simulate multiple AWS accounts with per-account resource isolation and cross-account STS AssumeRole:
+
+```yaml
+# cloudmock.yml
+accounts:
+  - id: "222222222222"
+    name: "Development"
+  - id: "333333333333"
+    name: "Production"
+```
+
+Each account gets isolated service instances. Cross-account `sts:AssumeRole` returns credentials bound to the target account. Organizations `CreateAccount` automatically provisions new isolated accounts.
+
 ## Traffic Recording & Replay
 
 Record real AWS traffic and replay it against CloudMock to prove your mock matches production.

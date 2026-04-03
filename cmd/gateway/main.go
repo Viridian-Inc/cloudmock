@@ -20,6 +20,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/neureaux/cloudmock/pkg/account"
 	"github.com/neureaux/cloudmock/pkg/admin"
 	"github.com/neureaux/cloudmock/pkg/auth"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -401,7 +402,8 @@ func main() {
 	// --- Always-eager: S3 with event bus support ---
 	registry.Register(s3svc.NewWithBus(bus))
 
-	registry.Register(stssvc.New(cfg.AccountID))
+	stsService := stssvc.New(cfg.AccountID)
+	registry.Register(stsService)
 
 	// IAM service — always eager, shares engine and store with the gateway auth layer.
 	registry.Register(iamsvc.New(cfg.AccountID, engine, store))
@@ -707,7 +709,17 @@ func main() {
 	_ = registerOrDefer("acm-pca", func() service.Service { return acmpcasvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("cloudtrail", func() service.Service { return cloudtrailsvc.NewWithBus(cfg.AccountID, cfg.Region, bus) })
 	_ = registerOrDefer("config", func() service.Service { return configsvc.NewWithBus(cfg.AccountID, cfg.Region, bus) })
-	_ = registerOrDefer("organizations", func() service.Service { return organizationssvc.New(cfg.AccountID, cfg.Region) })
+	var orgsService *organizationssvc.OrganizationsService
+	if eagerAll || minimalSet["organizations"] {
+		orgsService = organizationssvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(orgsService)
+	} else {
+		registry.RegisterLazy("organizations", func() service.Service {
+			svc := organizationssvc.New(cfg.AccountID, cfg.Region)
+			orgsService = svc
+			return svc
+		})
+	}
 	_ = registerOrDefer("wafv2", func() service.Service { return wafv2svc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("waf-regional", func() service.Service { return wafregionalsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("shield", func() service.Service { return shieldsvc.New(cfg.AccountID, cfg.Region) })
@@ -1721,6 +1733,22 @@ func main() {
 	gw := gateway.NewWithIAM(cfg, registry, store, engine)
 	gw.SetEventBus(bus)
 	gw.SetPluginManager(pluginMgr)
+
+	// Multi-account support: provision accounts from config and wire STS/Organizations.
+	if len(cfg.Accounts) > 0 {
+		acctRegistry := account.NewRegistry(cfg.AccountID, cfg.Region)
+		for _, acctCfg := range cfg.Accounts {
+			if _, err := acctRegistry.CreateAccount(acctCfg.ID, acctCfg.Name); err != nil {
+				slog.Warn("failed to provision account from config", "id", acctCfg.ID, "error", err)
+			}
+		}
+		gw.SetAccountRegistry(acctRegistry)
+		stsService.SetCredentialMapper(acctRegistry)
+		if orgsService != nil {
+			orgsService.SetProvisioner(acctRegistry)
+		}
+		slog.Info("multi-account support enabled", "accounts", len(cfg.Accounts)+1)
+	}
 	var handler http.Handler = gw
 	// Wrap with chaos middleware for fault injection
 	handler = gateway.ChaosMiddleware(handler, chaosEngine)

@@ -9,12 +9,19 @@ import (
 
 // STSService is the cloudmock implementation of the AWS Security Token Service API.
 type STSService struct {
-	accountID string
+	accountID  string
+	credMapper CredentialMapper
 }
 
 // New returns a new STSService for the given AWS account ID.
 func New(accountID string) *STSService {
 	return &STSService{accountID: accountID}
+}
+
+// SetCredentialMapper attaches a CredentialMapper for cross-account credential tracking.
+// When set, AssumeRole will register temporary credentials against the target account.
+func (s *STSService) SetCredentialMapper(cm CredentialMapper) {
+	s.credMapper = cm
 }
 
 // Name returns the AWS service name used for routing.
@@ -49,7 +56,7 @@ func (s *STSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 	case "GetCallerIdentity":
 		return handleGetCallerIdentity(ctx)
 	case "AssumeRole":
-		return handleAssumeRole(ctx, s.accountID)
+		return handleAssumeRole(ctx, s.accountID, s.credMapper)
 	case "GetSessionToken":
 		return handleGetSessionToken(ctx)
 	default:

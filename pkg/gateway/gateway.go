@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/neureaux/cloudmock/pkg/account"
 	"github.com/neureaux/cloudmock/pkg/config"
 	"github.com/neureaux/cloudmock/pkg/eventbus"
 	iampkg "github.com/neureaux/cloudmock/pkg/iam"
@@ -24,6 +25,7 @@ type Gateway struct {
 	engine       *iampkg.Engine
 	bus          *eventbus.Bus
 	rootIdentity *service.CallerIdentity // pre-built for IAM-mode "none"
+	accounts     *account.Registry       // optional; enables multi-account isolation
 }
 
 // New creates a Gateway with routes pre-registered.
@@ -71,6 +73,14 @@ func (g *Gateway) SetEventBus(bus *eventbus.Bus) {
 // falling back to the legacy service registry.
 func (g *Gateway) SetPluginManager(pm *plugin.Manager) {
 	g.plugins = pm
+}
+
+// SetAccountRegistry attaches an account registry for multi-account support.
+// When set, the gateway resolves the target account from credentials and
+// dispatches requests to per-account service instances. When not set,
+// the gateway uses the single shared routing.Registry (backward compatible).
+func (g *Gateway) SetAccountRegistry(ar *account.Registry) {
+	g.accounts = ar
 }
 
 // ServeHTTP implements http.Handler.
@@ -196,19 +206,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 3. Fall back to legacy registry.
-	svc, err := g.registry.Lookup(svcName)
-	if err != nil {
-		awsErr := service.NewAWSError(
-			"ServiceUnavailable",
-			fmt.Sprintf("Service %q is not registered in this cloudmock instance.", svcName),
-			http.StatusServiceUnavailable,
-		)
-		_ = service.WriteErrorResponse(w, awsErr, service.FormatXML)
-		return
-	}
-
-	// 4. Read request body.
+	// 3. Read request body (needed before service lookup for account resolution).
 	body, err := service.ParseRequestBody(r)
 	if err != nil {
 		awsErr := service.NewAWSError("InvalidRequest", "Failed to read request body.", http.StatusBadRequest)
@@ -216,7 +214,55 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 5. Build RequestContext.
+	// 4. Authenticate request.
+	// Hot path for IAM-mode "none": use pre-built root identity, skip all header parsing.
+	var identity *service.CallerIdentity
+	if g.rootIdentity != nil {
+		identity = g.rootIdentity
+	} else {
+		var authErr *service.AWSError
+		identity, authErr = g.authenticateRequest(r)
+		if authErr != nil {
+			_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
+			return
+		}
+	}
+
+	// 5. Resolve the target account and service instance.
+	// When an AccountRegistry is configured, resolve the account from
+	// credentials and use per-account service instances. Otherwise fall
+	// back to the shared routing.Registry for backward compatibility.
+	resolvedAccountID := g.cfg.AccountID
+	var svc service.Service
+
+	if g.accounts != nil {
+		// Try credential-based account resolution for STS temporary credentials.
+		if identity != nil && identity.AccessKeyID != "" {
+			if acctID, ok := g.accounts.ResolveCredential(identity.AccessKeyID); ok {
+				resolvedAccountID = acctID
+			}
+		}
+		if acctSvc, ok := g.accounts.GetService(resolvedAccountID, svcName); ok {
+			svc = acctSvc
+		}
+	}
+
+	// Fall back to legacy registry if account registry didn't resolve.
+	if svc == nil {
+		var lookupErr error
+		svc, lookupErr = g.registry.Lookup(svcName)
+		if lookupErr != nil {
+			awsErr := service.NewAWSError(
+				"ServiceUnavailable",
+				fmt.Sprintf("Service %q is not registered in this cloudmock instance.", svcName),
+				http.StatusServiceUnavailable,
+			)
+			_ = service.WriteErrorResponse(w, awsErr, service.FormatXML)
+			return
+		}
+	}
+
+	// 6. Build RequestContext.
 	action := routing.DetectAction(r)
 
 	// Only allocate the params map when there are query parameters to parse.
@@ -237,25 +283,11 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	ctx := &service.RequestContext{
 		Action:     action,
 		Region:     g.cfg.Region,
-		AccountID:  g.cfg.AccountID,
+		AccountID:  resolvedAccountID,
 		RawRequest: r,
 		Body:       body,
 		Params:     params,
 		Service:    svcName,
-	}
-
-	// 6. Authenticate request.
-	// Hot path for IAM-mode "none": use pre-built root identity, skip all header parsing.
-	var identity *service.CallerIdentity
-	if g.rootIdentity != nil {
-		identity = g.rootIdentity
-	} else {
-		var authErr *service.AWSError
-		identity, authErr = g.authenticateRequest(r)
-		if authErr != nil {
-			_ = service.WriteErrorResponse(w, authErr, service.FormatJSON)
-			return
-		}
 	}
 	ctx.Identity = identity
 
@@ -292,7 +324,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 			Detail:    detail,
 			Time:      time.Now().UTC(),
 			Region:    g.cfg.Region,
-			AccountID: g.cfg.AccountID,
+			AccountID: resolvedAccountID,
 		})
 	}
 

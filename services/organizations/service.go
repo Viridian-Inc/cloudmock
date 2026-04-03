@@ -61,6 +61,11 @@ func (s *OrganizationsService) Actions() []service.Action {
 	}
 }
 
+// SetProvisioner attaches an AccountProvisioner for multi-account integration.
+func (s *OrganizationsService) SetProvisioner(p AccountProvisioner) {
+	s.store.SetProvisioner(p)
+}
+
 // HealthCheck always returns nil.
 func (s *OrganizationsService) HealthCheck() error { return nil }
 

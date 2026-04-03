@@ -3,6 +3,7 @@ package sts
 import (
 	"encoding/xml"
 	"net/http"
+	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/service"
 )
@@ -90,7 +91,7 @@ func handleGetCallerIdentity(ctx *service.RequestContext) (*service.Response, er
 	}, nil
 }
 
-func handleAssumeRole(ctx *service.RequestContext, accountID string) (*service.Response, error) {
+func handleAssumeRole(ctx *service.RequestContext, accountID string, credMapper CredentialMapper) (*service.Response, error) {
 	formVals, err := parseFormBody(ctx.Body)
 	if err != nil {
 		return &service.Response{Format: service.FormatXML},
@@ -109,7 +110,20 @@ func handleAssumeRole(ctx *service.RequestContext, accountID string) (*service.R
 			service.ErrValidation("RoleSessionName is required.")
 	}
 
+	// Parse target account ID from the role ARN.
+	// ARN format: arn:aws:iam::{accountID}:role/{roleName}
+	targetAccountID := accountID
+	if parts := strings.Split(roleArn, ":"); len(parts) >= 5 && parts[4] != "" {
+		targetAccountID = parts[4]
+	}
+
 	creds := generateCredentials()
+
+	// If a credential mapper is available and this is a cross-account assume,
+	// register the temporary credential against the target account.
+	if credMapper != nil && targetAccountID != "" {
+		credMapper.MapCredential(creds.AccessKeyID, targetAccountID)
+	}
 
 	assumedRoleID := "AROA" + randomHex(16) + ":" + sessionName
 	assumedRoleArn := roleArn + "/" + sessionName

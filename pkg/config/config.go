@@ -280,6 +280,12 @@ type OTLPConfig struct {
 	Port    int  `yaml:"port" json:"port"`
 }
 
+// AccountConfig defines a pre-provisioned AWS account for multi-account support.
+type AccountConfig struct {
+	ID   string `yaml:"id"`
+	Name string `yaml:"name"`
+}
+
 // Config is the top-level configuration for cloudmock.
 type Config struct {
 	Region      string                   `yaml:"region"`
@@ -309,6 +315,7 @@ type Config struct {
 	Notifications  NotificationsConfig      `yaml:"notifications" json:"notifications"`
 	SCM            SCMConfig                `yaml:"scm" json:"scm"`
 	Services       map[string]ServiceConfig `yaml:"services"`
+	Accounts       []AccountConfig          `yaml:"accounts"`
 }
 
 // SCMConfig holds source code management integration configuration.

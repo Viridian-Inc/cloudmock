@@ -1,0 +1,38 @@
+services:
+  cloudmock:
+    image: ghcr.io/viridian-inc/cloudmock:latest
+    ports:
+      - "4566:4566"
+      - "4500:4500"
+      - "4599:4599"
+    environment:
+      CLOUDMOCK_PROFILE: full
+      CLOUDMOCK_IAM_MODE: none
+
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    depends_on:
+      - cloudmock
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  grafana-data:

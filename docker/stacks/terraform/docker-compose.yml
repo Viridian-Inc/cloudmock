@@ -1,0 +1,9 @@
+services:
+  cloudmock:
+    image: ghcr.io/viridian-inc/cloudmock:latest
+    ports:
+      - "4566:4566"
+      - "4500:4500"
+    environment:
+      CLOUDMOCK_PROFILE: full
+      CLOUDMOCK_IAM_MODE: none

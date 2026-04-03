@@ -1,0 +1,55 @@
+services:
+  cloudmock:
+    image: ghcr.io/viridian-inc/cloudmock:latest
+    ports:
+      - "4566:4566"
+      - "4500:4500"
+    environment:
+      CLOUDMOCK_PROFILE: full
+      CLOUDMOCK_IAM_MODE: none
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:4566/"]
+      interval: 5s
+      retries: 10
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: appdb
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d appdb"]
+      interval: 5s
+      retries: 10
+
+  setup:
+    image: amazon/aws-cli
+    environment:
+      AWS_ENDPOINT_URL: http://cloudmock:4566
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: >
+      /bin/sh -c "
+        aws s3 mb s3://user-files &&
+        aws sqs create-queue --queue-name jobs
+      "
+    depends_on:
+      cloudmock:
+        condition: service_healthy
+
+  api:
+    build: ./api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://app:secret@postgres:5432/appdb
+      AWS_ENDPOINT_URL: http://cloudmock:4566
+    depends_on:
+      postgres:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully

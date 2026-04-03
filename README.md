@@ -1,6 +1,6 @@
 # CloudMock
 
-![AWS Compatibility](https://img.shields.io/badge/AWS_Compatibility-30%25-orange)
+![AWS Compatibility](https://img.shields.io/badge/AWS_Compatibility-100%25-brightgreen)
 
 **Local AWS emulation with built-in observability.**
 

@@ -1,6 +1,7 @@
 package traffic
 
 import (
+	"fmt"
 	"testing"
 )
 
@@ -208,6 +209,132 @@ func TestCompareRecordings_DifferentLengths(t *testing.T) {
 	}
 	if report.Errors != 2 {
 		t.Errorf("expected 2 errors for missing entries, got %d", report.Errors)
+	}
+}
+
+func TestCompareJSON_EmptyObjects(t *testing.T) {
+	diffs := CompareJSON([]byte(`{}`), []byte(`{}`), nil)
+	if len(diffs) != 0 {
+		t.Errorf("expected no diffs for two empty objects, got %v", diffs)
+	}
+}
+
+func TestCompareJSON_DeepNested(t *testing.T) {
+	a := []byte(`{"level1":{"level2":{"level3":{"value":"original"}}}}`)
+	b := []byte(`{"level1":{"level2":{"level3":{"value":"changed"}}}}`)
+
+	diffs := CompareJSON(a, b, nil)
+	if len(diffs) == 0 {
+		t.Fatal("expected diffs for deep nested difference")
+	}
+	found := false
+	for _, d := range diffs {
+		if contains(d, "level1.level2.level3.value") || contains(d, "value") {
+			found = true
+		}
+	}
+	if !found {
+		t.Errorf("expected diff mentioning nested path, got %v", diffs)
+	}
+}
+
+func TestCompareJSON_NullValues(t *testing.T) {
+	// null value vs missing key — these should differ.
+	a := []byte(`{"key":null}`)
+	b := []byte(`{}`)
+
+	diffs := CompareJSON(a, b, nil)
+	if len(diffs) == 0 {
+		t.Fatal("expected diffs: null value vs missing key")
+	}
+}
+
+func TestCompareJSON_NumberTypes(t *testing.T) {
+	// JSON numbers: Go's json.Unmarshal decodes all numbers as float64,
+	// so 1 and 1.0 should decode identically.
+	a := []byte(`{"count":1}`)
+	b := []byte(`{"count":1.0}`)
+
+	diffs := CompareJSON(a, b, nil)
+	if len(diffs) != 0 {
+		t.Errorf("expected no diffs for int 1 vs float 1.0, got %v", diffs)
+	}
+}
+
+func TestCompareRecordings_EmptyRecordings(t *testing.T) {
+	original := &Recording{Entries: []CapturedEntry{}}
+	replay := &Recording{Entries: []CapturedEntry{}}
+
+	report := CompareRecordings(original, replay, ComparisonConfig{})
+	if report.TotalRequests != 0 {
+		t.Errorf("expected 0 total requests, got %d", report.TotalRequests)
+	}
+	if report.CompatibilityPct != 0 {
+		// With 0 total requests the pct is undefined; the implementation returns 0.
+		// Accept 0 or 100 as valid sentinel values.
+		if report.CompatibilityPct != 100 {
+			t.Errorf("unexpected compatibility pct for empty recordings: %f", report.CompatibilityPct)
+		}
+	}
+	if len(report.Mismatches) != 0 {
+		t.Errorf("expected no mismatches for empty recordings, got %v", report.Mismatches)
+	}
+}
+
+func TestCompareRecordings_IgnoreRequestId(t *testing.T) {
+	original := &Recording{
+		Entries: []CapturedEntry{
+			{ID: "1", Service: "s3", Action: "GetObject", StatusCode: 200, ResponseBody: `{"RequestId":"aaa-111","Data":"hello"}`},
+		},
+	}
+	replay := &Recording{
+		Entries: []CapturedEntry{
+			{ID: "1", Service: "s3", Action: "GetObject", StatusCode: 200, ResponseBody: `{"RequestId":"bbb-222","Data":"hello"}`},
+		},
+	}
+
+	cfg := ComparisonConfig{
+		StrictMode:  true,
+		IgnorePaths: []string{"RequestId"},
+	}
+	report := CompareRecordings(original, replay, cfg)
+	if report.Mismatched != 0 {
+		t.Errorf("expected 0 mismatches after ignoring RequestId, got %d: %v", report.Mismatched, report.Mismatches)
+	}
+	if report.Matched != 1 {
+		t.Errorf("expected 1 matched, got %d", report.Matched)
+	}
+}
+
+func TestCompareRecordings_CompatibilityScore(t *testing.T) {
+	// 8 matched, 2 mismatched → 80% compatibility.
+	var origEntries, replayEntries []CapturedEntry
+	for i := 0; i < 8; i++ {
+		id := fmt.Sprintf("%d", i)
+		origEntries = append(origEntries, CapturedEntry{ID: id, StatusCode: 200, ResponseBody: `{"ok":true}`})
+		replayEntries = append(replayEntries, CapturedEntry{ID: id, StatusCode: 200, ResponseBody: `{"ok":true}`})
+	}
+	for i := 8; i < 10; i++ {
+		id := fmt.Sprintf("%d", i)
+		origEntries = append(origEntries, CapturedEntry{ID: id, StatusCode: 200})
+		replayEntries = append(replayEntries, CapturedEntry{ID: id, StatusCode: 404})
+	}
+
+	original := &Recording{Entries: origEntries}
+	replay := &Recording{Entries: replayEntries}
+
+	report := CompareRecordings(original, replay, ComparisonConfig{})
+	if report.TotalRequests != 10 {
+		t.Errorf("expected 10 total requests, got %d", report.TotalRequests)
+	}
+	if report.Matched != 8 {
+		t.Errorf("expected 8 matched, got %d", report.Matched)
+	}
+	if report.Mismatched != 2 {
+		t.Errorf("expected 2 mismatched, got %d", report.Mismatched)
+	}
+	if report.CompatibilityPct != 80 {
+		t.Errorf("expected 80%% compatibility, got %f", report.CompatibilityPct)
 	}
 }
 

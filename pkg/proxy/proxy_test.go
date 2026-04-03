@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -204,5 +205,168 @@ func TestProxy_NoAuthHeader(t *testing.T) {
 	body := w.Body.String()
 	if !strings.Contains(body, "could not detect") {
 		t.Errorf("unexpected error body: %s", body)
+	}
+}
+
+func TestProxy_LargeBody(t *testing.T) {
+	// Build a 1 MB request body.
+	largeBody := strings.Repeat("x", 1024*1024)
+
+	var receivedLen int
+	p, cleanup := setupFakeAWS(t, "s3", func(w http.ResponseWriter, r *http.Request) {
+		data, _ := io.ReadAll(r.Body)
+		receivedLen = len(data)
+		w.WriteHeader(200)
+		w.Write([]byte(`{"ok":true}`))
+	})
+	defer cleanup()
+
+	req := httptest.NewRequest("PUT", "/my-bucket/large-key", strings.NewReader(largeBody))
+	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=abc")
+
+	w := httptest.NewRecorder()
+	p.ServeHTTP(w, req)
+
+	if w.Code != 200 {
+		t.Fatalf("expected 200, got %d", w.Code)
+	}
+	if receivedLen != len(largeBody) {
+		t.Errorf("upstream received %d bytes, want %d", receivedLen, len(largeBody))
+	}
+
+	entries := p.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if len(entries[0].RequestBody) != len(largeBody) {
+		t.Errorf("recorded body length %d, want %d", len(entries[0].RequestBody), len(largeBody))
+	}
+}
+
+func TestProxy_ErrorFromUpstream(t *testing.T) {
+	p, cleanup := setupFakeAWS(t, "dynamodb", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+		w.Write([]byte(`{"__type":"InternalServerError","message":"internal failure"}`))
+	})
+	defer cleanup()
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader(`{"TableName":"bad-table"}`))
+	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=abc")
+	req.Header.Set("X-Amz-Target", "DynamoDB_20120810.GetItem")
+
+	w := httptest.NewRecorder()
+	p.ServeHTTP(w, req)
+
+	if w.Code != 500 {
+		t.Fatalf("expected 500 from upstream, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "InternalServerError") {
+		t.Errorf("expected upstream error body, got %q", w.Body.String())
+	}
+
+	entries := p.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry recorded even for errors, got %d", len(entries))
+	}
+	if entries[0].StatusCode != 500 {
+		t.Errorf("expected recorded status 500, got %d", entries[0].StatusCode)
+	}
+}
+
+func TestProxy_ConcurrentRequests(t *testing.T) {
+	const n = 50
+
+	p, cleanup := setupFakeAWS(t, "sqs", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{"ok":true}`))
+	})
+	defer cleanup()
+
+	done := make(chan struct{}, n)
+	for i := 0; i < n; i++ {
+		go func() {
+			req := httptest.NewRequest("POST", "/?Action=SendMessage", strings.NewReader("msg"))
+			req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/sqs/aws4_request, SignedHeaders=host, Signature=abc")
+			rr := httptest.NewRecorder()
+			p.ServeHTTP(rr, req)
+			done <- struct{}{}
+		}()
+	}
+	for i := 0; i < n; i++ {
+		<-done
+	}
+
+	entries := p.Entries()
+	if len(entries) != n {
+		t.Errorf("expected %d recorded entries, got %d", n, len(entries))
+	}
+}
+
+func TestProxy_PreservesHeaders(t *testing.T) {
+	var gotTarget, gotContentType string
+
+	p, cleanup := setupFakeAWS(t, "dynamodb", func(w http.ResponseWriter, r *http.Request) {
+		gotTarget = r.Header.Get("X-Amz-Target")
+		gotContentType = r.Header.Get("Content-Type")
+		w.WriteHeader(200)
+		w.Write([]byte(`{}`))
+	})
+	defer cleanup()
+
+	req := httptest.NewRequest("POST", "/", strings.NewReader(`{}`))
+	req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=abc")
+	req.Header.Set("X-Amz-Target", "DynamoDB_20120810.PutItem")
+	req.Header.Set("Content-Type", "application/x-amz-json-1.0")
+
+	w := httptest.NewRecorder()
+	p.ServeHTTP(w, req)
+
+	if gotTarget != "DynamoDB_20120810.PutItem" {
+		t.Errorf("X-Amz-Target not forwarded: got %q", gotTarget)
+	}
+	if gotContentType != "application/x-amz-json-1.0" {
+		t.Errorf("Content-Type not forwarded: got %q", gotContentType)
+	}
+
+	entries := p.Entries()
+	if len(entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(entries))
+	}
+	if entries[0].RequestHeaders["X-Amz-Target"] != "DynamoDB_20120810.PutItem" {
+		t.Errorf("X-Amz-Target not in recorded headers: %v", entries[0].RequestHeaders)
+	}
+}
+
+func TestProxy_RecordingToRecording(t *testing.T) {
+	p, cleanup := setupFakeAWS(t, "s3", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte(`{}`))
+	})
+	defer cleanup()
+
+	const n = 3
+	for i := 0; i < n; i++ {
+		req := httptest.NewRequest("GET", "/bucket/key", nil)
+		req.Header.Set("Authorization", "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=abc")
+		rr := httptest.NewRecorder()
+		p.ServeHTTP(rr, req)
+	}
+
+	rec := p.Recording()
+	if rec.EntryCount != n {
+		t.Errorf("expected EntryCount %d, got %d", n, rec.EntryCount)
+	}
+	if len(rec.Entries) != n {
+		t.Errorf("expected %d entries, got %d", n, len(rec.Entries))
+	}
+	if rec.DurationSec < 0 {
+		t.Errorf("expected non-negative DurationSec, got %d", rec.DurationSec)
+	}
+
+	// Verify entries are in chronological order (non-decreasing OffsetMs).
+	for i := 1; i < len(rec.Entries); i++ {
+		if rec.Entries[i].OffsetMs < rec.Entries[i-1].OffsetMs {
+			t.Errorf("entry %d offset (%v) is before entry %d offset (%v)", i, rec.Entries[i].OffsetMs, i-1, rec.Entries[i-1].OffsetMs)
+		}
 	}
 }

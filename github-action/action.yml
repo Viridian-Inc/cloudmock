@@ -1,0 +1,92 @@
+name: CloudMock
+description: Start CloudMock for local AWS emulation in CI. 99 services, one line.
+branding:
+  icon: cloud
+  color: green
+
+inputs:
+  version:
+    description: CloudMock version to install (npm tag or semver)
+    default: latest
+  profile:
+    description: Service profile (minimal, standard, full)
+    default: minimal
+  services:
+    description: Comma-separated list of services to enable (overrides profile)
+    default: ''
+  port:
+    description: Gateway port
+    default: '4566'
+  state:
+    description: Path to state file to load on startup
+    default: ''
+  iam-mode:
+    description: IAM mode (none, log, enforce)
+    default: none
+
+outputs:
+  endpoint:
+    description: CloudMock gateway endpoint URL
+    value: ${{ steps.start.outputs.endpoint }}
+  admin-url:
+    description: CloudMock admin API endpoint URL
+    value: ${{ steps.start.outputs.admin-url }}
+  version:
+    description: Installed CloudMock version
+    value: ${{ steps.install.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - id: install
+      shell: bash
+      run: |
+        if [ "${{ inputs.version }}" = "latest" ]; then
+          npm install -g cloudmock
+        else
+          npm install -g cloudmock@${{ inputs.version }}
+        fi
+        VERSION=$(cloudmock --version 2>/dev/null || echo "unknown")
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "CloudMock $VERSION installed"
+
+    - id: start
+      shell: bash
+      run: |
+        ARGS="--port ${{ inputs.port }}"
+        if [ -n "${{ inputs.services }}" ]; then
+          ARGS="$ARGS --services ${{ inputs.services }}"
+        fi
+        if [ -n "${{ inputs.state }}" ]; then
+          ARGS="$ARGS --state ${{ inputs.state }}"
+        fi
+
+        CLOUDMOCK_PROFILE=${{ inputs.profile }} \
+        CLOUDMOCK_IAM_MODE=${{ inputs.iam-mode }} \
+        nohup cloudmock $ARGS > /tmp/cloudmock.log 2>&1 &
+        echo $! > /tmp/cloudmock.pid
+
+        # Health check with 30s timeout
+        echo -n "Waiting for CloudMock..."
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:${{ inputs.port }}/ > /dev/null 2>&1; then
+            echo " ready!"
+            break
+          fi
+          if [ $i -eq 60 ]; then
+            echo " TIMEOUT"
+            cat /tmp/cloudmock.log
+            exit 1
+          fi
+          sleep 0.5
+        done
+
+        echo "endpoint=http://localhost:${{ inputs.port }}" >> $GITHUB_OUTPUT
+        echo "admin-url=http://localhost:4599" >> $GITHUB_OUTPUT
+
+    - shell: bash
+      run: |
+        echo "AWS_ENDPOINT_URL=http://localhost:${{ inputs.port }}" >> $GITHUB_ENV
+        echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
+        echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
+        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV

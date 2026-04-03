@@ -1,0 +1,37 @@
+name: Test CloudMock Action
+on:
+  push:
+    paths: ['.github/actions/cloudmock/**']
+  pull_request:
+    paths: ['.github/actions/cloudmock/**']
+  workflow_dispatch:
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/cloudmock
+        id: cloudmock
+
+      - name: Verify CloudMock is running
+        run: curl -sf http://localhost:4566/
+
+      - name: Test S3
+        run: |
+          aws --endpoint http://localhost:4566 s3 mb s3://ci-test-bucket
+          aws --endpoint http://localhost:4566 s3 ls | grep ci-test-bucket
+
+      - name: Verify outputs
+        env:
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+          CM_VERSION: ${{ steps.cloudmock.outputs.version }}
+        run: |
+          [ -n "$CM_ENDPOINT" ]
+          [ -n "$CM_VERSION" ]
+
+      - name: Verify env vars
+        run: |
+          [ "$AWS_ENDPOINT_URL" = "http://localhost:4566" ]
+          [ "$AWS_ACCESS_KEY_ID" = "test" ]

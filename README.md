@@ -158,6 +158,25 @@ cm := sdk.New()
 s3Client := s3.NewFromConfig(cm.Config())
 ```
 
+## GitHub Action
+
+One line to add CloudMock to your CI:
+
+```yaml
+- uses: viridian-inc/cloudmock-action@v1
+```
+
+Auto-installs, starts, health-checks, and sets `AWS_ENDPOINT_URL` for all subsequent steps. Works with Node.js, Python, Go, Java, Rust, and any language with an AWS SDK.
+
+## Traffic Recording & Replay
+
+Record real AWS traffic and replay against CloudMock to validate compatibility:
+
+```bash
+cloudmock record --output prod-traffic.json    # proxy mode: captures real AWS calls
+cloudmock validate --input prod-traffic.json   # replay + compare, exit 0 = all match
+```
+
 ## Comparison
 
 | Feature | CloudMock | LocalStack (Free) | Moto |

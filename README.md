@@ -32,6 +32,7 @@ Open DevTools at [http://localhost:4500](http://localhost:4500)
 - **Full observability** — traces, metrics, logs, and errors in one dashboard
 - **Language-agnostic** — works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
 - **Built-in DevTools** — topology maps, request tracing, chaos engineering
+- **State snapshots** — export state to JSON, commit to git, restore on startup — everyone shares the same baseline
 - **Free for local dev and internal use** — source-available, no account required
 
 ## Usage

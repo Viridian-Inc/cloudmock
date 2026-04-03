@@ -32,6 +32,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/datasync"
 	"github.com/aws/aws-sdk-go-v2/service/dax"
 	"github.com/aws/aws-sdk-go-v2/service/docdb"
+	"github.com/aws/aws-sdk-go-v2/service/ecr"
 	"github.com/aws/aws-sdk-go-v2/service/elasticache"
 	"github.com/aws/aws-sdk-go-v2/service/elasticbeanstalk"
 	"github.com/aws/aws-sdk-go-v2/service/elasticloadbalancing"
@@ -51,6 +52,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/mediaconvert"
 	"github.com/aws/aws-sdk-go-v2/service/memorydb"
 	"github.com/aws/aws-sdk-go-v2/service/mq"
+	"github.com/aws/aws-sdk-go-v2/service/mwaa"
 	"github.com/aws/aws-sdk-go-v2/service/neptune"
 	"github.com/aws/aws-sdk-go-v2/service/opensearch"
 	"github.com/aws/aws-sdk-go-v2/service/organizations"
@@ -69,6 +71,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/servicediscovery"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/aws/aws-sdk-go-v2/service/sfn"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/aws/aws-sdk-go-v2/service/shield"
 	"github.com/aws/aws-sdk-go-v2/service/ssoadmin"
 	"github.com/aws/aws-sdk-go-v2/service/support"
@@ -160,6 +163,7 @@ func GenerateAll() []harness.Suite {
 		datasyncSuite(),
 		daxSuite(),
 		docdbSuite(),
+		ecrSuite(),
 		elasticacheSuite(),
 		elasticbeanstalkSuite(),
 		elasticloadbalancingSuite(),
@@ -179,6 +183,7 @@ func GenerateAll() []harness.Suite {
 		mediaconvertSuite(),
 		memorydbSuite(),
 		mqSuite(),
+		mwaaSuite(),
 		neptuneSuite(),
 		opensearchSuite(),
 		organizationsSuite(),
@@ -198,6 +203,7 @@ func GenerateAll() []harness.Suite {
 		sesSuite(),
 		sfnSuite(),
 		shieldSuite(),
+		ssmSuite(),
 		ssoadminSuite(),
 		supportSuite(),
 		swfSuite(),
@@ -2091,6 +2097,69 @@ func wafv2Suite() harness.Suite {
 			return cl.ListWebACLs(ctx, &wafv2.ListWebACLsInput{
 				Scope: wafv2types.ScopeRegional,
 			})
+		}),
+	}}
+}
+
+// ─── ECR ───────────────────────────────────────────────────────────────────────
+
+func ecrSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*ecr.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return ecr.NewFromConfig(cfg, func(o *ecr.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "ecr", ops: []harness.Operation{
+		op("DescribeRepositories", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.DescribeRepositories(ctx, &ecr.DescribeRepositoriesInput{})
+		}),
+	}}
+}
+
+// ─── MWAA (Airflow) ────────────────────────────────────────────────────────────
+
+func mwaaSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*mwaa.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return mwaa.NewFromConfig(cfg, func(o *mwaa.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "mwaa", ops: []harness.Operation{
+		op("ListEnvironments", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.ListEnvironments(ctx, &mwaa.ListEnvironmentsInput{})
+		}),
+	}}
+}
+
+// ─── SSM ───────────────────────────────────────────────────────────────────────
+
+func ssmSuite() harness.Suite {
+	c := newCache(func(endpoint string) (*ssm.Client, error) {
+		cfg, err := awsclient.NewConfig(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		return ssm.NewFromConfig(cfg, func(o *ssm.Options) { o.BaseEndpoint = awsclient.Endpoint(endpoint) }), nil
+	})
+	return &sdkSuite{name: "ssm", ops: []harness.Operation{
+		op("DescribeParameters", func(ctx context.Context, endpoint string) (any, error) {
+			cl, err := c.get(endpoint)
+			if err != nil {
+				return nil, err
+			}
+			return cl.DescribeParameters(ctx, &ssm.DescribeParametersInput{})
 		}),
 	}}
 }

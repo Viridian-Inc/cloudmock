@@ -42,6 +42,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/docdb v1.48.13
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.57.1
 	github.com/aws/aws-sdk-go-v2/service/ec2 v1.296.2
+	github.com/aws/aws-sdk-go-v2/service/ecr v1.56.2
 	github.com/aws/aws-sdk-go-v2/service/ecs v1.76.0
 	github.com/aws/aws-sdk-go-v2/service/eks v1.81.2
 	github.com/aws/aws-sdk-go-v2/service/elasticache v1.52.0
@@ -69,6 +70,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/mediaconvert v1.89.1
 	github.com/aws/aws-sdk-go-v2/service/memorydb v1.33.14
 	github.com/aws/aws-sdk-go-v2/service/mq v1.34.19
+	github.com/aws/aws-sdk-go-v2/service/mwaa v1.39.22
 	github.com/aws/aws-sdk-go-v2/service/neptune v1.44.3
 	github.com/aws/aws-sdk-go-v2/service/opensearch v1.64.0
 	github.com/aws/aws-sdk-go-v2/service/organizations v1.51.0
@@ -93,6 +95,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/shield v1.34.21
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.15
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.24
+	github.com/aws/aws-sdk-go-v2/service/ssm v1.68.4
 	github.com/aws/aws-sdk-go-v2/service/ssoadmin v1.37.6
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.9
 	github.com/aws/aws-sdk-go-v2/service/support v1.31.21

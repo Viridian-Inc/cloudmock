@@ -135,11 +135,42 @@ var routes = map[routeKey]s3Handler{
 	{http.MethodPut, scopeBucket, "versioning"}:  handlePutBucketVersioning,
 	{http.MethodPut, scopeBucket, "policy"}:      handlePutBucketPolicy,
 	// DELETE routes
-	{http.MethodDelete, scopeBucket, ""}:         handleDeleteBucket,
-	{http.MethodDelete, scopeBucket, "policy"}:   handleDeleteBucketPolicy,
+	{http.MethodDelete, scopeBucket, ""}:                  handleDeleteBucket,
+	{http.MethodDelete, scopeBucket, "policy"}:            handleDeleteBucketPolicy,
+	{http.MethodDelete, scopeBucket, "tagging"}:           handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "cors"}:              handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "lifecycle"}:         handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "encryption"}:        handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "publicAccessBlock"}: handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "ownershipControls"}: handleNoOpBucket,
 	// HEAD routes
 	{http.MethodHead, scopeBucket, ""}:  handleHeadBucket,
 	{http.MethodHead, scopeObject, ""}: handleHeadObject,
+	// GET subresource stubs (Terraform/Pulumi read these after creating a bucket)
+	{http.MethodGet, scopeBucket, "tagging"}:           handleGetEmptyXML("Tagging", "TagSet"),
+	{http.MethodGet, scopeBucket, "cors"}:              handleGetNoSuchConfig("CORSConfiguration"),
+	{http.MethodGet, scopeBucket, "lifecycle"}:         handleGetNoSuchConfig("LifecycleConfiguration"),
+	{http.MethodGet, scopeBucket, "encryption"}:        handleGetBucketEncryption,
+	{http.MethodGet, scopeBucket, "acl"}:               handleGetBucketACL,
+	{http.MethodGet, scopeBucket, "location"}:          handleGetBucketLocation,
+	{http.MethodGet, scopeBucket, "logging"}:           handleGetEmptyXML("BucketLoggingStatus", ""),
+	{http.MethodGet, scopeBucket, "notification"}:      handleGetEmptyXML("NotificationConfiguration", ""),
+	{http.MethodGet, scopeBucket, "website"}:           handleGetNoSuchConfig("WebsiteConfiguration"),
+	{http.MethodGet, scopeBucket, "accelerate"}:        handleGetEmptyXML("AccelerateConfiguration", ""),
+	{http.MethodGet, scopeBucket, "ownershipControls"}: handleGetOwnershipControls,
+	{http.MethodGet, scopeBucket, "publicAccessBlock"}: handleGetPublicAccessBlock,
+	// PUT subresource stubs
+	{http.MethodPut, scopeBucket, "tagging"}:           handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "cors"}:              handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "lifecycle"}:         handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "encryption"}:        handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "acl"}:               handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "logging"}:           handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "notification"}:      handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "website"}:           handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "accelerate"}:        handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "ownershipControls"}: handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "publicAccessBlock"}: handleNoOpBucket,
 }
 
 // HandleRequest routes an incoming S3 request to the appropriate handler.
@@ -162,6 +193,7 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 	}
 
 	// Determine the subresource for map lookup.
+	// Ignore x-id, x-amz-*, and other SDK metadata query params.
 	sub := ""
 	switch {
 	case q.Has("uploads"):
@@ -172,6 +204,30 @@ func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Respons
 		sub = "versions"
 	case q.Has("policy"):
 		sub = "policy"
+	case q.Has("tagging"):
+		sub = "tagging"
+	case q.Has("cors"):
+		sub = "cors"
+	case q.Has("lifecycle"):
+		sub = "lifecycle"
+	case q.Has("encryption"):
+		sub = "encryption"
+	case q.Has("acl"):
+		sub = "acl"
+	case q.Has("location"):
+		sub = "location"
+	case q.Has("notification"):
+		sub = "notification"
+	case q.Has("logging"):
+		sub = "logging"
+	case q.Has("website"):
+		sub = "website"
+	case q.Has("accelerate"):
+		sub = "accelerate"
+	case q.Has("ownershipControls"):
+		sub = "ownershipControls"
+	case q.Has("publicAccessBlock"):
+		sub = "publicAccessBlock"
 	case q.Get("uploadId") != "":
 		sub = "uploadId"
 	case q.Get("partNumber") != "":

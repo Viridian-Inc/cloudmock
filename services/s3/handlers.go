@@ -33,6 +33,87 @@ func xmlEscape(s string) string {
 	return b.String()
 }
 
+// ---- stub handlers for bucket subresources (Terraform/Pulumi compatibility) ----
+
+// handleNoOpBucket accepts the request and returns 200 with no body.
+func handleNoOpBucket(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	return &service.Response{StatusCode: http.StatusOK}, nil
+}
+
+// handleGetEmptyXML returns a minimal XML response for a subresource that has no configuration.
+func handleGetEmptyXML(root, child string) s3Handler {
+	return func(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+		xml := `<?xml version="1.0" encoding="UTF-8"?><` + root + ` xmlns="http://s3.amazonaws.com/doc/2006-03-01/">`
+		if child != "" {
+			xml += `<` + child + `/>`
+		}
+		xml += `</` + root + `>`
+		return &service.Response{
+			StatusCode:     http.StatusOK,
+			RawBody:        []byte(xml),
+			RawContentType: "application/xml",
+		}, nil
+	}
+}
+
+// handleGetNoSuchConfig returns a 404 NoSuchXxxConfiguration error (expected by Terraform when config doesn't exist).
+func handleGetNoSuchConfig(configName string) s3Handler {
+	return func(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+		code := "NoSuch" + configName
+		xml := `<?xml version="1.0" encoding="UTF-8"?><Error><Code>` + code + `</Code><Message>The ` + configName + ` does not exist.</Message></Error>`
+		return &service.Response{
+			StatusCode:     http.StatusNotFound,
+			RawBody:        []byte(xml),
+			RawContentType: "application/xml",
+		}, nil
+	}
+}
+
+func handleGetBucketEncryption(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><ServerSideEncryptionConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Rule><ApplyServerSideEncryptionByDefault><SSEAlgorithm>AES256</SSEAlgorithm></ApplyServerSideEncryptionByDefault><BucketKeyEnabled>false</BucketKeyEnabled></Rule></ServerSideEncryptionConfiguration>`
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(xml),
+		RawContentType: "application/xml",
+	}, nil
+}
+
+func handleGetBucketACL(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><AccessControlPolicy xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Owner><ID>` + xmlEscape(ctx.AccountID) + `</ID><DisplayName>cloudmock</DisplayName></Owner><AccessControlList><Grant><Grantee xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="CanonicalUser"><ID>` + xmlEscape(ctx.AccountID) + `</ID><DisplayName>cloudmock</DisplayName></Grantee><Permission>FULL_CONTROL</Permission></Grant></AccessControlList></AccessControlPolicy>`
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(xml),
+		RawContentType: "application/xml",
+	}, nil
+}
+
+func handleGetBucketLocation(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><LocationConstraint xmlns="http://s3.amazonaws.com/doc/2006-03-01/"/>`
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(xml),
+		RawContentType: "application/xml",
+	}, nil
+}
+
+func handleGetOwnershipControls(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><OwnershipControls xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><Rule><ObjectOwnership>BucketOwnerEnforced</ObjectOwnership></Rule></OwnershipControls>`
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(xml),
+		RawContentType: "application/xml",
+	}, nil
+}
+
+func handleGetPublicAccessBlock(store *Store, ctx *service.RequestContext) (*service.Response, error) {
+	xml := `<?xml version="1.0" encoding="UTF-8"?><PublicAccessBlockConfiguration xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><BlockPublicAcls>true</BlockPublicAcls><IgnorePublicAcls>true</IgnorePublicAcls><BlockPublicPolicy>true</BlockPublicPolicy><RestrictPublicBuckets>true</RestrictPublicBuckets></PublicAccessBlockConfiguration>`
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        []byte(xml),
+		RawContentType: "application/xml",
+	}, nil
+}
+
 // ---- helpers ----
 
 // extractBucketName returns the first non-empty path segment from the request URL.

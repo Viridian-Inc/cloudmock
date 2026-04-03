@@ -50,7 +50,7 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 		return defaultDomains, fmt.Errorf("domains is not a map in %s", path)
 	}
 	dc := defaultDomains
-	if v, ok := domainsMap["cloudmock"].(string); ok {
+	if v, ok := domainsMap["autotend"].(string); ok {
 		dc.Autotend = v
 	}
 	if v, ok := domainsMap["cloudmock"].(string); ok {

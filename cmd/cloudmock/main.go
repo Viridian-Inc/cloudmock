@@ -52,6 +52,8 @@ func main() {
 		cmdReplay(adminAddr, os.Args[2:])
 	case "validate":
 		cmdValidate(adminAddr, os.Args[2:])
+	case "contract":
+		cmdContract(os.Args[2:])
 	case "version":
 		cmdVersion()
 	case "config":
@@ -77,6 +79,7 @@ Commands:
   record     Record real AWS traffic via proxy
   replay     Replay a recording against CloudMock
   validate   Replay + compare + exit code (CI mode)
+  contract   Dual-mode proxy: compare real AWS vs CloudMock live
   config     Show current configuration
   version    Print version information
   help       Show this help message
@@ -481,4 +484,124 @@ func cmdConfig(adminAddr string) {
 
 	data, _ := json.MarshalIndent(cfg, "", "  ")
 	fmt.Println(string(data))
+}
+
+func cmdContract(args []string) {
+	fs := flag.NewFlagSet("contract", flag.ExitOnError)
+	cloudmockURL := fs.String("cloudmock", "http://localhost:4566", "CloudMock endpoint URL")
+	region := fs.String("region", "us-east-1", "AWS region for forwarding requests")
+	port := fs.String("port", "4577", "local port for the contract proxy")
+	output := fs.String("output", "contract-report.json", "path to write the JSON report")
+	ignorePaths := fs.String("ignore-paths", "RequestId,ResponseMetadata", "comma-separated JSON paths to ignore in comparison")
+	runCmd := fs.String("run", "", "command to execute (proxy starts, runs command, generates report)")
+	fs.Parse(args)
+
+	var ignore []string
+	if *ignorePaths != "" {
+		for _, p := range strings.Split(*ignorePaths, ",") {
+			p = strings.TrimSpace(p)
+			if p != "" {
+				ignore = append(ignore, p)
+			}
+		}
+	}
+
+	cp := proxy.NewContractProxy(*region, *cloudmockURL, ignore)
+
+	listener, err := net.Listen("tcp", ":"+*port)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: cannot listen on port %s: %v\n", *port, err)
+		os.Exit(1)
+	}
+
+	srv := &http.Server{Handler: cp}
+
+	if *runCmd != "" {
+		// Run mode: start proxy, execute command, generate report, exit.
+		go func() {
+			if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
+		}()
+
+		proxyAddr := fmt.Sprintf("http://localhost:%s", *port)
+		fmt.Printf("Contract proxy running on %s\n", proxyAddr)
+		fmt.Printf("Executing: %s\n", *runCmd)
+
+		cmd := exec.Command("sh", "-c", *runCmd)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		cmd.Env = append(os.Environ(), "AWS_ENDPOINT_URL="+proxyAddr)
+		cmdErr := cmd.Run()
+
+		srv.Shutdown(context.Background())
+
+		if err := cp.SaveReport(*output); err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving report: %v\n", err)
+			os.Exit(1)
+		}
+
+		report := cp.Report()
+		printContractSummary(report, *output)
+
+		if cmdErr != nil {
+			fmt.Fprintf(os.Stderr, "\nCommand failed: %v\n", cmdErr)
+			os.Exit(1)
+		}
+		if report.Mismatched > 0 {
+			os.Exit(1)
+		}
+	} else {
+		// Interactive mode: start proxy, wait for signal, generate report.
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+
+		go func() {
+			proxyAddr := fmt.Sprintf("http://localhost:%s", *port)
+			fmt.Printf("Contract proxy running on %s\n", proxyAddr)
+			fmt.Printf("CloudMock endpoint: %s\n", *cloudmockURL)
+			fmt.Printf("AWS region: %s\n", *region)
+			fmt.Println("Press Ctrl+C to stop and generate the report.")
+			if err := srv.Serve(listener); err != nil && err != http.ErrServerClosed {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			}
+		}()
+
+		<-ctx.Done()
+		fmt.Println("\nStopping contract proxy...")
+		srv.Shutdown(context.Background())
+
+		if err := cp.SaveReport(*output); err != nil {
+			fmt.Fprintf(os.Stderr, "Error saving report: %v\n", err)
+			os.Exit(1)
+		}
+
+		report := cp.Report()
+		printContractSummary(report, *output)
+
+		if report.Mismatched > 0 {
+			os.Exit(1)
+		}
+	}
+}
+
+func printContractSummary(report *proxy.ContractReport, outputPath string) {
+	fmt.Printf("\nContract Test Report\n")
+	fmt.Printf("  Total requests:  %d\n", report.TotalRequests)
+	fmt.Printf("  Matched:         %d\n", report.Matched)
+	fmt.Printf("  Mismatched:      %d\n", report.Mismatched)
+	fmt.Printf("  Compatibility:   %.1f%%\n", report.CompatibilityPct)
+
+	for svc, sr := range report.ByService {
+		fmt.Printf("  %s: %d/%d (%.1f%%)\n", svc, sr.Matched, sr.Total, sr.Pct)
+	}
+
+	for _, m := range report.Mismatches {
+		fmt.Printf("\n  [%s] %s.%s: AWS %d vs CloudMock %d (%s)\n", m.Severity, m.Service, m.Action, m.AWSStatus, m.CloudMockStatus, m.Severity)
+		for _, d := range m.Diffs {
+			fmt.Printf("    - %s\n", d)
+		}
+	}
+
+	fmt.Printf("\nReport written to %s\n", outputPath)
 }

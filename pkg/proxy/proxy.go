@@ -54,12 +54,13 @@ var serviceEndpoints = map[string]string{
 // AWSProxy is a reverse proxy that forwards requests to real AWS endpoints
 // and captures the request/response pairs as CapturedEntry values.
 type AWSProxy struct {
-	entries    []*traffic.CapturedEntry
-	mu         sync.Mutex
-	startTime  time.Time
-	httpClient *http.Client
-	region     string
-	entrySeq   int
+	entries      []*traffic.CapturedEntry
+	mu           sync.Mutex
+	startTime    time.Time
+	httpClient   *http.Client
+	region       string
+	entrySeq     int
+	testEndpoint string // if set, all requests are forwarded here instead of real AWS
 }
 
 // New creates a new AWSProxy targeting the given AWS region.
@@ -84,12 +85,6 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	host := resolveEndpoint(svc, p.region)
-	if host == "" {
-		http.Error(w, fmt.Sprintf("unknown service: %s", svc), http.StatusBadGateway)
-		return
-	}
-
 	// Read request body.
 	var reqBody []byte
 	if r.Body != nil {
@@ -97,13 +92,27 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body.Close()
 	}
 
-	// Build the forwarding URL. Use HTTPS for real AWS endpoints, HTTP otherwise
-	// (e.g., local test servers).
-	scheme := "https"
-	if !strings.HasSuffix(host, ".amazonaws.com") {
-		scheme = "http"
+	// Build the forwarding URL.
+	var targetURL string
+	var host string
+	if p.testEndpoint != "" {
+		// Test mode: forward everything to the test endpoint.
+		targetURL = strings.TrimRight(p.testEndpoint, "/") + r.URL.RequestURI()
+		host = ""
+	} else {
+		host = resolveEndpoint(svc, p.region)
+		if host == "" {
+			http.Error(w, fmt.Sprintf("unknown service: %s", svc), http.StatusBadGateway)
+			return
+		}
+
+		// Use HTTPS for real AWS endpoints, HTTP otherwise (e.g., local test servers).
+		scheme := "https"
+		if !strings.HasSuffix(host, ".amazonaws.com") {
+			scheme = "http"
+		}
+		targetURL = fmt.Sprintf("%s://%s%s", scheme, host, r.URL.RequestURI())
 	}
-	targetURL := fmt.Sprintf("%s://%s%s", scheme, host, r.URL.RequestURI())
 
 	fwdReq, err := http.NewRequestWithContext(r.Context(), r.Method, targetURL, bytes.NewReader(reqBody))
 	if err != nil {
@@ -117,8 +126,10 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			fwdReq.Header.Add(k, v)
 		}
 	}
-	// Override Host to the real AWS endpoint.
-	fwdReq.Host = host
+	// Override Host to the real AWS endpoint (skip in test mode).
+	if host != "" {
+		fwdReq.Host = host
+	}
 
 	resp, err := p.httpClient.Do(fwdReq)
 	if err != nil {

@@ -107,6 +107,22 @@ cfg.HTTPClient = &http.Client{Transport: recorder.Wrap(http.DefaultTransport)}
 recorder.SaveToFile("recording.json")
 ```
 
+## Contract Testing
+
+Verify CloudMock fidelity against real AWS in real time. The dual-mode proxy sends every request to both endpoints, diffs the responses, and produces a compatibility report.
+
+```bash
+# Run your test suite through the contract proxy
+cloudmock contract \
+  --cloudmock http://localhost:4566 \
+  --port 4577 \
+  --ignore-paths RequestId,ResponseMetadata \
+  --run "npm test"
+
+# Outputs contract-report.json with per-service compatibility %
+# Exit code 0 = 100% match, 1 = mismatches found
+```
+
 ## Links
 
 - [Documentation](https://cloudmock.io/docs)

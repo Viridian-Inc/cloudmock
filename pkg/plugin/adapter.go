@@ -58,7 +58,11 @@ func (a *ServiceAdapter) HandleRequest(ctx context.Context, req *Request) (*Resp
 		return nil, err
 	}
 	for k, v := range req.Headers {
-		httpReq.Header.Set(k, v)
+		if k == "Host" {
+			httpReq.Host = v // Go's net/http uses r.Host, not r.Header["Host"]
+		} else {
+			httpReq.Header.Set(k, v)
+		}
 	}
 	q := httpReq.URL.Query()
 	for k, v := range req.QueryParams {

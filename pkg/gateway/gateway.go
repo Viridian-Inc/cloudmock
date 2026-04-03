@@ -139,6 +139,11 @@ func (g *Gateway) handlePluginRequest(w http.ResponseWriter, r *http.Request, p 
 	for k := range r.Header {
 		headers[k] = r.Header.Get(k)
 	}
+	// Go's net/http removes Host from r.Header and stores it in r.Host.
+	// Preserve it so services can detect virtual-hosted-style S3 requests.
+	if r.Host != "" {
+		headers["Host"] = r.Host
+	}
 	queryParams := make(map[string]string)
 	for k, v := range r.URL.Query() {
 		if len(v) > 0 {

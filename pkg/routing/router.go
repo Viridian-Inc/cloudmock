@@ -49,6 +49,15 @@ func DetectService(r *http.Request) string {
 		}
 	}
 
+	// S3 virtual-hosted-style: bucket.s3.region.amazonaws.com or bucket.s3.localhost
+	host := r.Host
+	if host == "" {
+		host = r.Header.Get("Host")
+	}
+	if strings.Contains(host, ".s3.") || strings.HasSuffix(strings.Split(host, ":")[0], ".s3") {
+		return "s3"
+	}
+
 	return ""
 }
 

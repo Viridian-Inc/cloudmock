@@ -116,15 +116,49 @@ func handleGetPublicAccessBlock(store *Store, ctx *service.RequestContext) (*ser
 
 // ---- helpers ----
 
-// extractBucketName returns the first non-empty path segment from the request URL.
-// E.g. "/my-bucket" → "my-bucket".
+// extractBucketName returns the bucket name from the request.
+// Supports both path-style ("/my-bucket/key") and virtual-hosted-style
+// ("my-bucket.s3.us-east-1.amazonaws.com" or "my-bucket.s3.localhost" in Host header).
 func extractBucketName(ctx *service.RequestContext) string {
+	// Try path-style first.
 	path := ctx.RawRequest.URL.Path
 	path = strings.TrimPrefix(path, "/")
 	if idx := strings.Index(path, "/"); idx >= 0 {
 		path = path[:idx]
 	}
-	return path
+	if path != "" {
+		return path
+	}
+
+	// Fall back to virtual-hosted-style: extract bucket from Host header.
+	// Formats: "bucket.s3.region.amazonaws.com", "bucket.s3.localhost:4566", "bucket.s3.localhost"
+	host := ctx.RawRequest.Host
+	if host == "" {
+		host = ctx.RawRequest.Header.Get("Host")
+	}
+	// Strip port
+	if idx := strings.LastIndex(host, ":"); idx >= 0 {
+		// Only strip if it looks like a port (after last colon is all digits)
+		port := host[idx+1:]
+		allDigits := true
+		for _, c := range port {
+			if c < '0' || c > '9' {
+				allDigits = false
+				break
+			}
+		}
+		if allDigits {
+			host = host[:idx]
+		}
+	}
+	// Check for virtual-hosted pattern: "bucket.s3.xxx" or "bucket.s3"
+	if idx := strings.Index(host, ".s3."); idx >= 0 {
+		return host[:idx]
+	}
+	if strings.HasSuffix(host, ".s3") {
+		return host[:len(host)-3]
+	}
+	return ""
 }
 
 // ---- handlers ----

@@ -5,6 +5,14 @@ import (
 	"strings"
 )
 
+// serviceAliases maps alternative SigV4 signing names to the canonical
+// CloudMock service name. For example, Pulumi/Terraform AWS providers may
+// sign S3 Control requests with "s3control" in the credential scope, but
+// CloudMock handles them in the S3 service.
+var serviceAliases = map[string]string{
+	"s3control": "s3",
+}
+
 // DetectService determines the AWS service name from the request.
 // It checks the Authorization header credential scope first
 // (Credential=AKID/date/region/SERVICE/aws4_request), then falls back to
@@ -20,18 +28,28 @@ func DetectService(r *http.Request) string {
 	// Check Authorization header first.
 	if auth := r.Header.Get("Authorization"); auth != "" {
 		if svc := serviceFromAuthorization(auth); svc != "" {
+			if alias, ok := serviceAliases[svc]; ok {
+				return alias
+			}
 			return svc
 		}
 	}
 
 	// Fall back to X-Amz-Target header.
 	if target := r.Header.Get("X-Amz-Target"); target != "" {
-		return serviceFromTarget(target)
+		svc := serviceFromTarget(target)
+		if alias, ok := serviceAliases[svc]; ok {
+			return alias
+		}
+		return svc
 	}
 
 	// Fall back to presigned URL query parameter (X-Amz-Credential).
 	if cred := r.URL.Query().Get("X-Amz-Credential"); cred != "" {
 		if svc := serviceFromCredential(cred); svc != "" {
+			if alias, ok := serviceAliases[svc]; ok {
+				return alias
+			}
 			return svc
 		}
 	}

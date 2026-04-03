@@ -2,6 +2,7 @@ package s3
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/neureaux/cloudmock/pkg/eventbus"
@@ -176,6 +177,11 @@ var routes = map[routeKey]s3Handler{
 // HandleRequest routes an incoming S3 request to the appropriate handler.
 func (s *S3Service) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
 	r := ctx.RawRequest
+
+	// S3 Control API (/v20180820/...) — used by Terraform/Pulumi for tagging
+	if strings.HasPrefix(r.URL.Path, "/v20180820/") {
+		return s.handleS3Control(ctx)
+	}
 
 	bucketName := extractBucketName(ctx)
 	objectKey := extractObjectKey(ctx)

@@ -1,0 +1,3099 @@
+{
+  "generated_at": "2026-04-03T06:37:50Z",
+  "cloudmock_version": "",
+  "total_ops": 406,
+  "passed": 122,
+  "failed": 284,
+  "skipped": 0,
+  "compat_pct": 30.05,
+  "services": {
+    "account": {
+      "service": "account",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateContactInformation",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteContactInformation",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListContactInformations",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "acm": {
+      "service": "acm",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "DeleteCertificate",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"CertificateArn is required.\"}"
+        },
+        {
+          "name": "DescribeCertificate",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"CertificateArn is required.\"}"
+        },
+        {
+          "name": "ListCertificates",
+          "status": "pass"
+        },
+        {
+          "name": "RequestCertificate",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DomainName is required.\"}"
+        }
+      ]
+    },
+    "acm-pca": {
+      "service": "acm-pca",
+      "total_ops": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 66.67,
+      "operations": [
+        {
+          "name": "CreateCertificateAuthority",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeCertificateAuthority",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"CertificateAuthorityArn is required.\"}"
+        },
+        {
+          "name": "ListCertificateAuthorities",
+          "status": "pass"
+        }
+      ]
+    },
+    "airflow": {
+      "service": "airflow",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListEnvironments",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "amplify": {
+      "service": "amplify",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateApp",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteApp",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListApps",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "apigateway": {
+      "service": "apigateway",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateRestApi",
+          "status": "fail",
+          "error_detail": "operation error API Gateway: CreateRestApi, https response error StatusCode: 201, RequestID: , deserialization failed, failed to decode response body with invalid JSON, expected Timestamp to be a JSON Number, got string instead"
+        },
+        {
+          "name": "DeleteRestApi",
+          "status": "fail",
+          "error_detail": "operation error API Gateway: CreateRestApi, https response error StatusCode: 201, RequestID: , deserialization failed, failed to decode response body with invalid JSON, expected Timestamp to be a JSON Number, got string instead"
+        },
+        {
+          "name": "GetRestApi",
+          "status": "fail",
+          "error_detail": "operation error API Gateway: CreateRestApi, https response error StatusCode: 201, RequestID: , deserialization failed, failed to decode response body with invalid JSON, expected Timestamp to be a JSON Number, got string instead"
+        },
+        {
+          "name": "GetRestApis",
+          "status": "fail",
+          "error_detail": "operation error API Gateway: CreateRestApi, https response error StatusCode: 201, RequestID: , deserialization failed, failed to decode response body with invalid JSON, expected Timestamp to be a JSON Number, got string instead"
+        }
+      ]
+    },
+    "appconfig": {
+      "service": "appconfig",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "DeleteApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ApplicationId is required.\"}"
+        },
+        {
+          "name": "GetApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ApplicationId is required.\"}"
+        },
+        {
+          "name": "ListApplications",
+          "status": "pass"
+        }
+      ]
+    },
+    "application-autoscaling": {
+      "service": "application-autoscaling",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "DeregisterScalableTarget",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ServiceNamespace, ResourceId, and ScalableDimension are required.\"}"
+        },
+        {
+          "name": "DescribeScalableTargets",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ServiceNamespace is required.\"}"
+        },
+        {
+          "name": "RegisterScalableTarget",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ServiceNamespace, ResourceId, and ScalableDimension are required.\"}"
+        }
+      ]
+    },
+    "appmesh": {
+      "service": "appmesh",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateMesh",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;appmesh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteMesh",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;appmesh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListMeshes",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;appmesh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "apprunner": {
+      "service": "apprunner",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateService",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;apprunner\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteService",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;apprunner\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListServices",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;apprunner\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "appsync": {
+      "service": "appsync",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateGraphqlApi",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteGraphqlApi",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListGraphqlApis",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "athena": {
+      "service": "athena",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "GetQueryExecution",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"QueryExecutionId is required.\"}"
+        },
+        {
+          "name": "ListQueryExecutions",
+          "status": "pass"
+        },
+        {
+          "name": "StartQueryExecution",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"QueryString is required.\"}"
+        },
+        {
+          "name": "StopQueryExecution",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"QueryExecutionId is required.\"}"
+        }
+      ]
+    },
+    "autoscaling": {
+      "service": "autoscaling",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateAutoScalingGroup",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"AutoScalingGroupName is required.\"}"
+        },
+        {
+          "name": "DeleteAutoScalingGroup",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"AutoScalingGroupName is required.\"}"
+        },
+        {
+          "name": "DescribeAutoScalingGroups",
+          "status": "pass"
+        }
+      ]
+    },
+    "backup": {
+      "service": "backup",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateBackupPlan",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"BackupPlan.BackupPlanName is required\"}"
+        },
+        {
+          "name": "DeleteBackupPlan",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"BackupPlanId is required\"}"
+        },
+        {
+          "name": "DescribeBackupJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"BackupJobId is required\"}"
+        },
+        {
+          "name": "ListBackupPlans",
+          "status": "pass"
+        }
+      ]
+    },
+    "batch": {
+      "service": "batch",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateJobQueue",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteJobQueue",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListJobQueues",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "bedrock": {
+      "service": "bedrock",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateModelCustomizationJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "GetModelCustomizationJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListModelCustomizationJobs",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "cassandra": {
+      "service": "cassandra",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateKeyspace",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cassandra\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteKeyspace",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cassandra\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListKeyspaces",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cassandra\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "ce": {
+      "service": "ce",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "GetCostAndUsage",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TimePeriod.Start and TimePeriod.End are required\"}"
+        },
+        {
+          "name": "GetCostForecast",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TimePeriod.Start and TimePeriod.End are required\"}"
+        },
+        {
+          "name": "ListCostAllocationTags",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action ListCostAllocationTags is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "cloud9": {
+      "service": "cloud9",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cloud9\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cloud9\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListEnvironments",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;cloud9\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "cloudcontrol": {
+      "service": "cloudcontrol",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateResource",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"TypeNameNotFound\",\"Message\":\"TypeName is required\"}"
+        },
+        {
+          "name": "DeleteResource",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TypeName and Identifier are required\"}"
+        },
+        {
+          "name": "GetResource",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TypeName and Identifier are required\"}"
+        },
+        {
+          "name": "ListResources",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TypeName is required\"}"
+        }
+      ]
+    },
+    "cloudformation": {
+      "service": "cloudformation",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateStack",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteStack",
+          "status": "fail",
+          "error_detail": "operation error CloudFormation: CreateStack, https response error StatusCode: 400, RequestID: , api error UnknownError: UnknownError"
+        },
+        {
+          "name": "DescribeStacks",
+          "status": "fail",
+          "error_detail": "operation error CloudFormation: CreateStack, https response error StatusCode: 400, RequestID: , api error UnknownError: UnknownError"
+        },
+        {
+          "name": "ListStacks",
+          "status": "fail",
+          "error_detail": "operation error CloudFormation: CreateStack, https response error StatusCode: 400, RequestID: , api error UnknownError: UnknownError"
+        }
+      ]
+    },
+    "cloudfront": {
+      "service": "cloudfront",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateDistribution",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        },
+        {
+          "name": "DeleteDistribution",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        },
+        {
+          "name": "GetDistribution",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        },
+        {
+          "name": "ListDistributions",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        }
+      ]
+    },
+    "cloudtrail": {
+      "service": "cloudtrail",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateTrail",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "DeleteTrail",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "DescribeTrails",
+          "status": "pass"
+        },
+        {
+          "name": "GetTrail",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        }
+      ]
+    },
+    "cloudwatch": {
+      "service": "cloudwatch",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "GetMetricData",
+          "status": "fail",
+          "error_detail": "operation error CloudWatch: PutMetricData, https response error StatusCode: 400, RequestID: , deserialization failed, unexpected smithy-protocol response header '' (HTTP status: 400 Bad Request)"
+        },
+        {
+          "name": "ListMetrics",
+          "status": "fail",
+          "error_detail": "operation error CloudWatch: ListMetrics, https response error StatusCode: 400, RequestID: , deserialization failed, unexpected smithy-protocol response header '' (HTTP status: 400 Bad Request)"
+        },
+        {
+          "name": "PutMetricData",
+          "status": "fail",
+          "error_detail": "operation error CloudWatch: PutMetricData, https response error StatusCode: 400, RequestID: , deserialization failed, unexpected smithy-protocol response header '' (HTTP status: 400 Bad Request)"
+        }
+      ]
+    },
+    "cloudwatchlogs": {
+      "service": "cloudwatchlogs",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateLogGroup",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteLogGroup",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeLogGroups",
+          "status": "pass"
+        },
+        {
+          "name": "PutLogEvents",
+          "status": "pass"
+        }
+      ]
+    },
+    "codeartifact": {
+      "service": "codeartifact",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateRepository",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteRepository",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListRepositories",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "codebuild": {
+      "service": "codebuild",
+      "total_ops": 4,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 50,
+      "operations": [
+        {
+          "name": "BatchGetProjects",
+          "status": "pass"
+        },
+        {
+          "name": "CreateProject",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Project name is required.\"}"
+        },
+        {
+          "name": "DeleteProject",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Project name is required.\"}"
+        },
+        {
+          "name": "ListProjects",
+          "status": "pass"
+        }
+      ]
+    },
+    "codecommit": {
+      "service": "codecommit",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateRepository",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Repository name is required.\"}"
+        },
+        {
+          "name": "DeleteRepository",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"RepositoryDoesNotExistException\",\"Message\":\"Repository does not exist: \"}"
+        },
+        {
+          "name": "GetRepository",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"RepositoryDoesNotExistException\",\"Message\":\"Repository does not exist: \"}"
+        },
+        {
+          "name": "ListRepositories",
+          "status": "pass"
+        }
+      ]
+    },
+    "codeconnections": {
+      "service": "codeconnections",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateConnection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Connection name is required.\"}"
+        },
+        {
+          "name": "DeleteConnection",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Connection not found: \"}"
+        },
+        {
+          "name": "GetConnection",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Connection not found: \"}"
+        },
+        {
+          "name": "ListConnections",
+          "status": "pass"
+        }
+      ]
+    },
+    "codedeploy": {
+      "service": "codedeploy",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Application name is required.\"}"
+        },
+        {
+          "name": "DeleteApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"applicationName is required.\"}"
+        },
+        {
+          "name": "GetApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"applicationName is required.\"}"
+        },
+        {
+          "name": "ListApplications",
+          "status": "pass"
+        }
+      ]
+    },
+    "codepipeline": {
+      "service": "codepipeline",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreatePipeline",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"pipeline is required.\"}"
+        },
+        {
+          "name": "DeletePipeline",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Pipeline name is required.\"}"
+        },
+        {
+          "name": "GetPipeline",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Pipeline name is required.\"}"
+        },
+        {
+          "name": "ListPipelines",
+          "status": "pass"
+        }
+      ]
+    },
+    "codestar-connections": {
+      "service": "codestar-connections",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateConnection",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;codestar-connections\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteConnection",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;codestar-connections\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListConnections",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;codestar-connections\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "cognito": {
+      "service": "cognito",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateUserPool",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteUserPool",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeUserPool",
+          "status": "pass"
+        },
+        {
+          "name": "ListUserPools",
+          "status": "pass"
+        }
+      ]
+    },
+    "config": {
+      "service": "config",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "DeleteConfigRule",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ConfigRuleName is required.\"}"
+        },
+        {
+          "name": "DescribeConfigRules",
+          "status": "pass"
+        },
+        {
+          "name": "PutConfigRule",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ConfigRuleName is required.\"}"
+        }
+      ]
+    },
+    "datasync": {
+      "service": "datasync",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateTask",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;datasync\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteTask",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;datasync\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListTasks",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;datasync\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "devicefarm": {
+      "service": "devicefarm",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateProject",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;devicefarm\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteProject",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;devicefarm\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListProjects",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;devicefarm\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "dms": {
+      "service": "dms",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateReplicationInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ReplicationInstanceIdentifier is required\"}"
+        },
+        {
+          "name": "DeleteReplicationInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ReplicationInstanceArn is required\"}"
+        },
+        {
+          "name": "DescribeReplicationInstances",
+          "status": "pass"
+        }
+      ]
+    },
+    "docdb": {
+      "service": "docdb",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateDBCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DBClusterIdentifier is required.\"}"
+        },
+        {
+          "name": "DeleteDBCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DBClusterIdentifier is required.\"}"
+        },
+        {
+          "name": "DescribeDBClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "dynamodb": {
+      "service": "dynamodb",
+      "total_ops": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateTable",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteItem",
+          "status": "pass"
+        },
+        {
+          "name": "GetItem",
+          "status": "pass"
+        },
+        {
+          "name": "PutItem",
+          "status": "pass"
+        },
+        {
+          "name": "Query",
+          "status": "pass"
+        },
+        {
+          "name": "Scan",
+          "status": "pass"
+        },
+        {
+          "name": "UpdateItem",
+          "status": "pass"
+        }
+      ]
+    },
+    "ec2": {
+      "service": "ec2",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "DescribeInstances",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeSecurityGroups",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeSubnets",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeVpcs",
+          "status": "pass"
+        }
+      ]
+    },
+    "ecs": {
+      "service": "ecs",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeClusters",
+          "status": "pass"
+        },
+        {
+          "name": "ListClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "eks": {
+      "service": "eks",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        },
+        {
+          "name": "ListClusters",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"This method and path combination is not implemented by cloudmock.\"}"
+        }
+      ]
+    },
+    "elasticache": {
+      "service": "elasticache",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateCacheCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"CacheClusterId is required.\"}"
+        },
+        {
+          "name": "DeleteCacheCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"CacheClusterId is required.\"}"
+        },
+        {
+          "name": "DescribeCacheClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "elasticbeanstalk": {
+      "service": "elasticbeanstalk",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ApplicationName is required.\"}"
+        },
+        {
+          "name": "DeleteApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ApplicationName is required.\"}"
+        },
+        {
+          "name": "DescribeApplications",
+          "status": "pass"
+        }
+      ]
+    },
+    "elasticloadbalancing": {
+      "service": "elasticloadbalancing",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateLoadBalancer",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "DeleteLoadBalancer",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"LoadBalancerArn is required.\"}"
+        },
+        {
+          "name": "DescribeLoadBalancers",
+          "status": "pass"
+        }
+      ]
+    },
+    "elasticmapreduce": {
+      "service": "elasticmapreduce",
+      "total_ops": 4,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 50,
+      "operations": [
+        {
+          "name": "DescribeCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ClusterId is required.\"}"
+        },
+        {
+          "name": "ListClusters",
+          "status": "pass"
+        },
+        {
+          "name": "RunJobFlow",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "TerminateJobFlows",
+          "status": "pass"
+        }
+      ]
+    },
+    "es": {
+      "service": "es",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateElasticsearchDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DomainName is required.\"}"
+        },
+        {
+          "name": "DeleteElasticsearchDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DomainName is required.\"}"
+        },
+        {
+          "name": "DescribeElasticsearchDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DomainName is required.\"}"
+        }
+      ]
+    },
+    "eventbridge": {
+      "service": "eventbridge",
+      "total_ops": 4,
+      "passed": 3,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 75,
+      "operations": [
+        {
+          "name": "CreateEventBus",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteEventBus",
+          "status": "pass"
+        },
+        {
+          "name": "PutEvents",
+          "status": "fail",
+          "error_detail": "operation error EventBridge: PutEvents, https response error StatusCode: 400, RequestID: , api error InvalidParameterException: Request body is not valid JSON."
+        },
+        {
+          "name": "PutRule",
+          "status": "pass"
+        }
+      ]
+    },
+    "events": {
+      "service": "events",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateEventBus",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteEventBus",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListEventBuses",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "finspace": {
+      "service": "finspace",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;finspace\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteEnvironment",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;finspace\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListEnvironments",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;finspace\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "firehose": {
+      "service": "firehose",
+      "total_ops": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateDeliveryStream",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteDeliveryStream",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeDeliveryStream",
+          "status": "pass"
+        }
+      ]
+    },
+    "fis": {
+      "service": "fis",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateExperimentTemplate",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteExperimentTemplate",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListExperimentTemplates",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "forecast": {
+      "service": "forecast",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateDatasetGroup",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;forecast\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteDatasetGroup",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;forecast\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListDatasetGroups",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;forecast\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "glacier": {
+      "service": "glacier",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateVault",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteVault",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListVaults",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "glue": {
+      "service": "glue",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Database name is required.\"}"
+        },
+        {
+          "name": "DeleteDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"EntityNotFoundException\",\"Message\":\"Database  not found.\"}"
+        },
+        {
+          "name": "GetDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"EntityNotFoundException\",\"Message\":\"Database  not found.\"}"
+        },
+        {
+          "name": "GetDatabases",
+          "status": "pass"
+        }
+      ]
+    },
+    "groundstation": {
+      "service": "groundstation",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateConfig",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;groundstation\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteConfig",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;groundstation\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListConfigs",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;groundstation\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "healthlake": {
+      "service": "healthlake",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateFHIRDatastore",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;healthlake\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteFHIRDatastore",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;healthlake\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListFHIRDatastores",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;healthlake\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "iam": {
+      "service": "iam",
+      "total_ops": 6,
+      "passed": 6,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateRole",
+          "status": "pass"
+        },
+        {
+          "name": "CreateUser",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteRole",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteUser",
+          "status": "pass"
+        },
+        {
+          "name": "GetUser",
+          "status": "pass"
+        },
+        {
+          "name": "ListUsers",
+          "status": "pass"
+        }
+      ]
+    },
+    "identitystore": {
+      "service": "identitystore",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateUser",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"IdentityStoreId and UserName are required\"}"
+        },
+        {
+          "name": "DeleteUser",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"IdentityStoreId and UserId are required\"}"
+        },
+        {
+          "name": "DescribeUser",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"IdentityStoreId and UserId are required\"}"
+        },
+        {
+          "name": "ListUsers",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"IdentityStoreId is required\"}"
+        }
+      ]
+    },
+    "inspector2": {
+      "service": "inspector2",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateFilter",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;inspector2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteFilter",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;inspector2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListFilters",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;inspector2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "iot": {
+      "service": "iot",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateThing",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteThing",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListThings",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "iot-data": {
+      "service": "iot-data",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateThingShadow",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteThingShadow",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListThingShadows",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "iot-wireless": {
+      "service": "iot-wireless",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateWirelessDevice",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteWirelessDevice",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListWirelessDevices",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "kafka": {
+      "service": "kafka",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListClusters",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "kinesis": {
+      "service": "kinesis",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateStream",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteStream",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeStream",
+          "status": "pass"
+        },
+        {
+          "name": "PutRecord",
+          "status": "pass"
+        }
+      ]
+    },
+    "kinesisanalytics": {
+      "service": "kinesisanalytics",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateApplication",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ApplicationName is required.\"}"
+        },
+        {
+          "name": "DeleteApplication",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Application  not found.\"}"
+        },
+        {
+          "name": "DescribeApplication",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Application  not found.\"}"
+        },
+        {
+          "name": "ListApplications",
+          "status": "pass"
+        }
+      ]
+    },
+    "kms": {
+      "service": "kms",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateKey",
+          "status": "pass"
+        },
+        {
+          "name": "Decrypt",
+          "status": "pass"
+        },
+        {
+          "name": "Encrypt",
+          "status": "pass"
+        },
+        {
+          "name": "ListKeys",
+          "status": "pass"
+        }
+      ]
+    },
+    "lakeformation": {
+      "service": "lakeformation",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "DeregisterResource",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"NoSuchKey\",\"Message\":\"Resource not found: \"}"
+        },
+        {
+          "name": "DescribeResource",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ResourceArn is required.\"}"
+        },
+        {
+          "name": "ListResources",
+          "status": "pass"
+        },
+        {
+          "name": "RegisterResource",
+          "status": "fail",
+          "error_detail": "HTTP 409: {\"__type\":\"AlreadyExists\",\"Message\":\"Resource already exists: \"}"
+        }
+      ]
+    },
+    "lambda": {
+      "service": "lambda",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateFunction",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteFunction",
+          "status": "pass"
+        },
+        {
+          "name": "GetFunction",
+          "status": "pass"
+        },
+        {
+          "name": "ListFunctions",
+          "status": "pass"
+        }
+      ]
+    },
+    "location": {
+      "service": "location",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateMap",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;location\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteMap",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;location\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListMaps",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;location\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "lookoutmetrics": {
+      "service": "lookoutmetrics",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateAnomalyDetector",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;lookoutmetrics\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteAnomalyDetector",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;lookoutmetrics\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListAnomalyDetectors",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;lookoutmetrics\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "macie2": {
+      "service": "macie2",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateFindingsFilter",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;macie2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteFindingsFilter",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;macie2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListFindingsFilters",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;macie2\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "managedblockchain": {
+      "service": "managedblockchain",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateNetwork",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteNetwork",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListNetworks",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "mediaconvert": {
+      "service": "mediaconvert",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateJob",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteJob",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListJobs",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "memorydb": {
+      "service": "memorydb",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ClusterName is required.\"}"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ClusterNotFoundFault\",\"Message\":\"Cluster not found.\"}"
+        },
+        {
+          "name": "DescribeClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "mgh": {
+      "service": "mgh",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateProgressUpdateStream",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;mgh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteProgressUpdateStream",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;mgh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListProgressUpdateStreams",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;mgh\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "mq": {
+      "service": "mq",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateBroker",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteBroker",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListBrokers",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "neptune": {
+      "service": "neptune",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateDBInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DBInstanceIdentifier is required.\"}"
+        },
+        {
+          "name": "DeleteDBInstance",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"DBInstanceNotFound\",\"Message\":\"Instance  not found.\"}"
+        },
+        {
+          "name": "DescribeDBInstances",
+          "status": "pass"
+        }
+      ]
+    },
+    "nimble": {
+      "service": "nimble",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateStudio",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;nimble\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteStudio",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;nimble\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListStudios",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;nimble\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "opensearch": {
+      "service": "opensearch",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListDomains",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "organizations": {
+      "service": "organizations",
+      "total_ops": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateOrganization",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeOrganization",
+          "status": "pass"
+        },
+        {
+          "name": "ListAccounts",
+          "status": "pass"
+        }
+      ]
+    },
+    "outposts": {
+      "service": "outposts",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateOutpost",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;outposts\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteOutpost",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;outposts\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListOutposts",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;outposts\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "panorama": {
+      "service": "panorama",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateDevice",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;panorama\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteDevice",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;panorama\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListDevices",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;panorama\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "pinpoint": {
+      "service": "pinpoint",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateApp",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteApp",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListApps",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "pipes": {
+      "service": "pipes",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreatePipe",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeletePipe",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListPipes",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "private-networks": {
+      "service": "private-networks",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateNetwork",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;private-networks\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteNetwork",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;private-networks\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListNetworks",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;private-networks\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "proton": {
+      "service": "proton",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateEnvironmentTemplate",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;proton\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteEnvironmentTemplate",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;proton\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListEnvironmentTemplates",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;proton\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "ram": {
+      "service": "ram",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateResourceShare",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name is required.\"}"
+        },
+        {
+          "name": "DeleteResourceShare",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"UnknownResourceException\",\"Message\":\"Resource share  not found.\"}"
+        },
+        {
+          "name": "GetResourceShares",
+          "status": "pass"
+        }
+      ]
+    },
+    "rds": {
+      "service": "rds",
+      "total_ops": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateDBInstance",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteDBInstance",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeDBInstances",
+          "status": "pass"
+        }
+      ]
+    },
+    "redshift": {
+      "service": "redshift",
+      "total_ops": 3,
+      "passed": 1,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 33.33,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ClusterIdentifier is required.\"}"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ClusterIdentifier is required.\"}"
+        },
+        {
+          "name": "DescribeClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "rekognition": {
+      "service": "rekognition",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateCollection",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;rekognition\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteCollection",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;rekognition\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListCollections",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;rekognition\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "resource-groups": {
+      "service": "resource-groups",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateGroup",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteGroup",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListGroups",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "robomaker": {
+      "service": "robomaker",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateSimulationApplication",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;robomaker\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteSimulationApplication",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;robomaker\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListSimulationApplications",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;robomaker\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "route53": {
+      "service": "route53",
+      "total_ops": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateHostedZone",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteHostedZone",
+          "status": "pass"
+        },
+        {
+          "name": "ListHostedZones",
+          "status": "pass"
+        }
+      ]
+    },
+    "route53resolver": {
+      "service": "route53resolver",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateResolverEndpoint",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteResolverEndpoint",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListResolverEndpoints",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "s3": {
+      "service": "s3",
+      "total_ops": 7,
+      "passed": 7,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CopyObject",
+          "status": "pass"
+        },
+        {
+          "name": "CreateBucket",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteBucket",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteObject",
+          "status": "pass"
+        },
+        {
+          "name": "GetObject",
+          "status": "pass"
+        },
+        {
+          "name": "ListObjects",
+          "status": "pass"
+        },
+        {
+          "name": "PutObject",
+          "status": "pass"
+        }
+      ]
+    },
+    "s3tables": {
+      "service": "s3tables",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateTableBucket",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required\"}"
+        },
+        {
+          "name": "DeleteTableBucket",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required\"}"
+        },
+        {
+          "name": "ListTableBuckets",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required\"}"
+        }
+      ]
+    },
+    "sagemaker": {
+      "service": "sagemaker",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateNotebookInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"NotebookInstanceName is required.\"}"
+        },
+        {
+          "name": "DeleteNotebookInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"NotebookInstanceName is required.\"}"
+        },
+        {
+          "name": "DescribeNotebookInstance",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"NotebookInstanceName is required.\"}"
+        },
+        {
+          "name": "ListNotebookInstances",
+          "status": "pass"
+        }
+      ]
+    },
+    "scheduler": {
+      "service": "scheduler",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateSchedule",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteSchedule",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListSchedules",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "securityhub": {
+      "service": "securityhub",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateHub",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;securityhub\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "DeleteHub",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;securityhub\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        },
+        {
+          "name": "ListHubs",
+          "status": "fail",
+          "error_detail": "HTTP 503: \u003cError\u003e\u003cCode\u003eServiceUnavailable\u003c/Code\u003e\u003cMessage\u003eService \u0026#34;securityhub\u0026#34; is not registered in this cloudmock instance.\u003c/Message\u003e\u003c/Error\u003e"
+        }
+      ]
+    },
+    "serverlessrepo": {
+      "service": "serverlessrepo",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateApplication",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "DeleteApplication",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        },
+        {
+          "name": "ListApplications",
+          "status": "fail",
+          "error_detail": "HTTP 501: {\"__type\":\"NotImplemented\",\"Message\":\"Route not implemented\"}"
+        }
+      ]
+    },
+    "servicediscovery": {
+      "service": "servicediscovery",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateService",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Name and NamespaceId are required.\"}"
+        },
+        {
+          "name": "DeleteService",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Id is required.\"}"
+        },
+        {
+          "name": "GetService",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Id is required.\"}"
+        },
+        {
+          "name": "ListServices",
+          "status": "pass"
+        }
+      ]
+    },
+    "shield": {
+      "service": "shield",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateProtection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteProtection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DescribeProtection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListProtections",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "sns": {
+      "service": "sns",
+      "total_ops": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateTopic",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteTopic",
+          "status": "pass"
+        },
+        {
+          "name": "ListTopics",
+          "status": "pass"
+        },
+        {
+          "name": "Publish",
+          "status": "pass"
+        },
+        {
+          "name": "Subscribe",
+          "status": "pass"
+        }
+      ]
+    },
+    "sqs": {
+      "service": "sqs",
+      "total_ops": 5,
+      "passed": 5,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "CreateQueue",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteMessage",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteQueue",
+          "status": "pass"
+        },
+        {
+          "name": "ReceiveMessage",
+          "status": "pass"
+        },
+        {
+          "name": "SendMessage",
+          "status": "pass"
+        }
+      ]
+    },
+    "sso-admin": {
+      "service": "sso-admin",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreatePermissionSet",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Instance not found.\"}"
+        },
+        {
+          "name": "DeletePermissionSet",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Permission set not found.\"}"
+        },
+        {
+          "name": "DescribePermissionSet",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Permission set not found.\"}"
+        },
+        {
+          "name": "ListPermissionSets",
+          "status": "pass"
+        }
+      ]
+    },
+    "sts": {
+      "service": "sts",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "AssumeRole",
+          "status": "pass"
+        },
+        {
+          "name": "GetCallerIdentity",
+          "status": "pass"
+        }
+      ]
+    },
+    "support": {
+      "service": "support",
+      "total_ops": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 66.67,
+      "operations": [
+        {
+          "name": "CreateCase",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationException\",\"Message\":\"1 validation error detected: Value at 'subject' failed to satisfy constraint: Member must not be null\"}"
+        },
+        {
+          "name": "DescribeCases",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeTrustedAdvisorChecks",
+          "status": "pass"
+        }
+      ]
+    },
+    "swf": {
+      "service": "swf",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "DeprecateDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required.\"}"
+        },
+        {
+          "name": "DescribeDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required.\"}"
+        },
+        {
+          "name": "ListDomains",
+          "status": "pass"
+        },
+        {
+          "name": "RegisterDomain",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"name is required.\"}"
+        }
+      ]
+    },
+    "tagging": {
+      "service": "tagging",
+      "total_ops": 3,
+      "passed": 2,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 66.67,
+      "operations": [
+        {
+          "name": "GetResources",
+          "status": "pass"
+        },
+        {
+          "name": "TagResources",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidParameterException\",\"Message\":\"ResourceARNList must contain at least one ARN.\"}"
+        },
+        {
+          "name": "UntagResources",
+          "status": "pass"
+        }
+      ]
+    },
+    "textract": {
+      "service": "textract",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "AnalyzeDocument",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Document is required.\"}"
+        },
+        {
+          "name": "DetectDocumentText",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"Document is required.\"}"
+        },
+        {
+          "name": "GetDocumentTextDetection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"JobId is required.\"}"
+        },
+        {
+          "name": "StartDocumentTextDetection",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DocumentLocation is required.\"}"
+        }
+      ]
+    },
+    "timestream-write": {
+      "service": "timestream-write",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "CreateDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"DatabaseName is required.\"}"
+        },
+        {
+          "name": "DeleteDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Database  not found.\"}"
+        },
+        {
+          "name": "DescribeDatabase",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Database  not found.\"}"
+        },
+        {
+          "name": "ListDatabases",
+          "status": "pass"
+        }
+      ]
+    },
+    "transcribe": {
+      "service": "transcribe",
+      "total_ops": 4,
+      "passed": 1,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 25,
+      "operations": [
+        {
+          "name": "DeleteTranscriptionJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TranscriptionJobName is required.\"}"
+        },
+        {
+          "name": "GetTranscriptionJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TranscriptionJobName is required.\"}"
+        },
+        {
+          "name": "ListTranscriptionJobs",
+          "status": "pass"
+        },
+        {
+          "name": "StartTranscriptionJob",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"TranscriptionJobName is required.\"}"
+        }
+      ]
+    },
+    "transfer": {
+      "service": "transfer",
+      "total_ops": 4,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 50,
+      "operations": [
+        {
+          "name": "CreateServer",
+          "status": "pass"
+        },
+        {
+          "name": "DeleteServer",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ServerId is required\"}"
+        },
+        {
+          "name": "DescribeServer",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"ValidationError\",\"Message\":\"ServerId is required\"}"
+        },
+        {
+          "name": "ListServers",
+          "status": "pass"
+        }
+      ]
+    },
+    "verifiedpermissions": {
+      "service": "verifiedpermissions",
+      "total_ops": 4,
+      "passed": 2,
+      "failed": 2,
+      "skipped": 0,
+      "compat_pct": 50,
+      "operations": [
+        {
+          "name": "CreatePolicyStore",
+          "status": "pass"
+        },
+        {
+          "name": "DeletePolicyStore",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Policy store  not found.\"}"
+        },
+        {
+          "name": "GetPolicyStore",
+          "status": "fail",
+          "error_detail": "HTTP 404: {\"__type\":\"ResourceNotFoundException\",\"Message\":\"Policy store  not found.\"}"
+        },
+        {
+          "name": "ListPolicyStores",
+          "status": "pass"
+        }
+      ]
+    },
+    "waf-regional": {
+      "service": "waf-regional",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 4,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateWebACL",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteWebACL",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "GetWebACL",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListWebACLs",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "wafv2": {
+      "service": "wafv2",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 3,
+      "skipped": 0,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateWebACL",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "DeleteWebACL",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        },
+        {
+          "name": "ListWebACLs",
+          "status": "fail",
+          "error_detail": "HTTP 400: {\"__type\":\"InvalidAction\",\"Message\":\"The action  is not valid for this web service.\"}"
+        }
+      ]
+    },
+    "xray": {
+      "service": "xray",
+      "total_ops": 3,
+      "passed": 3,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "BatchGetTraces",
+          "status": "pass"
+        },
+        {
+          "name": "GetTraceSummaries",
+          "status": "pass"
+        },
+        {
+          "name": "PutTraceSegments",
+          "status": "pass"
+        }
+      ]
+    }
+  }
+}

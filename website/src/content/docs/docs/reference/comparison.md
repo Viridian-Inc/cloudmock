@@ -9,6 +9,7 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 
 | Feature | CloudMock | LocalStack | Moto | SAM Local |
 |---------|-----------|------------|------|-----------|
+| **AWS API Compatibility** | [Live dashboard](/docs/reference/compatibility/) — per-service pass/fail breakdown | No public dashboard | No public dashboard | No public dashboard |
 | **Service count** | 99 fully emulated services | 80+ (varies by tier) | 150+ (mock-level) | 4 (Lambda, API GW, DynamoDB, S3) |
 | **Protocol fidelity** | High -- implements actual AWS wire protocols (Query, JSON, REST-JSON, REST-XML) | High -- aims for API compatibility | Medium -- Python mocks, some protocol gaps | Medium -- focused on SAM/CloudFormation |
 | **Implementation language** | Go | Python | Python | Python / Go (Lambda runtime) |

@@ -1,0 +1,53 @@
+name: Compatibility Report
+
+on:
+  schedule:
+    # Run nightly at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  compat-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+
+      # Run the CloudMock-only benchmark to get fresh correctness data.
+      # AWS comparison is not run here yet — that requires AWS credentials
+      # configured in repository secrets. Add --target=aws when ready.
+      - name: Run CloudMock benchmark (correctness only)
+        run: |
+          go run ./benchmarks/cmd/bench \
+            --target=cloudmock \
+            --mode=docker \
+            --services='*' \
+            --quick
+
+      # Generate the compat report JSON from the fresh benchmark results.
+      - name: Generate compat report
+        run: |
+          go run ./benchmarks/compat/cmd/ \
+            --input benchmarks/results/full-cloudmock/results.json \
+            --output website/src/data/compat.json
+
+      # Commit the updated compat.json back to main so the website picks it up
+      # on the next Cloudflare Pages deployment.
+      - name: Commit updated compat report
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add website/src/data/compat.json benchmarks/results/full-cloudmock/
+          git diff --cached --quiet || git commit -m "chore: update compatibility report [skip ci]"
+          git push || true
+
+      - name: Upload compat report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: compat-report-${{ github.run_id }}
+          path: website/src/data/compat.json

@@ -29,6 +29,12 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | **State snapshots** | Built-in — export/import JSON, commit to git, `--state` flag on startup | Cloud Pods (Pro tier only) | No equivalent | No equivalent |
 | **Multi-account** | Single account (configurable ID) | Pro tier | In-process mocking | Single account |
 
+## Traffic recording & replay
+
+| Feature | CloudMock | LocalStack | Moto |
+|---|---|---|---|
+| Traffic recording & replay | Built-in (proxy + SDK interceptor) | No | No |
+
 ## IaC tool support
 
 | Feature | CloudMock | LocalStack (Free) | Moto |

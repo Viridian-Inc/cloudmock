@@ -3671,6 +3671,7 @@ func (a *API) SetTrafficEngine(e *traffic.Engine) {
 	a.mux.HandleFunc("/api/traffic/runs", a.handleTrafficRuns)
 	a.mux.HandleFunc("/api/traffic/synthetic", a.handleTrafficSynthetic)
 	a.mux.HandleFunc("/api/traffic/compare", a.handleTrafficCompare)
+	a.mux.HandleFunc("/api/traffic/entries", a.handleInjectEntries)
 }
 
 // SetAnnotationStore sets the annotation store for the admin API.

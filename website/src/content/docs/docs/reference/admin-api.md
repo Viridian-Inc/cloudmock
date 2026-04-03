@@ -421,6 +421,35 @@ curl -X POST http://localhost:4599/api/chaos \
 
 ---
 
+## Traffic
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/traffic/entries` | Inject recorded traffic entries into CloudMock |
+
+### POST /api/traffic/entries
+
+Inject an array of captured traffic entries to create an ad-hoc recording for replay or validation:
+
+```bash
+curl -X POST http://localhost:4599/api/traffic/entries \
+  -H 'Content-Type: application/json' \
+  -d '[
+    {
+      "id": "entry-1",
+      "service": "s3",
+      "action": "GetObject",
+      "method": "GET",
+      "path": "/my-bucket/key",
+      "status_code": 200
+    }
+  ]'
+```
+
+Each entry in the array accepts the same fields as a `CapturedEntry` in a recording file (see the [Traffic Replay guide](/docs/guides/traffic-replay/) for the full schema).
+
+---
+
 ## Shadow Testing
 
 | Method | Path | Description |

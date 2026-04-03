@@ -83,6 +83,30 @@ cloudmock-pulumi destroy
 
 Works with the official `@pulumi/aws` provider. Also ships a native CloudMock Pulumi provider with 44 resource types.
 
+## Traffic Recording & Replay
+
+Record real AWS traffic and replay it against CloudMock to prove your mock matches production.
+
+```bash
+# Record: proxy mode captures real AWS calls
+cloudmock record --output prod-traffic.json
+# (run your test suite — hits real AWS via proxy, all recorded)
+
+# Replay: send recorded traffic to CloudMock
+cloudmock replay --input prod-traffic.json
+
+# Validate: CI-friendly comparison (exit code 0 = all match)
+cloudmock validate --input prod-traffic.json
+```
+
+Go SDK interceptor for zero-config recording:
+```go
+recorder := sdk.NewRecorder()
+cfg.HTTPClient = &http.Client{Transport: recorder.Wrap(http.DefaultTransport)}
+// Use AWS SDK normally — all calls recorded
+recorder.SaveToFile("recording.json")
+```
+
 ## Links
 
 - [Documentation](https://cloudmock.io/docs)

@@ -1,0 +1,60 @@
+# {{PROJECT_NAME}}
+
+Express + S3 file upload/download app with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Run the app
+
+```bash
+npm start
+```
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /upload?key=filename | Upload a file |
+| GET | /files | List all files |
+| GET | /files/:key | Download a file |
+
+Example:
+
+```bash
+# Upload
+curl -X POST "http://localhost:3000/upload?key=notes.txt" \
+  -H "Content-Type: text/plain" \
+  --data-binary "Hello from CloudMock"
+
+# Download
+curl http://localhost:3000/files/notes.txt
+
+# List
+curl http://localhost:3000/files
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+Tests use `@cloudmock/sdk` — no Docker required.
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) to explore traces and request topology.

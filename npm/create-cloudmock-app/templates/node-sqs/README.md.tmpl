@@ -1,0 +1,64 @@
+# {{PROJECT_NAME}}
+
+Express + SQS producer/consumer app with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Create the queue
+
+```bash
+AWS_ENDPOINT_URL=http://localhost:4566 aws sqs create-queue \
+  --queue-name messages \
+  --endpoint-url http://localhost:4566 \
+  --region us-east-1
+```
+
+### 4. Run the API server and worker
+
+```bash
+npm start          # terminal 1 — HTTP API
+npm run worker     # terminal 2 — SQS consumer
+```
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /messages | Send a message to SQS |
+| GET | /messages | Receive and delete messages |
+
+Example:
+
+```bash
+# Send a message
+curl -X POST http://localhost:3000/messages \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"order.created","orderId":"42"}'
+
+# Poll messages
+curl http://localhost:3000/messages
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) to view queue metrics and message traces.

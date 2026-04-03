@@ -1,0 +1,58 @@
+# {{PROJECT_NAME}}
+
+Express + DynamoDB app with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+npm install
+```
+
+### 3. Run the app
+
+```bash
+npm start
+```
+
+The server starts on http://localhost:3000.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /items | Create / replace an item |
+| GET | /items | List all items |
+| GET | /items/:id | Get a single item |
+| DELETE | /items/:id | Delete an item |
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/items \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"1","name":"Widget","price":9.99}'
+
+curl http://localhost:3000/items/1
+```
+
+## Testing
+
+```bash
+npm test
+```
+
+Tests use `@cloudmock/sdk` to start an in-process CloudMock instance — no Docker required.
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) to explore traces, metrics, and request topology.

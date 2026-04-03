@@ -1,0 +1,52 @@
+# {{PROJECT_NAME}}
+
+Spring Boot + DynamoDB with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Run the application
+
+```bash
+mvn spring-boot:run
+```
+
+API available at http://localhost:8080.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /items | Create an item |
+| GET | /items | List all items |
+| GET | /items/{id} | Get an item |
+| DELETE | /items/{id} | Delete an item |
+
+Example:
+
+```bash
+curl -X POST http://localhost:8080/items \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"1","name":"Widget"}'
+
+curl http://localhost:8080/items/1
+```
+
+## Testing
+
+```bash
+mvn test
+```
+
+Tests use `CloudMock.start()` — no Docker required.
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) for traces and DynamoDB metrics.

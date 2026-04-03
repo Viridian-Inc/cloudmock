@@ -1,0 +1,54 @@
+# {{PROJECT_NAME}}
+
+Go HTTP server + SQS producer/consumer with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+go mod tidy
+```
+
+### 3. Run the server
+
+```bash
+go run .
+```
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /messages | Send a message to SQS |
+| GET | /messages | Receive and delete messages |
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/messages \
+  -H 'Content-Type: application/json' \
+  -d '{"message":"order.placed","orderId":"99"}'
+
+curl http://localhost:3000/messages
+```
+
+## Testing
+
+```bash
+go test ./...
+```
+
+Uses `sdk.New()` for in-process CloudMock — no Docker required.
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) for SQS metrics and traces.

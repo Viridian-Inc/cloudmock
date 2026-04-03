@@ -46,7 +46,7 @@ runs:
         else
           npm install -g cloudmock@${{ inputs.version }}
         fi
-        VERSION=$(cloudmock --version 2>/dev/null || echo "unknown")
+        VERSION=$(npm list -g cloudmock --depth=0 2>/dev/null | grep cloudmock | sed 's/.*@//' || echo "unknown")
         echo "version=$VERSION" >> $GITHUB_OUTPUT
         echo "CloudMock $VERSION installed"
 

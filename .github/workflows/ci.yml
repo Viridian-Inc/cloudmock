@@ -9,6 +9,6 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: '1.22'
-      - run: go build ./...
-      - run: go vet ./...
-      - run: go test $(go list ./... | grep -v postgres) -timeout 120s
+      - run: go build $(go list ./... | grep -v create-cloudmock-app/templates)
+      - run: go vet $(go list ./... | grep -v create-cloudmock-app/templates)
+      - run: go test $(go list ./... | grep -v postgres | grep -v create-cloudmock-app/templates) -timeout 120s

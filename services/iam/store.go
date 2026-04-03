@@ -510,7 +510,7 @@ func (s *Store) AttachUserPolicy(userName, policyArn string) error {
 
 	s.policiesMu.Lock()
 	pol, ok := s.policies[policyArn]
-	if !ok {
+	if !ok && !strings.HasPrefix(policyArn, "arn:aws:iam::aws:policy/") {
 		s.policiesMu.Unlock()
 		s.usersMu.Unlock()
 		return fmt.Errorf("NoSuchEntity: Policy %s does not exist", policyArn)
@@ -521,12 +521,14 @@ func (s *Store) AttachUserPolicy(userName, policyArn string) error {
 	}
 	if !s.userPolicies[userName][policyArn] {
 		s.userPolicies[userName][policyArn] = true
-		pol.AttachCount++
+		if pol != nil {
+			pol.AttachCount++
+		}
 	}
 
 	// Capture document for engine registration
 	var doc string
-	if s.engine != nil && pol.Document != "" {
+	if s.engine != nil && pol != nil && pol.Document != "" {
 		doc = pol.Document
 	}
 	s.policiesMu.Unlock()
@@ -612,7 +614,9 @@ func (s *Store) AttachRolePolicy(roleName, policyArn string) error {
 
 	s.policiesMu.Lock()
 	pol, ok := s.policies[policyArn]
-	if !ok {
+	if !ok && !strings.HasPrefix(policyArn, "arn:aws:iam::aws:policy/") {
+		// Only require the policy to exist for customer-managed policies.
+		// AWS managed policies (arn:aws:iam::aws:policy/*) are always valid.
 		s.policiesMu.Unlock()
 		s.rolesMu.Unlock()
 		return fmt.Errorf("NoSuchEntity: Policy %s does not exist", policyArn)
@@ -623,11 +627,13 @@ func (s *Store) AttachRolePolicy(roleName, policyArn string) error {
 	}
 	if !s.rolePolicies[roleName][policyArn] {
 		s.rolePolicies[roleName][policyArn] = true
-		pol.AttachCount++
+		if pol != nil {
+			pol.AttachCount++
+		}
 	}
 
 	var doc string
-	if s.engine != nil && pol.Document != "" {
+	if s.engine != nil && pol != nil && pol.Document != "" {
 		doc = pol.Document
 	}
 	s.policiesMu.Unlock()

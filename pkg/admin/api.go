@@ -44,6 +44,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/service"
 	"github.com/neureaux/cloudmock/pkg/marketplace"
 	"github.com/neureaux/cloudmock/pkg/security"
+	"github.com/neureaux/cloudmock/pkg/snapshot"
 	"github.com/neureaux/cloudmock/pkg/synthetics"
 	"github.com/neureaux/cloudmock/pkg/tracecompare"
 	"github.com/neureaux/cloudmock/pkg/traffic"
@@ -321,6 +322,11 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	// Natural language query endpoint
 	a.mux.HandleFunc("/api/ask", a.handleAsk)
 
+	// State snapshot endpoints
+	a.mux.HandleFunc("/api/state/export", a.handleStateExport)
+	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
+	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
+
 	a.seedDefaultDashboard()
 
 	return a
@@ -452,6 +458,11 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 
 	// Natural language query endpoint
 	a.mux.HandleFunc("/api/ask", a.handleAsk)
+
+	// State snapshot endpoints
+	a.mux.HandleFunc("/api/state/export", a.handleStateExport)
+	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
+	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
 
 	a.seedDefaultDashboard()
 
@@ -593,6 +604,55 @@ func (a *API) handleResetAll(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	writeJSON(w, http.StatusOK, map[string]any{"status": "reset", "services": resetNames})
+}
+
+func (a *API) handleStateExport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	data, err := snapshot.Export(a.registry)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(data)
+}
+
+func (a *API) handleStateImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "failed to read request body")
+		return
+	}
+	if err := snapshot.Import(a.registry, body); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "imported"})
+}
+
+func (a *API) handleStateReset(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	svcs := a.registry.All()
+	var resetNames []string
+	for _, svc := range svcs {
+		if snap, ok := svc.(service.Snapshotable); ok {
+			// Import an empty services map to reset state.
+			snap.ImportState([]byte("{}"))
+			resetNames = append(resetNames, svc.Name())
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"status": "reset", "services": resetNames})
 }
 

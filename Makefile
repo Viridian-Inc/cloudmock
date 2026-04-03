@@ -72,6 +72,7 @@ build-tools:
 	@go build -o bin/cloudmock-chalice ./tools/cloudmock-chalice
 	@go build -o bin/cloudmock-copilot ./tools/cloudmock-copilot
 	@go build -o bin/cloudmock-ci ./tools/cloudmock-ci
+	@go build -o bin/cloudmock-pulumi ./tools/cloudmock-pulumi
 
 build-plugins: build-plugin-example
 	@echo "Plugins built (in-process plugins are compiled into gateway)"

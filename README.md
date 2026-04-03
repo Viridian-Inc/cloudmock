@@ -200,6 +200,11 @@ docker compose up
 
 See the [Docker Compose guide](https://cloudmock.app/docs/guides/docker-compose) for quick starts, customization, and how to add your own services.
 
+## Switching from LocalStack or Moto?
+
+- [Migrate from LocalStack](https://cloudmock.app/docs/guides/migrate-from-localstack/) — 5-minute step-by-step
+- [Migrate from Moto](https://cloudmock.app/docs/guides/migrate-from-moto/) — Python pytest/unittest migration
+
 ## Traffic Recording & Replay
 
 Record real AWS traffic and replay against CloudMock to validate compatibility:

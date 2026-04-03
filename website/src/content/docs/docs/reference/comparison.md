@@ -149,7 +149,14 @@ Where SAM Local is stronger:
 | Budget-conscious teams | CloudMock or Moto (both fully free) |
 | Maximum service coverage regardless of cost | LocalStack Enterprise |
 
-## Migration from LocalStack
+## Migration guides
+
+Ready to switch? Step-by-step guides covering Docker Compose, environment variables, Terraform, CDK, pytest, Jest, Go, and GitHub Actions:
+
+- [Migrate from LocalStack](/docs/guides/migrate-from-localstack/) — same port (4566), same endpoint, most migrations take under 5 minutes
+- [Migrate from Moto](/docs/guides/migrate-from-moto/) — pytest fixture migration, unittest migration, and server mode replacement
+
+### Quick overview: LocalStack
 
 If you are currently using LocalStack, migrating to CloudMock is straightforward because both tools serve the AWS API on a configurable port:
 
@@ -157,3 +164,11 @@ If you are currently using LocalStack, migrating to CloudMock is straightforward
 2. Verify that the services your application uses are in CloudMock's [compatibility matrix](/docs/services/).
 3. Replace any LocalStack-specific admin API calls with the equivalent CloudMock admin API calls.
 4. Update CI/CD scripts to install and start CloudMock instead of LocalStack.
+
+See the [full LocalStack migration guide](/docs/guides/migrate-from-localstack/) for code examples in Python, Node.js, Go, Terraform, CDK, and GitHub Actions.
+
+### Quick overview: Moto
+
+If you are currently using Moto, the key change is replacing `@mock_aws` decorators with a CloudMock context manager or fixture. CloudMock runs as a real HTTP server rather than intercepting at the Python SDK level — this enables multi-language testing and protocol-level validation.
+
+See the [full Moto migration guide](/docs/guides/migrate-from-moto/) for pytest, unittest, and server mode examples.

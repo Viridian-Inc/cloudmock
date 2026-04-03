@@ -27,6 +27,9 @@ This page compares CloudMock with other popular AWS emulation and mocking tools.
 | **Language SDKs** | Node.js, Go, Python, Java, Rust, Ruby (with trace propagation) | None (use AWS SDKs directly) | Python only (decorator-based) | None (use AWS SDKs directly) |
 | **Persistence** | Snapshot, DuckDB, PostgreSQL | Pro tier (persistence) | In-memory only | In-memory only |
 | **State snapshots** | Built-in — export/import JSON, commit to git, `--state` flag on startup | Cloud Pods (Pro tier only) | No equivalent | No equivalent |
+| **Traffic recording & replay** | Built-in (proxy + Go SDK interceptor, validate subcommand) | No | No | No |
+| **GitHub Action** | `viridian-inc/cloudmock-action@v1` — one-line CI setup | Yes (localstack-action) | No | No |
+| **Scaffolding CLI** | `create-cloudmock-app` — 9 templates (Node/Python/Go/Java/Rust) | No | No | No |
 | **Multi-account** | Single account (configurable ID) | Pro tier | In-process mocking | Single account |
 
 ## Traffic recording & replay

@@ -709,6 +709,50 @@ func resetCloudMock(t *testing.T) {
 
 ## CI integration
 
+### GitHub Actions — cloudmock-action (recommended)
+
+The official `cloudmock-action` handles install, startup, health-check, and environment variable setup in one step:
+
+```yaml
+name: Tests
+on: push
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: viridian-inc/cloudmock-action@v1
+      - run: npm test  # AWS_ENDPOINT_URL is already set
+```
+
+The action automatically sets `AWS_ENDPOINT_URL`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `AWS_DEFAULT_REGION` for all subsequent steps.
+
+#### With options
+
+```yaml
+- uses: viridian-inc/cloudmock-action@v1
+  with:
+    profile: full            # minimal (default), standard, or full (all 99 services)
+    state: fixtures/state.json  # pre-load a state snapshot
+    iam-mode: enforce        # none (default), log, or enforce
+```
+
+#### Outputs
+
+```yaml
+- uses: viridian-inc/cloudmock-action@v1
+  id: cloudmock
+- run: |
+    echo "Endpoint: ${{ steps.cloudmock.outputs.endpoint }}"
+    aws --endpoint ${{ steps.cloudmock.outputs.endpoint }} s3 ls
+```
+
+| Output | Description |
+|--------|-------------|
+| `endpoint` | Gateway URL (e.g., `http://localhost:4566`) |
+| `admin-url` | Admin API URL (e.g., `http://localhost:4599`) |
+| `version` | Installed CloudMock version |
+
 ### GitHub Actions — npx
 
 ```yaml

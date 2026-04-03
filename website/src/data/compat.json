@@ -1,44 +1,28 @@
 {
-  "generated_at": "2026-04-02T23:53:59Z",
-  "cloudmock_version": "1.2.0",
-  "total_ops": 213,
-  "passed": 122,
+  "generated_at": "2026-04-03T00:11:55Z",
+  "cloudmock_version": "1.3.0",
+  "total_ops": 219,
+  "passed": 154,
   "failed": 0,
-  "skipped": 91,
+  "skipped": 65,
   "compat_pct": 100.0,
   "services": {
-    "acm": {
-      "service": "acm",
-      "total_ops": 4,
-      "passed": 1,
+    "account": {
+      "service": "account",
+      "total_ops": 1,
+      "passed": 0,
       "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
+      "skipped": 1,
+      "compat_pct": 0,
       "operations": [
         {
-          "name": "DeleteCertificate",
-          "status": "skip",
-          "cm_status": 1.020083
-        },
-        {
-          "name": "DescribeCertificate",
-          "status": "skip",
-          "cm_status": 0.994292
-        },
-        {
-          "name": "ListCertificates",
-          "status": "pass",
-          "cm_status": 0.168959
-        },
-        {
-          "name": "RequestCertificate",
-          "status": "skip",
-          "cm_status": 1.218458
+          "name": "ListRegions",
+          "status": "skip"
         }
       ]
     },
-    "acm-pca": {
-      "service": "acm-pca",
+    "acm": {
+      "service": "acm",
       "total_ops": 3,
       "passed": 2,
       "failed": 0,
@@ -46,134 +30,264 @@
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateCertificateAuthority",
-          "status": "pass",
-          "cm_status": 0.170167
+          "name": "DescribeCertificate",
+          "status": "skip"
         },
         {
-          "name": "DescribeCertificateAuthority",
-          "status": "skip",
-          "cm_status": 1.032458
+          "name": "ListCertificates",
+          "status": "pass"
         },
+        {
+          "name": "RequestCertificate",
+          "status": "pass"
+        }
+      ]
+    },
+    "acm-pca": {
+      "service": "acm-pca",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
         {
           "name": "ListCertificateAuthorities",
-          "status": "pass",
-          "cm_status": 1.024458
+          "status": "pass"
+        }
+      ]
+    },
+    "amplify": {
+      "service": "amplify",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateApp",
+          "status": "skip"
+        },
+        {
+          "name": "ListApps",
+          "status": "skip"
+        }
+      ]
+    },
+    "apigateway": {
+      "service": "apigateway",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 4,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateRestApi",
+          "status": "skip"
+        },
+        {
+          "name": "DeleteRestApi",
+          "status": "skip"
+        },
+        {
+          "name": "GetRestApi",
+          "status": "skip"
+        },
+        {
+          "name": "GetRestApis",
+          "status": "skip"
         }
       ]
     },
     "appconfig": {
       "service": "appconfig",
-      "total_ops": 4,
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListApplications",
+          "status": "skip"
+        },
+        {
+          "name": "ListEnvironments",
+          "status": "skip"
+        }
+      ]
+    },
+    "application-autoscaling": {
+      "service": "application-autoscaling",
+      "total_ops": 1,
       "passed": 1,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateApplication",
-          "status": "skip",
-          "cm_status": 0.763417
+          "name": "DescribeScalableTargets",
+          "status": "pass"
+        }
+      ]
+    },
+    "apprunner": {
+      "service": "apprunner",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListAutoScalingConfigurations",
+          "status": "skip"
         },
         {
-          "name": "DeleteApplication",
-          "status": "skip",
-          "cm_status": 0.830083
+          "name": "ListServices",
+          "status": "skip"
+        }
+      ]
+    },
+    "appsync": {
+      "service": "appsync",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateGraphqlApi",
+          "status": "skip"
         },
         {
-          "name": "GetApplication",
-          "status": "skip",
-          "cm_status": 0.752583
-        },
-        {
-          "name": "ListApplications",
-          "status": "pass",
-          "cm_status": 0.157333
+          "name": "ListGraphqlApis",
+          "status": "skip"
         }
       ]
     },
     "athena": {
       "service": "athena",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "GetQueryExecution",
-          "status": "skip",
-          "cm_status": 0.75425
-        },
-        {
           "name": "ListQueryExecutions",
-          "status": "pass",
-          "cm_status": 0.130667
+          "status": "pass"
         },
         {
           "name": "StartQueryExecution",
-          "status": "skip",
-          "cm_status": 0.779042
-        },
-        {
-          "name": "StopQueryExecution",
-          "status": "skip",
-          "cm_status": 0.935666
+          "status": "pass"
         }
       ]
     },
     "autoscaling": {
       "service": "autoscaling",
       "total_ops": 3,
-      "passed": 1,
+      "passed": 3,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateAutoScalingGroup",
-          "status": "skip",
-          "cm_status": 0.811875
-        },
-        {
-          "name": "DeleteAutoScalingGroup",
-          "status": "skip",
-          "cm_status": 0.81275
-        },
-        {
           "name": "DescribeAutoScalingGroups",
-          "status": "pass",
-          "cm_status": 0.791334
+          "status": "pass"
+        },
+        {
+          "name": "DescribeAutoScalingInstances",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeLaunchConfigurations",
+          "status": "pass"
         }
       ]
     },
     "backup": {
       "service": "backup",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 0,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListBackupPlans",
+          "status": "skip"
+        },
+        {
+          "name": "ListBackupVaults",
+          "status": "skip"
+        }
+      ]
+    },
+    "batch": {
+      "service": "batch",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateBackupPlan",
-          "status": "skip",
-          "cm_status": 0.818084
+          "name": "DescribeComputeEnvironments",
+          "status": "pass"
         },
         {
-          "name": "DeleteBackupPlan",
-          "status": "skip",
-          "cm_status": 0.866875
+          "name": "DescribeJobQueues",
+          "status": "pass"
+        }
+      ]
+    },
+    "bedrock": {
+      "service": "bedrock",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListCustomModels",
+          "status": "skip"
         },
         {
-          "name": "DescribeBackupJob",
-          "status": "skip",
-          "cm_status": 0.771584
-        },
+          "name": "ListFoundationModels",
+          "status": "skip"
+        }
+      ]
+    },
+    "ce": {
+      "service": "ce",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
         {
-          "name": "ListBackupPlans",
-          "status": "pass",
-          "cm_status": 0.123334
+          "name": "GetCostAndUsage",
+          "status": "pass"
+        }
+      ]
+    },
+    "cloudcontrol": {
+      "service": "cloudcontrol",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListResources",
+          "status": "skip"
         }
       ]
     },
@@ -187,53 +301,77 @@
       "operations": [
         {
           "name": "CreateStack",
-          "status": "pass",
-          "cm_status": 1.864833
+          "status": "pass"
         },
         {
           "name": "DeleteStack",
-          "status": "skip",
-          "cm_status": 0
+          "status": "skip"
         },
         {
           "name": "DescribeStacks",
-          "status": "skip",
-          "cm_status": 0
+          "status": "skip"
         },
         {
           "name": "ListStacks",
-          "status": "skip",
-          "cm_status": 0
+          "status": "skip"
+        }
+      ]
+    },
+    "cloudfront": {
+      "service": "cloudfront",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListDistributions",
+          "status": "pass"
         }
       ]
     },
     "cloudtrail": {
       "service": "cloudtrail",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 3,
+      "passed": 3,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "CreateTrail",
-          "status": "skip",
-          "cm_status": 0.892125
+          "status": "pass"
         },
         {
           "name": "DeleteTrail",
-          "status": "skip",
-          "cm_status": 0.913875
+          "status": "pass"
         },
         {
           "name": "DescribeTrails",
-          "status": "pass",
-          "cm_status": 0.1035
+          "status": "pass"
+        }
+      ]
+    },
+    "cloudwatch": {
+      "service": "cloudwatch",
+      "total_ops": 3,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 3,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "GetMetricData",
+          "status": "skip"
         },
         {
-          "name": "GetTrail",
-          "status": "skip",
-          "cm_status": 0.877709
+          "name": "ListMetrics",
+          "status": "skip"
+        },
+        {
+          "name": "PutMetricData",
+          "status": "skip"
         }
       ]
     },
@@ -247,173 +385,139 @@
       "operations": [
         {
           "name": "CreateLogGroup",
-          "status": "pass",
-          "cm_status": 1.053792
+          "status": "pass"
         },
         {
           "name": "DeleteLogGroup",
-          "status": "pass",
-          "cm_status": 0.392458
+          "status": "pass"
         },
         {
           "name": "DescribeLogGroups",
-          "status": "pass",
-          "cm_status": 0.518375
+          "status": "pass"
         },
         {
           "name": "PutLogEvents",
-          "status": "pass",
-          "cm_status": 0.4215
+          "status": "pass"
+        }
+      ]
+    },
+    "codeartifact": {
+      "service": "codeartifact",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListDomains",
+          "status": "skip"
+        },
+        {
+          "name": "ListRepositories",
+          "status": "skip"
         }
       ]
     },
     "codebuild": {
       "service": "codebuild",
-      "total_ops": 4,
-      "passed": 2,
+      "total_ops": 3,
+      "passed": 0,
       "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
+      "skipped": 3,
+      "compat_pct": 0,
       "operations": [
         {
-          "name": "BatchGetProjects",
-          "status": "pass",
-          "cm_status": 0.098583
-        },
-        {
           "name": "CreateProject",
-          "status": "skip",
-          "cm_status": 0.963458
+          "status": "skip"
         },
         {
           "name": "DeleteProject",
-          "status": "skip",
-          "cm_status": 1.046166
+          "status": "skip"
         },
         {
           "name": "ListProjects",
-          "status": "pass",
-          "cm_status": 0.073
+          "status": "skip"
         }
       ]
     },
     "codecommit": {
       "service": "codecommit",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "CreateRepository",
-          "status": "skip",
-          "cm_status": 0.956125
-        },
-        {
-          "name": "DeleteRepository",
-          "status": "skip",
-          "cm_status": 1.291625
-        },
-        {
-          "name": "GetRepository",
-          "status": "skip",
-          "cm_status": 0.903416
+          "status": "pass"
         },
         {
           "name": "ListRepositories",
-          "status": "pass",
-          "cm_status": 0.052625
+          "status": "pass"
         }
       ]
     },
     "codeconnections": {
       "service": "codeconnections",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateConnection",
-          "status": "skip",
-          "cm_status": 0.98025
-        },
-        {
-          "name": "DeleteConnection",
-          "status": "skip",
-          "cm_status": 1.128708
-        },
-        {
-          "name": "GetConnection",
-          "status": "skip",
-          "cm_status": 0.913125
-        },
-        {
           "name": "ListConnections",
-          "status": "pass",
-          "cm_status": 0.056458
+          "status": "pass"
+        },
+        {
+          "name": "ListHosts",
+          "status": "pass"
         }
       ]
     },
     "codedeploy": {
       "service": "codedeploy",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "CreateApplication",
-          "status": "skip",
-          "cm_status": 0.951042
-        },
-        {
-          "name": "DeleteApplication",
-          "status": "skip",
-          "cm_status": 1.04075
-        },
-        {
-          "name": "GetApplication",
-          "status": "skip",
-          "cm_status": 0.919209
+          "status": "pass"
         },
         {
           "name": "ListApplications",
-          "status": "pass",
-          "cm_status": 0.047458
+          "status": "pass"
         }
       ]
     },
     "codepipeline": {
       "service": "codepipeline",
       "total_ops": 4,
-      "passed": 1,
+      "passed": 4,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "CreatePipeline",
-          "status": "skip",
-          "cm_status": 0.997625
+          "status": "pass"
         },
         {
           "name": "DeletePipeline",
-          "status": "skip",
-          "cm_status": 1.049916
+          "status": "pass"
         },
         {
           "name": "GetPipeline",
-          "status": "skip",
-          "cm_status": 0.965583
+          "status": "pass"
         },
         {
           "name": "ListPipelines",
-          "status": "pass",
-          "cm_status": 0.051333
+          "status": "pass"
         }
       ]
     },
@@ -427,98 +531,113 @@
       "operations": [
         {
           "name": "CreateUserPool",
-          "status": "pass",
-          "cm_status": 1.001667
+          "status": "pass"
         },
         {
           "name": "DeleteUserPool",
-          "status": "pass",
-          "cm_status": 0.712917
+          "status": "pass"
         },
         {
           "name": "DescribeUserPool",
-          "status": "pass",
-          "cm_status": 0.887458
+          "status": "pass"
         },
         {
           "name": "ListUserPools",
-          "status": "pass",
-          "cm_status": 0.450208
+          "status": "pass"
         }
       ]
     },
     "config": {
       "service": "config",
       "total_ops": 3,
-      "passed": 1,
+      "passed": 3,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "DeleteConfigRule",
-          "status": "skip",
-          "cm_status": 1.039375
+          "status": "pass"
         },
         {
           "name": "DescribeConfigRules",
-          "status": "pass",
-          "cm_status": 0.07475
+          "status": "pass"
         },
         {
           "name": "PutConfigRule",
-          "status": "skip",
-          "cm_status": 1.320791
+          "status": "pass"
+        }
+      ]
+    },
+    "datasync": {
+      "service": "datasync",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListLocations",
+          "status": "skip"
+        },
+        {
+          "name": "ListTasks",
+          "status": "skip"
+        }
+      ]
+    },
+    "dax": {
+      "service": "dax",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "DescribeClusters",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeSubnetGroups",
+          "status": "pass"
         }
       ]
     },
     "dms": {
       "service": "dms",
-      "total_ops": 3,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateReplicationInstance",
-          "status": "skip",
-          "cm_status": 0.939583
-        },
-        {
-          "name": "DeleteReplicationInstance",
-          "status": "skip",
-          "cm_status": 1.194666
+          "name": "DescribeEndpoints",
+          "status": "pass"
         },
         {
           "name": "DescribeReplicationInstances",
-          "status": "pass",
-          "cm_status": 0.08775
+          "status": "pass"
         }
       ]
     },
     "docdb": {
       "service": "docdb",
-      "total_ops": 3,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateDBCluster",
-          "status": "skip",
-          "cm_status": 1.007167
-        },
-        {
-          "name": "DeleteDBCluster",
-          "status": "skip",
-          "cm_status": 0.939834
-        },
-        {
           "name": "DescribeDBClusters",
-          "status": "pass",
-          "cm_status": 1.129666
+          "status": "pass"
+        },
+        {
+          "name": "DescribeDBInstances",
+          "status": "pass"
         }
       ]
     },
@@ -532,38 +651,31 @@
       "operations": [
         {
           "name": "CreateTable",
-          "status": "pass",
-          "cm_status": 1.408375
+          "status": "pass"
         },
         {
           "name": "DeleteItem",
-          "status": "pass",
-          "cm_status": 0.389583
+          "status": "pass"
         },
         {
           "name": "GetItem",
-          "status": "pass",
-          "cm_status": 0.385916
+          "status": "pass"
         },
         {
           "name": "PutItem",
-          "status": "pass",
-          "cm_status": 0.792584
+          "status": "pass"
         },
         {
           "name": "Query",
-          "status": "pass",
-          "cm_status": 0.447959
+          "status": "pass"
         },
         {
           "name": "Scan",
-          "status": "pass",
-          "cm_status": 0.384916
+          "status": "pass"
         },
         {
           "name": "UpdateItem",
-          "status": "pass",
-          "cm_status": 0.378542
+          "status": "pass"
         }
       ]
     },
@@ -577,23 +689,19 @@
       "operations": [
         {
           "name": "DescribeInstances",
-          "status": "pass",
-          "cm_status": 0.521958
+          "status": "pass"
         },
         {
           "name": "DescribeSecurityGroups",
-          "status": "pass",
-          "cm_status": 0.438708
+          "status": "pass"
         },
         {
           "name": "DescribeSubnets",
-          "status": "pass",
-          "cm_status": 0.417667
+          "status": "pass"
         },
         {
           "name": "DescribeVpcs",
-          "status": "pass",
-          "cm_status": 0.434625
+          "status": "pass"
         }
       ]
     },
@@ -607,128 +715,131 @@
       "operations": [
         {
           "name": "CreateCluster",
-          "status": "pass",
-          "cm_status": 0.881125
+          "status": "pass"
         },
         {
           "name": "DeleteCluster",
-          "status": "pass",
-          "cm_status": 1.484166
+          "status": "pass"
         },
         {
           "name": "DescribeClusters",
-          "status": "pass",
-          "cm_status": 0.367458
+          "status": "pass"
         },
         {
           "name": "ListClusters",
-          "status": "pass",
-          "cm_status": 0.394916
+          "status": "pass"
+        }
+      ]
+    },
+    "eks": {
+      "service": "eks",
+      "total_ops": 4,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 4,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateCluster",
+          "status": "skip"
+        },
+        {
+          "name": "DeleteCluster",
+          "status": "skip"
+        },
+        {
+          "name": "DescribeCluster",
+          "status": "skip"
+        },
+        {
+          "name": "ListClusters",
+          "status": "skip"
         }
       ]
     },
     "elasticache": {
       "service": "elasticache",
-      "total_ops": 3,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateCacheCluster",
-          "status": "skip",
-          "cm_status": 1.08
-        },
-        {
-          "name": "DeleteCacheCluster",
-          "status": "skip",
-          "cm_status": 1.104792
-        },
-        {
           "name": "DescribeCacheClusters",
-          "status": "pass",
-          "cm_status": 1.145833
+          "status": "pass"
+        },
+        {
+          "name": "DescribeReplicationGroups",
+          "status": "pass"
         }
       ]
     },
     "elasticbeanstalk": {
       "service": "elasticbeanstalk",
       "total_ops": 3,
-      "passed": 1,
+      "passed": 3,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
           "name": "CreateApplication",
-          "status": "skip",
-          "cm_status": 1.095042
-        },
-        {
-          "name": "DeleteApplication",
-          "status": "skip",
-          "cm_status": 1.090917
+          "status": "pass"
         },
         {
           "name": "DescribeApplications",
-          "status": "pass",
-          "cm_status": 1.129375
+          "status": "pass"
+        },
+        {
+          "name": "DescribeEnvironments",
+          "status": "pass"
         }
       ]
     },
     "elasticloadbalancing": {
       "service": "elasticloadbalancing",
-      "total_ops": 3,
+      "total_ops": 1,
       "passed": 1,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateLoadBalancer",
-          "status": "skip",
-          "cm_status": 1.11475
-        },
-        {
-          "name": "DeleteLoadBalancer",
-          "status": "skip",
-          "cm_status": 1.20825
-        },
-        {
           "name": "DescribeLoadBalancers",
-          "status": "pass",
-          "cm_status": 1.123125
+          "status": "pass"
         }
       ]
     },
     "elasticmapreduce": {
       "service": "elasticmapreduce",
-      "total_ops": 4,
-      "passed": 2,
+      "total_ops": 2,
+      "passed": 0,
       "failed": 0,
       "skipped": 2,
-      "compat_pct": 100.0,
+      "compat_pct": 0,
       "operations": [
         {
-          "name": "DescribeCluster",
-          "status": "skip",
-          "cm_status": 1.1205
-        },
-        {
           "name": "ListClusters",
-          "status": "pass",
-          "cm_status": 1.095667
+          "status": "skip"
         },
         {
-          "name": "RunJobFlow",
-          "status": "skip",
-          "cm_status": 1.14975
-        },
+          "name": "ListSteps",
+          "status": "skip"
+        }
+      ]
+    },
+    "es": {
+      "service": "es",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
         {
-          "name": "TerminateJobFlows",
-          "status": "pass",
-          "cm_status": 1.198959
+          "name": "ListDomainNames",
+          "status": "skip"
         }
       ]
     },
@@ -742,23 +853,19 @@
       "operations": [
         {
           "name": "CreateEventBus",
-          "status": "pass",
-          "cm_status": 1.643292
+          "status": "pass"
         },
         {
           "name": "DeleteEventBus",
-          "status": "pass",
-          "cm_status": 0.519958
+          "status": "pass"
         },
         {
           "name": "PutEvents",
-          "status": "skip",
-          "cm_status": 1.746333
+          "status": "skip"
         },
         {
           "name": "PutRule",
-          "status": "pass",
-          "cm_status": 0.699959
+          "status": "pass"
         }
       ]
     },
@@ -772,48 +879,73 @@
       "operations": [
         {
           "name": "CreateDeliveryStream",
-          "status": "pass",
-          "cm_status": 1.476042
+          "status": "pass"
         },
         {
           "name": "DeleteDeliveryStream",
-          "status": "pass",
-          "cm_status": 0.453417
+          "status": "pass"
         },
         {
           "name": "DescribeDeliveryStream",
-          "status": "pass",
-          "cm_status": 0.976042
+          "status": "pass"
+        }
+      ]
+    },
+    "fis": {
+      "service": "fis",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListExperimentTemplates",
+          "status": "pass"
+        },
+        {
+          "name": "ListExperiments",
+          "status": "pass"
+        }
+      ]
+    },
+    "glacier": {
+      "service": "glacier",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "CreateVault",
+          "status": "pass"
+        },
+        {
+          "name": "ListVaults",
+          "status": "pass"
         }
       ]
     },
     "glue": {
       "service": "glue",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 3,
+      "passed": 3,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateDatabase",
-          "status": "skip",
-          "cm_status": 1.271
-        },
-        {
-          "name": "DeleteDatabase",
-          "status": "skip",
-          "cm_status": 1.334959
-        },
-        {
-          "name": "GetDatabase",
-          "status": "skip",
-          "cm_status": 1.205583
+          "name": "GetCrawlers",
+          "status": "pass"
         },
         {
           "name": "GetDatabases",
-          "status": "pass",
-          "cm_status": 0.149292
+          "status": "pass"
+        },
+        {
+          "name": "GetJobs",
+          "status": "pass"
         }
       ]
     },
@@ -827,33 +959,109 @@
       "operations": [
         {
           "name": "CreateRole",
-          "status": "pass",
-          "cm_status": 3.841834
+          "status": "pass"
         },
         {
           "name": "CreateUser",
-          "status": "pass",
-          "cm_status": 1.195459
+          "status": "pass"
         },
         {
           "name": "DeleteRole",
-          "status": "pass",
-          "cm_status": 1.925459
+          "status": "pass"
         },
         {
           "name": "DeleteUser",
-          "status": "pass",
-          "cm_status": 2.085125
+          "status": "pass"
         },
         {
           "name": "GetUser",
-          "status": "pass",
-          "cm_status": 1.963
+          "status": "pass"
         },
         {
           "name": "ListUsers",
-          "status": "pass",
-          "cm_status": 2.036834
+          "status": "pass"
+        }
+      ]
+    },
+    "identitystore": {
+      "service": "identitystore",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListGroups",
+          "status": "pass"
+        },
+        {
+          "name": "ListUsers",
+          "status": "pass"
+        }
+      ]
+    },
+    "iot": {
+      "service": "iot",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateThing",
+          "status": "skip"
+        },
+        {
+          "name": "ListThings",
+          "status": "skip"
+        }
+      ]
+    },
+    "iot-data": {
+      "service": "iot-data",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListRetainedMessages",
+          "status": "skip"
+        }
+      ]
+    },
+    "iotwireless": {
+      "service": "iotwireless",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListWirelessDevices",
+          "status": "skip"
+        },
+        {
+          "name": "ListWirelessGateways",
+          "status": "skip"
+        }
+      ]
+    },
+    "kafka": {
+      "service": "kafka",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListClustersV2",
+          "status": "skip"
         }
       ]
     },
@@ -867,53 +1075,33 @@
       "operations": [
         {
           "name": "CreateStream",
-          "status": "pass",
-          "cm_status": 1.504459
+          "status": "pass"
         },
         {
           "name": "DeleteStream",
-          "status": "pass",
-          "cm_status": 1.065084
+          "status": "pass"
         },
         {
           "name": "DescribeStream",
-          "status": "pass",
-          "cm_status": 1.952958
+          "status": "pass"
         },
         {
           "name": "PutRecord",
-          "status": "pass",
-          "cm_status": 1.187625
+          "status": "pass"
         }
       ]
     },
     "kinesisanalytics": {
       "service": "kinesisanalytics",
-      "total_ops": 4,
+      "total_ops": 1,
       "passed": 1,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateApplication",
-          "status": "skip",
-          "cm_status": 1.505125
-        },
-        {
-          "name": "DeleteApplication",
-          "status": "skip",
-          "cm_status": 1.90325
-        },
-        {
-          "name": "DescribeApplication",
-          "status": "skip",
-          "cm_status": 1.42975
-        },
-        {
           "name": "ListApplications",
-          "status": "pass",
-          "cm_status": 0.157333
+          "status": "pass"
         }
       ]
     },
@@ -927,53 +1115,37 @@
       "operations": [
         {
           "name": "CreateKey",
-          "status": "pass",
-          "cm_status": 1.039125
+          "status": "pass"
         },
         {
           "name": "Decrypt",
-          "status": "pass",
-          "cm_status": 0.486541
+          "status": "pass"
         },
         {
           "name": "Encrypt",
-          "status": "pass",
-          "cm_status": 0.51925
+          "status": "pass"
         },
         {
           "name": "ListKeys",
-          "status": "pass",
-          "cm_status": 0.565542
+          "status": "pass"
         }
       ]
     },
     "lakeformation": {
       "service": "lakeformation",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 0,
       "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
+      "skipped": 2,
+      "compat_pct": 0,
       "operations": [
         {
-          "name": "DeregisterResource",
-          "status": "skip",
-          "cm_status": 1.5295
-        },
-        {
-          "name": "DescribeResource",
-          "status": "skip",
-          "cm_status": 1.400833
+          "name": "ListPermissions",
+          "status": "skip"
         },
         {
           "name": "ListResources",
-          "status": "pass",
-          "cm_status": 0.078875
-        },
-        {
-          "name": "RegisterResource",
-          "status": "skip",
-          "cm_status": 1.830875
+          "status": "skip"
         }
       ]
     },
@@ -987,123 +1159,171 @@
       "operations": [
         {
           "name": "CreateFunction",
-          "status": "pass",
-          "cm_status": 0.803166
+          "status": "pass"
         },
         {
           "name": "DeleteFunction",
-          "status": "pass",
-          "cm_status": 2.026458
+          "status": "pass"
         },
         {
           "name": "GetFunction",
-          "status": "pass",
-          "cm_status": 1.911
+          "status": "pass"
         },
         {
           "name": "ListFunctions",
-          "status": "pass",
-          "cm_status": 2.13675
+          "status": "pass"
         }
       ]
     },
-    "memorydb": {
-      "service": "memorydb",
-      "total_ops": 3,
+    "managedblockchain": {
+      "service": "managedblockchain",
+      "total_ops": 1,
       "passed": 1,
-      "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreateCluster",
-          "status": "skip",
-          "cm_status": 1.708666
-        },
-        {
-          "name": "DeleteCluster",
-          "status": "skip",
-          "cm_status": 1.986834
-        },
-        {
-          "name": "DescribeClusters",
-          "status": "pass",
-          "cm_status": 0.171834
-        }
-      ]
-    },
-    "neptune": {
-      "service": "neptune",
-      "total_ops": 3,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreateDBInstance",
-          "status": "skip",
-          "cm_status": 1.709042
-        },
-        {
-          "name": "DeleteDBInstance",
-          "status": "skip",
-          "cm_status": 1.531833
-        },
-        {
-          "name": "DescribeDBInstances",
-          "status": "pass",
-          "cm_status": 1.6075
-        }
-      ]
-    },
-    "organizations": {
-      "service": "organizations",
-      "total_ops": 3,
-      "passed": 3,
       "failed": 0,
       "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateOrganization",
-          "status": "pass",
-          "cm_status": 0.169333
+          "name": "ListNetworks",
+          "status": "pass"
+        }
+      ]
+    },
+    "mediaconvert": {
+      "service": "mediaconvert",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListJobs",
+          "status": "pass"
         },
         {
+          "name": "ListQueues",
+          "status": "pass"
+        }
+      ]
+    },
+    "memorydb": {
+      "service": "memorydb",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "DescribeClusters",
+          "status": "pass"
+        }
+      ]
+    },
+    "mq": {
+      "service": "mq",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListBrokers",
+          "status": "skip"
+        }
+      ]
+    },
+    "neptune": {
+      "service": "neptune",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "DescribeDBClusters",
+          "status": "pass"
+        },
+        {
+          "name": "DescribeDBInstances",
+          "status": "pass"
+        }
+      ]
+    },
+    "opensearch": {
+      "service": "opensearch",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListDomainNames",
+          "status": "skip"
+        }
+      ]
+    },
+    "organizations": {
+      "service": "organizations",
+      "total_ops": 2,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 100.0,
+      "operations": [
+        {
           "name": "DescribeOrganization",
-          "status": "pass",
-          "cm_status": 0.155583
+          "status": "skip"
         },
         {
           "name": "ListAccounts",
-          "status": "pass",
-          "cm_status": 0.105333
+          "status": "pass"
+        }
+      ]
+    },
+    "pinpoint": {
+      "service": "pinpoint",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "GetApps",
+          "status": "skip"
+        }
+      ]
+    },
+    "pipes": {
+      "service": "pipes",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListPipes",
+          "status": "skip"
         }
       ]
     },
     "ram": {
       "service": "ram",
-      "total_ops": 3,
-      "passed": 1,
+      "total_ops": 1,
+      "passed": 0,
       "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
+      "skipped": 1,
+      "compat_pct": 0,
       "operations": [
         {
-          "name": "CreateResourceShare",
-          "status": "skip",
-          "cm_status": 1.684667
-        },
-        {
-          "name": "DeleteResourceShare",
-          "status": "skip",
-          "cm_status": 1.923208
-        },
-        {
           "name": "GetResourceShares",
-          "status": "pass",
-          "cm_status": 0.109
+          "status": "skip"
         }
       ]
     },
@@ -1117,43 +1337,61 @@
       "operations": [
         {
           "name": "CreateDBInstance",
-          "status": "pass",
-          "cm_status": 1.193833
+          "status": "pass"
         },
         {
           "name": "DeleteDBInstance",
-          "status": "pass",
-          "cm_status": 2.454375
+          "status": "pass"
         },
         {
           "name": "DescribeDBInstances",
-          "status": "pass",
-          "cm_status": 2.505
+          "status": "pass"
         }
       ]
     },
     "redshift": {
       "service": "redshift",
-      "total_ops": 3,
+      "total_ops": 1,
       "passed": 1,
       "failed": 0,
-      "skipped": 2,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateCluster",
-          "status": "skip",
-          "cm_status": 1.652625
-        },
-        {
-          "name": "DeleteCluster",
-          "status": "skip",
-          "cm_status": 1.824333
-        },
-        {
           "name": "DescribeClusters",
-          "status": "pass",
-          "cm_status": 1.652125
+          "status": "pass"
+        }
+      ]
+    },
+    "rekognition": {
+      "service": "rekognition",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "CreateCollection",
+          "status": "skip"
+        },
+        {
+          "name": "ListCollections",
+          "status": "skip"
+        }
+      ]
+    },
+    "resource-groups": {
+      "service": "resource-groups",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListGroups",
+          "status": "skip"
         }
       ]
     },
@@ -1167,18 +1405,33 @@
       "operations": [
         {
           "name": "CreateHostedZone",
-          "status": "pass",
-          "cm_status": 1.091209
+          "status": "pass"
         },
         {
           "name": "DeleteHostedZone",
-          "status": "pass",
-          "cm_status": 1.203166
+          "status": "pass"
         },
         {
           "name": "ListHostedZones",
-          "status": "pass",
-          "cm_status": 0.50475
+          "status": "pass"
+        }
+      ]
+    },
+    "route53resolver": {
+      "service": "route53resolver",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListResolverEndpoints",
+          "status": "pass"
+        },
+        {
+          "name": "ListResolverRules",
+          "status": "pass"
         }
       ]
     },
@@ -1192,98 +1445,149 @@
       "operations": [
         {
           "name": "CopyObject",
-          "status": "pass",
-          "cm_status": 3.015958
+          "status": "pass"
         },
         {
           "name": "CreateBucket",
-          "status": "pass",
-          "cm_status": 1.187833
+          "status": "pass"
         },
         {
           "name": "DeleteBucket",
-          "status": "pass",
-          "cm_status": 2.791
+          "status": "pass"
         },
         {
           "name": "DeleteObject",
-          "status": "pass",
-          "cm_status": 2.546291
+          "status": "pass"
         },
         {
           "name": "GetObject",
-          "status": "pass",
-          "cm_status": 3.582667
+          "status": "pass"
         },
         {
           "name": "ListObjects",
-          "status": "pass",
-          "cm_status": 2.972542
+          "status": "pass"
         },
         {
           "name": "PutObject",
-          "status": "pass",
-          "cm_status": 2.75425
+          "status": "pass"
         }
       ]
     },
     "sagemaker": {
       "service": "sagemaker",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateNotebookInstance",
-          "status": "skip",
-          "cm_status": 1.942375
-        },
-        {
-          "name": "DeleteNotebookInstance",
-          "status": "skip",
-          "cm_status": 2.174125
-        },
-        {
-          "name": "DescribeNotebookInstance",
-          "status": "skip",
-          "cm_status": 2.232125
+          "name": "ListEndpoints",
+          "status": "pass"
         },
         {
           "name": "ListNotebookInstances",
-          "status": "pass",
-          "cm_status": 0.194375
+          "status": "pass"
+        }
+      ]
+    },
+    "scheduler": {
+      "service": "scheduler",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListScheduleGroups",
+          "status": "skip"
+        },
+        {
+          "name": "ListSchedules",
+          "status": "skip"
+        }
+      ]
+    },
+    "secretsmanager": {
+      "service": "secretsmanager",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "CreateSecret",
+          "status": "pass"
+        },
+        {
+          "name": "ListSecrets",
+          "status": "pass"
+        }
+      ]
+    },
+    "serverlessrepo": {
+      "service": "serverlessrepo",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListApplications",
+          "status": "pass"
         }
       ]
     },
     "servicediscovery": {
       "service": "servicediscovery",
-      "total_ops": 4,
-      "passed": 1,
+      "total_ops": 2,
+      "passed": 2,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreateService",
-          "status": "skip",
-          "cm_status": 2.037958
-        },
-        {
-          "name": "DeleteService",
-          "status": "skip",
-          "cm_status": 2.787708
-        },
-        {
-          "name": "GetService",
-          "status": "skip",
-          "cm_status": 1.974708
+          "name": "ListNamespaces",
+          "status": "pass"
         },
         {
           "name": "ListServices",
-          "status": "pass",
-          "cm_status": 0.174792
+          "status": "pass"
+        }
+      ]
+    },
+    "ses": {
+      "service": "ses",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListIdentities",
+          "status": "pass"
+        },
+        {
+          "name": "ListVerifiedEmailAddresses",
+          "status": "pass"
+        }
+      ]
+    },
+    "shield": {
+      "service": "shield",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListProtections",
+          "status": "pass"
         }
       ]
     },
@@ -1297,28 +1601,23 @@
       "operations": [
         {
           "name": "CreateTopic",
-          "status": "pass",
-          "cm_status": 1.535042
+          "status": "pass"
         },
         {
           "name": "DeleteTopic",
-          "status": "pass",
-          "cm_status": 8.103709
+          "status": "pass"
         },
         {
           "name": "ListTopics",
-          "status": "pass",
-          "cm_status": 3.588583
+          "status": "pass"
         },
         {
           "name": "Publish",
-          "status": "pass",
-          "cm_status": 7.929959
+          "status": "pass"
         },
         {
           "name": "Subscribe",
-          "status": "pass",
-          "cm_status": 5.10725
+          "status": "pass"
         }
       ]
     },
@@ -1332,58 +1631,55 @@
       "operations": [
         {
           "name": "CreateQueue",
-          "status": "pass",
-          "cm_status": 0.80725
+          "status": "pass"
         },
         {
           "name": "DeleteMessage",
-          "status": "pass",
-          "cm_status": 0.934125
+          "status": "pass"
         },
         {
           "name": "DeleteQueue",
-          "status": "pass",
-          "cm_status": 0.56875
+          "status": "pass"
         },
         {
           "name": "ReceiveMessage",
-          "status": "pass",
-          "cm_status": 0.748292
+          "status": "pass"
         },
         {
           "name": "SendMessage",
-          "status": "pass",
-          "cm_status": 2.949458
+          "status": "pass"
         }
       ]
     },
     "sso-admin": {
       "service": "sso-admin",
-      "total_ops": 4,
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListInstances",
+          "status": "skip"
+        }
+      ]
+    },
+    "stepfunctions": {
+      "service": "stepfunctions",
+      "total_ops": 2,
       "passed": 1,
       "failed": 0,
-      "skipped": 3,
+      "skipped": 1,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "CreatePermissionSet",
-          "status": "skip",
-          "cm_status": 2.164584
+          "name": "ListActivities",
+          "status": "skip"
         },
         {
-          "name": "DeletePermissionSet",
-          "status": "skip",
-          "cm_status": 2.3145
-        },
-        {
-          "name": "DescribePermissionSet",
-          "status": "skip",
-          "cm_status": 2.198542
-        },
-        {
-          "name": "ListPermissionSets",
-          "status": "pass",
-          "cm_status": 0.179625
+          "name": "ListStateMachines",
+          "status": "pass"
         }
       ]
     },
@@ -1397,238 +1693,173 @@
       "operations": [
         {
           "name": "AssumeRole",
-          "status": "pass",
-          "cm_status": 0.553042
+          "status": "pass"
         },
         {
           "name": "GetCallerIdentity",
-          "status": "pass",
-          "cm_status": 0.925459
+          "status": "pass"
         }
       ]
     },
     "support": {
       "service": "support",
-      "total_ops": 3,
-      "passed": 2,
-      "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreateCase",
-          "status": "skip",
-          "cm_status": 2.521959
-        },
-        {
-          "name": "DescribeCases",
-          "status": "pass",
-          "cm_status": 0.086041
-        },
-        {
-          "name": "DescribeTrustedAdvisorChecks",
-          "status": "pass",
-          "cm_status": 0.201042
-        }
-      ]
-    },
-    "swf": {
-      "service": "swf",
-      "total_ops": 4,
+      "total_ops": 1,
       "passed": 1,
-      "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "DeprecateDomain",
-          "status": "skip",
-          "cm_status": 2.389084
-        },
-        {
-          "name": "DescribeDomain",
-          "status": "skip",
-          "cm_status": 2.1
-        },
-        {
-          "name": "ListDomains",
-          "status": "pass",
-          "cm_status": 0.12175
-        },
-        {
-          "name": "RegisterDomain",
-          "status": "skip",
-          "cm_status": 2.502834
-        }
-      ]
-    },
-    "tagging": {
-      "service": "tagging",
-      "total_ops": 3,
-      "passed": 2,
-      "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "GetResources",
-          "status": "pass",
-          "cm_status": 0.085042
-        },
-        {
-          "name": "TagResources",
-          "status": "skip",
-          "cm_status": 2.004375
-        },
-        {
-          "name": "UntagResources",
-          "status": "pass",
-          "cm_status": 0.075542
-        }
-      ]
-    },
-    "timestream-write": {
-      "service": "timestream-write",
-      "total_ops": 4,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreateDatabase",
-          "status": "skip",
-          "cm_status": 1.911333
-        },
-        {
-          "name": "DeleteDatabase",
-          "status": "skip",
-          "cm_status": 2.41325
-        },
-        {
-          "name": "DescribeDatabase",
-          "status": "skip",
-          "cm_status": 1.912917
-        },
-        {
-          "name": "ListDatabases",
-          "status": "pass",
-          "cm_status": 0.099792
-        }
-      ]
-    },
-    "transcribe": {
-      "service": "transcribe",
-      "total_ops": 4,
-      "passed": 1,
-      "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "DeleteTranscriptionJob",
-          "status": "skip",
-          "cm_status": 2.2515
-        },
-        {
-          "name": "GetTranscriptionJob",
-          "status": "skip",
-          "cm_status": 1.989542
-        },
-        {
-          "name": "ListTranscriptionJobs",
-          "status": "pass",
-          "cm_status": 0.107459
-        },
-        {
-          "name": "StartTranscriptionJob",
-          "status": "skip",
-          "cm_status": 2.060667
-        }
-      ]
-    },
-    "transfer": {
-      "service": "transfer",
-      "total_ops": 4,
-      "passed": 2,
-      "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreateServer",
-          "status": "pass",
-          "cm_status": 0.084334
-        },
-        {
-          "name": "DeleteServer",
-          "status": "skip",
-          "cm_status": 2.574875
-        },
-        {
-          "name": "DescribeServer",
-          "status": "skip",
-          "cm_status": 2.292875
-        },
-        {
-          "name": "ListServers",
-          "status": "pass",
-          "cm_status": 0.530583
-        }
-      ]
-    },
-    "verifiedpermissions": {
-      "service": "verifiedpermissions",
-      "total_ops": 4,
-      "passed": 2,
-      "failed": 0,
-      "skipped": 2,
-      "compat_pct": 100.0,
-      "operations": [
-        {
-          "name": "CreatePolicyStore",
-          "status": "pass",
-          "cm_status": 0.861833
-        },
-        {
-          "name": "DeletePolicyStore",
-          "status": "skip",
-          "cm_status": 2.368375
-        },
-        {
-          "name": "GetPolicyStore",
-          "status": "skip",
-          "cm_status": 2.275125
-        },
-        {
-          "name": "ListPolicyStores",
-          "status": "pass",
-          "cm_status": 0.289291
-        }
-      ]
-    },
-    "xray": {
-      "service": "xray",
-      "total_ops": 3,
-      "passed": 3,
       "failed": 0,
       "skipped": 0,
       "compat_pct": 100.0,
       "operations": [
         {
-          "name": "BatchGetTraces",
-          "status": "pass",
-          "cm_status": 0.065125
+          "name": "DescribeTrustedAdvisorChecks",
+          "status": "pass"
+        }
+      ]
+    },
+    "swf": {
+      "service": "swf",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListDomains",
+          "status": "pass"
+        }
+      ]
+    },
+    "tagging": {
+      "service": "tagging",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "GetResources",
+          "status": "pass"
+        }
+      ]
+    },
+    "textract": {
+      "service": "textract",
+      "total_ops": 2,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 2,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListAdapterVersions",
+          "status": "skip"
         },
+        {
+          "name": "ListAdapters",
+          "status": "skip"
+        }
+      ]
+    },
+    "timestream-write": {
+      "service": "timestream-write",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
+        {
+          "name": "ListDatabases",
+          "status": "skip"
+        }
+      ]
+    },
+    "transcribe": {
+      "service": "transcribe",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListTranscriptionJobs",
+          "status": "pass"
+        }
+      ]
+    },
+    "transfer": {
+      "service": "transfer",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListServers",
+          "status": "pass"
+        }
+      ]
+    },
+    "verifiedpermissions": {
+      "service": "verifiedpermissions",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListPolicyStores",
+          "status": "pass"
+        }
+      ]
+    },
+    "waf-regional": {
+      "service": "waf-regional",
+      "total_ops": 2,
+      "passed": 2,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListRules",
+          "status": "pass"
+        },
+        {
+          "name": "ListWebACLs",
+          "status": "pass"
+        }
+      ]
+    },
+    "wafv2": {
+      "service": "wafv2",
+      "total_ops": 1,
+      "passed": 1,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100.0,
+      "operations": [
+        {
+          "name": "ListWebACLs",
+          "status": "pass"
+        }
+      ]
+    },
+    "xray": {
+      "service": "xray",
+      "total_ops": 1,
+      "passed": 0,
+      "failed": 0,
+      "skipped": 1,
+      "compat_pct": 0,
+      "operations": [
         {
           "name": "GetTraceSummaries",
-          "status": "pass",
-          "cm_status": 0.899583
-        },
-        {
-          "name": "PutTraceSegments",
-          "status": "pass",
-          "cm_status": 0.083625
+          "status": "skip"
         }
       ]
     }

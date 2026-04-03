@@ -14,92 +14,62 @@ hero:
       icon: external
 ---
 
-import { Card, CardGrid } from "@astrojs/starlight/components";
+import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-## What is CloudMock?
+<div style="text-align:center; margin:2rem 0 3rem;">
+  <p style="font-size:1.4rem; font-weight:600; color:var(--sl-color-white); margin:0;">
+    99 AWS services. One binary. <span style="color:#52b788;">$4.32/year.</span>
+  </p>
+  <p style="color:var(--sl-color-gray-3); margin:0.5rem 0 0;">
+    110x faster than Moto. 8x less memory than LocalStack. Zero stubs.
+  </p>
+</div>
 
-CloudMock is a local AWS emulator that runs 99 fully implemented AWS services in a single binary. Point any AWS SDK at `localhost:4566` and your code works as if it's talking to real AWS — but everything runs on your laptop, costs nothing, and starts in under a second.
+## Quick Start
 
-### Why CloudMock?
-
-**LocalStack** charges for Pro features (chaos testing, CI, Cloud Pods) and uses 583MB of RAM. **Moto** only works in-process for Python and has no DevTools. CloudMock gives you everything — 99 services, chaos engineering, state snapshots, traffic replay, distributed tracing, IaC support, and 10 language SDKs — in one free binary that uses 67MB.
-
-### How it works
-
+```bash
+npx cloudmock                                    # start (65ms)
+export AWS_ENDPOINT_URL=http://localhost:4566     # point your SDK
+aws s3 mb s3://my-bucket                          # it just works
 ```
-Your Code → AWS SDK → localhost:4566 → CloudMock Gateway → 99 AWS Services
-                                            ↓
-                                       DevTools (localhost:4500)
-                                       ├── Topology map
-                                       ├── Request tracing
-                                       ├── Metrics dashboard
-                                       ├── Chaos engineering
-                                       └── Traffic replay
-```
-
-Every request flows through the gateway, which routes to the correct service based on SigV4 credential scope. Services maintain state in memory (or export to JSON via state snapshots). The DevTools dashboard shows real-time topology, traces, and metrics.
-
-### Two performance modes
-
-**HTTP mode** (any language): Start CloudMock as a server. Every AWS SDK works. Sub-millisecond latency.
-
-**In-process mode** (Go only): Import `github.com/neureaux/cloudmock/sdk`. Zero network. 20 microseconds per operation. The AWS SDK doesn't know it's not hitting a real server.
-
-### The full toolkit
-
-CloudMock isn't just a mock — it's a complete local AWS development platform:
-
-- **99 AWS services** with proper error codes, pagination, and state machines
-- **10 language SDKs** (Go, Python, Node, Java, Kotlin, Rust, C/C++, Ruby, C#, Swift)
-- **IaC support** (Terraform, CDK, Pulumi — use your existing files)
-- **State snapshots** — export to JSON, commit to git, restore on startup
-- **Traffic replay** — record real AWS calls, replay against CloudMock
-- **Contract testing** — prove your mock matches production
-- **Chaos engineering** — inject S3 503s, DynamoDB throttles, Lambda timeouts
-- **Distributed tracing** — W3C traceparent propagation, OpenTelemetry ingestion
-- **CloudTrail replay** — recreate production state from audit logs
-- **Multi-account** — isolated accounts with cross-account STS AssumeRole
-- **Compatibility dashboard** — live API compatibility tested nightly
-- **Docker Compose stacks** — 8 pre-built templates for common architectures
-- **GitHub Action** — one line to add CloudMock to CI
 
 <CardGrid>
-  <Card title="99 AWS services" icon="rocket">
-    99 fully emulated AWS services — S3, DynamoDB, SQS, SNS, Lambda, IAM, EC2, ECS, RDS, and 90 more. Zero stubs. All on one endpoint.
+  <Card title="99 AWS Services" icon="rocket">
+    S3, DynamoDB, SQS, SNS, Lambda, IAM, EC2, ECS, RDS, and 90 more.
+    Every service fully emulated with proper error codes, pagination, and state machines.
+    [Browse services →](/docs/services/s3/)
   </Card>
-  <Card title="110x faster than Moto" icon="approve-check-circle">
-    In-process Go mode runs at ~20 μs/op — no HTTP server, no network
-    round-trip. Wins 31/31 benchmark operations. HTTP mode beats LocalStack too.
+  <Card title="110x Faster" icon="approve-check-circle">
+    In-process Go mode: 20μs per operation. HTTP mode: sub-millisecond.
+    Beats LocalStack and Moto on every service.
+    [See benchmarks →](/docs/reference/benchmarks/)
   </Card>
-  <Card title="Multi-language SDKs" icon="puzzle">
-    Native SDK adapters for Go, Node.js, Python, Java, Rust, and Ruby with
-    trace propagation and devtools integration. Any language works via HTTP.
-  </Card>
-  <Card title="Zero dependencies" icon="seti:config">
-    Pure Go binary. No database, no Docker requirement, no JVM. Starts in under
-    a second.
-  </Card>
-  <Card title="Real IAM enforcement" icon="approve-check-circle">
-    Full policy evaluation, credential verification, or no-auth mode. Test your
-    IAM policies locally before deploying.
-  </Card>
-  <Card title="Built-in dashboard" icon="laptop">
-    12-view desktop app: topology maps, distributed traces, metrics, chaos
-    engineering, and more. No extra tooling needed.
-  </Card>
-  <Card title="Example project" icon="open-book">
-    Try the [todo demo](https://github.com/Viridian-Inc/cloudmock-todo-demo) --
-    a working app with S3, DynamoDB, SQS, and SNS in Node.js, Python, and Go.
+  <Card title="10 Language SDKs" icon="puzzle">
+    Go (in-process), Python, Node.js, Java, Kotlin, Rust, C/C++, Ruby, C#, Swift.
+    One line to start testing.
+    [View SDKs →](/docs/reference/sdks/)
   </Card>
   <Card title="Infrastructure as Code" icon="seti:terraform">
-    Works with Terraform (`cloudmock-terraform`), CDK (`cloudmock-cdk`), and
-    Pulumi (`cloudmock-pulumi`). Use your existing IaC files — no code changes
-    needed. 30 CloudFormation resource types and a native Pulumi provider with
-    44 resource types.
+    Terraform, CDK, and Pulumi work out of the box. Use your existing IaC files.
+    [Terraform guide →](/docs/guides/terraform/)
   </Card>
-  <Card title="Traffic Recording & Replay" icon="approve-check-circle">
-    Record real AWS traffic via proxy or Go SDK interceptor, then replay and
-    validate against CloudMock. Prove your mock matches production — CI-friendly
-    with exit code 0 on full compatibility.
+  <Card title="Test Toolkit" icon="setting">
+    State snapshots, chaos engineering, traffic replay, contract testing,
+    CloudTrail replay, and multi-account isolation.
+    [Testing guide →](/docs/guides/testing/)
+  </Card>
+  <Card title="DevTools Dashboard" icon="laptop">
+    Topology maps, distributed traces, metrics, and chaos controls at localhost:4500.
+    [DevTools overview →](/docs/devtools/overview/)
   </Card>
 </CardGrid>
+
+<div style="text-align:center; margin:2rem 0; padding:1.5rem; border:1px solid var(--sl-color-gray-5); border-radius:8px;">
+  <p style="margin:0; font-size:1.1rem;">
+    <strong>Switching from LocalStack or Moto?</strong>
+    &nbsp;
+    <a href="/docs/guides/migrate-from-localstack/">LocalStack → CloudMock</a>
+    &nbsp;·&nbsp;
+    <a href="/docs/guides/migrate-from-moto/">Moto → CloudMock</a>
+  </p>
+</div>

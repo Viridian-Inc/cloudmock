@@ -1,14 +1,336 @@
 ---
+const title = "CloudMock -- AWS, locally.";
+const description = "Local AWS emulation for developers. 99 services, one binary, built-in devtools. No Docker, no cloud account.";
+
+const services = [
+  "Account",
+  "ACM",
+  "ACM PCA",
+  "Amplify",
+  "API Gateway",
+  "AppConfig",
+  "Application Auto Scaling",
+  "AppSync",
+  "Athena",
+  "Auto Scaling",
+  "Backup",
+  "Batch",
+  "Bedrock",
+  "Cloud Control API",
+  "CloudFormation",
+  "CloudFront",
+  "CloudTrail",
+  "CloudWatch",
+  "CloudWatch Logs",
+  "CodeArtifact",
+  "CodeBuild",
+  "CodeCommit",
+  "CodeConnections",
+  "CodeDeploy",
+  "CodePipeline",
+  "Cognito",
+  "Config",
+  "Cost Explorer",
+  "Data Firehose",
+  "DMS",
+  "DocumentDB",
+  "DynamoDB",
+  "EC2",
+  "ECR",
+  "ECS",
+  "EKS",
+  "Elastic Beanstalk",
+  "Elastic Load Balancing",
+  "ElastiCache",
+  "Elasticsearch",
+  "EMR",
+  "EventBridge",
+  "EventBridge Pipes",
+  "EventBridge Scheduler",
+  "FIS",
+  "Glacier",
+  "Glue",
+  "IAM",
+  "Identity Store",
+  "IoT Core",
+  "IoT Data Plane",
+  "IoT Wireless",
+  "Kafka (MSK)",
+  "Kinesis",
+  "Kinesis Data Analytics",
+  "KMS",
+  "Lake Formation",
+  "Lambda",
+  "Managed Blockchain",
+  "MediaConvert",
+  "MemoryDB",
+  "Amazon MQ",
+  "MWAA (Airflow)",
+  "Neptune",
+  "OpenSearch",
+  "Organizations",
+  "Pinpoint",
+  "RAM",
+  "RDS",
+  "Redshift",
+  "Resource Groups",
+  "Resource Groups Tagging API",
+  "Route 53",
+  "Route 53 Resolver",
+  "S3",
+  "S3 Tables",
+  "SageMaker",
+  "Secrets Manager",
+  "Serverless Application Repository",
+  "Service Discovery",
+  "SES",
+  "Shield",
+  "SNS",
+  "SQS",
+  "SSM Parameter Store",
+  "SSO Admin",
+  "Step Functions",
+  "STS",
+  "Support",
+  "SWF",
+  "Textract",
+  "Timestream Write",
+  "Transcribe",
+  "Transfer Family",
+  "Verified Permissions",
+  "WAF Regional",
+  "WAFv2",
+];
 ---
+
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta http-equiv="refresh" content="0;url=/docs/" />
-    <link rel="canonical" href="/docs/" />
-    <title>CloudMock — AWS, locally.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://cloudmock.app" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      @import "../styles/homepage.css";
+    </style>
   </head>
   <body>
-    <p>Redirecting to <a href="/docs/">CloudMock docs</a>...</p>
+    <!-- Navigation -->
+    <nav class="nav">
+      <div class="nav-inner">
+        <a href="/" class="nav-logo">CloudMock</a>
+        <ul class="nav-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/Viridian-Inc/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="container">
+        <h1 class="hero-headline">AWS, locally.</h1>
+        <p class="hero-sub">99 services. One binary. Built-in devtools.</p>
+        <div class="hero-install">
+          <span class="prompt">$</span>
+          <span>npx cloudmock</span>
+        </div>
+        <div class="hero-cta">
+          <a href="/docs/" class="btn-primary"
+            >Get Started</
+          >
+          <a
+            href="https://github.com/Viridian-Inc/cloudmock-todo-demo"
+            class="btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer">Try the Demo</a
+          >
+          <a
+            href="https://github.com/Viridian-Inc/cloudmock"
+            class="btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer">View on GitHub</a
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- How it works -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">How it works</p>
+          <h2 class="section-title">Three steps. No configuration.</h2>
+        </div>
+        <div class="steps-grid">
+          <div class="step">
+            <div class="step-number">1</div>
+            <h3>Install</h3>
+            <p>One command. No dependencies, no Docker, no cloud account.</p>
+            <code>npx cloudmock</code>
+          </div>
+          <div class="step">
+            <div class="step-number">2</div>
+            <h3>Point your SDK</h3>
+            <p>Override the endpoint in your AWS SDK config.</p>
+            <code
+              >const client = new S3Client(&#123;<br />&nbsp;&nbsp;endpoint:
+              "http://localhost:4566",<br />&#125;);</code
+            >
+          </div>
+          <div class="step">
+            <div class="step-number">3</div>
+            <h3>Open Devtools</h3>
+            <p>
+              Inspect services, trace requests, and test failure scenarios in the
+              browser.
+            </p>
+            <code>http://localhost:4500</code>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Feature Grid -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">Features</p>
+          <h2 class="section-title">Everything you need to develop locally</h2>
+        </div>
+        <div class="feature-grid">
+          <div class="feature-card">
+            <h3>99 AWS Services</h3>
+            <p>
+              99 fully emulated AWS services -- S3, DynamoDB, SQS, Lambda, IAM,
+              EC2, ECS, RDS, and 90 more. Zero stubs. Test your integrations
+              without an AWS account.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Built-in Devtools</h3>
+            <p>
+              Topology map, request tracing, metrics dashboard, and chaos
+              engineering. All accessible at localhost:4500.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>10 Language SDKs</h3>
+            <p>
+              Go, Python, Node.js, Java, Kotlin, Rust, C/C++, Ruby, C#, and Swift. Use your
+              existing AWS SDK -- just change the endpoint.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>IAM Enforcement</h3>
+            <p>
+              Full policy evaluation, credential verification, or no-auth mode.
+              Test your IAM policies locally before deploying.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Chaos Engineering</h3>
+            <p>
+              Inject failures, latency, and errors to test your application's
+              resilience before it hits production.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>State Snapshots</h3>
+            <p>
+              Export state to JSON, commit to version control, and restore on
+              startup. Every developer starts with the same pre-configured
+              resources — no setup scripts needed.
+            </p>
+          </div>
+          <div class="feature-card">
+            <h3>Zero Config</h3>
+            <p>
+              Works out of the box. No Docker required. No cloud account. No
+              YAML files. Start building in seconds.
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Service List -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">Services</p>
+          <h2 class="section-title">99 AWS services</h2>
+          <p class="section-desc">
+            99 fully emulated AWS services with proper error codes, pagination,
+            state machines, and resource relationships. Zero stubs.
+          </p>
+        </div>
+        <div class="service-grid">
+          {services.map((name) => <div class="service-item">{name}</div>)}
+        </div>
+      </div>
+    </section>
+
+    <!-- Source Available -->
+    <section class="oss-section">
+      <div class="container">
+        <p class="section-label">Source Available</p>
+        <h2 class="section-title">
+          Free for local dev and internal use. Always.
+        </h2>
+        <p class="section-desc">
+          CloudMock is source-available under the Business Source License.
+          Use it locally, host it internally, run it in CI -- no limits.
+          Converts to Apache 2.0 on April 1, 2030.
+        </p>
+        <div class="oss-links">
+          <a
+            href="https://github.com/Viridian-Inc/cloudmock"
+            class="btn-secondary"
+            target="_blank"
+            rel="noopener noreferrer">View on GitHub</a
+          >
+          <a href="/docs/" class="btn-primary"
+            >Get Started</
+          >
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span class="footer-copy">CloudMock</span>
+        <ul class="footer-links">
+          <li><a href="/docs/">Docs</a></li>
+          <li><a href="/pricing">Pricing</a></li>
+          <li>
+            <a
+              href="https://github.com/Viridian-Inc/cloudmock"
+              target="_blank"
+              rel="noopener noreferrer">GitHub</a
+            >
+          </li>
+        </ul>
+      </div>
+    </footer>
   </body>
 </html>

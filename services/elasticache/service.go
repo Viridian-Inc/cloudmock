@@ -3,6 +3,7 @@ package elasticache
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -76,6 +77,55 @@ func (s *ElastiCacheService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *ElastiCacheService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for ElastiCache resource types.
+func (s *ElastiCacheService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "elasticache",
+			ResourceType:  "aws_elasticache_cluster",
+			TerraformType: "cloudmock_elasticache_cluster",
+			AWSType:       "AWS::ElastiCache::CacheCluster",
+			CreateAction:  "CreateCacheCluster",
+			ReadAction:    "DescribeCacheClusters",
+			UpdateAction:  "ModifyCacheCluster",
+			DeleteAction:  "DeleteCacheCluster",
+			ImportID:      "cluster_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "cluster_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "engine", Type: "string", Required: true, ForceNew: true},
+				{Name: "engine_version", Type: "string"},
+				{Name: "node_type", Type: "string", Required: true},
+				{Name: "num_cache_nodes", Type: "int", Required: true, Default: 1},
+				{Name: "port", Type: "int"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "cache_nodes", Type: "list", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "elasticache",
+			ResourceType:  "aws_elasticache_replication_group",
+			TerraformType: "cloudmock_elasticache_replication_group",
+			AWSType:       "AWS::ElastiCache::ReplicationGroup",
+			CreateAction:  "CreateReplicationGroup",
+			ReadAction:    "DescribeReplicationGroups",
+			UpdateAction:  "ModifyReplicationGroup",
+			DeleteAction:  "DeleteReplicationGroup",
+			ImportID:      "replication_group_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "replication_group_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "description", Type: "string", Required: true},
+				{Name: "node_type", Type: "string"},
+				{Name: "num_cache_clusters", Type: "int"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "primary_endpoint_address", Type: "string", Computed: true},
+				{Name: "reader_endpoint_address", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming ElastiCache request to the appropriate handler.
 // ElastiCache uses the query protocol (form-encoded, XML responses).

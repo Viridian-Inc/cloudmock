@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -63,6 +64,46 @@ func (s *SNSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *SNSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for SNS topic resources.
+func (s *SNSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "sns",
+			ResourceType:  "aws_sns_topic",
+			TerraformType: "cloudmock_sns_topic",
+			AWSType:       "AWS::SNS::Topic",
+			CreateAction:  "CreateTopic",
+			ReadAction:    "GetTopicAttributes",
+			DeleteAction:  "DeleteTopic",
+			ListAction:    "ListTopics",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "fifo_topic", Type: "bool", Default: false, ForceNew: true},
+				{Name: "display_name", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "sns",
+			ResourceType:  "aws_sns_topic_subscription",
+			TerraformType: "cloudmock_sns_topic_subscription",
+			AWSType:       "AWS::SNS::Subscription",
+			CreateAction:  "Subscribe",
+			DeleteAction:  "Unsubscribe",
+			ListAction:    "ListSubscriptions",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "topic_arn", Type: "string", Required: true, ForceNew: true},
+				{Name: "protocol", Type: "string", Required: true, ForceNew: true},
+				{Name: "endpoint", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+			},
+		},
+	}
+}
 
 // GetAllSubscriptions returns all SNS subscriptions for topology queries.
 func (s *SNSService) GetAllSubscriptions() []*Subscription {

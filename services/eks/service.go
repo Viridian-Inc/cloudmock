@@ -3,6 +3,7 @@ package eks
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -76,6 +77,54 @@ func (s *EKSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *EKSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for EKS resource types.
+func (s *EKSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "eks",
+			ResourceType:  "aws_eks_cluster",
+			TerraformType: "cloudmock_eks_cluster",
+			AWSType:       "AWS::EKS::Cluster",
+			CreateAction:  "CreateCluster",
+			ReadAction:    "DescribeCluster",
+			DeleteAction:  "DeleteCluster",
+			ListAction:    "ListClusters",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "role_arn", Type: "string", Required: true, ForceNew: true},
+				{Name: "version", Type: "string"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "endpoint", Type: "string", Computed: true},
+				{Name: "status", Type: "string", Computed: true},
+				{Name: "vpc_config", Type: "map", Required: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "eks",
+			ResourceType:  "aws_eks_node_group",
+			TerraformType: "cloudmock_eks_node_group",
+			AWSType:       "AWS::EKS::Nodegroup",
+			CreateAction:  "CreateNodegroup",
+			ReadAction:    "DescribeNodegroup",
+			DeleteAction:  "DeleteNodegroup",
+			ListAction:    "ListNodegroups",
+			ImportID:      "cluster_name:node_group_name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "cluster_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "node_group_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "node_role_arn", Type: "string", Required: true, ForceNew: true},
+				{Name: "scaling_config", Type: "map", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "status", Type: "string", Computed: true},
+				{Name: "instance_types", Type: "list"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming EKS request to the appropriate handler.
 // EKS uses REST-JSON path-based routing.

@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -59,6 +60,55 @@ func (s *LambdaService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *LambdaService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Lambda function resources.
+func (s *LambdaService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "lambda",
+			ResourceType:  "aws_lambda_function",
+			TerraformType: "cloudmock_lambda_function",
+			AWSType:       "AWS::Lambda::Function",
+			CreateAction:  "CreateFunction",
+			ReadAction:    "GetFunction",
+			UpdateAction:  "UpdateFunctionCode",
+			DeleteAction:  "DeleteFunction",
+			ListAction:    "ListFunctions",
+			ImportID:      "function_name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "function_name", Type: "string", Required: true, ForceNew: true},
+				{Name: "runtime", Type: "string", Required: true},
+				{Name: "role", Type: "string", Required: true},
+				{Name: "handler", Type: "string", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "invoke_arn", Type: "string", Computed: true},
+				{Name: "last_modified", Type: "string", Computed: true},
+				{Name: "memory_size", Type: "int", Default: 128},
+				{Name: "timeout", Type: "int", Default: 3},
+				{Name: "environment", Type: "map"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "lambda",
+			ResourceType:  "aws_lambda_event_source_mapping",
+			TerraformType: "cloudmock_lambda_event_source_mapping",
+			AWSType:       "AWS::Lambda::EventSourceMapping",
+			CreateAction:  "CreateEventSourceMapping",
+			ReadAction:    "GetEventSourceMapping",
+			DeleteAction:  "DeleteEventSourceMapping",
+			ListAction:    "ListEventSourceMappings",
+			ImportID:      "uuid",
+			Attributes: []schema.AttributeSchema{
+				{Name: "function_name", Type: "string", Required: true},
+				{Name: "event_source_arn", Type: "string", Required: true, ForceNew: true},
+				{Name: "uuid", Type: "string", Computed: true},
+				{Name: "batch_size", Type: "int", Default: 10},
+				{Name: "enabled", Type: "bool", Default: true},
+			},
+		},
+	}
+}
 
 // Logs returns the Lambda execution log buffer.
 func (s *LambdaService) Logs() *LogBuffer {

@@ -3,6 +3,7 @@ package redshift
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -58,6 +59,39 @@ func (s *RedshiftService) Actions() []service.Action {
 
 // HealthCheck always returns nil.
 func (s *RedshiftService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Redshift resource types.
+func (s *RedshiftService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "redshift",
+			ResourceType:  "aws_redshift_cluster",
+			TerraformType: "cloudmock_redshift_cluster",
+			AWSType:       "AWS::Redshift::Cluster",
+			CreateAction:  "CreateCluster",
+			ReadAction:    "DescribeClusters",
+			UpdateAction:  "ModifyCluster",
+			DeleteAction:  "DeleteCluster",
+			ImportID:      "cluster_identifier",
+			Attributes: []schema.AttributeSchema{
+				{Name: "cluster_identifier", Type: "string", Required: true, ForceNew: true},
+				{Name: "node_type", Type: "string", Required: true},
+				{Name: "master_username", Type: "string", Required: true, ForceNew: true},
+				{Name: "master_password", Type: "string", Required: true},
+				{Name: "cluster_type", Type: "string", Default: "single-node"},
+				{Name: "number_of_nodes", Type: "int", Default: 1},
+				{Name: "database_name", Type: "string", Default: "dev"},
+				{Name: "port", Type: "int", Default: 5439},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "endpoint", Type: "string", Computed: true},
+				{Name: "dns_name", Type: "string", Computed: true},
+				{Name: "publicly_accessible", Type: "bool", Default: true},
+				{Name: "skip_final_snapshot", Type: "bool", Default: false},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming Redshift request to the appropriate handler.
 func (s *RedshiftService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {

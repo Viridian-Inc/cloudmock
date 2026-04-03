@@ -3,6 +3,7 @@ package rds
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -45,6 +46,63 @@ func (s *RDSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *RDSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for RDS resource types.
+func (s *RDSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "rds",
+			ResourceType:  "aws_db_instance",
+			TerraformType: "cloudmock_db_instance",
+			AWSType:       "AWS::RDS::DBInstance",
+			CreateAction:  "CreateDBInstance",
+			ReadAction:    "DescribeDBInstances",
+			UpdateAction:  "ModifyDBInstance",
+			DeleteAction:  "DeleteDBInstance",
+			ImportID:      "identifier",
+			Attributes: []schema.AttributeSchema{
+				{Name: "identifier", Type: "string", Required: true, ForceNew: true},
+				{Name: "engine", Type: "string", Required: true, ForceNew: true},
+				{Name: "engine_version", Type: "string"},
+				{Name: "instance_class", Type: "string", Required: true},
+				{Name: "allocated_storage", Type: "int", Required: true},
+				{Name: "username", Type: "string", Required: true, ForceNew: true},
+				{Name: "password", Type: "string", Required: true},
+				{Name: "db_name", Type: "string"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "endpoint", Type: "string", Computed: true},
+				{Name: "port", Type: "int", Computed: true},
+				{Name: "multi_az", Type: "bool", Default: false},
+				{Name: "publicly_accessible", Type: "bool", Default: false},
+				{Name: "skip_final_snapshot", Type: "bool", Default: false},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "rds",
+			ResourceType:  "aws_rds_cluster",
+			TerraformType: "cloudmock_rds_cluster",
+			AWSType:       "AWS::RDS::DBCluster",
+			CreateAction:  "CreateDBCluster",
+			ReadAction:    "DescribeDBClusters",
+			DeleteAction:  "DeleteDBCluster",
+			ImportID:      "cluster_identifier",
+			Attributes: []schema.AttributeSchema{
+				{Name: "cluster_identifier", Type: "string", Required: true, ForceNew: true},
+				{Name: "engine", Type: "string", Required: true},
+				{Name: "engine_version", Type: "string"},
+				{Name: "master_username", Type: "string", Required: true, ForceNew: true},
+				{Name: "master_password", Type: "string", Required: true},
+				{Name: "database_name", Type: "string"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "endpoint", Type: "string", Computed: true},
+				{Name: "reader_endpoint", Type: "string", Computed: true},
+				{Name: "skip_final_snapshot", Type: "bool", Default: false},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming RDS request to the appropriate handler.
 // RDS uses form-encoded POST bodies; the Action may appear in the query string

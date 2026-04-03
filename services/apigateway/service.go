@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -45,6 +46,49 @@ func (s *APIGatewayService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *APIGatewayService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for API Gateway resource types.
+func (s *APIGatewayService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "apigateway",
+			ResourceType:  "aws_api_gateway_rest_api",
+			TerraformType: "cloudmock_api_gateway_rest_api",
+			AWSType:       "AWS::ApiGateway::RestApi",
+			CreateAction:  "CreateRestApi",
+			ReadAction:    "GetRestApi",
+			DeleteAction:  "DeleteRestApi",
+			ListAction:    "GetRestApis",
+			ImportID:      "id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true},
+				{Name: "description", Type: "string"},
+				{Name: "endpoint_configuration", Type: "map"},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "root_resource_id", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "execution_arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "apigateway",
+			ResourceType:  "aws_api_gateway_deployment",
+			TerraformType: "cloudmock_api_gateway_deployment",
+			AWSType:       "AWS::ApiGateway::Deployment",
+			CreateAction:  "CreateDeployment",
+			ReadAction:    "GetDeployments",
+			ImportID:      "rest_api_id/id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "rest_api_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "stage_name", Type: "string"},
+				{Name: "description", Type: "string"},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "invoke_url", Type: "string", Computed: true},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming API Gateway request to the appropriate handler.
 // API Gateway uses REST path-based routing.

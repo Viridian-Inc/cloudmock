@@ -3,6 +3,7 @@ package eventbridge
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -66,6 +67,49 @@ func (s *EventBridgeService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *EventBridgeService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for EventBridge resource types.
+func (s *EventBridgeService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "eventbridge",
+			ResourceType:  "aws_cloudwatch_event_bus",
+			TerraformType: "cloudmock_cloudwatch_event_bus",
+			AWSType:       "AWS::Events::EventBus",
+			CreateAction:  "CreateEventBus",
+			ReadAction:    "DescribeEventBus",
+			DeleteAction:  "DeleteEventBus",
+			ListAction:    "ListEventBuses",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "eventbridge",
+			ResourceType:  "aws_cloudwatch_event_rule",
+			TerraformType: "cloudmock_cloudwatch_event_rule",
+			AWSType:       "AWS::Events::Rule",
+			CreateAction:  "PutRule",
+			ReadAction:    "DescribeRule",
+			DeleteAction:  "DeleteRule",
+			ListAction:    "ListRules",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "event_bus_name", Type: "string", Default: "default"},
+				{Name: "schedule_expression", Type: "string"},
+				{Name: "event_pattern", Type: "string"},
+				{Name: "description", Type: "string"},
+				{Name: "is_enabled", Type: "bool", Default: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // RuleWithTargets pairs a rule with its targets for topology queries.
 type RuleWithTargets struct {

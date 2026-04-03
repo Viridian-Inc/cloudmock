@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -40,6 +41,49 @@ func (s *Route53Service) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *Route53Service) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Route 53 resource types.
+func (s *Route53Service) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "route53",
+			ResourceType:  "aws_route53_zone",
+			TerraformType: "cloudmock_route53_zone",
+			AWSType:       "AWS::Route53::HostedZone",
+			CreateAction:  "CreateHostedZone",
+			ReadAction:    "GetHostedZone",
+			DeleteAction:  "DeleteHostedZone",
+			ListAction:    "ListHostedZones",
+			ImportID:      "zone_id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "zone_id", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "name_servers", Type: "list", Computed: true},
+				{Name: "private_zone", Type: "bool", Default: false},
+				{Name: "comment", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "route53",
+			ResourceType:  "aws_route53_record",
+			TerraformType: "cloudmock_route53_record",
+			AWSType:       "AWS::Route53::RecordSet",
+			CreateAction:  "ChangeResourceRecordSets",
+			ReadAction:    "ListResourceRecordSets",
+			DeleteAction:  "ChangeResourceRecordSets",
+			ImportID:      "zone_id_name_type",
+			Attributes: []schema.AttributeSchema{
+				{Name: "zone_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "type", Type: "string", Required: true, ForceNew: true},
+				{Name: "ttl", Type: "int"},
+				{Name: "records", Type: "list"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming Route 53 request to the appropriate handler.
 // Route 53 uses path-based REST routing; ctx.Action will be empty.

@@ -3,6 +3,7 @@ package ssm
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -36,6 +37,36 @@ func (s *SSMService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *SSMService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for SSM resource types.
+func (s *SSMService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "ssm",
+			ResourceType:  "aws_ssm_parameter",
+			TerraformType: "cloudmock_ssm_parameter",
+			AWSType:       "AWS::SSM::Parameter",
+			CreateAction:  "PutParameter",
+			ReadAction:    "GetParameter",
+			UpdateAction:  "PutParameter",
+			DeleteAction:  "DeleteParameter",
+			ListAction:    "DescribeParameters",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "type", Type: "string", Required: true},
+				{Name: "value", Type: "string", Required: true},
+				{Name: "description", Type: "string"},
+				{Name: "key_id", Type: "string"},
+				{Name: "tier", Type: "string", Default: "Standard"},
+				{Name: "overwrite", Type: "bool", Default: false},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "version", Type: "int", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming SSM request to the appropriate handler.
 // SSM uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway

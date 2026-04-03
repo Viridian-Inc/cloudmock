@@ -3,6 +3,7 @@ package ecs
 import (
 	"net/http"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -55,6 +56,73 @@ func (s *ECSService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *ECSService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for ECS resource types.
+func (s *ECSService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "ecs",
+			ResourceType:  "aws_ecs_cluster",
+			TerraformType: "cloudmock_ecs_cluster",
+			AWSType:       "AWS::ECS::Cluster",
+			CreateAction:  "CreateCluster",
+			ReadAction:    "DescribeClusters",
+			DeleteAction:  "DeleteCluster",
+			ListAction:    "ListClusters",
+			ImportID:      "name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "ecs",
+			ResourceType:  "aws_ecs_task_definition",
+			TerraformType: "cloudmock_ecs_task_definition",
+			AWSType:       "AWS::ECS::TaskDefinition",
+			CreateAction:  "RegisterTaskDefinition",
+			ReadAction:    "DescribeTaskDefinition",
+			DeleteAction:  "DeregisterTaskDefinition",
+			ListAction:    "ListTaskDefinitions",
+			ImportID:      "arn",
+			Attributes: []schema.AttributeSchema{
+				{Name: "family", Type: "string", Required: true, ForceNew: true},
+				{Name: "container_definitions", Type: "string", Required: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "revision", Type: "int", Computed: true},
+				{Name: "cpu", Type: "string"},
+				{Name: "memory", Type: "string"},
+				{Name: "network_mode", Type: "string"},
+				{Name: "requires_compatibilities", Type: "list"},
+				{Name: "task_role_arn", Type: "string"},
+				{Name: "execution_role_arn", Type: "string"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "ecs",
+			ResourceType:  "aws_ecs_service",
+			TerraformType: "cloudmock_ecs_service",
+			AWSType:       "AWS::ECS::Service",
+			CreateAction:  "CreateService",
+			ReadAction:    "DescribeServices",
+			UpdateAction:  "UpdateService",
+			DeleteAction:  "DeleteService",
+			ListAction:    "ListServices",
+			ImportID:      "cluster/name",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "cluster", Type: "string", Required: true, ForceNew: true},
+				{Name: "task_definition", Type: "string", Required: true},
+				{Name: "desired_count", Type: "int", Default: 1},
+				{Name: "launch_type", Type: "string"},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "tags", Type: "map"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming ECS request to the appropriate handler.
 // ECS uses the JSON protocol; the action is parsed from X-Amz-Target by the gateway

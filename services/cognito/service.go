@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -53,6 +54,51 @@ func (s *CognitoService) Actions() []service.Action {
 
 // HealthCheck always returns nil (no external dependencies).
 func (s *CognitoService) HealthCheck() error { return nil }
+
+// ResourceSchemas returns the schema for Cognito resource types.
+func (s *CognitoService) ResourceSchemas() []schema.ResourceSchema {
+	return []schema.ResourceSchema{
+		{
+			ServiceName:   "cognito",
+			ResourceType:  "aws_cognito_user_pool",
+			TerraformType: "cloudmock_cognito_user_pool",
+			AWSType:       "AWS::Cognito::UserPool",
+			CreateAction:  "CreateUserPool",
+			ReadAction:    "DescribeUserPool",
+			DeleteAction:  "DeleteUserPool",
+			ListAction:    "ListUserPools",
+			ImportID:      "id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "arn", Type: "string", Computed: true},
+				{Name: "endpoint", Type: "string", Computed: true},
+				{Name: "alias_attributes", Type: "list"},
+				{Name: "auto_verified_attributes", Type: "list"},
+				{Name: "tags", Type: "map"},
+			},
+		},
+		{
+			ServiceName:   "cognito",
+			ResourceType:  "aws_cognito_user_pool_client",
+			TerraformType: "cloudmock_cognito_user_pool_client",
+			AWSType:       "AWS::Cognito::UserPoolClient",
+			CreateAction:  "CreateUserPoolClient",
+			ReadAction:    "DescribeUserPoolClient",
+			ListAction:    "ListUserPoolClients",
+			ImportID:      "user_pool_id/id",
+			Attributes: []schema.AttributeSchema{
+				{Name: "name", Type: "string", Required: true, ForceNew: true},
+				{Name: "user_pool_id", Type: "string", Required: true, ForceNew: true},
+				{Name: "id", Type: "string", Computed: true},
+				{Name: "generate_secret", Type: "bool", Default: false},
+				{Name: "allowed_oauth_flows", Type: "list"},
+				{Name: "allowed_oauth_scopes", Type: "list"},
+				{Name: "callback_urls", Type: "list"},
+			},
+		},
+	}
+}
 
 // HandleRequest routes an incoming Cognito User Pools request to the appropriate handler.
 // It first checks for OAuth/OIDC REST-style paths, then falls back to the JSON protocol

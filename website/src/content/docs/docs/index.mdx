@@ -3,10 +3,10 @@ title: CloudMock
 description: Local AWS emulation for developers. Run 99 AWS services on your laptop with a single binary.
 template: splash
 hero:
-  tagline: A standalone, open-source local AWS emulator. Run a single binary and point your SDKs at localhost — no internet required.
+  tagline: "99 services. One binary. Built-in devtools. No Docker, no cloud account."
   actions:
     - text: Get Started
-      link: /docs/guides/about/
+      link: /docs/getting-started/installation/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
@@ -14,34 +14,57 @@ hero:
       icon: external
 ---
 
-import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
+import { Card, CardGrid } from "@astrojs/starlight/components";
 
-<div style="text-align:center; margin:2rem 0 3rem;">
-  <p style="font-size:1.4rem; font-weight:600; color:var(--sl-color-white); margin:0;">
-    99 AWS services. One binary. <span style="color:#52b788;">$4.32/year.</span>
+<div style="text-align:center; margin:1.5rem 0 2.5rem;">
+  <p style="font-size:1.5rem; font-weight:700; color:var(--sl-color-white); margin:0;">
+    AWS, locally.
   </p>
-  <p style="color:var(--sl-color-gray-3); margin:0.5rem 0 0;">
-    110x faster than Moto. 8x less memory than LocalStack. Zero stubs.
+  <p style="font-size:1.1rem; color:var(--sl-color-gray-3); margin:0.5rem 0 0;">
+    110x faster than Moto · 8x less memory than LocalStack · <span style="color:#52b788;">$4.32/year</span> at 1,000 builds/day
   </p>
 </div>
 
-## Quick Start
+<div style="background:var(--sl-color-gray-6); border-radius:8px; padding:1.25rem 1.5rem; margin:0 0 2.5rem; font-family:var(--sl-font-mono); font-size:0.9rem;">
+  <div><span style="color:var(--sl-color-gray-3);">$</span> npx cloudmock</div>
+  <div><span style="color:var(--sl-color-gray-3);">$</span> export AWS_ENDPOINT_URL=http://localhost:4566</div>
+  <div><span style="color:var(--sl-color-gray-3);">$</span> aws s3 mb s3://my-bucket <span style="color:#52b788;"># it just works</span></div>
+</div>
 
-```bash
-npx cloudmock                                    # start (65ms)
-export AWS_ENDPOINT_URL=http://localhost:4566     # point your SDK
-aws s3 mb s3://my-bucket                          # it just works
-```
+## How it works
+
+<div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:1.5rem; margin:1rem 0 2.5rem;">
+  <div style="background:var(--sl-color-gray-6); border-radius:8px; padding:1.25rem; text-align:center;">
+    <div style="font-size:1.5rem; font-weight:700; color:#52b788; margin-bottom:0.5rem;">1</div>
+    <strong>Install</strong>
+    <p style="font-size:0.9rem; color:var(--sl-color-gray-3); margin:0.5rem 0 0;">One command. No dependencies.</p>
+    <code style="font-size:0.8rem;">npx cloudmock</code>
+  </div>
+  <div style="background:var(--sl-color-gray-6); border-radius:8px; padding:1.25rem; text-align:center;">
+    <div style="font-size:1.5rem; font-weight:700; color:#52b788; margin-bottom:0.5rem;">2</div>
+    <strong>Point your SDK</strong>
+    <p style="font-size:0.9rem; color:var(--sl-color-gray-3); margin:0.5rem 0 0;">Override the endpoint.</p>
+    <code style="font-size:0.8rem;">endpoint: localhost:4566</code>
+  </div>
+  <div style="background:var(--sl-color-gray-6); border-radius:8px; padding:1.25rem; text-align:center;">
+    <div style="font-size:1.5rem; font-weight:700; color:#52b788; margin-bottom:0.5rem;">3</div>
+    <strong>Open DevTools</strong>
+    <p style="font-size:0.9rem; color:var(--sl-color-gray-3); margin:0.5rem 0 0;">Traces, metrics, chaos.</p>
+    <code style="font-size:0.8rem;">localhost:4500</code>
+  </div>
+</div>
+
+## Features
 
 <CardGrid>
   <Card title="99 AWS Services" icon="rocket">
     S3, DynamoDB, SQS, SNS, Lambda, IAM, EC2, ECS, RDS, and 90 more.
-    Every service fully emulated with proper error codes, pagination, and state machines.
+    Every service fully emulated with proper error codes, pagination, and state machines. Zero stubs.
     [Browse services →](/docs/services/s3/)
   </Card>
   <Card title="110x Faster" icon="approve-check-circle">
     In-process Go mode: 20μs per operation. HTTP mode: sub-millisecond.
-    Beats LocalStack and Moto on every service.
+    Beats LocalStack and Moto on every benchmark.
     [See benchmarks →](/docs/reference/benchmarks/)
   </Card>
   <Card title="10 Language SDKs" icon="puzzle">
@@ -50,7 +73,7 @@ aws s3 mb s3://my-bucket                          # it just works
     [View SDKs →](/docs/reference/sdks/)
   </Card>
   <Card title="Infrastructure as Code" icon="seti:terraform">
-    Terraform, CDK, and Pulumi work out of the box. Use your existing IaC files.
+    Terraform, CDK, and Pulumi work out of the box with your existing files.
     [Terraform guide →](/docs/guides/terraform/)
   </Card>
   <Card title="Test Toolkit" icon="setting">
@@ -59,17 +82,49 @@ aws s3 mb s3://my-bucket                          # it just works
     [Testing guide →](/docs/guides/testing/)
   </Card>
   <Card title="DevTools Dashboard" icon="laptop">
-    Topology maps, distributed traces, metrics, and chaos controls at localhost:4500.
+    Topology maps, distributed traces, metrics, chaos controls, and traffic replay — all at localhost:4500.
     [DevTools overview →](/docs/devtools/overview/)
   </Card>
 </CardGrid>
 
-<div style="text-align:center; margin:2rem 0; padding:1.5rem; border:1px solid var(--sl-color-gray-5); border-radius:8px;">
-  <p style="margin:0; font-size:1.1rem;">
-    <strong>Switching from LocalStack or Moto?</strong>
-    &nbsp;
-    <a href="/docs/guides/migrate-from-localstack/">LocalStack → CloudMock</a>
+## More
+
+<CardGrid>
+  <Card title="Chaos Engineering" icon="warning">
+    Inject S3 503s, DynamoDB throttles, Lambda timeouts. Test resilience before production.
+    [Chaos guide →](/docs/guides/chaos-testing/)
+  </Card>
+  <Card title="Contract Testing" icon="approve-check-circle">
+    Dual-mode proxy sends requests to both real AWS and CloudMock. Diff responses automatically.
+    [Contract testing →](/docs/guides/contract-testing/)
+  </Card>
+  <Card title="State Snapshots" icon="document">
+    Export to JSON, commit to git, restore on startup. Every developer starts with the same state.
+    [Snapshots guide →](/docs/guides/state-snapshots/)
+  </Card>
+  <Card title="GitHub Action" icon="github">
+    One line: `uses: viridian-inc/cloudmock-action@v1`. Auto-install, start, health-check.
+    [Action docs →](https://github.com/Viridian-Inc/cloudmock-action)
+  </Card>
+  <Card title="IAM Enforcement" icon="approve-check-circle">
+    Full policy evaluation, credential verification, or no-auth mode. Test IAM locally.
+    [Configuration →](/docs/reference/configuration/)
+  </Card>
+  <Card title="Docker Compose" icon="seti:docker">
+    8 pre-built stacks: serverless, microservices, data pipeline, fullstack, monitoring, and more.
+    [Docker stacks →](/docs/guides/docker-compose/)
+  </Card>
+</CardGrid>
+
+<div style="text-align:center; margin:2.5rem 0 1rem; padding:1.5rem; border:1px solid var(--sl-color-gray-5); border-radius:8px;">
+  <p style="margin:0 0 0.5rem; font-size:1.1rem; font-weight:600;">
+    Switching from LocalStack or Moto?
+  </p>
+  <p style="margin:0; color:var(--sl-color-gray-3);">
+    <a href="/docs/guides/migrate-from-localstack/">LocalStack → CloudMock (5 min)</a>
     &nbsp;·&nbsp;
     <a href="/docs/guides/migrate-from-moto/">Moto → CloudMock</a>
+    &nbsp;·&nbsp;
+    <a href="/docs/reference/comparison/">Full comparison</a>
   </p>
 </div>

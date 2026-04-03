@@ -3,10 +3,10 @@ title: CloudMock
 description: Local AWS emulation for developers. Run 100 AWS services on your laptop with a single binary.
 template: splash
 hero:
-  tagline: A standalone, open-source local AWS emulator. Run a single binary and point your SDKs at localhost — no internet required.
+  tagline: Test against 100 AWS services without an AWS account. Same SDKs. Same APIs. Offline. In milliseconds.
   actions:
     - text: Get Started
-      link: /docs/guides/about/
+      link: /docs/getting-started/installation/
       icon: right-arrow
       variant: primary
     - text: View on GitHub
@@ -16,12 +16,10 @@ hero:
 
 import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components";
 
-<div style="text-align:center; margin:2rem 0 3rem;">
-  <p style="font-size:1.4rem; font-weight:600; color:var(--sl-color-white); margin:0;">
-    100 AWS services. One binary. <span style="color:#52b788;">$4.32/year.</span>
-  </p>
-  <p style="color:var(--sl-color-gray-3); margin:0.5rem 0 0;">
-    110x faster than Moto. 8x less memory than LocalStack. Zero stubs.
+<div style="text-align:center; margin:1.5rem 0 2.5rem;">
+  <p style="font-size:1.1rem; color:var(--sl-color-gray-3); margin:0; line-height:1.6;">
+    Stop mocking AWS. Start testing against it.<br/>
+    <span style="color:var(--sl-color-white);">100 services. One binary. 65ms startup. <span style="color:#52b788;">$4/year in CI.</span></span>
   </p>
 </div>
 

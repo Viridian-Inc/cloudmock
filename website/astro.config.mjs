@@ -6,6 +6,10 @@ export default defineConfig({
   integrations: [
     starlight({
       title: "CloudMock",
+      logo: {
+        src: "./public/favicon.svg",
+        alt: "CloudMock",
+      },
       description: "Local AWS emulation for developers",
       social: [
         {

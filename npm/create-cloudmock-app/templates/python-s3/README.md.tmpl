@@ -1,0 +1,54 @@
+# {{PROJECT_NAME}}
+
+FastAPI + S3 file upload/download app with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Run the API
+
+```bash
+uvicorn app:app --reload
+```
+
+API docs at http://localhost:8000/docs.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /upload?key=name | Upload a file |
+| GET | /files | List files |
+| GET | /files/{key} | Download a file |
+
+Example:
+
+```bash
+curl -X POST "http://localhost:8000/upload?key=hello.txt" \
+  -F "file=@/path/to/file.txt"
+
+curl http://localhost:8000/files/hello.txt
+```
+
+## Testing
+
+```bash
+pytest
+```
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) for traces and S3 metrics.

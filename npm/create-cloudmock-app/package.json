@@ -1,0 +1,14 @@
+{
+  "name": "create-cloudmock-app",
+  "version": "1.0.0",
+  "description": "Scaffold a new project with CloudMock pre-configured for your stack",
+  "bin": {
+    "create-cloudmock-app": "index.mjs"
+  },
+  "type": "module",
+  "license": "BSL-1.1",
+  "files": ["index.mjs", "prompts.mjs", "scaffold.mjs", "templates/"],
+  "dependencies": {
+    "prompts": "^2.4.0"
+  }
+}

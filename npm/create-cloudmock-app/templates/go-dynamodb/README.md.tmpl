@@ -1,0 +1,58 @@
+# {{PROJECT_NAME}}
+
+Go HTTP server + DynamoDB with CloudMock for local development.
+
+## Getting Started
+
+### 1. Start CloudMock
+
+```bash
+docker compose up
+# or
+npx cloudmock
+```
+
+### 2. Install dependencies
+
+```bash
+go mod tidy
+```
+
+### 3. Run the server
+
+```bash
+go run .
+```
+
+Server starts on http://localhost:3000.
+
+## API
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /items | Create an item |
+| GET | /items | List all items |
+| GET | /items/{id} | Get an item |
+| DELETE | /items/{id} | Delete an item |
+
+Example:
+
+```bash
+curl -X POST http://localhost:3000/items \
+  -H 'Content-Type: application/json' \
+  -d '{"id":"1","name":"Widget"}'
+
+curl http://localhost:3000/items/1
+```
+
+## Testing
+
+```bash
+go test ./...
+```
+
+Tests use `sdk.New()` for in-process CloudMock — zero network overhead, ~20μs per operation.
+
+## CloudMock DevTools
+
+Open [http://localhost:4500](http://localhost:4500) to explore traces and topology.

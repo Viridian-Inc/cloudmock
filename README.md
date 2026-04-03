@@ -168,6 +168,14 @@ One line to add CloudMock to your CI:
 
 Auto-installs, starts, health-checks, and sets `AWS_ENDPOINT_URL` for all subsequent steps. Works with Node.js, Python, Go, Java, Rust, and any language with an AWS SDK.
 
+## Create a Project
+
+```bash
+npx create-cloudmock-app my-app
+```
+
+Generates a complete project with CloudMock pre-configured for your stack. Supports Node.js, Python, Go, Java, and Rust with S3, DynamoDB, and SQS templates.
+
 ## Traffic Recording & Replay
 
 Record real AWS traffic and replay against CloudMock to validate compatibility:

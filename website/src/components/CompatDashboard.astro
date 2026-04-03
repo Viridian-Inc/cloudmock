@@ -1,0 +1,322 @@
+---
+import compatData from "../data/compat.json";
+
+const report = compatData as typeof compatData;
+
+function pctColor(pct: number): string {
+  if (pct >= 90) return "#52b788";
+  if (pct >= 60) return "#f4a261";
+  return "#e63946";
+}
+
+const heroColor = pctColor(report.compat_pct);
+
+// Format date nicely
+const generatedDate = new Date(report.generated_at).toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+
+// Sort services: by compat_pct descending, then name
+const services = Object.values(report.services).sort((a, b) => {
+  if (b.compat_pct !== a.compat_pct) return b.compat_pct - a.compat_pct;
+  return a.service.localeCompare(b.service);
+});
+---
+
+<style>
+  /* ── Hero ── */
+  .compat-hero {
+    background: linear-gradient(135deg, #0f2027 0%, #1a3a2a 50%, #0f2027 100%);
+    border: 1px solid #2d6a4f;
+    border-radius: 12px;
+    padding: 2.5rem 2rem;
+    text-align: center;
+    margin: 2rem 0 2rem;
+  }
+  .compat-hero h2 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #95d5b2;
+    margin: 0 0 0.5rem;
+    border: none;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .compat-pct {
+    font-size: 5rem;
+    font-weight: 900;
+    line-height: 1;
+    margin: 0.25rem 0 0.5rem;
+  }
+  .compat-meta {
+    font-size: 0.85rem;
+    color: #95d5b2;
+    margin: 0.5rem 0 0;
+  }
+  .compat-counts {
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+  }
+  .compat-count {
+    background: rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 0.75rem 1.25rem;
+    min-width: 90px;
+  }
+  .compat-count .val {
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .compat-count .lbl {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 0.3rem;
+    color: #b7e4c7;
+  }
+  .val-pass  { color: #52b788; }
+  .val-fail  { color: #e63946; }
+  .val-skip  { color: #adb5bd; }
+  .val-total { color: #ffffff; }
+
+  /* ── Section header ── */
+  .section-hdr {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--sl-color-text-accent, #aaa);
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    margin: 2.5rem 0 1rem;
+    border: none;
+  }
+
+  /* ── Service grid ── */
+  .service-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+
+  /* ── Service card ── */
+  .service-card {
+    background: var(--sl-color-bg-nav, #1a1a2e);
+    border: 1px solid var(--sl-color-hairline, #333);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .service-card summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 1rem 1.1rem 0.85rem;
+    user-select: none;
+  }
+  .service-card summary::-webkit-details-marker { display: none; }
+  .service-card summary::marker { display: none; }
+
+  .card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    margin-bottom: 0.6rem;
+  }
+  .card-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--sl-color-text, #eee);
+    text-transform: capitalize;
+  }
+  .card-pct {
+    font-size: 0.85rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .card-expand-icon {
+    font-size: 0.65rem;
+    color: var(--sl-color-text-accent, #888);
+    flex-shrink: 0;
+  }
+  details[open] .card-expand-icon { transform: rotate(90deg); }
+
+  /* Progress bar */
+  .pct-bar-track {
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    height: 6px;
+    overflow: hidden;
+    margin-bottom: 0.6rem;
+  }
+  .pct-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    min-width: 2px;
+    transition: width 0.3s ease;
+  }
+
+  /* Mini counts */
+  .card-counts {
+    display: flex;
+    gap: 0.75rem;
+    font-size: 0.75rem;
+  }
+  .card-counts span { display: flex; align-items: center; gap: 0.25rem; }
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    flex-shrink: 0;
+  }
+  .dot-pass { background: #52b788; }
+  .dot-fail { background: #e63946; }
+  .dot-skip { background: #adb5bd; }
+
+  /* ── Operations list ── */
+  .ops-list {
+    border-top: 1px solid var(--sl-color-hairline, #2a2a2a);
+    padding: 0.75rem 1.1rem 0.9rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    max-height: 280px;
+    overflow-y: auto;
+  }
+  .op-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.45rem;
+    font-size: 0.76rem;
+    line-height: 1.4;
+  }
+  .op-icon {
+    flex-shrink: 0;
+    font-size: 0.75rem;
+    margin-top: 0.05rem;
+  }
+  .op-name {
+    color: var(--sl-color-text, #ddd);
+    font-family: "JetBrains Mono", monospace;
+    word-break: break-all;
+  }
+  .op-pass .op-name { color: #95d5b2; }
+  .op-fail .op-name { color: #f28b8d; }
+  .op-skip .op-name { color: #888; }
+
+  /* ── Note box ── */
+  .compat-note {
+    background: rgba(82, 183, 136, 0.08);
+    border-left: 3px solid #52b788;
+    border-radius: 0 8px 8px 0;
+    padding: 0.75rem 1rem;
+    margin: 1.5rem 0 2rem;
+    font-size: 0.85rem;
+    color: var(--sl-color-text, #ccc);
+    line-height: 1.6;
+  }
+</style>
+
+<!-- Hero -->
+<div class="compat-hero">
+  <h2>AWS API Compatibility</h2>
+  <div class="compat-pct" style={`color: ${heroColor}`}>
+    {report.compat_pct.toFixed(1)}%
+  </div>
+  <p class="compat-meta">
+    {report.services ? Object.keys(report.services).length : 0} services &nbsp;·&nbsp;
+    {report.total_ops} operations tested
+    {report.cloudmock_version ? ` · CloudMock ${report.cloudmock_version}` : ""}
+    &nbsp;·&nbsp; Updated {generatedDate}
+  </p>
+  <div class="compat-counts">
+    <div class="compat-count">
+      <div class="val val-pass">{report.passed}</div>
+      <div class="lbl">Passing</div>
+    </div>
+    <div class="compat-count">
+      <div class="val val-fail">{report.failed}</div>
+      <div class="lbl">Failing</div>
+    </div>
+    {report.skipped > 0 && (
+      <div class="compat-count">
+        <div class="val val-skip">{report.skipped}</div>
+        <div class="lbl">Skipped</div>
+      </div>
+    )}
+    <div class="compat-count">
+      <div class="val val-total">{report.total_ops}</div>
+      <div class="lbl">Total Ops</div>
+    </div>
+  </div>
+</div>
+
+<!-- Per-service grid -->
+<h2 class="section-hdr">Per-Service Breakdown</h2>
+
+<div class="service-grid">
+  {services.map((svc) => {
+    const color = pctColor(svc.compat_pct);
+    const barWidth = Math.max(svc.compat_pct, svc.total_ops > 0 ? 1 : 0);
+    return (
+      <div class="service-card">
+        <details>
+          <summary>
+            <div class="card-header">
+              <span class="card-name">{svc.service}</span>
+              <span class="card-pct" style={`color: ${color}`}>
+                {svc.compat_pct.toFixed(0)}%
+              </span>
+              <span class="card-expand-icon">&#9658;</span>
+            </div>
+            <div class="pct-bar-track">
+              <div
+                class="pct-bar-fill"
+                style={`width: ${barWidth}%; background: ${color}`}
+              />
+            </div>
+            <div class="card-counts">
+              <span>
+                <span class="dot dot-pass" />
+                <span style="color: #52b788">{svc.passed} pass</span>
+              </span>
+              <span>
+                <span class="dot dot-fail" />
+                <span style="color: #e63946">{svc.failed} fail</span>
+              </span>
+              {svc.skipped > 0 && (
+                <span>
+                  <span class="dot dot-skip" />
+                  <span style="color: #adb5bd">{svc.skipped} skip</span>
+                </span>
+              )}
+            </div>
+          </summary>
+          <div class="ops-list">
+            {svc.operations.map((op) => (
+              <div class={`op-row op-${op.status}`}>
+                <span class="op-icon">
+                  {op.status === "pass" ? "✓" : op.status === "fail" ? "✗" : "–"}
+                </span>
+                <span class="op-name">{op.name}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      </div>
+    );
+  })}
+</div>
+
+<div class="compat-note">
+  Compatibility is measured by running each operation against CloudMock and checking for correct responses.
+  A passing operation returns a valid response with no errors.
+  Failing operations return HTTP errors or incorrect responses.
+  Results are generated from the nightly benchmark suite — see the
+  <a href="/docs/reference/benchmarks/">Benchmarks</a> page for full methodology.
+</div>

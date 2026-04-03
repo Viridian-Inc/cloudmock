@@ -1,5 +1,7 @@
 # CloudMock
 
+![AWS Compatibility](https://img.shields.io/badge/AWS_Compatibility-30%25-orange)
+
 **Local AWS emulation with built-in observability.**
 
 99 AWS services + distributed tracing + error tracking + alerting — in one binary. Language-agnostic via OpenTelemetry.

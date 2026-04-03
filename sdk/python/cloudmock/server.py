@@ -151,6 +151,49 @@ class CloudMock:
             aws_secret_access_key="test",
         )
 
+    def inject_fault(self, service, action, fault_type, status_code=500, message="", latency_ms=0, percentage=100):
+        """Inject a fault rule into the running CloudMock instance.
+
+        Args:
+            service: AWS service name (e.g. "s3", "dynamodb", "*" for all).
+            action: API action name (e.g. "GetObject") or "*" for all.
+            fault_type: One of "error", "latency", "timeout", "blackhole", "throttle".
+            status_code: HTTP status code for "error" faults (default 500).
+            message: Error message body.
+            latency_ms: Milliseconds of added latency for "latency" faults.
+            percentage: Probability 0-100 that the fault fires (default 100).
+        """
+        import json
+        import urllib.request
+
+        rule = {
+            "service": service,
+            "action": action,
+            "type": fault_type,
+            "enabled": True,
+            "errorCode": status_code,
+            "errorMsg": message,
+            "latencyMs": latency_ms,
+            "percentage": percentage,
+        }
+        req = urllib.request.Request(
+            f"{self._endpoint.rstrip('/')}/api/chaos",
+            data=json.dumps(rule).encode(),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        urllib.request.urlopen(req)
+
+    def clear_faults(self):
+        """Disable all chaos rules on the running CloudMock instance."""
+        import urllib.request
+
+        req = urllib.request.Request(
+            f"{self._endpoint.rstrip('/')}/api/chaos",
+            method="DELETE",
+        )
+        urllib.request.urlopen(req)
+
     def __enter__(self):
         self.start()
         return self

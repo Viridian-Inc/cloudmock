@@ -126,6 +126,41 @@ class CloudMock {
   }
 
   /**
+   * Injects a fault rule into the running CloudMock instance.
+   *
+   * @param {string} service - AWS service name (e.g. "s3", "dynamodb", "*" for all).
+   * @param {string} action - API action (e.g. "GetObject") or "*" for all.
+   * @param {string} type - Fault type: "error", "latency", "timeout", "blackhole", or "throttle".
+   * @param {{ statusCode?: number, message?: string, latencyMs?: number, percentage?: number }} [opts]
+   * @returns {Promise<void>}
+   */
+  async injectFault(service, action, type, opts = {}) {
+    const body = JSON.stringify({
+      service,
+      action,
+      type,
+      enabled: true,
+      errorCode: opts.statusCode ?? 500,
+      errorMsg: opts.message ?? "",
+      latencyMs: opts.latencyMs ?? 0,
+      percentage: opts.percentage ?? 100,
+    });
+    await fetch(`${this.endpoint}/api/chaos`, {
+      method: "POST",
+      body,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  /**
+   * Disables all chaos rules on the running CloudMock instance.
+   * @returns {Promise<void>}
+   */
+  async clearFaults() {
+    await fetch(`${this.endpoint}/api/chaos`, { method: "DELETE" });
+  }
+
+  /**
    * Returns an AWS SDK v3 client configuration object.
    * Pass the return value directly to any client constructor:
    *

@@ -216,6 +216,17 @@ func ChaosMiddleware(next http.Handler, engine *ChaosEngine) http.Handler {
 				_, _ = w.Write([]byte(`{"__type":"ChaosTimeout","message":"Request timed out (chaos injection)"}`))
 				return
 
+			case "throttle":
+				w.Header().Set("X-Cloudmock-Chaos", rule.ID)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusTooManyRequests)
+				msg := rule.ErrorMsg
+				if msg == "" {
+					msg = "Rate exceeded"
+				}
+				fmt.Fprintf(w, `{"__type":"ThrottlingException","Message":"%s"}`, msg)
+				return
+
 			case "blackhole":
 				// Hijack the connection and close it without sending a response.
 				hj, ok := w.(http.Hijacker)

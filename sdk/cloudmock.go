@@ -52,9 +52,10 @@ func WithAccountID(id string) Option { return func(o *options) { o.accountID = i
 // CloudMock is an in-process AWS mock. All AWS SDK calls routed through its
 // Config() go directly to the gateway handler with zero network overhead.
 type CloudMock struct {
-	handler   http.Handler
-	transport *inProcessTransport
-	cfg       aws.Config
+	handler      http.Handler
+	transport    *inProcessTransport
+	cfg          aws.Config
+	chaosEngine  *gateway.ChaosEngine
 }
 
 // New creates a new in-process CloudMock instance. By default it uses a
@@ -103,7 +104,11 @@ func New(opts ...Option) *CloudMock {
 	}
 	gw.SetEventBus(bus)
 
-	transport := newInProcessTransport(gw)
+	// Create a chaos engine and wrap the gateway with chaos middleware.
+	chaosEngine := gateway.NewChaosEngine()
+	var handler http.Handler = gateway.ChaosMiddleware(gw, chaosEngine)
+
+	transport := newInProcessTransport(handler)
 
 	// Build the aws.Config that the caller will pass to SDK clients.
 	// Static credentials avoid per-call credential resolution and keep the
@@ -125,9 +130,10 @@ func New(opts ...Option) *CloudMock {
 	awsConfig.BaseEndpoint = aws.String("http://cloudmock.local")
 
 	return &CloudMock{
-		handler:   gw,
-		transport: transport,
-		cfg:       awsConfig,
+		handler:     handler,
+		transport:   transport,
+		cfg:         awsConfig,
+		chaosEngine: chaosEngine,
 	}
 }
 

@@ -98,6 +98,7 @@ import (
 	k8splugin "github.com/neureaux/cloudmock/plugins/kubernetes"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
+	snapshotpkg "github.com/neureaux/cloudmock/pkg/snapshot"
 	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
 	ec2svc "github.com/neureaux/cloudmock/services/ec2"
 	cfnsvc "github.com/neureaux/cloudmock/services/cloudformation"
@@ -327,7 +328,15 @@ func main() {
 	pluginDir := flag.String("plugin-dir", "", "directory containing external plugin binaries (default: ~/.cloudmock/plugins/)")
 	iacDir := flag.String("iac", "", "path to Pulumi/Terraform project directory — auto-provisions DynamoDB tables, API routes from IaC source (auto-detected if not set)")
 	iacEnv := flag.String("iac-env", "dev", "environment name for IaC resource name resolution (e.g., dev, stage, prod)")
+	stateFile := flag.String("state", "", "path to cloudmock state JSON file for snapshot restore/save (env: CLOUDMOCK_STATE)")
 	flag.Parse()
+
+	// Allow env var override for state file.
+	if *stateFile == "" {
+		if v := os.Getenv("CLOUDMOCK_STATE"); v != "" {
+			*stateFile = v
+		}
+	}
 
 	var cfg *config.Config
 	var err error
@@ -1952,11 +1961,35 @@ func main() {
 		}()
 	}
 
+	// Restore state from snapshot file if provided and file exists.
+	if *stateFile != "" {
+		if stateData, err := os.ReadFile(*stateFile); err == nil {
+			if err := snapshotpkg.Import(registry, stateData); err != nil {
+				slog.Error("failed to import state file", "path", *stateFile, "error", err)
+			} else {
+				slog.Info("state restored from snapshot", "path", *stateFile)
+			}
+		} else if !os.IsNotExist(err) {
+			slog.Error("failed to read state file", "path", *stateFile, "error", err)
+		}
+	}
+
 	// Wait for termination signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
 	sig := <-sigCh
 	slog.Info("shutdown signal received", "signal", sig)
+
+	// Export state to snapshot file on shutdown if path was provided.
+	if *stateFile != "" {
+		if data, err := snapshotpkg.Export(registry); err != nil {
+			slog.Error("failed to export state on shutdown", "error", err)
+		} else if err := os.WriteFile(*stateFile, data, 0644); err != nil {
+			slog.Error("failed to write state file on shutdown", "path", *stateFile, "error", err)
+		} else {
+			slog.Info("state saved to snapshot file", "path", *stateFile)
+		}
+	}
 
 	// Cancel the root context so background goroutines (e.g. SLO callbacks) stop.
 	rootCancel()

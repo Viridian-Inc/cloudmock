@@ -102,6 +102,24 @@ func (reg *Registry) List() []service.Service {
 	return out
 }
 
+// All returns all services, forcing initialization of any lazy services.
+// This is used by snapshot export/import which needs the real service instances.
+func (reg *Registry) All() []service.Service {
+	reg.mu.Lock()
+	// Initialize all pending lazy factories.
+	for name, factory := range reg.factories {
+		svc := factory()
+		reg.services[name] = svc
+		delete(reg.factories, name)
+	}
+	out := make([]service.Service, 0, len(reg.services))
+	for _, svc := range reg.services {
+		out = append(out, svc)
+	}
+	reg.mu.Unlock()
+	return out
+}
+
 // LazyService is a lightweight placeholder that satisfies service.Service for
 // services registered via RegisterLazy that have not yet been initialized.
 // It must never be used to handle real requests; Lookup will always return the

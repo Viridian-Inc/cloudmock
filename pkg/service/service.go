@@ -1,6 +1,9 @@
 package service
 
-import "net/http"
+import (
+	"encoding/json"
+	"net/http"
+)
 
 // Service is the interface every AWS service mock must implement.
 type Service interface {
@@ -8,6 +11,12 @@ type Service interface {
 	Actions() []Action
 	HandleRequest(ctx *RequestContext) (*Response, error)
 	HealthCheck() error
+}
+
+// Snapshotable is implemented by services that support state export/import.
+type Snapshotable interface {
+	ExportState() (json.RawMessage, error)
+	ImportState(data json.RawMessage) error
 }
 
 // Action describes a single AWS API action that a service supports.

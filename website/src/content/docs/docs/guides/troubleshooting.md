@@ -97,7 +97,7 @@ If you need additional services, switch to a larger profile:
 # Use the standard profile (20 services)
 CLOUDMOCK_PROFILE=standard npx cloudmock start
 
-# Use the full profile (all 98 services)
+# Use the full profile (all 99 services)
 CLOUDMOCK_PROFILE=full npx cloudmock start
 
 # Or enable specific services on top of minimal
@@ -288,7 +288,7 @@ The SDK works by monkey-patching HTTP libraries at `init()` time. If you create 
 
 **Does CloudMock support service X?**
 
-Check the [Compatibility Matrix](/docs/reference/compatibility-matrix/). CloudMock supports 98 fully emulated AWS services.
+Check the [Compatibility Matrix](/docs/reference/compatibility-matrix/). CloudMock supports 99 fully emulated AWS services.
 
 **Can I use CloudMock with Terraform/CDK/Pulumi?**
 

@@ -95,7 +95,7 @@ kinesis, firehose, events, stepfunctions, apigateway
 
 ### full
 
-Starts all 98 supported services, including all Tier 2 CRUD stubs. Use this when your application depends on less common services, or when you want full coverage without listing services individually.
+Starts all 99 fully emulated AWS services. Use this when your application depends on less common services, or when you want full coverage without listing services individually.
 
 ### custom
 
@@ -343,6 +343,31 @@ Configure with:
 logging:
   level: debug
   format: json
+```
+
+## State Persistence
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `--state` | `CLOUDMOCK_STATE` | (none) | Path to state file. Loaded on startup, saved on shutdown. |
+| `--persist` | `CLOUDMOCK_PERSIST` | `false` | Auto-save state on shutdown (SIGTERM/SIGINT) |
+
+### Example
+
+```bash
+# Start with pre-configured state
+cloudmock --state cloudmock-state.json
+
+# Auto-save state on shutdown
+cloudmock --state cloudmock-state.json --persist
+```
+
+### YAML Configuration
+
+```yaml
+persistence:
+  enabled: true
+  path: ./cloudmock-state.json
 ```
 
 ## Config file location

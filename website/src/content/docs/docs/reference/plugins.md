@@ -297,32 +297,16 @@ curl -X POST http://localhost:4599/api/plugins \
   -d '{"name": "myservice", "type": "grpc", "address": "localhost:50051"}'
 ```
 
-## Adding a Tier 2 CRUD stub (simplest option)
+## Adding a custom service
 
-If your custom service only needs basic CRUD operations (create, get, list, delete, update), you do not need a plugin at all. Add a service model entry to `services/stubs/catalog.go`:
+To add a new AWS service to CloudMock, create a new package under `services/` following the pattern of existing services. See `services/s3/` or `services/sqs/` for reference implementations. Each service needs:
 
-```go
-{
-    ServiceName:  "myservice",
-    Protocol:     "json",
-    TargetPrefix: "MyService_20260101",
-    Actions: map[string]stub.Action{
-        "CreateWidget": createAction("CreateWidget", "widget", "WidgetId",
-            []stub.Field{reqStr("WidgetName")},
-            []stub.Field{optStr("WidgetName")}),
-        "DescribeWidget": describeAction("DescribeWidget", "widget", "WidgetId"),
-        "ListWidgets":    listAction("ListWidgets", "widget"),
-        "DeleteWidget":   deleteAction("DeleteWidget", "widget", "WidgetId"),
-    },
-    ResourceTypes: map[string]stub.ResourceType{
-        "widget": rt("Widget", "WidgetId",
-            "arn:aws:myservice:{region}:{account}:widget/{id}",
-            []stub.Field{optStr("WidgetName")}),
-    },
-},
-```
+- `service.go` — implements `service.Service` interface with `Name()`, `Actions()`, `HandleRequest()`
+- `store.go` — in-memory data storage
+- `handlers.go` — per-action request handlers
+- `service_test.go` — tests
 
-No other code changes are needed. The stub engine handles routing, request parsing, response serialization, and IAM integration automatically.
+Register your service in `cmd/gateway/main.go` and it will be available on the gateway endpoint.
 
 ## Plugin lifecycle
 

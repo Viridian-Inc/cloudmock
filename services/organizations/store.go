@@ -98,6 +98,12 @@ type PolicyTarget struct {
 	Type     string // ROOT, ORGANIZATIONAL_UNIT, ACCOUNT
 }
 
+// AccountProvisioner is called when a new account is created via Organizations.
+// The account.Registry implements this by provisioning an isolated account.
+type AccountProvisioner interface {
+	ProvisionAccount(id, name string) error
+}
+
 // Store is the in-memory store for Organizations resources.
 type Store struct {
 	mu                   sync.RWMutex
@@ -110,6 +116,7 @@ type Store struct {
 	createAccountStatuses map[string]*CreateAccountStatus // keyed by request ID
 	accountID            string
 	region               string
+	provisioner          AccountProvisioner
 }
 
 // NewStore creates an empty Organizations Store.
@@ -124,6 +131,15 @@ func NewStore(accountID, region string) *Store {
 		accountID:             accountID,
 		region:                region,
 	}
+}
+
+// SetProvisioner attaches an AccountProvisioner that is called when new
+// accounts are created via the CreateAccount API. This enables integration
+// with the multi-account registry for resource isolation.
+func (s *Store) SetProvisioner(p AccountProvisioner) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.provisioner = p
 }
 
 func newID(prefix string) string {
@@ -370,6 +386,17 @@ func (s *Store) CreateAccount(name, email string) (*Account, *CreateAccountStatu
 
 	s.accounts[accountId] = acct
 	s.createAccountStatuses[requestID] = status
+
+	// Provision an isolated account in the account registry if available.
+	if s.provisioner != nil {
+		// Unlock before calling external code to avoid deadlocks.
+		// The account is already recorded; provisioner failure is non-fatal.
+		provisioner := s.provisioner
+		s.mu.Unlock()
+		_ = provisioner.ProvisionAccount(accountId, name)
+		s.mu.Lock()
+	}
+
 	return acct, status, nil
 }
 

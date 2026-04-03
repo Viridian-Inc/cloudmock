@@ -551,3 +551,29 @@ curl -X POST http://localhost:4599/api/iam/evaluate \
 |--------|------|-------------|
 | `GET` | `/api/lambda/logs` | Get Lambda execution logs |
 | `GET` | `/api/lambda/logs/stream` | SSE stream of Lambda logs |
+
+---
+
+## State Management
+
+### Export State
+
+`POST /api/state/export`
+
+Export the current state of all services as a JSON file.
+
+**Response:** JSON state file containing all S3 buckets, DynamoDB tables, SQS queues, SNS topics, Lambda functions, IAM resources, CloudWatch Logs groups, and Route53 zones.
+
+### Import State
+
+`POST /api/state/import`
+
+Import a previously exported state file. The request body should be a JSON state file.
+
+**Request Body:** JSON state file (same format as export response)
+
+### Reset State
+
+`POST /api/state/reset`
+
+Clear all service state. All buckets, tables, queues, topics, functions, and other resources are deleted.

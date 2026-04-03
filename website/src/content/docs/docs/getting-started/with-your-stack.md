@@ -243,6 +243,57 @@ let config = aws_config::defaults(BehaviorVersion::latest())
 let s3 = aws_sdk_s3::Client::new(&config);
 ```
 
+### C# / .NET
+
+```csharp
+using var cm = new CloudMockServer();
+var s3 = new AmazonS3Client(
+    new BasicAWSCredentials("test", "test"),
+    new AmazonS3Config { ServiceURL = cm.Endpoint, ForcePathStyle = true });
+```
+
+See the [C# guide](/docs/language-guides/csharp/) for full setup.
+
+### Ruby
+
+```ruby
+cm = CloudMock.start
+s3 = Aws::S3::Client.new(cm.aws_config)
+```
+
+See the [Ruby guide](/docs/language-guides/ruby/) for full setup.
+
+### C / C++
+
+```c
+cloudmock_t *cm = cloudmock_start(NULL);
+// Use AWS SDK for C++ with endpoint: cloudmock_endpoint(cm)
+cloudmock_stop(cm);
+```
+
+See the [C/C++ guide](/docs/language-guides/cpp/) for full setup.
+
+### Swift
+
+```swift
+let cm = try CloudMockServer()
+try cm.start()
+// Use Soto with cm.endpoint
+cm.stop()
+```
+
+See the [Swift guide](/docs/language-guides/swift/) for full setup.
+
+### Kotlin
+
+```kotlin
+CloudMock.start().use { cm ->
+    // Use AWS SDK for Kotlin with cm.endpoint
+}
+```
+
+See the [Kotlin guide](/docs/language-guides/kotlin/) for full setup.
+
 ## Tips
 
 **Keep production code clean.** Rather than hardcoding `localhost:4566`, use the environment variable approach. Your application reads `AWS_ENDPOINT_URL` automatically -- set it in development, leave it unset in production.

@@ -345,6 +345,31 @@ logging:
   format: json
 ```
 
+## State Persistence
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `--state` | `CLOUDMOCK_STATE` | (none) | Path to state file. Loaded on startup, saved on shutdown. |
+| `--persist` | `CLOUDMOCK_PERSIST` | `false` | Auto-save state on shutdown (SIGTERM/SIGINT) |
+
+### Example
+
+```bash
+# Start with pre-configured state
+cloudmock --state cloudmock-state.json
+
+# Auto-save state on shutdown
+cloudmock --state cloudmock-state.json --persist
+```
+
+### YAML Configuration
+
+```yaml
+persistence:
+  enabled: true
+  path: ./cloudmock-state.json
+```
+
 ## Config file location
 
 CloudMock looks for `cloudmock.yml` in the following order:

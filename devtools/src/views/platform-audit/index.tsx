@@ -1,74 +1,24 @@
-import { useState, useMemo } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../../lib/api';
 import './platform-audit.css';
 
 interface AuditEntry {
   id: string;
-  timestamp: string;
+  created_at: string;
   actor: string;
+  actor_type: string;
   action: string;
   resource: string;
-  ip: string;
+  resource_id: string;
+  ip_address: string;
 }
 
-// TODO: Replace with API call to GET /api/platform/audit
-const MOCK_AUDIT: AuditEntry[] = [
-  {
-    id: '1',
-    timestamp: '2026-04-03T10:45:00Z',
-    actor: 'admin@example.com',
-    action: 'app.create',
-    resource: 'app/staging',
-    ip: '203.0.113.10',
-  },
-  {
-    id: '2',
-    timestamp: '2026-04-03T10:30:00Z',
-    actor: 'cm_live_a1b2',
-    action: 'aws.request',
-    resource: 's3/my-bucket',
-    ip: '198.51.100.5',
-  },
-  {
-    id: '3',
-    timestamp: '2026-04-02T18:00:00Z',
-    actor: 'admin@example.com',
-    action: 'key.revoke',
-    resource: 'key/cm_live_e5f6',
-    ip: '203.0.113.10',
-  },
-  {
-    id: '4',
-    timestamp: '2026-04-01T14:22:00Z',
-    actor: 'admin@example.com',
-    action: 'key.create',
-    resource: 'key/cm_live_c3d4',
-    ip: '203.0.113.10',
-  },
-  {
-    id: '5',
-    timestamp: '2026-03-30T09:15:00Z',
-    actor: 'ci@example.com',
-    action: 'app.update',
-    resource: 'app/ci-tests',
-    ip: '192.0.2.42',
-  },
-  {
-    id: '6',
-    timestamp: '2026-03-29T16:00:00Z',
-    actor: 'cm_live_a1b2',
-    action: 'aws.request',
-    resource: 'dynamodb/my-table',
-    ip: '198.51.100.5',
-  },
-  {
-    id: '7',
-    timestamp: '2026-03-28T11:30:00Z',
-    actor: 'admin@example.com',
-    action: 'org.settings.update',
-    resource: 'org/my-org',
-    ip: '203.0.113.10',
-  },
-];
+interface AuditResponse {
+  entries: AuditEntry[];
+  total: number;
+  offset: number;
+  limit: number;
+}
 
 const PAGE_SIZE = 5;
 
@@ -102,38 +52,38 @@ function actionBadgeClass(action: string): string {
   return 'audit-badge audit-badge-gray';
 }
 
-function exportCSV(entries: AuditEntry[]) {
-  const header = 'Timestamp,Actor,Action,Resource,IP\n';
-  const rows = entries
-    .map((e) => `${e.timestamp},"${e.actor}","${e.action}","${e.resource}","${e.ip}"`)
-    .join('\n');
-  const blob = new Blob([header + rows], { type: 'text/csv' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'cloudmock-audit-log.csv';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
 export function PlatformAuditView() {
+  const [entries, setEntries] = useState<AuditEntry[]>([]);
+  const [total, setTotal] = useState(0);
   const [actionFilter, setActionFilter] = useState('all');
   const [page, setPage] = useState(0);
 
-  const filtered = useMemo(
-    () =>
-      actionFilter === 'all'
-        ? MOCK_AUDIT
-        : MOCK_AUDIT.filter((e) => e.action === actionFilter),
-    [actionFilter],
-  );
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (actionFilter !== 'all') params.set('action', actionFilter);
+    params.set('offset', String(page * PAGE_SIZE));
+    params.set('limit', String(PAGE_SIZE));
+    api<AuditResponse>(`/api/platform/audit?${params.toString()}`)
+      .then((resp) => {
+        setEntries(resp.entries ?? []);
+        setTotal(resp.total ?? 0);
+      })
+      .catch(console.error);
+  }, [actionFilter, page]);
 
-  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-  const pageEntries = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+  const totalPages = Math.ceil(total / PAGE_SIZE);
 
   function handleFilterChange(val: string) {
     setActionFilter(val);
     setPage(0);
+  }
+
+  function handleExport() {
+    const params = new URLSearchParams();
+    if (actionFilter !== 'all') params.set('action', actionFilter);
+    // Trigger download via direct navigation
+    const base = (window as any).__adminBase ?? '';
+    window.location.href = `${base}/api/platform/audit/export?${params.toString()}`;
   }
 
   return (
@@ -143,7 +93,7 @@ export function PlatformAuditView() {
           <h2 class="platform-title">Audit Log</h2>
           <p class="platform-subtitle">Track all actions taken across your organization</p>
         </div>
-        <button class="btn" onClick={() => exportCSV(filtered)}>
+        <button class="btn" onClick={handleExport}>
           Export CSV
         </button>
       </div>
@@ -176,14 +126,14 @@ export function PlatformAuditView() {
             </tr>
           </thead>
           <tbody>
-            {pageEntries.length === 0 && (
+            {entries.length === 0 && (
               <tr>
                 <td colspan={5} class="platform-table-empty">No audit entries match your filter</td>
               </tr>
             )}
-            {pageEntries.map((entry) => (
+            {entries.map((entry) => (
               <tr key={entry.id}>
-                <td class="audit-timestamp">{formatTimestamp(entry.timestamp)}</td>
+                <td class="audit-timestamp">{formatTimestamp(entry.created_at)}</td>
                 <td>
                   <code class="audit-actor">{entry.actor}</code>
                 </td>
@@ -191,7 +141,7 @@ export function PlatformAuditView() {
                   <span class={actionBadgeClass(entry.action)}>{entry.action}</span>
                 </td>
                 <td class="audit-resource">{entry.resource}</td>
-                <td class="audit-ip">{entry.ip}</td>
+                <td class="audit-ip">{entry.ip_address}</td>
               </tr>
             ))}
           </tbody>

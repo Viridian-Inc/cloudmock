@@ -152,6 +152,7 @@ type API struct {
 	marketplace        *marketplace.Registry
 	persistDir         string       // if set, dashboards/views/deploys are persisted here
 	dynamoStore        *DynamoStore // if set, dashboards/views/deploys use DynamoDB
+	platform           *PlatformStore
 
 	// Lazy initialization for devtools subsystems (deferred in minimal profile).
 	lazyInitOnce sync.Once
@@ -218,6 +219,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 		stats:       stats,
 		broadcaster: NewEventBroadcaster(),
 		mux:         http.NewServeMux(),
+		platform:    newPlatformStore(),
 	}
 
 	a.mux.HandleFunc("/api/version", a.handleVersion)
@@ -281,6 +283,16 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
 	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
+
+	// Platform management endpoints
+	a.mux.HandleFunc("/api/platform/apps", a.handlePlatformApps)
+	a.mux.HandleFunc("/api/platform/apps/", a.handlePlatformAppByID)
+	a.mux.HandleFunc("/api/platform/keys", a.handlePlatformKeys)
+	a.mux.HandleFunc("/api/platform/keys/", a.handlePlatformKeyByID)
+	a.mux.HandleFunc("/api/platform/usage", a.handlePlatformUsage)
+	a.mux.HandleFunc("/api/platform/audit", a.handlePlatformAudit)
+	a.mux.HandleFunc("/api/platform/audit/export", a.handlePlatformAuditExport)
+	a.mux.HandleFunc("/api/platform/settings", a.handlePlatformSettings)
 
 	// RUM (Real User Monitoring) endpoints
 	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)
@@ -346,6 +358,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 		broadcaster: NewEventBroadcaster(),
 		mux:         http.NewServeMux(),
 		dp:          dp,
+		platform:    newPlatformStore(),
 	}
 
 	a.mux.HandleFunc("/api/version", a.handleVersion)
@@ -421,6 +434,16 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
 	a.mux.HandleFunc("/api/webhooks/stripe", a.handleStripeWebhook)
+
+	// Platform management endpoints
+	a.mux.HandleFunc("/api/platform/apps", a.handlePlatformApps)
+	a.mux.HandleFunc("/api/platform/apps/", a.handlePlatformAppByID)
+	a.mux.HandleFunc("/api/platform/keys", a.handlePlatformKeys)
+	a.mux.HandleFunc("/api/platform/keys/", a.handlePlatformKeyByID)
+	a.mux.HandleFunc("/api/platform/usage", a.handlePlatformUsage)
+	a.mux.HandleFunc("/api/platform/audit", a.handlePlatformAudit)
+	a.mux.HandleFunc("/api/platform/audit/export", a.handlePlatformAuditExport)
+	a.mux.HandleFunc("/api/platform/settings", a.handlePlatformSettings)
 
 	// RUM (Real User Monitoring) endpoints
 	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)

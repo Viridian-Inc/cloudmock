@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../../lib/api';
 import './platform-apps.css';
 
 type InfraType = 'shared' | 'dedicated';
@@ -12,28 +13,6 @@ interface App {
   status: string;
   request_count: number;
 }
-
-// TODO: Replace with API call to GET /api/platform/apps
-const MOCK_APPS: App[] = [
-  {
-    id: '1',
-    name: 'staging',
-    slug: 'staging',
-    endpoint: 'https://abc123.cloudmock.io',
-    infra_type: 'shared',
-    status: 'running',
-    request_count: 42891,
-  },
-  {
-    id: '2',
-    name: 'ci-tests',
-    slug: 'ci-tests',
-    endpoint: 'https://def456.cloudmock.io',
-    infra_type: 'dedicated',
-    status: 'running',
-    request_count: 1203,
-  },
-];
 
 function statusClass(status: string): string {
   if (status === 'running') return 'badge-green';
@@ -62,7 +41,6 @@ function CreateAppDialog({ onClose, onCreate }: CreateAppDialogProps) {
       setError('App name is required');
       return;
     }
-    // TODO: POST /api/platform/apps
     onCreate(name.trim(), infra);
   }
 
@@ -126,22 +104,29 @@ function CreateAppDialog({ onClose, onCreate }: CreateAppDialogProps) {
 }
 
 export function PlatformAppsView() {
-  const [apps, setApps] = useState<App[]>(MOCK_APPS);
+  const [apps, setApps] = useState<App[]>([]);
   const [showCreate, setShowCreate] = useState(false);
 
+  useEffect(() => {
+    api<App[]>('/api/platform/apps').then(setApps).catch(console.error);
+  }, []);
+
   function handleCreate(name: string, infra: InfraType) {
-    // TODO: Refresh from API after POST /api/platform/apps
-    const newApp: App = {
-      id: String(Date.now()),
-      name,
-      slug: name.toLowerCase().replace(/\s+/g, '-'),
-      endpoint: `https://${Math.random().toString(36).slice(2, 8)}.cloudmock.io`,
-      infra_type: infra,
-      status: 'running',
-      request_count: 0,
-    };
-    setApps((prev) => [...prev, newApp]);
-    setShowCreate(false);
+    api<App>('/api/platform/apps', {
+      method: 'POST',
+      body: JSON.stringify({ name, infra_type: infra }),
+    })
+      .then((newApp) => {
+        setApps((prev) => [...prev, newApp]);
+        setShowCreate(false);
+      })
+      .catch(console.error);
+  }
+
+  function handleDelete(id: string) {
+    api(`/api/platform/apps/${id}`, { method: 'DELETE' })
+      .then(() => setApps((prev) => prev.filter((a) => a.id !== id)))
+      .catch(console.error);
   }
 
   return (
@@ -184,8 +169,7 @@ export function PlatformAppsView() {
               </div>
             </div>
             <div class="app-card-footer">
-              {/* TODO: Navigate to app detail view */}
-              <button class="btn" onClick={() => {}}>View</button>
+              <button class="btn btn-danger-ghost" onClick={() => handleDelete(app.id)}>Delete</button>
             </div>
           </div>
         ))}

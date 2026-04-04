@@ -1,43 +1,53 @@
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../../lib/api';
 import './platform-usage.css';
 
-const FREE_LIMIT = 1000;
-const PRICE_PER_10K = 0.5;
-
-// TODO: Replace with API call to GET /api/platform/usage
-const MOCK_TOTAL = 44094;
-
-const MOCK_APP_BREAKDOWN = [
-  { id: '1', name: 'staging', request_count: 42891 },
-  { id: '2', name: 'ci-tests', request_count: 1203 },
-];
-
-// Generate 30 days of mock daily request counts ending today
-function mockDailyData(): { day: string; count: number }[] {
-  const days: { day: string; count: number }[] = [];
-  const now = new Date('2026-04-03');
-  for (let i = 29; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i);
-    const label = `${d.getMonth() + 1}/${d.getDate()}`;
-    // Mock: ramp up toward the end of the month
-    const base = 800 + Math.sin(i * 0.4) * 400;
-    days.push({ day: label, count: Math.max(0, Math.round(base + Math.random() * 500)) });
-  }
-  return days;
+interface AppUsage {
+  name: string;
+  requests: number;
 }
 
-const DAILY_DATA = mockDailyData();
-const MAX_DAY = Math.max(...DAILY_DATA.map((d) => d.count));
+interface DayUsage {
+  day: string;
+  count: number;
+}
 
-function formatCost(requests: number): string {
-  const billable = Math.max(0, requests - FREE_LIMIT);
-  const cost = (billable / 10000) * PRICE_PER_10K;
+interface UsageData {
+  total: number;
+  free_limit: number;
+  cost: number;
+  apps: AppUsage[];
+  daily: DayUsage[];
+}
+
+function formatCost(cost: number): string {
   return cost === 0 ? '$0.00' : `$${cost.toFixed(2)}`;
 }
 
 export function PlatformUsageView() {
-  const total = MOCK_TOTAL;
-  const pct = Math.min(100, (total / FREE_LIMIT) * 100);
+  const [data, setData] = useState<UsageData | null>(null);
+
+  useEffect(() => {
+    api<UsageData>('/api/platform/usage').then(setData).catch(console.error);
+  }, []);
+
+  if (!data) {
+    return (
+      <div class="platform-view">
+        <div class="platform-header">
+          <div class="platform-header-left">
+            <h2 class="platform-title">Usage</h2>
+            <p class="platform-subtitle">Request usage for this billing period</p>
+          </div>
+        </div>
+        <div class="platform-loading">Loading...</div>
+      </div>
+    );
+  }
+
+  const { total, free_limit, cost, apps, daily } = data;
+  const pct = Math.min(100, (total / free_limit) * 100);
+  const maxDay = daily.length > 0 ? Math.max(...daily.map((d) => d.count)) : 1;
 
   return (
     <div class="platform-view">
@@ -61,16 +71,16 @@ export function PlatformUsageView() {
               />
             </div>
             <div class="usage-progress-label">
-              {total.toLocaleString()} / {FREE_LIMIT.toLocaleString()} free
+              {total.toLocaleString()} / {free_limit.toLocaleString()} free
             </div>
           </div>
         </div>
 
         <div class="usage-card">
           <div class="usage-card-label">Estimated Cost</div>
-          <div class="usage-card-value usage-cost">{formatCost(total)}</div>
+          <div class="usage-card-value usage-cost">{formatCost(cost)}</div>
           <div class="usage-cost-note">
-            First {FREE_LIMIT.toLocaleString()} req/mo free · ${PRICE_PER_10K.toFixed(2)} per 10k after
+            First {free_limit.toLocaleString()} req/mo free · $0.05 per 10k after
           </div>
         </div>
       </div>
@@ -88,18 +98,18 @@ export function PlatformUsageView() {
               </tr>
             </thead>
             <tbody>
-              {MOCK_APP_BREAKDOWN.map((app) => (
-                <tr key={app.id}>
+              {apps.map((app) => (
+                <tr key={app.name}>
                   <td class="key-name">{app.name}</td>
-                  <td>{app.request_count.toLocaleString()}</td>
+                  <td>{app.requests.toLocaleString()}</td>
                   <td>
                     <div class="usage-share-bar">
                       <div
                         class="usage-share-fill"
-                        style={{ width: `${Math.round((app.request_count / total) * 100)}%` }}
+                        style={{ width: `${total > 0 ? Math.round((app.requests / total) * 100) : 0}%` }}
                       />
                       <span class="usage-share-pct">
-                        {Math.round((app.request_count / total) * 100)}%
+                        {total > 0 ? Math.round((app.requests / total) * 100) : 0}%
                       </span>
                     </div>
                   </td>
@@ -114,11 +124,11 @@ export function PlatformUsageView() {
       <div class="usage-section">
         <h3 class="usage-section-title">Daily Requests (Last 30 Days)</h3>
         <div class="usage-chart">
-          {DAILY_DATA.map((d) => (
+          {daily.map((d) => (
             <div class="usage-bar-wrap" key={d.day} title={`${d.day}: ${d.count.toLocaleString()}`}>
               <div
                 class="usage-bar"
-                style={{ height: `${Math.round((d.count / MAX_DAY) * 100)}%` }}
+                style={{ height: `${maxDay > 0 ? Math.round((d.count / maxDay) * 100) : 0}%` }}
               />
               <div class="usage-bar-label">{d.day.split('/')[1]}</div>
             </div>

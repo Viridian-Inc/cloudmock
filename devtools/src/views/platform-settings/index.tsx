@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../../lib/api';
 import './platform-settings.css';
 
 interface RetentionConfig {
@@ -7,33 +8,33 @@ interface RetentionConfig {
   state_snapshot: number;
 }
 
-// TODO: Replace with API call to GET /api/platform/settings
-const DEFAULT_RETENTION: RetentionConfig = {
-  audit_log: 365,
-  request_log: 90,
-  state_snapshot: 30,
-};
-
 interface OrgInfo {
   name: string;
   slug: string;
   plan: string;
   owner_email: string;
+  retention: RetentionConfig;
 }
 
-// TODO: Replace with API call to GET /api/platform/org
-const MOCK_ORG: OrgInfo = {
-  name: 'My Organization',
-  slug: 'my-org',
-  plan: 'Free',
-  owner_email: 'admin@example.com',
-};
-
 export function PlatformSettingsView() {
-  const [retention, setRetention] = useState<RetentionConfig>(DEFAULT_RETENTION);
+  const [org, setOrg] = useState<OrgInfo | null>(null);
+  const [retention, setRetention] = useState<RetentionConfig>({
+    audit_log: 365,
+    request_log: 90,
+    state_snapshot: 30,
+  });
   const [saved, setSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+
+  useEffect(() => {
+    api<OrgInfo>('/api/platform/settings')
+      .then((data) => {
+        setOrg(data);
+        setRetention(data.retention);
+      })
+      .catch(console.error);
+  }, []);
 
   function handleRetentionChange(key: keyof RetentionConfig, raw: string) {
     const val = parseInt(raw, 10);
@@ -43,17 +44,27 @@ export function PlatformSettingsView() {
   }
 
   function handleSave() {
-    // TODO: PUT /api/platform/settings with retention config
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    api<OrgInfo>('/api/platform/settings', {
+      method: 'PUT',
+      body: JSON.stringify({ retention }),
+    })
+      .then((data) => {
+        setOrg(data);
+        setRetention(data.retention);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      })
+      .catch(console.error);
   }
 
   function handleDeleteOrg() {
-    // TODO: DELETE /api/platform/org
-    alert('Organization deleted (mock). In production this would be irreversible.');
+    alert('Organization deleted (local mode). In production this would be irreversible.');
     setShowDeleteConfirm(false);
     setDeleteInput('');
   }
+
+  const orgName = org?.name ?? 'My Organization';
+  const orgSlug = org?.slug ?? 'my-org';
 
   return (
     <div class="platform-view">
@@ -71,19 +82,19 @@ export function PlatformSettingsView() {
           <div class="settings-info-grid">
             <div class="settings-info-row">
               <span class="settings-info-label">Name</span>
-              <span class="settings-info-value">{MOCK_ORG.name}</span>
+              <span class="settings-info-value">{orgName}</span>
             </div>
             <div class="settings-info-row">
               <span class="settings-info-label">Slug</span>
-              <code class="settings-info-mono">{MOCK_ORG.slug}</code>
+              <code class="settings-info-mono">{orgSlug}</code>
             </div>
             <div class="settings-info-row">
               <span class="settings-info-label">Plan</span>
-              <span class="badge badge-green">{MOCK_ORG.plan}</span>
+              <span class="badge badge-green">{org?.plan ?? 'Free'}</span>
             </div>
             <div class="settings-info-row">
               <span class="settings-info-label">Owner</span>
-              <span class="settings-info-value">{MOCK_ORG.owner_email}</span>
+              <span class="settings-info-value">{org?.owner_email ?? ''}</span>
             </div>
           </div>
         </div>
@@ -192,12 +203,12 @@ export function PlatformSettingsView() {
             </div>
             <div class="platform-modal-body">
               <p class="danger-confirm-text">
-                This will permanently delete <strong>{MOCK_ORG.name}</strong> and all its data.
-                Type <strong>{MOCK_ORG.slug}</strong> to confirm.
+                This will permanently delete <strong>{orgName}</strong> and all its data.
+                Type <strong>{orgSlug}</strong> to confirm.
               </p>
               <input
                 class="input platform-input"
-                placeholder={MOCK_ORG.slug}
+                placeholder={orgSlug}
                 value={deleteInput}
                 onInput={(e) => setDeleteInput((e.target as HTMLInputElement).value)}
               />
@@ -206,7 +217,7 @@ export function PlatformSettingsView() {
               <button class="btn" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
               <button
                 class="btn btn-danger"
-                disabled={deleteInput !== MOCK_ORG.slug}
+                disabled={deleteInput !== orgSlug}
                 onClick={handleDeleteOrg}
               >
                 Delete Forever

@@ -1,4 +1,5 @@
-import { useState } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
+import { api } from '../../lib/api';
 import './platform-keys.css';
 
 type Role = 'admin' | 'developer' | 'viewer';
@@ -11,26 +12,6 @@ interface ApiKey {
   last_used_at: string | null;
   created_at: string;
 }
-
-// TODO: Replace with API call to GET /api/platform/keys
-const MOCK_KEYS: ApiKey[] = [
-  {
-    id: '1',
-    prefix: 'cm_live_a1b2',
-    name: 'CI Pipeline',
-    role: 'developer',
-    last_used_at: '2026-04-03T10:30:00Z',
-    created_at: '2026-03-15T08:00:00Z',
-  },
-  {
-    id: '2',
-    prefix: 'cm_live_c3d4',
-    name: 'Local Dev',
-    role: 'admin',
-    last_used_at: null,
-    created_at: '2026-04-01T14:00:00Z',
-  },
-];
 
 function relativeTime(iso: string | null): string {
   if (!iso) return 'Never';
@@ -65,7 +46,6 @@ function CreateKeyDialog({ onClose, onCreate }: CreateKeyDialogProps) {
       setError('Key name is required');
       return;
     }
-    // TODO: POST /api/platform/keys
     onCreate(name.trim(), role);
   }
 
@@ -150,30 +130,32 @@ function NewKeyReveal({ keyValue, onDone }: NewKeyRevealProps) {
 }
 
 export function PlatformKeysView() {
-  const [keys, setKeys] = useState<ApiKey[]>(MOCK_KEYS);
+  const [keys, setKeys] = useState<ApiKey[]>([]);
   const [showCreate, setShowCreate] = useState(false);
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
 
+  useEffect(() => {
+    api<ApiKey[]>('/api/platform/keys').then(setKeys).catch(console.error);
+  }, []);
+
   function handleCreate(name: string, role: Role) {
-    // TODO: Refresh from API after POST /api/platform/keys
-    const prefix = `cm_live_${Math.random().toString(36).slice(2, 6)}`;
-    const newKey: ApiKey = {
-      id: String(Date.now()),
-      prefix,
-      name,
-      role,
-      last_used_at: null,
-      created_at: new Date().toISOString(),
-    };
-    setKeys((prev) => [newKey, ...prev]);
-    setShowCreate(false);
-    // Show the plaintext key once
-    setNewKeyValue(`${prefix}${Math.random().toString(36).slice(2, 22)}`);
+    api<ApiKey & { key: string }>('/api/platform/keys', {
+      method: 'POST',
+      body: JSON.stringify({ name, role }),
+    })
+      .then((resp) => {
+        const { key, ...keyMeta } = resp;
+        setKeys((prev) => [keyMeta, ...prev]);
+        setShowCreate(false);
+        setNewKeyValue(key);
+      })
+      .catch(console.error);
   }
 
   function handleRevoke(id: string) {
-    // TODO: DELETE /api/platform/keys/:id
-    setKeys((prev) => prev.filter((k) => k.id !== id));
+    api(`/api/platform/keys/${id}`, { method: 'DELETE' })
+      .then(() => setKeys((prev) => prev.filter((k) => k.id !== id)))
+      .catch(console.error);
   }
 
   return (

@@ -293,6 +293,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/platform/audit", a.handlePlatformAudit)
 	a.mux.HandleFunc("/api/platform/audit/export", a.handlePlatformAuditExport)
 	a.mux.HandleFunc("/api/platform/settings", a.handlePlatformSettings)
+	a.mux.HandleFunc("/api/platform/environments", a.handlePlatformEnvironments)
 
 	// RUM (Real User Monitoring) endpoints
 	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)
@@ -444,6 +445,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/platform/audit", a.handlePlatformAudit)
 	a.mux.HandleFunc("/api/platform/audit/export", a.handlePlatformAuditExport)
 	a.mux.HandleFunc("/api/platform/settings", a.handlePlatformSettings)
+	a.mux.HandleFunc("/api/platform/environments", a.handlePlatformEnvironments)
 
 	// RUM (Real User Monitoring) endpoints
 	a.mux.HandleFunc("/api/rum/events", a.handleRUMIngest)

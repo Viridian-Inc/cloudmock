@@ -47,6 +47,10 @@
   font-size: 11px;
 }
 
+.source-bar-spacer {
+  flex: 1;
+}
+
 .source-add-btn {
   display: inline-flex;
   align-items: center;

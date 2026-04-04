@@ -498,6 +498,21 @@ func (a *API) handlePlatformSettings(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ── /api/platform/environments ───────────────────────────────────────────────
+
+func (a *API) handlePlatformEnvironments(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	// For now, return just local. When cloud is connected,
+	// this will also return cloud environments.
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"environments": []string{"Local"},
+	})
+}
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 // addAudit appends a new audit entry derived from the HTTP request.

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { EnvPicker } from '../env-picker/env-picker';
 import './source-bar.css';
 
 interface ConnectedSource {
@@ -24,6 +25,8 @@ const RUNTIME_BORDERS: Record<string, string> = {
 
 export function SourceBar() {
   const [sources, setSources] = useState<ConnectedSource[]>([]);
+  // TODO: wire env to API calls when cloud backend is connected
+  const [env, setEnv] = useState('local');
 
   // TODO: poll /api/sources when admin API exposes connected SDK clients
   useEffect(() => {
@@ -56,6 +59,8 @@ export function SourceBar() {
       <button class="source-add-btn" title="Sources connect automatically via SDK">
         + Add
       </button>
+      <div class="source-bar-spacer" />
+      <EnvPicker value={env} onChange={setEnv} />
     </div>
   );
 }

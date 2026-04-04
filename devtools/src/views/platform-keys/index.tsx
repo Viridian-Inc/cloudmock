@@ -1,8 +1,24 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
 import './platform-keys.css';
 
 type Role = 'admin' | 'developer' | 'viewer';
+
+function CopyInline({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback((e: Event) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [text]);
+  return (
+    <button class="copy-inline" onClick={handleCopy} title="Copy to clipboard">
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  );
+}
 
 interface ApiKey {
   id: string;
@@ -204,7 +220,10 @@ export function PlatformKeysView() {
             {keys.map((key) => (
               <tr key={key.id}>
                 <td>
-                  <code class="key-prefix">{key.prefix}…</code>
+                  <div class="key-prefix-row">
+                    <code class="key-prefix">{key.prefix}…</code>
+                    <CopyInline text={key.prefix} />
+                  </div>
                 </td>
                 <td class="key-name">{key.name}</td>
                 <td>

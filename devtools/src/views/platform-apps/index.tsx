@@ -1,8 +1,23 @@
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
 import './platform-apps.css';
 
 type InfraType = 'shared' | 'dedicated';
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = useCallback(() => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }, [text]);
+  return (
+    <button class="copy-btn" onClick={handleCopy} title="Copy to clipboard">
+      {copied ? 'Copied!' : 'Copy'}
+    </button>
+  );
+}
 
 interface App {
   id: string;
@@ -157,7 +172,17 @@ export function PlatformAppsView() {
             <div class="app-card-body">
               <div class="app-field">
                 <span class="app-field-label">Endpoint</span>
-                <span class="app-endpoint">{app.endpoint}</span>
+                <div class="app-endpoint-row">
+                  <code class="app-endpoint" title={app.endpoint}>{app.endpoint}</code>
+                  <CopyButton text={app.endpoint} />
+                </div>
+              </div>
+              <div class="app-field">
+                <span class="app-field-label">Quick Start</span>
+                <div class="app-endpoint-row">
+                  <code class="app-quickstart">export AWS_ENDPOINT_URL={app.endpoint}</code>
+                  <CopyButton text={`export AWS_ENDPOINT_URL=${app.endpoint}`} />
+                </div>
               </div>
               <div class="app-field">
                 <span class="app-field-label">Infrastructure</span>

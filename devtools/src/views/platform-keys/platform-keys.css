@@ -45,6 +45,12 @@
   padding: 32px !important;
 }
 
+.key-prefix-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .key-prefix {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -52,6 +58,24 @@
   background: var(--bg-secondary);
   padding: 2px 6px;
   border-radius: var(--radius-sm);
+  user-select: all;
+}
+
+.copy-inline {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  color: var(--text-tertiary);
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.copy-inline:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
 }
 
 .key-name {

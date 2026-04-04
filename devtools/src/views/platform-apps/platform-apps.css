@@ -74,23 +74,56 @@
 
 .app-field {
   display: flex;
-  align-items: center;
-  gap: 8px;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .app-field-label {
   font-size: 11px;
   color: var(--text-tertiary);
-  min-width: 80px;
+}
+
+.app-endpoint-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .app-endpoint {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-accent);
-  overflow: hidden;
-  text-overflow: ellipsis;
+  word-break: break-all;
+  user-select: all;
+}
+
+.app-quickstart {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  word-break: break-all;
+  user-select: all;
+}
+
+.copy-btn {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
   white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.copy-btn:hover {
+  color: var(--text-primary);
+  border-color: var(--border-hover);
 }
 
 .app-requests {

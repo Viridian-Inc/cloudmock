@@ -2,13 +2,17 @@
 
 ## Executive Summary
 
-CloudMock is a local AWS emulator that runs 100 AWS services on a developer's machine in a single binary. It is the fastest, most complete open-source alternative to LocalStack and Moto. The SaaS product (CloudMock Platform) extends this into hosted, team-ready cloud testing infrastructure with usage-based pricing, HIPAA-ready audit logs, and zero-setup onboarding.
+CloudMock is a local AWS emulator that runs 100 AWS services on a developer's machine in a single binary. It is the fastest, most complete open-source alternative to LocalStack and Moto. Two SaaS products extend it:
 
-**Revenue model:** Usage-based. First 1,000 requests/month free. $0.50 per 10,000 requests after that. Enterprise customers get dedicated infrastructure and BAA for custom pricing.
+1. **CloudMock Platform** -- hosted AWS emulation for teams. Usage-based pricing ($0.50/10K requests). For CI/CD, staging, and shared testing environments.
 
-**Target first-year revenue:** $120K ARR from ~200 paying teams.
+2. **CloudMock Cloud** -- observability for real AWS infrastructure. The same devtools UI shows your production topology, traces, metrics, and errors. Per-seat + usage pricing ($10/seat/mo + $0.50/M events). For engineering teams that want to see local dev AND production in one dashboard.
 
-**Competitive advantage:** CloudMock is 110x faster than LocalStack, fully open-source (BSL), and the only AWS emulator with built-in devtools, chaos engineering, and a hosted SaaS option at usage-based pricing.
+**Revenue model:** Three tiers. CLI (free, drives adoption), Platform (usage-based, drives team revenue), Cloud (seat + usage, drives enterprise revenue).
+
+**Target first-year revenue:** $300K ARR ($180K Platform + $120K Cloud).
+
+**Competitive advantage:** CloudMock is 110x faster than LocalStack, fully open-source (BSL), and the only product that unifies local AWS emulation with production AWS observability in one UI. Datadog charges $270/mo for 5 hosts. CloudMock Cloud: $60/mo.
 
 ---
 
@@ -91,21 +95,36 @@ Usage-based pricing wins over tiers for three reasons:
 
 ### Revenue Projections (Year 1)
 
-| Month | Free Users | Paying Teams | Avg. Revenue/Team | MRR |
-|-------|-----------|-------------|-------------------|-----|
-| 1 | 500 | 5 | $15 | $75 |
-| 3 | 2,000 | 25 | $25 | $625 |
-| 6 | 5,000 | 75 | $40 | $3,000 |
-| 9 | 10,000 | 150 | $50 | $7,500 |
-| 12 | 20,000 | 250 | $60 | $15,000 |
+| Month | Free Users | Platform MRR | Cloud MRR | Total MRR |
+|-------|-----------|-------------|-----------|-----------|
+| 1 | 500 | $75 | $0 | $75 |
+| 3 | 2,000 | $625 | $0 | $625 |
+| 5 | 4,000 | $2,000 | $500 | $2,500 |
+| 6 | 5,000 | $3,000 | $1,500 | $4,500 |
+| 9 | 10,000 | $7,500 | $5,000 | $12,500 |
+| 12 | 20,000 | $15,000 | $10,000 | $25,000 |
 
-**Year 1 total revenue: ~$80K-120K**
-**Year 2 target: $500K ARR** (with enterprise deals)
+**Year 1 total revenue: ~$200K-300K**
+**Year 2 target: $1.2M ARR** ($600K Platform + $600K Cloud)
 
-Revenue grows as:
-- Free users convert to hosted (5% conversion rate)
-- Paying teams increase usage over time
+Revenue grows through three loops:
+- Free CLI users convert to Platform (5% conversion rate)
+- Platform teams discover Cloud (20% upsell rate)
+- Cloud customers expand seats as their team grows
 - Enterprise deals close ($500-5,000/mo each)
+
+### Revenue per Product
+
+**Platform** ($0.50/10K requests):
+- Average team does 100K requests/mo = ~$5/mo
+- Power users (CI-heavy) do 1M+/mo = ~$50/mo
+- Low ARPU but high volume, zero sales touch
+
+**Cloud** ($10/seat + $0.50/M events):
+- Average team: 5 seats, 20M events = $60/mo
+- Growth team: 20 seats, 100M events = $250/mo
+- Enterprise: 50+ seats, 500M+ events = $1,000+/mo
+- Higher ARPU, stickier (observability is hard to switch)
 
 ---
 

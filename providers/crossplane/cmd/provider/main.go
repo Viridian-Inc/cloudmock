@@ -257,9 +257,9 @@ func extractForProvider(manifest map[string]any) map[string]any {
 
 // findSchemaForManifest locates the registry schema matching a Crossplane manifest.
 func findSchemaForManifest(reg *cmschema.Registry, apiVersion, kind string) *cmschema.ResourceSchema {
-	// apiVersion is like "s3.cloudmock.io/v1alpha1"
+	// apiVersion is like "s3.cloudmock.app/v1alpha1"
 	group := strings.Split(apiVersion, "/")[0]
-	// group is like "s3.cloudmock.io" — extract service name.
+	// group is like "s3.cloudmock.app" — extract service name.
 	service := strings.Split(group, ".")[0]
 
 	for _, rs := range reg.ByService(service) {

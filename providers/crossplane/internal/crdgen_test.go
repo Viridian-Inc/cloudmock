@@ -62,7 +62,7 @@ func TestGenerateCRD_S3Bucket_Structure(t *testing.T) {
 	assert.Equal(t, "CustomResourceDefinition", crd.Kind)
 
 	// Verify group/version/kind.
-	assert.Equal(t, "s3.cloudmock.io", crd.Spec.Group)
+	assert.Equal(t, "s3.cloudmock.app", crd.Spec.Group)
 	assert.Equal(t, "Bucket", crd.Spec.Names.Kind)
 	assert.Equal(t, "BucketList", crd.Spec.Names.ListKind)
 	assert.Equal(t, "buckets", crd.Spec.Names.Plural)
@@ -71,7 +71,7 @@ func TestGenerateCRD_S3Bucket_Structure(t *testing.T) {
 	assert.Equal(t, "Cluster", crd.Spec.Scope)
 
 	// Verify metadata.
-	assert.Equal(t, "buckets.s3.cloudmock.io", crd.Metadata.Name)
+	assert.Equal(t, "buckets.s3.cloudmock.app", crd.Metadata.Name)
 	assert.Equal(t, "cloudmock-crossplane", crd.Metadata.Labels["app.kubernetes.io/managed-by"])
 
 	// Verify version.
@@ -158,7 +158,7 @@ func TestGenerateCRD_EC2VPC(t *testing.T) {
 	}
 
 	crd := GenerateCRD(rs)
-	assert.Equal(t, "ec2.cloudmock.io", crd.Spec.Group)
+	assert.Equal(t, "ec2.cloudmock.app", crd.Spec.Group)
 	assert.Equal(t, "VPC", crd.Spec.Names.Kind)
 	assert.Equal(t, []string{"vpc"}, crd.Spec.Names.ShortNames)
 }
@@ -179,7 +179,7 @@ func TestGenerateCRD_DynamoDBTable(t *testing.T) {
 	}
 
 	crd := GenerateCRD(rs)
-	assert.Equal(t, "dynamodb.cloudmock.io", crd.Spec.Group)
+	assert.Equal(t, "dynamodb.cloudmock.app", crd.Spec.Group)
 	assert.Equal(t, "Table", crd.Spec.Names.Kind)
 
 	spec := crd.Spec.Versions[0].Schema.OpenAPIV3Schema.Properties["spec"]
@@ -231,7 +231,7 @@ func TestGenerateCRD_UnknownResourceDerivesMapping(t *testing.T) {
 	}
 
 	crd := GenerateCRD(rs)
-	assert.Equal(t, "newservice.cloudmock.io", crd.Spec.Group)
+	assert.Equal(t, "newservice.cloudmock.app", crd.Spec.Group)
 	assert.Equal(t, "FancyThing", crd.Spec.Names.Kind)
 	// No short name for unknown resources.
 	assert.Empty(t, crd.Spec.Names.ShortNames)
@@ -242,7 +242,7 @@ func TestCRDGroup_And_CRDKind(t *testing.T) {
 		ServiceName:   "s3",
 		TerraformType: "cloudmock_s3_bucket",
 	}
-	assert.Equal(t, "s3.cloudmock.io", CRDGroup(rs))
+	assert.Equal(t, "s3.cloudmock.app", CRDGroup(rs))
 	assert.Equal(t, "Bucket", CRDKind(rs))
 }
 
@@ -262,7 +262,7 @@ func TestGenerateCRD_ValidYAML(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, string(data), "apiextensions.k8s.io/v1")
 	assert.Contains(t, string(data), "Bucket")
-	assert.Contains(t, string(data), "s3.cloudmock.io")
+	assert.Contains(t, string(data), "s3.cloudmock.app")
 
 	// Verify it round-trips.
 	var parsed CRD

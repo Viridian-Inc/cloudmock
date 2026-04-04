@@ -33,7 +33,7 @@ func TestParsePulumiConfigMissing(t *testing.T) {
 	if err == nil {
 		t.Error("expected error for missing file")
 	}
-	if dc.Autotend != "cloudmock.app" || dc.Cloudmock != "cloudmock.io" {
+	if dc.Autotend != "cloudmock.app" || dc.Cloudmock != "cloudmock.app" {
 		t.Errorf("expected default domains, got %+v", dc)
 	}
 }
@@ -49,7 +49,7 @@ func TestParsePulumiConfigNoDomains(t *testing.T) {
 	if err == nil {
 		t.Error("expected error when domains key is missing")
 	}
-	if dc.Autotend != "cloudmock.app" || dc.Cloudmock != "cloudmock.io" {
+	if dc.Autotend != "cloudmock.app" || dc.Cloudmock != "cloudmock.app" {
 		t.Errorf("expected default domains, got %+v", dc)
 	}
 }

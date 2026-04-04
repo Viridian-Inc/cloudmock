@@ -57,7 +57,7 @@ type cfDNSRecord struct {
 // --- Public API ---
 
 // AddCNAME creates a proxied CNAME record pointing name to target.
-// name is the subdomain (e.g. "acme.cloudmock.io"), target is the
+// name is the subdomain (e.g. "acme.cloudmock.app"), target is the
 // Fly app hostname (e.g. "cm-acme.fly.dev").
 func (c *CloudflareClient) AddCNAME(ctx context.Context, name, target string) error {
 	body := cfCreateRecordRequest{

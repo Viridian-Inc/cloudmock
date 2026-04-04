@@ -1894,7 +1894,7 @@ func main() {
 		}
 		cloudmockDomain := os.Getenv("CLOUDMOCK_DOMAIN_CLOUDMOCK")
 		if cloudmockDomain == "" {
-			cloudmockDomain = "cloudmock.io"
+			cloudmockDomain = "cloudmock.app"
 		}
 
 		routes := gateway.BuildRoutes(primaryDomain, cloudmockDomain)

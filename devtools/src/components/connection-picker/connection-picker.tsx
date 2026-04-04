@@ -49,7 +49,7 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
     storeMode('hosted');
     // After Clerk sign-in completes (future), the org endpoint URL will be
     // stored and used for connection. For now, redirect to sign-in page.
-    window.open('https://cloudmock.io/sign-in', '_blank');
+    window.open('https://cloudmock.app/sign-in', '_blank');
   };
 
   const handleCustomConnect = () => {
@@ -87,7 +87,7 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
           <button class="connection-option" onClick={handleHostedClick}>
             <span class="connection-option-icon">☁️</span>
             <div class="connection-option-content">
-              <div class="connection-option-title">cloudmock.io</div>
+              <div class="connection-option-title">cloudmock.app</div>
               <div class="connection-option-desc">
                 Connect to a hosted instance
               </div>
@@ -100,7 +100,7 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
           {showHosted && (
             <div class="connection-hosted-panel">
               <p class="connection-hosted-desc">
-                Sign in with your cloudmock.io account to connect to your
+                Sign in with your cloudmock.app account to connect to your
                 organization's hosted endpoint.
               </p>
               <button

@@ -252,7 +252,7 @@ func TestOrchestrator_Deprovision(t *testing.T) {
 
 	// Pre-populate a DNS record so RemoveCNAME can find it.
 	cfState.mu.Lock()
-	cfState.records["deprov-test.cloudmock.io"] = "rec_deprov"
+	cfState.records["deprov-test.cloudmock.app"] = "rec_deprov"
 	cfState.mu.Unlock()
 
 	flyClient := NewFlyClient("fly-token", "my-org", "iad", "registry.fly.io/cloudmock:latest")

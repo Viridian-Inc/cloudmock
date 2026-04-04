@@ -62,7 +62,7 @@ func TestBuildRoutes_CustomDomainRoutesUseDomains(t *testing.T) {
 func TestBuildRoutes_NoHardcodedDomains(t *testing.T) {
 	routes := BuildRoutes("example.com", "mock.dev")
 
-	hardcoded := []string{"autotend.io", "cloudmock.io"}
+	hardcoded := []string{"autotend.io", "cloudmock.app"}
 	for _, r := range routes {
 		for _, hc := range hardcoded {
 			if strings.Contains(r.Host, hc) {

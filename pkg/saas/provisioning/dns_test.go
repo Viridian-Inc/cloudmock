@@ -40,7 +40,7 @@ func TestCloudflare_AddCNAME(t *testing.T) {
 		Transport: &cfTestTransport{base: mock.URL, inner: http.DefaultTransport},
 	}
 
-	err := client.AddCNAME(context.Background(), "acme.cloudmock.io", "cm-acme.fly.dev")
+	err := client.AddCNAME(context.Background(), "acme.cloudmock.app", "cm-acme.fly.dev")
 	if err != nil {
 		t.Fatalf("AddCNAME: %v", err)
 	}
@@ -48,8 +48,8 @@ func TestCloudflare_AddCNAME(t *testing.T) {
 	if capturedBody.Type != "CNAME" {
 		t.Errorf("Type = %q, want %q", capturedBody.Type, "CNAME")
 	}
-	if capturedBody.Name != "acme.cloudmock.io" {
-		t.Errorf("Name = %q, want %q", capturedBody.Name, "acme.cloudmock.io")
+	if capturedBody.Name != "acme.cloudmock.app" {
+		t.Errorf("Name = %q, want %q", capturedBody.Name, "acme.cloudmock.app")
 	}
 	if capturedBody.Content != "cm-acme.fly.dev" {
 		t.Errorf("Content = %q, want %q", capturedBody.Content, "cm-acme.fly.dev")
@@ -78,7 +78,7 @@ func TestCloudflare_RemoveCNAME(t *testing.T) {
 		if r.Method == http.MethodGet {
 			// This is the findRecordID call.
 			records := []cfDNSRecord{
-				{ID: "rec_to_delete", Name: "acme.cloudmock.io", Type: "CNAME"},
+				{ID: "rec_to_delete", Name: "acme.cloudmock.app", Type: "CNAME"},
 			}
 			recordsJSON, _ := json.Marshal(records)
 			resp := cfAPIResponse{
@@ -110,7 +110,7 @@ func TestCloudflare_RemoveCNAME(t *testing.T) {
 		Transport: &cfTestTransport{base: mock.URL, inner: http.DefaultTransport},
 	}
 
-	err := client.RemoveCNAME(context.Background(), "acme.cloudmock.io")
+	err := client.RemoveCNAME(context.Background(), "acme.cloudmock.app")
 	if err != nil {
 		t.Fatalf("RemoveCNAME: %v", err)
 	}

@@ -27,7 +27,7 @@ type domainConfig struct {
 
 var defaultDomains = domainConfig{
 	Autotend:  "cloudmock.app",
-	Cloudmock: "cloudmock.io",
+	Cloudmock: "cloudmock.app",
 }
 
 func parsePulumiConfig(path string) (domainConfig, error) {

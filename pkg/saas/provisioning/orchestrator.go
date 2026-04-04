@@ -62,7 +62,7 @@ func (o *Orchestrator) Provision(ctx context.Context, t *tenant.Tenant) error {
 	}
 
 	// 3. Create the DNS CNAME record.
-	dnsName := t.Slug + ".cloudmock.io"
+	dnsName := t.Slug + ".cloudmock.app"
 	dnsTarget := appName + ".fly.dev"
 	if err := o.dns.AddCNAME(ctx, dnsName, dnsTarget); err != nil {
 		// Best-effort cleanup: destroy the machine and app.
@@ -142,7 +142,7 @@ func (o *Orchestrator) Deprovision(ctx context.Context, t *tenant.Tenant) error 
 	}
 
 	// 3. Remove the DNS record.
-	dnsName := t.Slug + ".cloudmock.io"
+	dnsName := t.Slug + ".cloudmock.app"
 	if err := o.dns.RemoveCNAME(ctx, dnsName); err != nil {
 		slog.ErrorContext(ctx, "deprovision: failed to remove DNS record",
 			"dns_name", dnsName,

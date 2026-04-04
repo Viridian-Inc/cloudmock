@@ -143,7 +143,7 @@ describe('isLocalMode', () => {
   });
 
   it('returns false for production URL', () => {
-    expect(isLocalMode('https://api.cloudmock.io')).toBe(false);
+    expect(isLocalMode('https://api.cloudmock.app')).toBe(false);
   });
 });
 

@@ -60,5 +60,5 @@ The app manages a local cloudmock gateway process and connects to its admin API 
 ## Connection Modes
 
 - **Local** — starts cloudmock on your machine (default)
-- **cloudmock.io** — connects to a hosted instance (coming soon)
+- **cloudmock.app** — connects to a hosted instance (coming soon)
 - **Custom** — any cloudmock instance by URL

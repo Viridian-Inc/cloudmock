@@ -213,7 +213,7 @@ func generateCRD(rs cmschema.ResourceSchema) CRD {
 		shortNames = []string{shortName}
 	}
 
-	fullGroup := group + ".cloudmock.io"
+	fullGroup := group + ".cloudmock.app"
 
 	return CRD{
 		APIVersion: "apiextensions.k8s.io/v1",
@@ -273,7 +273,7 @@ func resolveCRDMapping(rs cmschema.ResourceSchema) (string, string, string) {
 // CRDGroup returns the API group for a resource schema.
 func CRDGroup(rs cmschema.ResourceSchema) string {
 	group, _, _ := resolveCRDMapping(rs)
-	return group + ".cloudmock.io"
+	return group + ".cloudmock.app"
 }
 
 // CRDKind returns the Kind for a resource schema.

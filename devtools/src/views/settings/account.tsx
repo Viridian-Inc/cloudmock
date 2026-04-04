@@ -47,7 +47,7 @@ export function Account() {
         <div class="settings-field-row">
           <span class={`settings-status-dot ${state.connected ? 'connected' : 'disconnected'}`} />
           <span class="settings-status-label">
-            {isLocal ? 'Local Development' : 'cloudmock.io'}
+            {isLocal ? 'Local Development' : 'cloudmock.app'}
           </span>
         </div>
       </div>

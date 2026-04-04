@@ -144,6 +144,6 @@ cloudmock contract \
 
 ## Links
 
-- [Documentation](https://cloudmock.io/docs)
+- [Documentation](https://cloudmock.app/docs)
 - [GitHub](https://github.com/neureaux/cloudmock)
 - [License](https://github.com/neureaux/cloudmock/blob/main/LICENSE) (Apache-2.0)

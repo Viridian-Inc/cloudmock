@@ -396,6 +396,62 @@ export function ProfilerIcon(p: IconProps) {
   </Icon>;
 }
 
+/** Grid of app squares for Platform Apps */
+export function AppsIcon(p: IconProps) {
+  return <Icon {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <rect x="14" y="14" width="7" height="7" rx="1" />
+    <path d="M10 6.5h4" stroke-dasharray="0" />
+  </Icon>;
+}
+
+/** Key icon for API Keys */
+export function KeyIcon(p: IconProps) {
+  return <Icon {...p}>
+    <circle cx="7.5" cy="15.5" r="5.5" />
+    <path d="M21 2l-9.6 9.6" />
+    <path d="M15.5 7.5L17 6" />
+    <path d="M19 4l2 2" />
+  </Icon>;
+}
+
+/** Bar chart up arrow for Usage */
+export function UsageIcon(p: IconProps) {
+  return <Icon {...p}>
+    <line x1="18" y1="20" x2="18" y2="6" />
+    <line x1="12" y1="20" x2="12" y2="10" />
+    <line x1="6" y1="20" x2="6" y2="14" />
+    <line x1="2" y1="20" x2="22" y2="20" />
+  </Icon>;
+}
+
+/** Clock with list lines for Audit Log */
+export function AuditIcon(p: IconProps) {
+  return <Icon {...p}>
+    <circle cx="12" cy="12" r="10" />
+    <polyline points="12 6 12 12 16 14" />
+    <line x1="2" y1="12" x2="4" y2="12" />
+    <line x1="20" y1="12" x2="22" y2="12" />
+  </Icon>;
+}
+
+/** Sliders icon for Platform Settings */
+export function PlatformSettingsIcon(p: IconProps) {
+  return <Icon {...p}>
+    <line x1="4" y1="21" x2="4" y2="14" />
+    <line x1="4" y1="10" x2="4" y2="3" />
+    <line x1="12" y1="21" x2="12" y2="12" />
+    <line x1="12" y1="8" x2="12" y2="3" />
+    <line x1="20" y1="21" x2="20" y2="16" />
+    <line x1="20" y1="12" x2="20" y2="3" />
+    <line x1="1" y1="14" x2="7" y2="14" />
+    <line x1="9" y1="8" x2="15" y2="8" />
+    <line x1="17" y1="16" x2="23" y2="16" />
+  </Icon>;
+}
+
 export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
   home: HomeIcon,
   cloud: CloudIcon,

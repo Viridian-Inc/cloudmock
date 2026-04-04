@@ -1,0 +1,184 @@
+@import '../platform-apps/platform-apps.css';
+
+/* Platform Settings view specific styles */
+
+.settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-section-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  margin-top: -4px;
+}
+
+.settings-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.settings-info-grid {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-info-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-info-row:last-child {
+  border-bottom: none;
+}
+
+.settings-info-label {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  min-width: 80px;
+}
+
+.settings-info-value {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.settings-info-mono {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-accent);
+}
+
+/* Retention */
+.retention-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.retention-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.retention-row-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.retention-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.retention-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.retention-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.retention-input {
+  width: 72px;
+  text-align: right;
+}
+
+.retention-unit {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+.settings-card-footer {
+  padding: 14px 16px;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Danger zone */
+.settings-danger-section .settings-section-title {
+  color: var(--error);
+}
+
+.settings-danger-card {
+  border-color: var(--error-subtle);
+}
+
+.danger-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 16px;
+}
+
+.danger-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.danger-desc {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  max-width: 480px;
+  line-height: 1.5;
+}
+
+.btn-danger {
+  background: var(--error-subtle);
+  border: 1px solid var(--error);
+  color: var(--error);
+  font-size: 12px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-family: var(--font-sans);
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--error);
+  color: #fff;
+}
+
+.btn-danger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Delete confirm dialog */
+.danger-confirm-text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.danger-confirm-text strong {
+  color: var(--text-primary);
+}

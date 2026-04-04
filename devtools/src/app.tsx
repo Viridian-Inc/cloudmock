@@ -33,6 +33,11 @@ import { LambdaView } from './views/lambda';
 import { IAMView } from './views/iam';
 import { MailView } from './views/mail';
 import { RegressionsView } from './views/regressions';
+import { PlatformAppsView } from './views/platform-apps';
+import { PlatformKeysView } from './views/platform-keys';
+import { PlatformUsageView } from './views/platform-usage';
+import { PlatformAuditView } from './views/platform-audit';
+import { PlatformSettingsView } from './views/platform-settings';
 
 export type ViewId =
   | 'activity'
@@ -58,7 +63,12 @@ export type ViewId =
   | 'routing'
   | 'traffic'
   | 'rum'
-  | 'settings';
+  | 'settings'
+  | 'platform-apps'
+  | 'platform-keys'
+  | 'platform-usage'
+  | 'platform-audit'
+  | 'platform-settings';
 
 const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   activity: ActivityView,
@@ -85,6 +95,11 @@ const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   traffic: TrafficView,
   rum: RUMView,
   settings: SettingsView,
+  'platform-apps': PlatformAppsView,
+  'platform-keys': PlatformKeysView,
+  'platform-usage': PlatformUsageView,
+  'platform-audit': PlatformAuditView,
+  'platform-settings': PlatformSettingsView,
 };
 
 /** View IDs reachable via Cmd+number shortcuts */

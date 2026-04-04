@@ -1,0 +1,44 @@
+<h2>CloudMock SaaS: What's the product?</h2>
+<p class="subtitle">You already have tenant management, Clerk auth, Stripe billing, Fly provisioning, quota enforcement, and DNS routing built in <code>pkg/saas/*</code>. Now we need a separate project for the customer-facing app. What's the core offering?</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Hosted CloudMock Instances</h3>
+      <p>Each tenant gets a dedicated CloudMock instance on Fly (e.g. <code>acme.cloudmock.io</code>). Dashboard manages instances, shows usage, billing. Like managed LocalStack but per-org.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Simple product model</li><li>Your Fly provisioning code already does this</li><li>Clear value: no setup, always-on AWS emulation</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Per-instance infra cost</li><li>Cold start if machines sleep</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Hosted + Team Collaboration Platform</h3>
+      <p>Hosted instances plus: shared state snapshots, team environments (staging/prod), audit logs, RBAC, and a topology/debug dashboard per org. More like a dev platform than just "hosted binary."</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Higher value = higher price</li><li>Teams need shared environments</li><li>Leverages your existing devtools</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>More to build upfront</li><li>Scope creep risk</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>API-First Cloud Testing Platform</h3>
+      <p>Multi-tenant API where orgs create "apps" (isolated CloudMock environments). Each app gets an endpoint, API key, usage tracking. Dashboard is secondary -- the API is the product. SDKs call your API instead of localhost.</p>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Scales naturally (shared infra, not per-tenant machines)</li><li>CI/CD friendly (no binary install)</li><li>Usage-based billing is natural</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Latency vs local (network hop)</li><li>More complex multi-tenancy</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--surface)">
+  <p style="margin:0;color:var(--text-secondary)"><strong>Your existing code supports all three.</strong> The Fly provisioning + DNS code maps to A/B. The tenant isolation + quota middleware maps to C. The question is: what product do your customers want to pay for?</p>
+</div>

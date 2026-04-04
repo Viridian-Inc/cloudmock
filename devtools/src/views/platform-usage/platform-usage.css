@@ -1,0 +1,153 @@
+@import '../platform-apps/platform-apps.css';
+@import '../platform-keys/platform-keys.css';
+
+/* Usage view specific styles */
+
+/* Summary row */
+.usage-summary-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+
+.usage-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.usage-card-label {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.usage-card-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.usage-cost {
+  color: var(--brand-green);
+}
+
+.usage-cost-note {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* Progress bar */
+.usage-progress-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.usage-progress-track {
+  height: 6px;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+.usage-progress-bar {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.3s ease;
+}
+
+.usage-progress-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+/* Sections */
+.usage-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.usage-section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+/* Per-app share bar */
+.usage-share-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 160px;
+}
+
+.usage-share-fill {
+  height: 6px;
+  min-width: 2px;
+  background: var(--brand-blue);
+  border-radius: var(--radius-full);
+  flex-shrink: 0;
+}
+
+.usage-share-pct {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+}
+
+/* Bar chart */
+.usage-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 120px;
+  padding: 0 4px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px 12px 8px;
+}
+
+.usage-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  height: 100%;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.usage-bar {
+  width: 100%;
+  min-height: 2px;
+  background: var(--brand-blue);
+  border-radius: 2px 2px 0 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.usage-bar-wrap:hover .usage-bar {
+  opacity: 1;
+}
+
+.usage-bar-label {
+  font-size: 9px;
+  color: var(--text-tertiary);
+  white-space: nowrap;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: clip;
+}

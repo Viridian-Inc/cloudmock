@@ -1,0 +1,88 @@
+@import '../platform-apps/platform-apps.css';
+@import '../platform-keys/platform-keys.css';
+
+/* Audit view specific styles */
+
+.audit-filters {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.audit-filters .platform-label {
+  white-space: nowrap;
+}
+
+.audit-timestamp {
+  color: var(--text-tertiary) !important;
+  font-size: 11px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-actor {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-accent);
+}
+
+.audit-resource {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.audit-ip {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+/* Action badges */
+.audit-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-mono);
+  white-space: nowrap;
+}
+
+.audit-badge-blue {
+  background: var(--info-subtle);
+  color: var(--info);
+}
+
+.audit-badge-yellow {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.audit-badge-green {
+  background: var(--success-subtle);
+  color: var(--success-bright);
+}
+
+.audit-badge-gray {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-tertiary);
+}
+
+/* Pagination */
+.audit-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.audit-page-info {
+  font-size: 12px;
+  color: var(--text-tertiary);
+  min-width: 80px;
+  text-align: center;
+}

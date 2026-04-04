@@ -1,0 +1,111 @@
+@import '../platform-apps/platform-apps.css';
+
+/* API Keys view specific styles */
+.platform-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.platform-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.platform-table th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-default);
+  white-space: nowrap;
+}
+
+.platform-table td {
+  padding: 10px 14px;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-subtle);
+  vertical-align: middle;
+}
+
+.platform-table tr:last-child td {
+  border-bottom: none;
+}
+
+.platform-table tr:hover td {
+  background: var(--bg-secondary);
+}
+
+.platform-table-empty {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: 32px !important;
+}
+
+.key-prefix {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-accent);
+  background: var(--bg-secondary);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.key-name {
+  color: var(--text-primary) !important;
+  font-weight: 500;
+}
+
+.key-time {
+  color: var(--text-tertiary) !important;
+  white-space: nowrap;
+}
+
+.btn-danger-ghost {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--error);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: var(--font-sans);
+}
+
+.btn-danger-ghost:hover {
+  background: var(--error-subtle);
+  border-color: var(--error);
+}
+
+/* Key reveal dialog */
+.key-reveal-warning {
+  padding: 10px 14px;
+  background: var(--warning-subtle);
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.key-reveal-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.key-reveal-value {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-primary);
+  word-break: break-all;
+  overflow-wrap: anywhere;
+}

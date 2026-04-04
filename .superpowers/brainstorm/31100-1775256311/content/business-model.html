@@ -1,0 +1,56 @@
+<h2>Open Core vs Hosted-Only: How do you monetize?</h2>
+<p class="subtitle">CloudMock is source-available (BSL). The SaaS platform needs a clear boundary between what's free and what's paid.</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Open Core (Public Repo + Proprietary SaaS)</h3>
+      <p>CloudMock stays public and free. The SaaS dashboard, multi-tenant API, HIPAA controls, and team features live in a <strong>private repo</strong>. Users can self-host CloudMock but can't self-host the platform.</p>
+      <div style="margin-top:12px;padding:12px;background:#111;border-radius:6px;font-size:13px">
+        <div style="color:#52b788;margin-bottom:4px">How others do it:</div>
+        <div style="color:#ccc">GitLab CE (free) vs GitLab EE (paid). Supabase (open) vs Supabase Cloud (hosted). PostHog (open) vs PostHog Cloud.</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>Clear monetization boundary</li><li>Open source drives adoption</li><li>SaaS features stay proprietary</li><li>No licensing complexity</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Two repos to manage</li><li>Community can't contribute to SaaS features</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Source-Available Everything (BSL for SaaS too)</h3>
+      <p>SaaS code lives in the <strong>same public repo</strong> under BSL. Anyone can read it, run it locally, even self-host internally -- but can't offer it as a competing hosted service. You sell the hosted version as the convenience layer.</p>
+      <div style="margin-top:12px;padding:12px;background:#111;border-radius:6px;font-size:13px">
+        <div style="color:#52b788;margin-bottom:4px">How others do it:</div>
+        <div style="color:#ccc">HashiCorp (BSL), Sentry (BSL), CockroachDB (BSL). All source-available, monetize the hosted version.</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>One repo, simpler management</li><li>Transparency builds trust (esp. for HIPAA)</li><li>Community can audit security code</li><li>Self-hosting allowed = more adoption</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>Competitors can read your SaaS code</li><li>Self-hosters don't pay you</li><li>BSL enforcement is untested legally</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Hybrid: Open Emulator + Gated Enterprise Features</h3>
+      <p>CloudMock core stays public (BSL). Enterprise/SaaS features (HIPAA, audit logs, SSO, multi-tenant API) are <strong>feature-gated behind a license key</strong> in the same repo. Code is visible but requires a paid license to activate in production.</p>
+      <div style="margin-top:12px;padding:12px;background:#111;border-radius:6px;font-size:13px">
+        <div style="color:#52b788;margin-bottom:4px">How others do it:</div>
+        <div style="color:#ccc">Elasticsearch (open + X-Pack). GitLab (CE + EE in same repo, license-gated). Airbyte (open + enterprise connectors).</div>
+      </div>
+      <div class="pros-cons" style="margin-top:12px">
+        <div class="pros"><h4>Pros</h4><ul><li>One repo, one codebase</li><li>Self-hosting allowed with license</li><li>Enterprise features visible (trust) but gated (revenue)</li><li>Upsell path: free &rarr; self-host &rarr; hosted</li></ul></div>
+        <div class="cons"><h4>Cons</h4><ul><li>License key infra to build</li><li>Gate bypass is trivial (code is visible)</li><li>More complex build/release process</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top:24px;padding:16px;border:1px solid var(--border);border-radius:8px;background:var(--surface)">
+  <p style="margin:0;color:var(--text-secondary)"><strong>Key insight:</strong> You already chose BSL which converts to Apache 2.0 in 2030. The question is whether SaaS/enterprise features get the same treatment or stay proprietary forever. HIPAA customers generally <em>prefer</em> being able to audit the code, which favors B or C.</p>
+</div>

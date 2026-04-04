@@ -24,6 +24,11 @@ import {
   TrafficIcon,
   RUMIcon,
   SettingsIcon,
+  AppsIcon,
+  KeyIcon,
+  UsageIcon,
+  AuditIcon,
+  PlatformSettingsIcon,
 } from '../icons';
 import './icon-rail.css';
 
@@ -85,6 +90,16 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'routing', icon: RoutingIcon, i18nKey: 'nav.routing' },
       { id: 'traffic', icon: TrafficIcon, i18nKey: 'nav.traffic' },
       { id: 'rum', icon: RUMIcon, i18nKey: 'nav.rum' },
+    ],
+  },
+  {
+    label: 'Platform',
+    items: [
+      { id: 'platform-apps', icon: AppsIcon, i18nKey: 'nav.platform_apps' },
+      { id: 'platform-keys', icon: KeyIcon, i18nKey: 'nav.platform_keys' },
+      { id: 'platform-usage', icon: UsageIcon, i18nKey: 'nav.platform_usage' },
+      { id: 'platform-audit', icon: AuditIcon, i18nKey: 'nav.platform_audit' },
+      { id: 'platform-settings', icon: PlatformSettingsIcon, i18nKey: 'nav.platform_settings' },
     ],
   },
 ];

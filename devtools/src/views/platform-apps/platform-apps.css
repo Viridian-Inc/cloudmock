@@ -1,0 +1,271 @@
+.platform-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+  gap: 20px;
+}
+
+.platform-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.platform-header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.platform-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.platform-subtitle {
+  font-size: 12px;
+  color: var(--text-tertiary);
+}
+
+/* App cards grid */
+.apps-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.app-card {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: border-color 0.15s;
+}
+
+.app-card:hover {
+  border-color: var(--border-hover);
+}
+
+.app-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.app-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.app-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.app-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.app-field-label {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  min-width: 80px;
+}
+
+.app-endpoint {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-requests {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.app-card-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Badges */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.badge-green {
+  background: var(--success-subtle);
+  color: var(--success-bright);
+}
+
+.badge-yellow {
+  background: var(--warning-subtle);
+  color: var(--warning);
+}
+
+.badge-blue {
+  background: var(--info-subtle);
+  color: var(--info);
+}
+
+.badge-gray {
+  background: rgba(148, 163, 184, 0.1);
+  color: var(--text-tertiary);
+}
+
+.badge-red {
+  background: var(--error-subtle);
+  color: var(--error);
+}
+
+/* Modal */
+.platform-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.platform-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  width: 420px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+.platform-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.platform-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.platform-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 20px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.platform-modal-close:hover {
+  color: var(--text-primary);
+}
+
+.platform-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.platform-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.platform-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.platform-label {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.platform-input {
+  width: 100%;
+}
+
+.platform-radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.platform-radio-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.platform-radio-option:hover {
+  border-color: var(--border-hover);
+}
+
+.platform-radio-option input[type="radio"] {
+  margin-top: 2px;
+  accent-color: var(--brand-green);
+}
+
+.platform-radio-label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.platform-radio-label strong {
+  font-size: 12px;
+  color: var(--text-primary);
+}
+
+.platform-radio-desc {
+  font-size: 11px;
+  color: var(--text-tertiary);
+}
+
+.platform-error {
+  font-size: 12px;
+  color: var(--error);
+}

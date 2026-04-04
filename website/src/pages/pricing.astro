@@ -48,8 +48,7 @@ const description = "Free for local development. Hosted endpoints for teams.";
       <div class="container">
         <h1>Pricing</h1>
         <p>
-          Free for local development. Hosted endpoints for teams that need
-          shared environments.
+          Free locally. Pay only for what you use in the cloud.
         </p>
       </div>
     </section>
@@ -58,27 +57,24 @@ const description = "Free for local development. Hosted endpoints for teams.";
     <section style="padding-top: 0;">
       <div class="container">
         <div class="pricing-grid">
-          <!-- Free -->
+          <!-- Local (Free) -->
           <div class="tier-card">
-            <h2 class="tier-name">Free</h2>
+            <h2 class="tier-name">Local</h2>
             <p class="tier-desc">
-              Local development. No limits, no account required.
+              Run on your machine. No account, no limits.
             </p>
             <div class="tier-price">
               <span class="amount">$0</span>
+              <span class="period">forever</span>
             </div>
             <ul class="tier-features">
-              <li>
-                <span class="check">&#10003;</span>
-                <span>Local CLI</span>
-              </li>
               <li>
                 <span class="check">&#10003;</span>
                 <span>100 AWS services</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>Unlimited local requests</span>
+                <span>Unlimited requests</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
@@ -86,7 +82,11 @@ const description = "Free for local development. Hosted endpoints for teams.";
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>1 seat</span>
+                <span>State snapshots</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Chaos engineering</span>
               </li>
               <li>
                 <span class="dash">--</span>
@@ -105,21 +105,21 @@ const description = "Free for local development. Hosted endpoints for teams.";
             </div>
           </div>
 
-          <!-- Pro -->
+          <!-- Hosted (Pay-as-you-go) -->
           <div class="tier-card featured">
-            <span class="tier-badge">Most Popular</span>
-            <h2 class="tier-name">Pro</h2>
+            <span class="tier-badge">For Teams</span>
+            <h2 class="tier-name">Hosted</h2>
             <p class="tier-desc">
-              Hosted endpoint for CI/CD and staging environments.
+              Cloud endpoints for CI/CD, staging, and shared environments. Pay per request.
             </p>
             <div class="tier-price">
-              <span class="amount">$29</span>
-              <span class="period">/mo</span>
+              <span class="amount">$0.50</span>
+              <span class="period">per 10K requests</span>
             </div>
             <ul class="tier-features">
               <li>
                 <span class="check">&#10003;</span>
-                <span>Local CLI</span>
+                <span>1,000 free requests/mo</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
@@ -127,21 +127,27 @@ const description = "Free for local development. Hosted endpoints for teams.";
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>1M requests/mo (hosted)</span>
+                <span>Hosted endpoint: yourteam.cloudmock.io</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>Built-in devtools</span>
+                <span>Multiple apps per org</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>1 seat</span>
+                <span>API keys with RBAC</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span
-                  ><span class="label">Hosted:</span> {"{org}"}.cloudmock.app</span
-                >
+                <span>Team management (SSO)</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>HIPAA-ready audit logs</span>
+              </li>
+              <li>
+                <span class="check">&#10003;</span>
+                <span>Usage dashboard</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
@@ -150,71 +156,72 @@ const description = "Free for local development. Hosted endpoints for teams.";
             </ul>
             <div class="tier-cta">
               <a
-                href="https://checkout.stripe.com/pay/{pro_price_link}"
-                class="btn-primary"
-                target="_blank"
-                rel="noopener noreferrer">Subscribe to Pro</a
+                href="https://app.cloudmock.io/sign-up"
+                class="btn-primary">Start Free</a
               >
               <p class="tier-cta-note">
-                You'll be redirected to Stripe for secure payment
+                1,000 requests free every month. No credit card required.
               </p>
             </div>
           </div>
 
-          <!-- Team -->
+          <!-- Enterprise -->
           <div class="tier-card">
-            <h2 class="tier-name">Team</h2>
+            <h2 class="tier-name">Enterprise</h2>
             <p class="tier-desc">
-              Shared hosted environment for your entire team.
+              Dedicated infrastructure, BAA, and volume pricing.
             </p>
             <div class="tier-price">
-              <span class="amount">$99</span>
-              <span class="period">/mo</span>
+              <span class="amount">Custom</span>
             </div>
             <ul class="tier-features">
               <li>
                 <span class="check">&#10003;</span>
-                <span>Local CLI</span>
+                <span>Everything in Hosted</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>100 AWS services</span>
+                <span>Dedicated CloudMock instances</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>10M requests/mo (hosted)</span>
+                <span>HIPAA BAA</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>Built-in devtools</span>
+                <span>Volume pricing</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>10 seats</span>
+                <span>Custom data retention</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span
-                  ><span class="label">Hosted:</span> {"{org}"}.cloudmock.app</span
-                >
+                <span>SSO / SAML</span>
               </li>
               <li>
                 <span class="check">&#10003;</span>
-                <span>Priority support</span>
+                <span>Priority support + SLA</span>
               </li>
             </ul>
             <div class="tier-cta">
               <a
-                href="https://checkout.stripe.com/pay/{team_price_link}"
-                class="btn-primary"
-                target="_blank"
-                rel="noopener noreferrer">Subscribe to Team</a
+                href="mailto:sales@viridian.dev"
+                class="btn-primary">Contact Sales</a
               >
-              <p class="tier-cta-note">
-                You'll be redirected to Stripe for secure payment
-              </p>
             </div>
           </div>
+        </div>
+
+        <!-- Cost calculator -->
+        <div style="text-align:center; margin:3rem 0 0; padding:1.5rem; border:1px solid var(--border-muted, #333); border-radius:8px; max-width:600px; margin-left:auto; margin-right:auto;">
+          <p style="margin:0 0 0.5rem; font-size:1.1rem; font-weight:600;">How much will it cost?</p>
+          <p style="margin:0; color:#999; font-size:0.9rem;">
+            10K requests/mo = <strong style="color:#52b788;">$0.50</strong> &nbsp;|&nbsp;
+            100K requests/mo = <strong style="color:#52b788;">$4.95</strong> &nbsp;|&nbsp;
+            1M requests/mo = <strong style="color:#52b788;">$49.95</strong>
+          </p>
+          <p style="margin:0.5rem 0 0; color:#666; font-size:0.8rem;">First 1,000 requests free every month</p>
         </div>
       </div>
     </section>
@@ -230,59 +237,59 @@ const description = "Free for local development. Hosted endpoints for teams.";
             <thead>
               <tr>
                 <th></th>
-                <th>Free</th>
-                <th class="highlight-col">Pro</th>
-                <th>Team</th>
+                <th>Local</th>
+                <th class="highlight-col">Hosted</th>
+                <th>Enterprise</th>
               </tr>
             </thead>
             <tbody>
               <tr>
                 <td>Price</td>
                 <td>$0</td>
-                <td class="highlight-col">$29/mo</td>
-                <td>$99/mo</td>
+                <td class="highlight-col">$0.50 / 10K reqs</td>
+                <td>Custom</td>
               </tr>
               <tr>
-                <td>Local CLI</td>
-                <td>Yes</td>
-                <td class="highlight-col">Yes</td>
-                <td>Yes</td>
+                <td>AWS services</td>
+                <td>100</td>
+                <td class="highlight-col">100</td>
+                <td>100</td>
               </tr>
               <tr>
                 <td>Hosted endpoint</td>
                 <td>No</td>
-                <td class="highlight-col">{"{org}"}.cloudmock.app</td>
-                <td>{"{org}"}.cloudmock.app</td>
+                <td class="highlight-col">yourteam.cloudmock.io</td>
+                <td>yourteam.cloudmock.io</td>
               </tr>
               <tr>
-                <td>Services</td>
-                <td>98</td>
-                <td class="highlight-col">98</td>
-                <td>98</td>
+                <td>Infrastructure</td>
+                <td>Your machine</td>
+                <td class="highlight-col">Shared</td>
+                <td>Dedicated</td>
               </tr>
               <tr>
-                <td>Requests/mo</td>
-                <td>Unlimited (local)</td>
-                <td class="highlight-col">1M</td>
-                <td>10M</td>
+                <td>Team management</td>
+                <td>No</td>
+                <td class="highlight-col">Yes (SSO)</td>
+                <td>Yes (SAML)</td>
               </tr>
               <tr>
-                <td>Seats</td>
-                <td>1</td>
-                <td class="highlight-col">1</td>
-                <td>10</td>
-              </tr>
-              <tr>
-                <td>Devtools</td>
-                <td>Yes</td>
+                <td>Audit log</td>
+                <td>No</td>
                 <td class="highlight-col">Yes</td>
-                <td>Yes</td>
+                <td>Yes + export</td>
+              </tr>
+              <tr>
+                <td>HIPAA</td>
+                <td>No</td>
+                <td class="highlight-col">Audit logs</td>
+                <td>Full BAA</td>
               </tr>
               <tr>
                 <td>Support</td>
                 <td>Community</td>
                 <td class="highlight-col">Email</td>
-                <td>Priority</td>
+                <td>Priority + SLA</td>
               </tr>
             </tbody>
           </table>
@@ -308,16 +315,17 @@ const description = "Free for local development. Hosted endpoints for teams.";
           <div class="faq-item">
             <h3>What are hosted endpoints?</h3>
             <p>
-              Pro and Team plans include a hosted CloudMock instance at
-              {"{org}"}.cloudmock.app for CI/CD pipelines, staging environments,
-              and shared development.
+              Sign up and you get a hosted CloudMock endpoint at
+              yourteam.cloudmock.io. Point your AWS SDK at it from CI/CD,
+              staging, or anywhere your team needs shared AWS emulation.
             </p>
           </div>
           <div class="faq-item">
-            <h3>How does payment work?</h3>
+            <h3>How does billing work?</h3>
             <p>
-              Pro and Team subscriptions are handled securely through Stripe.
-              You'll be redirected to Stripe Checkout to complete your purchase.
+              Pay-as-you-go. First 1,000 requests per month are free.
+              After that, $0.50 per 10,000 requests. No upfront commitment.
+              Add a credit card when you're ready to go beyond the free tier.
             </p>
           </div>
           <div class="faq-item">

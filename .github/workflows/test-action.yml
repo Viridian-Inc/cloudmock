@@ -16,7 +16,7 @@ jobs:
         id: cloudmock
 
       - name: Verify CloudMock is running
-        run: curl -sf http://localhost:4566/
+        run: curl -sf http://localhost:4599/api/health
 
       - name: Test S3
         run: |

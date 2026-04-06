@@ -295,19 +295,19 @@ description: Performance comparison of CloudMock (In-Process and HTTP modes) vs 
 
 {/* ── Hero ── */}
 <div class="bench-hero">
-  <h2>135× faster than LocalStack &nbsp;·&nbsp; 95× faster than Moto</h2>
-  <p class="subtitle">Verified benchmarks using <a href="https://github.com/rakyll/hey" style="color:#b7e4c7">hey</a>. Endpoints fingerprinted via response headers (<code>x-localstack: true</code>, <code>Server: Werkzeug</code>).</p>
+  <h2>246× faster than LocalStack &nbsp;·&nbsp; 142× faster than Moto</h2>
+  <p class="subtitle">Verified benchmarks using <a href="https://github.com/rakyll/hey" style="color:#b7e4c7">hey</a>. Rust-accelerated DynamoDB. Endpoints fingerprinted via response headers (<code>x-localstack: true</code>, <code>Server: Werkzeug</code>).</p>
   <div class="bench-stats">
     <div class="bench-stat">
-      <div class="value">115K</div>
+      <div class="value">113K</div>
       <div class="label">req/s (geo mean)</div>
     </div>
     <div class="bench-stat">
-      <div class="value">135×</div>
+      <div class="value">246×</div>
       <div class="label">vs LocalStack</div>
     </div>
     <div class="bench-stat">
-      <div class="value">95×</div>
+      <div class="value">142×</div>
       <div class="label">vs Moto</div>
     </div>
     <div class="bench-stat">
@@ -537,72 +537,72 @@ Requests per second across 8 core AWS operations. Higher is better. Measured wit
   <tbody>
     <tr>
       <td><strong>DynamoDB ListTables</strong></td>
-      <td class="col-cm-http">101,636 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">739</td>
-      <td class="col-moto">1,557</td>
-      <td><strong>138×</strong></td>
-      <td><strong>65×</strong></td>
+      <td class="col-cm-http">114,212 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">665</td>
+      <td class="col-moto">1,518</td>
+      <td><strong>172×</strong></td>
+      <td><strong>75×</strong></td>
     </tr>
     <tr>
       <td><strong>DynamoDB PutItem</strong></td>
-      <td class="col-cm-http">119,995 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">545</td>
-      <td class="col-moto">1,560</td>
-      <td><strong>220×</strong></td>
-      <td><strong>77×</strong></td>
+      <td class="col-cm-http">125,142 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">468</td>
+      <td class="col-moto">1,520</td>
+      <td><strong>267×</strong></td>
+      <td><strong>82×</strong></td>
     </tr>
     <tr>
       <td><strong>DynamoDB GetItem</strong></td>
-      <td class="col-cm-http">110,641 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">656</td>
-      <td class="col-moto">1,520</td>
-      <td><strong>169×</strong></td>
-      <td><strong>73×</strong></td>
+      <td class="col-cm-http">126,460 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">753</td>
+      <td class="col-moto">1,583</td>
+      <td><strong>168×</strong></td>
+      <td><strong>80×</strong></td>
     </tr>
     <tr>
       <td><strong>S3 ListBuckets</strong></td>
-      <td class="col-cm-http">132,864 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">1,408</td>
-      <td class="col-moto">1,222</td>
-      <td><strong>94×</strong></td>
-      <td><strong>109×</strong></td>
+      <td class="col-cm-http">97,751 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">445</td>
+      <td class="col-moto">1,194</td>
+      <td><strong>220×</strong></td>
+      <td><strong>82×</strong></td>
     </tr>
     <tr>
       <td><strong>SQS ListQueues</strong></td>
-      <td class="col-cm-http">111,962 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">1,363</td>
-      <td class="col-moto">1,118</td>
-      <td><strong>82×</strong></td>
-      <td><strong>100×</strong></td>
+      <td class="col-cm-http">120,317 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">616</td>
+      <td class="col-moto">388</td>
+      <td><strong>195×</strong></td>
+      <td><strong>310×</strong></td>
     </tr>
     <tr>
       <td><strong>IAM ListUsers</strong></td>
-      <td class="col-cm-http">114,808 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">1,120</td>
-      <td class="col-moto">989</td>
-      <td><strong>103×</strong></td>
-      <td><strong>116×</strong></td>
+      <td class="col-cm-http">117,466 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">290</td>
+      <td class="col-moto">356</td>
+      <td><strong>405×</strong></td>
+      <td><strong>330×</strong></td>
     </tr>
     <tr>
       <td><strong>Lambda ListFunctions</strong></td>
-      <td class="col-cm-http">118,653 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">577</td>
-      <td class="col-moto">1,218</td>
-      <td><strong>206×</strong></td>
-      <td><strong>97×</strong></td>
+      <td class="col-cm-http">112,902 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">615</td>
+      <td class="col-moto">1,274</td>
+      <td><strong>184×</strong></td>
+      <td><strong>89×</strong></td>
     </tr>
     <tr>
       <td><strong>EC2 DescribeInstances</strong></td>
-      <td class="col-cm-http">116,063 <span class="badge badge-best">best</span></td>
-      <td class="col-ls">898</td>
-      <td class="col-moto">787</td>
-      <td><strong>129×</strong></td>
-      <td><strong>147×</strong></td>
+      <td class="col-cm-http">97,943 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">180</td>
+      <td class="col-moto">213</td>
+      <td><strong>544×</strong></td>
+      <td><strong>460×</strong></td>
     </tr>
   </tbody>
 </table>
 
-**Geometric mean: CloudMock 115,530 req/s — 135× faster than LocalStack (858 req/s), 95× faster than Moto (1,216 req/s).**
+**Geometric mean: CloudMock 113,537 req/s — 246× faster than LocalStack (462 req/s), 142× faster than Moto (797 req/s).**
 
 ## Startup Time
 
@@ -650,21 +650,21 @@ Annual cost for a team running **1,000 CI builds per day**, with 5,000 AWS SDK c
     <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
     <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
   </div>
-  {/* scale: 18s = 100% */}
+  {/* scale: 23s = 100% */}
   <div class="bar-row">
     <div class="bar-label">CloudMock</div>
-    <div class="bar-track"><div class="bar-fill cm-http" style="width:0.6%"></div></div>
+    <div class="bar-track"><div class="bar-fill cm-http" style="width:0.4%"></div></div>
     <div class="bar-val">0.1s <span class="badge badge-best">best</span></div>
   </div>
   <div class="bar-row">
     <div class="bar-label">Moto</div>
     <div class="bar-track"><div class="bar-fill moto" style="width:40%"></div></div>
-    <div class="bar-val">7.2s</div>
+    <div class="bar-val">9.3s</div>
   </div>
   <div class="bar-row">
     <div class="bar-label">LocalStack</div>
     <div class="bar-track"><div class="bar-fill ls" style="width:100%"></div></div>
-    <div class="bar-val">18.0s</div>
+    <div class="bar-val">23.0s</div>
   </div>
 </div>
 
@@ -681,23 +681,23 @@ Annual cost for a team running **1,000 CI builds per day**, with 5,000 AWS SDK c
   <tbody>
     <tr>
       <td>500</td>
-      <td class="col-cm-http"><strong>$95,769</strong> / yr</td>
-      <td class="col-cm-http"><strong>$25,392</strong> / yr</td>
+      <td class="col-cm-http"><strong>$99,324</strong> / yr</td>
+      <td class="col-cm-http"><strong>$26,958</strong> / yr</td>
     </tr>
     <tr>
       <td>2,000</td>
-      <td class="col-cm-http"><strong>$109,869</strong> / yr</td>
-      <td class="col-cm-http"><strong>$34,987</strong> / yr</td>
+      <td class="col-cm-http"><strong>$124,090</strong> / yr</td>
+      <td class="col-cm-http"><strong>$41,253</strong> / yr</td>
     </tr>
     <tr>
       <td>5,000</td>
-      <td class="col-cm-http"><strong>$138,069</strong> / yr</td>
-      <td class="col-cm-http"><strong>$54,179</strong> / yr</td>
+      <td class="col-cm-http"><strong>$173,621</strong> / yr</td>
+      <td class="col-cm-http"><strong>$69,842</strong> / yr</td>
     </tr>
     <tr>
       <td>10,000</td>
-      <td class="col-cm-http"><strong>$185,069</strong> / yr</td>
-      <td class="col-cm-http"><strong>$86,165</strong> / yr</td>
+      <td class="col-cm-http"><strong>$256,173</strong> / yr</td>
+      <td class="col-cm-http"><strong>$117,491</strong> / yr</td>
     </tr>
   </tbody>
 </table>
@@ -717,29 +717,29 @@ At 5,000 SDK calls per build, 1,000 builds/day:
   <tbody>
     <tr>
       <td>Hours saved / year</td>
-      <td class="col-cm-http"><strong>1,810</strong></td>
-      <td class="col-cm-http"><strong>715</strong></td>
+      <td class="col-cm-http"><strong>2,322</strong></td>
+      <td class="col-cm-http"><strong>932</strong></td>
     </tr>
     <tr>
       <td>Engineer-years saved</td>
-      <td class="col-cm-http"><strong>0.9</strong></td>
-      <td class="col-cm-http"><strong>0.3</strong></td>
+      <td class="col-cm-http"><strong>1.1</strong></td>
+      <td class="col-cm-http"><strong>0.4</strong></td>
     </tr>
     <tr>
       <td>Working days saved</td>
-      <td class="col-cm-http"><strong>226</strong></td>
-      <td class="col-cm-http"><strong>89</strong></td>
+      <td class="col-cm-http"><strong>290</strong></td>
+      <td class="col-cm-http"><strong>117</strong></td>
     </tr>
     <tr>
       <td>Cost saved ($75/hr loaded)</td>
-      <td class="col-cm-http"><strong>$135,772</strong></td>
-      <td class="col-cm-http"><strong>$53,647</strong></td>
+      <td class="col-cm-http"><strong>$174,150</strong></td>
+      <td class="col-cm-http"><strong>$69,900</strong></td>
     </tr>
   </tbody>
 </table>
 
 <div class="note-box">
-  Savings include GitHub Actions compute and developer wait time. CloudMock finishes 5,000 SDK calls in 0.1 seconds where LocalStack takes 18 seconds (12s Docker startup + 6s request processing) and Moto takes 7.2 seconds (3s Python startup + 4.2s request processing). That 18-second gap, repeated 1,000 times per day, adds up to 5 hours of cumulative wait time every day.
+  Savings include GitHub Actions compute and developer wait time. CloudMock finishes 5,000 SDK calls in 0.1 seconds where LocalStack takes 23 seconds (12s Docker startup + 11s request processing) and Moto takes 9.3 seconds (3s Python startup + 6.3s request processing). That 23-second gap, repeated 1,000 times per day, adds up to 6.4 hours of cumulative wait time every day — over a full engineer-year annually.
 </div>
 
 ## Methodology

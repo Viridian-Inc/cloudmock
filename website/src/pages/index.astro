@@ -213,29 +213,29 @@ const services = [
       <div class="container">
         <div class="section-header-center">
           <p class="section-label">Performance</p>
-          <h2 class="section-title">135x faster than LocalStack. 95x faster than Moto.</h2>
-          <p class="section-desc">Verified benchmarks. Endpoint-fingerprinted. Not theoretical — measured with <a href="https://github.com/rakyll/hey" style="color:#52b788">hey</a> on real HTTP requests.</p>
+          <h2 class="section-title">246x faster than LocalStack. 142x faster than Moto.</h2>
+          <p class="section-desc">Verified benchmarks. Endpoint-fingerprinted. Rust-accelerated DynamoDB. Measured with <a href="https://github.com/rakyll/hey" style="color:#52b788">hey</a> on real HTTP requests.</p>
         </div>
         <div class="stats-grid">
           <div class="stat-card">
-            <div class="stat-value">115K</div>
+            <div class="stat-value">113K</div>
             <div class="stat-label">req/s</div>
             <p>Geometric mean across 8 core AWS operations</p>
           </div>
           <div class="stat-card">
-            <div class="stat-value">135x</div>
+            <div class="stat-value">246x</div>
             <div class="stat-label">vs LocalStack</div>
-            <p>LocalStack: 858 req/s (Docker + Python)</p>
+            <p>LocalStack: 462 req/s (Docker + Python)</p>
           </div>
           <div class="stat-card">
-            <div class="stat-value">95x</div>
+            <div class="stat-value">142x</div>
             <div class="stat-label">vs Moto</div>
-            <p>Moto: 1,216 req/s (Python + Flask)</p>
+            <p>Moto: 797 req/s (Python + Flask)</p>
           </div>
           <div class="stat-card">
             <div class="stat-value">0.1s</div>
             <div class="stat-label">per CI build</div>
-            <p>5,000 SDK calls in 0.1s vs 18s on LocalStack</p>
+            <p>5,000 SDK calls in 0.1s vs 23s on LocalStack</p>
           </div>
         </div>
         <div style="text-align:center;margin-top:1.5rem;">
@@ -249,8 +249,8 @@ const services = [
       <div class="container">
         <div class="section-header-center">
           <p class="section-label">ROI</p>
-          <h2 class="section-title">Save $138K/yr vs LocalStack at 1,000 CI builds/day.</h2>
-          <p class="section-desc">18 seconds saved per build &times; 1,000 builds/day = 5 hours of developer wait time eliminated every day. That's almost a full engineer-year saved annually.</p>
+          <h2 class="section-title">Save $174K/yr vs LocalStack at 1,000 CI builds/day.</h2>
+          <p class="section-desc">23 seconds saved per build &times; 1,000 builds/day = 6.4 hours of developer wait time eliminated every day. That's over a full engineer-year saved annually.</p>
         </div>
       </div>
     </section>

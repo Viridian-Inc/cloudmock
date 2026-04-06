@@ -84,11 +84,11 @@ See the full list at [cloudmock.app/docs/services](https://cloudmock.app/docs/).
 
 ## Performance
 
-CloudMock is the fastest AWS mock available — **95-220x faster than LocalStack**, **65-147x faster than Moto**.
+CloudMock is the fastest AWS mock available — **246x faster than LocalStack**, **142x faster than Moto**.
 
 ### Test Mode
 
-For CI and test suites, test mode strips all observability overhead. Only the gateway runs — no dashboard, no admin API, no tracing:
+For CI and test suites, test mode strips all observability overhead and uses a Rust-accelerated DynamoDB store. Only the gateway runs — no dashboard, no admin API, no tracing:
 
 ```bash
 CLOUDMOCK_TEST_MODE=true npx cloudmock  # 0.1s startup, 0.009ms per operation
@@ -100,16 +100,16 @@ Measured with [hey](https://github.com/rakyll/hey). Endpoints verified via respo
 
 | Operation | CloudMock | LocalStack | Moto | CM/LS | CM/Moto |
 |-----------|-----------|------------|------|-------|---------|
-| **DynamoDB ListTables** | **101,636** | 739 | 1,557 | 138x | 65x |
-| **DynamoDB PutItem** | **119,995** | 545 | 1,560 | 220x | 77x |
-| **DynamoDB GetItem** | **110,641** | 656 | 1,520 | 169x | 73x |
-| **S3 ListBuckets** | **132,864** | 1,408 | 1,222 | 94x | 109x |
-| **SQS ListQueues** | **111,962** | 1,363 | 1,118 | 82x | 100x |
-| **IAM ListUsers** | **114,808** | 1,120 | 989 | 103x | 116x |
-| **Lambda ListFunctions** | **118,653** | 577 | 1,218 | 206x | 97x |
-| **EC2 DescribeInstances** | **116,063** | 898 | 787 | 129x | 147x |
+| **DynamoDB ListTables** | **114,212** | 665 | 1,518 | 172x | 75x |
+| **DynamoDB PutItem** | **125,142** | 468 | 1,520 | 267x | 82x |
+| **DynamoDB GetItem** | **126,460** | 753 | 1,583 | 168x | 80x |
+| **S3 ListBuckets** | **97,751** | 445 | 1,194 | 220x | 82x |
+| **SQS ListQueues** | **120,317** | 616 | 388 | 195x | 310x |
+| **IAM ListUsers** | **117,466** | 290 | 356 | 405x | 330x |
+| **Lambda ListFunctions** | **112,902** | 615 | 1,274 | 184x | 89x |
+| **EC2 DescribeInstances** | **97,943** | 180 | 213 | 544x | 460x |
 
-**Geometric mean: CloudMock 115,530 req/s — 135x faster than LocalStack, 95x faster than Moto.**
+**Geometric mean: CloudMock 113,537 req/s — 246x faster than LocalStack (462 req/s), 142x faster than Moto (797 req/s).**
 
 <details>
 <summary>In-process mode (Go)</summary>
@@ -125,26 +125,27 @@ client := dynamodb.NewFromConfig(cfg) // 20μs per GetItem
 
 ### CI Cost Savings at 1,000 Builds/Day
 
-A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on CloudMock vs **18 seconds** on LocalStack and **7 seconds** on Moto.
+A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on CloudMock vs **23 seconds** on LocalStack and **9 seconds** on Moto.
 
 | | CloudMock | LocalStack | Moto |
 |---|---|---|---|
-| **Time per build** | **0.1s** | 18.0s | 7.2s |
-| **Annual compute cost** | **$7** | $885 | $352 |
+| **Time per build** | **0.1s** | 23.0s | 9.3s |
+| **Annual compute cost** | **$7** | $1,398 | $564 |
 
 #### Annual savings by switching to CloudMock
 
 | SDK calls/build | vs LocalStack | vs Moto |
 |----------------|---------------|---------|
-| 500 | **$96K** saved | **$25K** saved |
-| 2,000 | **$110K** saved | **$35K** saved |
-| 5,000 | **$138K** saved | **$54K** saved |
-| 10,000 | **$185K** saved | **$86K** saved |
+| 500 | **$99K** saved | **$27K** saved |
+| 2,000 | **$124K** saved | **$41K** saved |
+| 5,000 | **$174K** saved | **$70K** saved |
+| 10,000 | **$256K** saved | **$117K** saved |
 
 *Includes GitHub Actions compute ($0.008/min) + developer wait time ($75/hr loaded). See [full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
 
 ### What makes CloudMock fast
 
+- **Rust-accelerated DynamoDB** — hot-path operations (PutItem, GetItem) use a Rust shared library with serde_json + DashMap via CGO
 - **Go + fasthttp** — native binary, zero-copy request handling, no interpreter overhead
 - **Test mode** — strips all observability (tracing, logging, SSE, anomaly detection)
 - **Sharded stores** — per-partition locks in DynamoDB, lock-free service routing via `sync.Map`
@@ -283,9 +284,9 @@ curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
 | Feature | CloudMock | LocalStack (Free) | Moto |
 |---|---|---|---|
 | AWS services | 100 | ~25 | ~100 |
-| **Throughput** | **115,530 req/s** | 858 req/s | 1,216 req/s |
-| **Speed multiplier** | **baseline** | 135x slower | 95x slower |
-| **Avg latency** | **0.009ms** | 1.2ms | 0.84ms |
+| **Throughput** | **113,537 req/s** | 462 req/s | 797 req/s |
+| **Speed multiplier** | **baseline** | 246x slower | 142x slower |
+| **Avg latency** | **0.009ms** | 2.2ms | 1.25ms |
 | Test mode (CI) | Built-in | No | No |
 | Distributed tracing | Built-in | No | No |
 | Chaos engineering | Built-in | Pro only | No |

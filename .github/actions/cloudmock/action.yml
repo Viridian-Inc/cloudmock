@@ -26,6 +26,9 @@ inputs:
   test-mode:
     description: Enable test mode (disables observability for faster throughput)
     default: 'true'
+  iac:
+    description: Path to Pulumi or Terraform project directory (auto-provisions DynamoDB tables, etc.)
+    default: ''
 
 outputs:
   endpoint:
@@ -56,11 +59,15 @@ runs:
     - id: start
       shell: bash
       run: |
+        IAC_FLAG=""
+        if [ -n "${{ inputs.iac }}" ]; then
+          IAC_FLAG="--iac ${{ inputs.iac }}"
+        fi
         CLOUDMOCK_PROFILE=${{ inputs.profile }} \
         CLOUDMOCK_IAM_MODE=${{ inputs.iam-mode }} \
         CLOUDMOCK_PORT=${{ inputs.port }} \
         CLOUDMOCK_TEST_MODE=${{ inputs.test-mode }} \
-        nohup cloudmock > /tmp/cloudmock.log 2>&1 &
+        nohup cloudmock $IAC_FLAG > /tmp/cloudmock.log 2>&1 &
         echo $! > /tmp/cloudmock.pid
 
         # Health check with 30s timeout.

@@ -84,7 +84,7 @@ See the full list at [cloudmock.app/docs/services](https://cloudmock.app/docs/).
 
 ## Performance
 
-CloudMock is the fastest AWS mock available — **246x faster than LocalStack**, **142x faster than Moto**.
+CloudMock is the fastest AWS mock available — **249x faster than LocalStack**, **143x faster than Moto**.
 
 ### Test Mode
 
@@ -100,16 +100,16 @@ Measured with [hey](https://github.com/rakyll/hey). Endpoints verified via respo
 
 | Operation | CloudMock | LocalStack | Moto | CM/LS | CM/Moto |
 |-----------|-----------|------------|------|-------|---------|
-| **DynamoDB ListTables** | **114,212** | 665 | 1,518 | 172x | 75x |
-| **DynamoDB PutItem** | **125,142** | 468 | 1,520 | 267x | 82x |
-| **DynamoDB GetItem** | **126,460** | 753 | 1,583 | 168x | 80x |
-| **S3 ListBuckets** | **97,751** | 445 | 1,194 | 220x | 82x |
-| **SQS ListQueues** | **120,317** | 616 | 388 | 195x | 310x |
-| **IAM ListUsers** | **117,466** | 290 | 356 | 405x | 330x |
-| **Lambda ListFunctions** | **112,902** | 615 | 1,274 | 184x | 89x |
-| **EC2 DescribeInstances** | **97,943** | 180 | 213 | 544x | 460x |
+| **DynamoDB ListTables** | **98,150** | 662 | 1,526 | 148x | 64x |
+| **DynamoDB PutItem** | **128,164** | 449 | 1,492 | 285x | 85x |
+| **DynamoDB GetItem** | **134,714** | 723 | 1,569 | 186x | 85x |
+| **S3 ListBuckets** | **102,010** | 506 | 1,129 | 201x | 90x |
+| **SQS ListQueues** | **102,880** | 554 | 387 | 185x | 265x |
+| **IAM ListUsers** | **115,341** | 294 | 355 | 392x | 325x |
+| **Lambda ListFunctions** | **117,876** | 601 | 1,330 | 196x | 88x |
+| **EC2 DescribeInstances** | **117,161** | 179 | 217 | 653x | 539x |
 
-**Geometric mean: CloudMock 113,537 req/s — 246x faster than LocalStack (462 req/s), 142x faster than Moto (797 req/s).**
+**Geometric mean: CloudMock 113,901 req/s — 249x faster than LocalStack (457 req/s), 143x faster than Moto (795 req/s).**
 
 <details>
 <summary>In-process mode (Go)</summary>
@@ -129,8 +129,8 @@ A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on
 
 | | CloudMock | LocalStack | Moto |
 |---|---|---|---|
-| **Time per build** | **0.1s** | 23.0s | 9.3s |
-| **Annual compute cost** | **$7** | $1,398 | $564 |
+| **Time per build** | **0.1s** | 22.9s | 9.3s |
+| **Annual compute cost** | **$7** | $1,393 | $565 |
 
 #### Annual savings by switching to CloudMock
 
@@ -139,7 +139,7 @@ A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on
 | 500 | **$99K** saved | **$27K** saved |
 | 2,000 | **$124K** saved | **$41K** saved |
 | 5,000 | **$174K** saved | **$70K** saved |
-| 10,000 | **$256K** saved | **$117K** saved |
+| 10,000 | **$258K** saved | **$118K** saved |
 
 *Includes GitHub Actions compute ($0.008/min) + developer wait time ($75/hr loaded). See [full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
 
@@ -284,9 +284,9 @@ curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
 | Feature | CloudMock | LocalStack (Free) | Moto |
 |---|---|---|---|
 | AWS services | 100 | ~25 | ~100 |
-| **Throughput** | **113,537 req/s** | 462 req/s | 797 req/s |
-| **Speed multiplier** | **baseline** | 246x slower | 142x slower |
-| **Avg latency** | **0.009ms** | 2.2ms | 1.25ms |
+| **Throughput** | **113,901 req/s** | 457 req/s | 795 req/s |
+| **Speed multiplier** | **baseline** | 249x slower | 143x slower |
+| **Avg latency** | **0.009ms** | 2.2ms | 1.26ms |
 | Test mode (CI) | Built-in | No | No |
 | Distributed tracing | Built-in | No | No |
 | Chaos engineering | Built-in | Pro only | No |

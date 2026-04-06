@@ -13,9 +13,23 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-      - name: Build
-        run: go build $(go list ./... | grep -v templates | grep -v integration | grep -v dashboard)
-      - name: Vet
-        run: go vet $(go list ./... | grep -v templates | grep -v integration)
-      - name: Test
-        run: go test $(go list ./... | grep -v postgres | grep -v templates | grep -v integration | grep -v dashboard) -timeout 120s
+      - name: Download modules
+        run: go mod download
+      - name: Build, Vet, and Test
+        run: |
+          PKGS=$(go list ./... | grep -v templates | grep -v integration | grep -v dashboard)
+          VET_PKGS=$(go list ./... | grep -v templates | grep -v integration)
+          TEST_PKGS=$(go list ./... | grep -v postgres | grep -v templates | grep -v integration | grep -v dashboard)
+
+          go build $PKGS &
+          PID_BUILD=$!
+          go vet $VET_PKGS &
+          PID_VET=$!
+          go test $TEST_PKGS -timeout 120s &
+          PID_TEST=$!
+
+          FAIL=0
+          wait $PID_BUILD || FAIL=1
+          wait $PID_VET   || FAIL=1
+          wait $PID_TEST  || FAIL=1
+          exit $FAIL

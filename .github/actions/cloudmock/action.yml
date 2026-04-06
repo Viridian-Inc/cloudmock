@@ -23,6 +23,9 @@ inputs:
   iam-mode:
     description: IAM mode (none, log, enforce)
     default: none
+  test-mode:
+    description: Enable test mode (disables observability for faster throughput)
+    default: 'true'
 
 outputs:
   endpoint:
@@ -56,13 +59,20 @@ runs:
         CLOUDMOCK_PROFILE=${{ inputs.profile }} \
         CLOUDMOCK_IAM_MODE=${{ inputs.iam-mode }} \
         CLOUDMOCK_PORT=${{ inputs.port }} \
+        CLOUDMOCK_TEST_MODE=${{ inputs.test-mode }} \
         nohup cloudmock > /tmp/cloudmock.log 2>&1 &
         echo $! > /tmp/cloudmock.pid
 
-        # Health check with 30s timeout
+        # Health check with 30s timeout.
+        # In test mode, admin API is disabled so probe the gateway directly.
+        if [ "${{ inputs.test-mode }}" = "true" ]; then
+          HEALTH_URL="http://localhost:${{ inputs.port }}"
+        else
+          HEALTH_URL="http://localhost:4599/api/health"
+        fi
         echo -n "Waiting for CloudMock..."
         for i in $(seq 1 60); do
-          if curl -sf http://localhost:4599/api/health > /dev/null 2>&1; then
+          if curl -so /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null | grep -qE '^[2-4]'; then
             echo " ready!"
             break
           fi

@@ -313,6 +313,8 @@ func buildIaCTopology(result *iac.IaCImportResult) ([]admin.TopologyNodeV2, []ad
 	return nodes, edges
 }
 
+const version = "1.5.1"
+
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.
 	logFormat := os.Getenv("CLOUDMOCK_LOG_FORMAT")
@@ -354,6 +356,23 @@ func main() {
 	}
 
 	cfg.ApplyEnv()
+
+	// Test mode: strip all observability, disable dashboard/admin/OTLP for maximum throughput.
+	// Use CLOUDMOCK_TEST_MODE=true when CloudMock is a test dependency.
+	testMode := os.Getenv("CLOUDMOCK_TEST_MODE") == "true" || os.Getenv("CLOUDMOCK_TEST_MODE") == "1"
+	if testMode {
+		cfg.Dashboard.Enabled = false
+		cfg.OTLP.Enabled = false
+		cfg.SLO.Enabled = false
+		cfg.RateLimit.Enabled = false
+		cfg.Regression.Enabled = false
+		cfg.Incidents.Enabled = false
+		cfg.Monitor.Enabled = false
+		cfg.RUM.Enabled = false
+		cfg.IAM.Mode = "none"
+		cfg.Logging.Level = "warn"
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelWarn})))
+	}
 
 	// Resolve IaC project directory. Priority: --iac flag > CLOUDMOCK_IAC_DIR env > cloudmock.yml iac_dir
 	if *iacDir == "" {
@@ -870,6 +889,14 @@ func main() {
 	var promClient *promImpl.Client
 	var otelShutdown func(context.Context) error
 
+	// Test mode: skip all data plane and observability initialization.
+	// requestLog, requestStats, traceStore, sloEngine stay nil → logging middleware
+	// enters its "lightweight" fast path and skips all per-request overhead.
+	if testMode {
+		dp = &dataplane.DataPlane{Mode: "local"}
+	}
+
+	if !testMode {
 	switch mode {
 	case "local":
 		requestLog = gateway.NewRequestLog(1000)
@@ -960,6 +987,7 @@ func main() {
 	default:
 		log.Fatalf("unknown dataplane mode: %q", mode)
 	}
+	} // end if !testMode
 
 	// DynamoDB store — initialized when mode is "dynamodb". Used by feature
 	// stores below. Shared across all features via the single-table design.
@@ -1815,7 +1843,13 @@ func main() {
 		)
 	}
 
-	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
+	// In test mode, skip all observability — the logging middleware "lightweight" path
+	// short-circuits when all deps are nil, adding zero overhead per request.
+	var loggedGW http.Handler
+	if testMode {
+		loggedGW = gateway.LoggingMiddlewareWithOpts(handler, nil, nil, gateway.LoggingMiddlewareOpts{})
+	} else {
+	loggedGW = gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster:   adminAPI.Broadcaster(),
 		TraceStore:    traceStore,
 		SLOEngine:     sloEngine,
@@ -1855,7 +1889,10 @@ func main() {
 			}
 		},
 	})
+	} // end if !testMode
 
+	var adminServer *http.Server
+	if !testMode {
 	var adminHandler http.Handler = adminAPI
 	if cfg.Auth.Enabled {
 		adminHandler = auth.Middleware([]byte(cfg.Auth.Secret))(adminHandler)
@@ -1867,7 +1904,7 @@ func main() {
 		adminHandler = gateway.CORSMiddleware(adminHandler)
 	}
 	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
-	adminServer := &http.Server{
+	adminServer = &http.Server{
 		Addr:              adminAddr,
 		Handler:           adminHandler,
 		ReadTimeout:       30 * time.Second,
@@ -1892,6 +1929,7 @@ func main() {
 			slog.Error("source server exited", "error", err)
 		}
 	}()
+	} // end if !testMode
 
 	// OTLP/HTTP ingestion server — accepts OpenTelemetry traces, metrics, and logs.
 	var otlpServer *http.Server
@@ -1985,12 +2023,17 @@ func main() {
 	}()
 
 	// Startup banner — printed after all servers are launched.
-	fmt.Printf("\nCloudMock v1.0.0\n")
+	fmt.Printf("\nCloudMock %s\n", version)
+	if testMode {
+		fmt.Printf("  Mode:       TEST (observability disabled)\n")
+	}
 	fmt.Printf("  Gateway:    http://localhost:%d\n", cfg.Gateway.Port)
-	fmt.Printf("  Devtools:   http://localhost:%d  <-- open in browser\n", cfg.Dashboard.Port)
-	fmt.Printf("  Admin API:  http://localhost:%d\n", cfg.Admin.Port)
-	if cfg.OTLP.Enabled {
-		fmt.Printf("  OTLP/HTTP:  http://localhost:%d  <-- set OTEL_EXPORTER_OTLP_ENDPOINT\n", cfg.OTLP.Port)
+	if !testMode {
+		fmt.Printf("  Devtools:   http://localhost:%d  <-- open in browser\n", cfg.Dashboard.Port)
+		fmt.Printf("  Admin API:  http://localhost:%d\n", cfg.Admin.Port)
+		if cfg.OTLP.Enabled {
+			fmt.Printf("  OTLP/HTTP:  http://localhost:%d  <-- set OTEL_EXPORTER_OTLP_ENDPOINT\n", cfg.OTLP.Port)
+		}
 	}
 	fmt.Printf("  Services:   %d active (%s profile)\n", len(registry.List()), cfg.Profile)
 	fmt.Println()
@@ -2093,8 +2136,10 @@ func main() {
 	if err := gwServer.Shutdown(shutdownCtx); err != nil {
 		slog.Error("gateway shutdown error", "error", err)
 	}
-	if err := adminServer.Shutdown(shutdownCtx); err != nil {
-		slog.Error("admin shutdown error", "error", err)
+	if adminServer != nil {
+		if err := adminServer.Shutdown(shutdownCtx); err != nil {
+			slog.Error("admin shutdown error", "error", err)
+		}
 	}
 	if dashServer != nil {
 		if err := dashServer.Shutdown(shutdownCtx); err != nil {

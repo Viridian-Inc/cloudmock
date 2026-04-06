@@ -22,7 +22,7 @@ import (
 
 const (
 	defaultAdminAddr = "http://localhost:4599"
-	version          = "1.5.1"
+	version          = "1.5.2"
 )
 
 func main() {

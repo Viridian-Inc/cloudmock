@@ -1,6 +1,6 @@
 {
   "name": "cloudmock",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Local AWS emulation. 98 services. One command.",
   "bin": {
     "cloudmock": "bin/cloudmock.mjs"

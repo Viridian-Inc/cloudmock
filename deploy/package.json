@@ -1,0 +1,19 @@
+{
+  "name": "cloudmock-deploy",
+  "version": "1.0.0",
+  "description": "Deploy CloudMock gateway to AWS (ECS Fargate + ALB)",
+  "main": "index.ts",
+  "scripts": {
+    "test": "pulumi preview --stack test --non-interactive",
+    "deploy": "pulumi up --stack dev --yes",
+    "destroy": "pulumi destroy --stack dev --yes"
+  },
+  "dependencies": {
+    "@pulumi/aws": "^6.0.0",
+    "@pulumi/pulumi": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

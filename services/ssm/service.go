@@ -32,6 +32,13 @@ func (s *SSMService) Actions() []service.Action {
 		{Name: "DeleteParameter", Method: http.MethodPost, IAMAction: "ssm:DeleteParameter"},
 		{Name: "DeleteParameters", Method: http.MethodPost, IAMAction: "ssm:DeleteParameters"},
 		{Name: "DescribeParameters", Method: http.MethodPost, IAMAction: "ssm:DescribeParameters"},
+		{Name: "CreateDocument", Method: http.MethodPost, IAMAction: "ssm:CreateDocument"},
+		{Name: "DescribeDocument", Method: http.MethodPost, IAMAction: "ssm:DescribeDocument"},
+		{Name: "GetDocument", Method: http.MethodPost, IAMAction: "ssm:GetDocument"},
+		{Name: "ListDocuments", Method: http.MethodPost, IAMAction: "ssm:ListDocuments"},
+		{Name: "DeleteDocument", Method: http.MethodPost, IAMAction: "ssm:DeleteDocument"},
+		{Name: "StartAutomationExecution", Method: http.MethodPost, IAMAction: "ssm:StartAutomationExecution"},
+		{Name: "DescribeAutomationExecutions", Method: http.MethodPost, IAMAction: "ssm:DescribeAutomationExecutions"},
 	}
 }
 
@@ -87,6 +94,20 @@ func (s *SSMService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDeleteParameters(ctx, s.store)
 	case "DescribeParameters":
 		return handleDescribeParameters(ctx, s.store)
+	case "CreateDocument":
+		return handleCreateDocument(ctx, s.store)
+	case "DescribeDocument":
+		return handleDescribeDocument(ctx, s.store)
+	case "GetDocument":
+		return handleGetDocument(ctx, s.store)
+	case "ListDocuments":
+		return handleListDocuments(ctx, s.store)
+	case "DeleteDocument":
+		return handleDeleteDocument(ctx, s.store)
+	case "StartAutomationExecution":
+		return handleStartAutomationExecution(ctx, s.store)
+	case "DescribeAutomationExecutions":
+		return handleDescribeAutomationExecutions(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

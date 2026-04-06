@@ -98,8 +98,8 @@ func TestStripe_CheckoutCompleted(t *testing.T) {
 	if got.Tier != "pro" {
 		t.Errorf("Tier = %q, want %q", got.Tier, "pro")
 	}
-	if got.RequestLimit != 100_000 {
-		t.Errorf("RequestLimit = %d, want %d", got.RequestLimit, 100_000)
+	if got.RequestLimit != 0 {
+		t.Errorf("RequestLimit = %d, want %d (paid tier = unlimited/metered)", got.RequestLimit, 0)
 	}
 }
 
@@ -188,8 +188,8 @@ func TestStripe_SubscriptionUpdated_Active(t *testing.T) {
 	if got.Tier != "team" {
 		t.Errorf("Tier = %q, want %q", got.Tier, "team")
 	}
-	if got.RequestLimit != 1_000_000 {
-		t.Errorf("RequestLimit = %d, want %d", got.RequestLimit, 1_000_000)
+	if got.RequestLimit != 0 {
+		t.Errorf("RequestLimit = %d, want %d (paid tier = unlimited/metered)", got.RequestLimit, 0)
 	}
 }
 
@@ -282,20 +282,23 @@ func TestStripe_InvalidSignature(t *testing.T) {
 }
 
 func TestStripe_TierLimits(t *testing.T) {
-	expected := map[string]int64{
-		"free": 1_000,
-		"pro":  100_000,
-		"team": 1_000_000,
+	// Pay-by-usage model: free tier has a hard cap, all paid tiers are unlimited.
+	cases := []struct {
+		tier  string
+		limit int64
+	}{
+		{"free", 1_000},
+		{"", 1_000},       // empty tier defaults to free
+		{"hosted", 0},     // paid = unlimited (metered to Stripe)
+		{"pro", 0},        // paid = unlimited
+		{"team", 0},       // paid = unlimited
+		{"enterprise", 0}, // paid = unlimited
 	}
 
-	for tier, limit := range expected {
-		got, ok := tierLimits[tier]
-		if !ok {
-			t.Errorf("tierLimits missing key %q", tier)
-			continue
-		}
-		if got != limit {
-			t.Errorf("tierLimits[%q] = %d, want %d", tier, got, limit)
+	for _, tc := range cases {
+		got := tierLimit(tc.tier)
+		if got != tc.limit {
+			t.Errorf("tierLimit(%q) = %d, want %d", tc.tier, got, tc.limit)
 		}
 	}
 }

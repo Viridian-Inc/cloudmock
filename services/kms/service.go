@@ -25,16 +25,32 @@ func (s *KMSService) Name() string { return "kms" }
 // Actions returns the list of KMS API actions supported by this service.
 func (s *KMSService) Actions() []service.Action {
 	return []service.Action{
+		// Key management
 		{Name: "CreateKey", Method: http.MethodPost, IAMAction: "kms:CreateKey"},
 		{Name: "DescribeKey", Method: http.MethodPost, IAMAction: "kms:DescribeKey"},
 		{Name: "ListKeys", Method: http.MethodPost, IAMAction: "kms:ListKeys"},
-		{Name: "Encrypt", Method: http.MethodPost, IAMAction: "kms:Encrypt"},
-		{Name: "Decrypt", Method: http.MethodPost, IAMAction: "kms:Decrypt"},
-		{Name: "CreateAlias", Method: http.MethodPost, IAMAction: "kms:CreateAlias"},
-		{Name: "ListAliases", Method: http.MethodPost, IAMAction: "kms:ListAliases"},
 		{Name: "EnableKey", Method: http.MethodPost, IAMAction: "kms:EnableKey"},
 		{Name: "DisableKey", Method: http.MethodPost, IAMAction: "kms:DisableKey"},
 		{Name: "ScheduleKeyDeletion", Method: http.MethodPost, IAMAction: "kms:ScheduleKeyDeletion"},
+		// Aliases
+		{Name: "CreateAlias", Method: http.MethodPost, IAMAction: "kms:CreateAlias"},
+		{Name: "ListAliases", Method: http.MethodPost, IAMAction: "kms:ListAliases"},
+		// Symmetric encrypt/decrypt
+		{Name: "Encrypt", Method: http.MethodPost, IAMAction: "kms:Encrypt"},
+		{Name: "Decrypt", Method: http.MethodPost, IAMAction: "kms:Decrypt"},
+		// Envelope encryption (GenerateDataKey) — LocalStack gets this wrong
+		{Name: "GenerateDataKey", Method: http.MethodPost, IAMAction: "kms:GenerateDataKey"},
+		{Name: "GenerateDataKeyWithoutPlaintext", Method: http.MethodPost, IAMAction: "kms:GenerateDataKeyWithoutPlaintext"},
+		// HMAC operations — LocalStack doesn't support these
+		{Name: "GenerateMac", Method: http.MethodPost, IAMAction: "kms:GenerateMac"},
+		{Name: "VerifyMac", Method: http.MethodPost, IAMAction: "kms:VerifyMac"},
+		// Asymmetric sign/verify — LocalStack stubs these
+		{Name: "Sign", Method: http.MethodPost, IAMAction: "kms:Sign"},
+		{Name: "Verify", Method: http.MethodPost, IAMAction: "kms:Verify"},
+		// Key rotation — LocalStack's is broken
+		{Name: "EnableKeyRotation", Method: http.MethodPost, IAMAction: "kms:EnableKeyRotation"},
+		{Name: "DisableKeyRotation", Method: http.MethodPost, IAMAction: "kms:DisableKeyRotation"},
+		{Name: "GetKeyRotationStatus", Method: http.MethodPost, IAMAction: "kms:GetKeyRotationStatus"},
 	}
 }
 
@@ -101,6 +117,18 @@ func (s *KMSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleEncrypt(ctx, s.store)
 	case "Decrypt":
 		return handleDecrypt(ctx, s.store)
+	case "GenerateDataKey":
+		return handleGenerateDataKey(ctx, s.store)
+	case "GenerateDataKeyWithoutPlaintext":
+		return handleGenerateDataKeyWithoutPlaintext(ctx, s.store)
+	case "GenerateMac":
+		return handleGenerateMac(ctx, s.store)
+	case "VerifyMac":
+		return handleVerifyMac(ctx, s.store)
+	case "Sign":
+		return handleSign(ctx, s.store)
+	case "Verify":
+		return handleVerify(ctx, s.store)
 	case "CreateAlias":
 		return handleCreateAlias(ctx, s.store)
 	case "ListAliases":
@@ -111,6 +139,12 @@ func (s *KMSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleDisableKey(ctx, s.store)
 	case "ScheduleKeyDeletion":
 		return handleScheduleKeyDeletion(ctx, s.store)
+	case "EnableKeyRotation":
+		return handleEnableKeyRotation(ctx, s.store)
+	case "DisableKeyRotation":
+		return handleDisableKeyRotation(ctx, s.store)
+	case "GetKeyRotationStatus":
+		return handleGetKeyRotationStatus(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

@@ -139,6 +139,15 @@ func (s *IAMService) Actions() []service.Action {
 		{Name: "DeleteInstanceProfile", Method: http.MethodPost, IAMAction: "iam:DeleteInstanceProfile"},
 		{Name: "AddRoleToInstanceProfile", Method: http.MethodPost, IAMAction: "iam:AddRoleToInstanceProfile"},
 		{Name: "RemoveRoleFromInstanceProfile", Method: http.MethodPost, IAMAction: "iam:RemoveRoleFromInstanceProfile"},
+		// OIDC Providers
+		{Name: "CreateOpenIDConnectProvider", Method: http.MethodPost, IAMAction: "iam:CreateOpenIDConnectProvider"},
+		{Name: "GetOpenIDConnectProvider", Method: http.MethodPost, IAMAction: "iam:GetOpenIDConnectProvider"},
+		{Name: "ListOpenIDConnectProviders", Method: http.MethodPost, IAMAction: "iam:ListOpenIDConnectProviders"},
+		{Name: "DeleteOpenIDConnectProvider", Method: http.MethodPost, IAMAction: "iam:DeleteOpenIDConnectProvider"},
+		// SAML Providers
+		{Name: "CreateSAMLProvider", Method: http.MethodPost, IAMAction: "iam:CreateSAMLProvider"},
+		{Name: "ListSAMLProviders", Method: http.MethodPost, IAMAction: "iam:ListSAMLProviders"},
+		{Name: "DeleteSAMLProvider", Method: http.MethodPost, IAMAction: "iam:DeleteSAMLProvider"},
 	}
 }
 
@@ -244,6 +253,22 @@ func (s *IAMService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleAddRoleToInstanceProfile(s.store, form)
 	case "RemoveRoleFromInstanceProfile":
 		return handleRemoveRoleFromInstanceProfile(s.store, form)
+	// OIDC Providers
+	case "CreateOpenIDConnectProvider":
+		return handleCreateOpenIDConnectProvider(s.store, form)
+	case "GetOpenIDConnectProvider":
+		return handleGetOpenIDConnectProvider(s.store, form)
+	case "ListOpenIDConnectProviders":
+		return handleListOpenIDConnectProviders(s.store, form)
+	case "DeleteOpenIDConnectProvider":
+		return handleDeleteOpenIDConnectProvider(s.store, form)
+	// SAML Providers
+	case "CreateSAMLProvider":
+		return handleCreateSAMLProvider(s.store, form)
+	case "ListSAMLProviders":
+		return handleListSAMLProviders(s.store, form)
+	case "DeleteSAMLProvider":
+		return handleDeleteSAMLProvider(s.store, form)
 	default:
 		awsErr := service.NewAWSError(
 			"InvalidAction",

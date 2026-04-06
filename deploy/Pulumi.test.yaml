@@ -1,0 +1,20 @@
+config:
+  aws:endpoints:
+    - ecs: http://localhost:4566
+      ecr: http://localhost:4566
+      elasticloadbalancingv2: http://localhost:4566
+      route53: http://localhost:4566
+      cloudwatchlogs: http://localhost:4566
+      iam: http://localhost:4566
+      sts: http://localhost:4566
+  aws:accessKey: test
+  aws:secretKey: test
+  aws:skipCredentialsValidation: "true"
+  aws:skipMetadataApiCheck: "true"
+  aws:skipRequestingAccountId: "true"
+  aws:s3UsePathStyle: "true"
+  cloudmock-deploy:domain: cloudmock.test
+  cloudmock-deploy:containerImage: ghcr.io/neureaux/cloudmock:latest
+  cloudmock-deploy:desiredCount: "1"
+  cloudmock-deploy:cpu: "256"
+  cloudmock-deploy:memory: "512"

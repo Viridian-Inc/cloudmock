@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudMock Todo Demo</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4eb;
+      min-height: 100vh;
+    }
+
+    header {
+      background: #161922;
+      border-bottom: 1px solid #2a2d3a;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 { font-size: 18px; font-weight: 600; color: #fff; }
+    header h1 span { color: #818cf8; }
+
+    .header-links { display: flex; gap: 16px; font-size: 13px; }
+    .header-links a { color: #9ca3af; text-decoration: none; }
+    .header-links a:hover { color: #818cf8; }
+
+    .container { max-width: 720px; margin: 0 auto; padding: 32px 24px; }
+
+    .create-form {
+      background: #161922;
+      border: 1px solid #2a2d3a;
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+    }
+
+    .create-form h2 {
+      font-size: 14px; font-weight: 500; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+    }
+
+    .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
+    .form-row:last-child { margin-bottom: 0; }
+
+    input, textarea {
+      flex: 1; background: #0f1117; border: 1px solid #2a2d3a;
+      border-radius: 8px; padding: 10px 14px; color: #e1e4eb;
+      font-size: 14px; font-family: inherit; outline: none; transition: border-color 0.15s;
+    }
+    input:focus, textarea:focus { border-color: #818cf8; }
+    textarea { resize: vertical; min-height: 60px; }
+
+    button {
+      background: #4f46e5; color: #fff; border: none; border-radius: 8px;
+      padding: 10px 20px; font-size: 14px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s; white-space: nowrap;
+    }
+    button:hover { background: #4338ca; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button.secondary {
+      background: transparent; border: 1px solid #2a2d3a; color: #9ca3af;
+    }
+    button.secondary:hover { border-color: #818cf8; color: #818cf8; }
+
+    button.complete-btn { background: #059669; font-size: 12px; padding: 6px 12px; }
+    button.complete-btn:hover { background: #047857; }
+
+    .todo-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .todo-card {
+      background: #161922; border: 1px solid #2a2d3a;
+      border-radius: 12px; padding: 16px; transition: border-color 0.15s;
+    }
+    .todo-card:hover { border-color: #3a3d4a; }
+    .todo-card.completed { opacity: 0.6; }
+
+    .todo-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+    }
+    .todo-title { font-size: 16px; font-weight: 600; }
+
+    .todo-status {
+      font-size: 11px; font-weight: 500; text-transform: uppercase;
+      letter-spacing: 0.05em; padding: 3px 8px; border-radius: 4px;
+    }
+    .todo-status.pending { background: #1e1b4b; color: #818cf8; }
+    .todo-status.completed { background: #022c22; color: #34d399; }
+
+    .todo-description { font-size: 14px; color: #9ca3af; margin-bottom: 12px; }
+
+    .todo-image {
+      width: 100%; max-height: 200px; object-fit: cover;
+      border-radius: 8px; margin-bottom: 12px; background: #0f1117;
+    }
+
+    .todo-actions { display: flex; gap: 8px; align-items: center; }
+    .todo-actions label { font-size: 13px; color: #818cf8; cursor: pointer; }
+    .todo-actions input[type="file"] { display: none; }
+    .todo-time { font-size: 12px; color: #6b7280; margin-left: auto; }
+
+    .notifications {
+      margin-top: 24px; background: #161922; border: 1px solid #2a2d3a;
+      border-radius: 12px; padding: 20px;
+    }
+
+    .notifications h2 {
+      font-size: 14px; font-weight: 500; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .notif-item {
+      font-size: 13px; color: #34d399; padding: 8px 0; border-bottom: 1px solid #2a2d3a;
+    }
+    .notif-item:last-child { border-bottom: none; }
+
+    .empty { font-size: 14px; color: #6b7280; text-align: center; padding: 32px; }
+
+    .error-banner {
+      background: #451a1a; border: 1px solid #7f1d1d; border-radius: 8px;
+      padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: #fca5a5;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1><span>CloudMock</span> Todo Demo</h1>
+    <div class="header-links">
+      <a href="http://localhost:4500" target="_blank" rel="noopener noreferrer">DevTools</a>
+      <a href="https://github.com/Viridian-Inc/cloudmock-todo-demo" target="_blank" rel="noopener noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="error-banner" class="error-banner"></div>
+
+    <div class="create-form">
+      <h2>New Todo</h2>
+      <div class="form-row">
+        <input type="text" id="title" placeholder="What needs to be done?">
+        <button id="add-btn">Add</button>
+      </div>
+      <div class="form-row">
+        <textarea id="description" placeholder="Description (optional)" rows="1"></textarea>
+      </div>
+    </div>
+
+    <div id="todo-list" class="todo-list"></div>
+
+    <div class="notifications">
+      <h2>
+        Notifications
+        <button class="secondary" id="poll-btn" style="font-size: 12px; padding: 4px 10px;">Poll SQS</button>
+      </h2>
+      <div id="notif-list"></div>
+    </div>
+  </div>
+
+  <script>
+    const API = "http://localhost:3000";
+
+    function showError(msg) {
+      const el = document.getElementById("error-banner");
+      el.textContent = msg;
+      el.style.display = "block";
+      setTimeout(() => el.style.display = "none", 5000);
+    }
+
+    function el(tag, attrs, children) {
+      const node = document.createElement(tag);
+      if (attrs) {
+        for (const [k, v] of Object.entries(attrs)) {
+          if (k === "className") node.className = v;
+          else if (k.startsWith("on")) node.addEventListener(k.slice(2).toLowerCase(), v);
+          else node.setAttribute(k, v);
+        }
+      }
+      if (children) {
+        for (const child of Array.isArray(children) ? children : [children]) {
+          if (typeof child === "string") node.appendChild(document.createTextNode(child));
+          else if (child) node.appendChild(child);
+        }
+      }
+      return node;
+    }
+
+    async function createTodo() {
+      const titleInput = document.getElementById("title");
+      const descInput = document.getElementById("description");
+      const title = titleInput.value.trim();
+      const description = descInput.value.trim();
+      if (!title) return;
+
+      try {
+        await fetch(`${API}/todos`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title, description }),
+        });
+        titleInput.value = "";
+        descInput.value = "";
+        loadTodos();
+      } catch (e) {
+        showError("Failed to create todo. Is the API server running on localhost:3000?");
+      }
+    }
+
+    function buildTodoCard(todo) {
+      const card = el("div", { className: `todo-card ${todo.status === "completed" ? "completed" : ""}` });
+
+      const header = el("div", { className: "todo-header" }, [
+        el("span", { className: "todo-title" }, todo.title),
+        el("span", { className: `todo-status ${todo.status}` }, todo.status),
+      ]);
+      card.appendChild(header);
+
+      if (todo.description) {
+        card.appendChild(el("div", { className: "todo-description" }, todo.description));
+      }
+
+      if (todo.imageKey) {
+        const img = el("img", {
+          className: "todo-image",
+          src: `${API}/todos/${todo.id}/image`,
+          alt: "attachment",
+        });
+        img.addEventListener("error", () => { img.style.display = "none"; });
+        card.appendChild(img);
+      }
+
+      const actions = el("div", { className: "todo-actions" });
+
+      if (todo.status === "pending") {
+        actions.appendChild(el("button", {
+          className: "complete-btn",
+          onClick: () => completeTodo(todo.id),
+        }, "Complete"));
+
+        const fileInput = el("input", { type: "file", accept: "image/*" });
+        fileInput.addEventListener("change", () => {
+          if (fileInput.files[0]) uploadImage(todo.id, fileInput.files[0]);
+        });
+        const label = el("label", {}, todo.imageKey ? "Replace image" : "Attach image");
+        label.appendChild(fileInput);
+        actions.appendChild(label);
+      }
+
+      actions.appendChild(el("span", { className: "todo-time" },
+        new Date(todo.createdAt).toLocaleString()));
+
+      card.appendChild(actions);
+      return card;
+    }
+
+    async function loadTodos() {
+      try {
+        const res = await fetch(`${API}/todos`);
+        const todos = await res.json();
+        const list = document.getElementById("todo-list");
+
+        while (list.firstChild) list.removeChild(list.firstChild);
+
+        if (todos.length === 0) {
+          list.appendChild(el("div", { className: "empty" }, "No todos yet. Create one above."));
+          return;
+        }
+
+        todos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        for (const todo of todos) {
+          list.appendChild(buildTodoCard(todo));
+        }
+      } catch (e) {
+        showError("Failed to load todos. Is the API server running on localhost:3000?");
+      }
+    }
+
+    async function completeTodo(id) {
+      try {
+        await fetch(`${API}/todos/${id}/complete`, { method: "PUT" });
+        loadTodos();
+      } catch (e) {
+        showError("Failed to complete todo.");
+      }
+    }
+
+    async function uploadImage(id, file) {
+      if (!file) return;
+      try {
+        await fetch(`${API}/todos/${id}/image`, {
+          method: "PUT",
+          headers: { "Content-Type": file.type },
+          body: file,
+        });
+        loadTodos();
+      } catch (e) {
+        showError("Failed to upload image.");
+      }
+    }
+
+    async function pollNotifications() {
+      try {
+        const res = await fetch(`${API}/notifications`);
+        const notifs = await res.json();
+        const list = document.getElementById("notif-list");
+
+        while (list.firstChild) list.removeChild(list.firstChild);
+
+        if (notifs.length === 0) {
+          list.appendChild(el("div", { className: "empty", style: "padding: 12px" }, "No new notifications."));
+          return;
+        }
+
+        for (const n of notifs) {
+          const text = `"${n.title}" completed at ${new Date(n.completedAt).toLocaleString()}`;
+          list.appendChild(el("div", { className: "notif-item" }, text));
+        }
+      } catch (e) {
+        showError("Failed to poll notifications.");
+      }
+    }
+
+    document.getElementById("add-btn").addEventListener("click", createTodo);
+    document.getElementById("poll-btn").addEventListener("click", pollNotifications);
+    document.getElementById("title").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") createTodo();
+    });
+
+    loadTodos();
+  </script>
+</body>
+</html>

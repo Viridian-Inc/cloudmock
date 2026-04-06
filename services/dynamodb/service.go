@@ -58,6 +58,20 @@ func (s *DynamoDBService) Actions() []service.Action {
 		{Name: "ListTagsOfResource", Method: http.MethodPost, IAMAction: "dynamodb:ListTagsOfResource"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "dynamodb:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "dynamodb:UntagResource"},
+		// PartiQL
+		{Name: "ExecuteStatement", Method: http.MethodPost, IAMAction: "dynamodb:PartiQLSelect"},
+		// Backups
+		{Name: "CreateBackup", Method: http.MethodPost, IAMAction: "dynamodb:CreateBackup"},
+		{Name: "ListBackups", Method: http.MethodPost, IAMAction: "dynamodb:ListBackups"},
+		{Name: "DescribeBackup", Method: http.MethodPost, IAMAction: "dynamodb:DescribeBackup"},
+		// Global Tables
+		{Name: "CreateGlobalTable", Method: http.MethodPost, IAMAction: "dynamodb:CreateGlobalTable"},
+		{Name: "DescribeGlobalTable", Method: http.MethodPost, IAMAction: "dynamodb:DescribeGlobalTable"},
+		{Name: "ListGlobalTables", Method: http.MethodPost, IAMAction: "dynamodb:ListGlobalTables"},
+		// Exports
+		{Name: "ExportTableToPointInTime", Method: http.MethodPost, IAMAction: "dynamodb:ExportTableToPointInTime"},
+		{Name: "DescribeExport", Method: http.MethodPost, IAMAction: "dynamodb:DescribeExport"},
+		{Name: "ListExports", Method: http.MethodPost, IAMAction: "dynamodb:ListExports"},
 	}
 }
 
@@ -156,6 +170,30 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":
 		return handleUntagResource(ctx, s.store)
+	// PartiQL
+	case "ExecuteStatement":
+		return handleExecuteStatement(ctx, s.store)
+	// Backups
+	case "CreateBackup":
+		return handleCreateBackup(ctx, s.store)
+	case "ListBackups":
+		return handleListBackups(ctx, s.store)
+	case "DescribeBackup":
+		return handleDescribeBackup(ctx, s.store)
+	// Global Tables
+	case "CreateGlobalTable":
+		return handleCreateGlobalTable(ctx, s.store)
+	case "DescribeGlobalTable":
+		return handleDescribeGlobalTable(ctx, s.store)
+	case "ListGlobalTables":
+		return handleListGlobalTables(ctx, s.store)
+	// Exports
+	case "ExportTableToPointInTime":
+		return handleExportTableToPointInTime(ctx, s.store)
+	case "DescribeExport":
+		return handleDescribeExport(ctx, s.store)
+	case "ListExports":
+		return handleListExports(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

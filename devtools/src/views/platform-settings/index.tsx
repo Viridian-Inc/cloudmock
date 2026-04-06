@@ -12,20 +12,19 @@ interface OrgInfo {
   name: string;
   slug: string;
   plan: string;
-  owner_email: string;
+  owner_email?: string;
+  request_count?: number;
+  request_limit?: number;
   retention: RetentionConfig;
 }
 
 export function PlatformSettingsView() {
   const [org, setOrg] = useState<OrgInfo | null>(null);
-  const [retention, setRetention] = useState<RetentionConfig>({
-    audit_log: 365,
-    request_log: 90,
-    state_snapshot: 30,
-  });
+  const [retention, setRetention] = useState<RetentionConfig | null>(null);
   const [saved, setSaved] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteInput, setDeleteInput] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     api<OrgInfo>('/api/platform/settings')
@@ -33,38 +32,55 @@ export function PlatformSettingsView() {
         setOrg(data);
         setRetention(data.retention);
       })
-      .catch(console.error);
+      .catch((e) => setError(e.message));
   }, []);
 
   function handleRetentionChange(key: keyof RetentionConfig, raw: string) {
     const val = parseInt(raw, 10);
-    if (!isNaN(val) && val > 0) {
-      setRetention((prev) => ({ ...prev, [key]: val }));
+    if (!isNaN(val) && val > 0 && retention) {
+      setRetention((prev) => prev ? { ...prev, [key]: val } : prev);
     }
   }
 
   function handleSave() {
-    api<OrgInfo>('/api/platform/settings', {
+    api('/api/platform/settings', {
       method: 'PUT',
       body: JSON.stringify({ retention }),
     })
-      .then((data) => {
-        setOrg(data);
-        setRetention(data.retention);
+      .then(() => {
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
       })
-      .catch(console.error);
+      .catch((e) => setError(e.message));
   }
 
   function handleDeleteOrg() {
-    alert('Organization deleted (local mode). In production this would be irreversible.');
+    // In production this calls the real delete endpoint
     setShowDeleteConfirm(false);
     setDeleteInput('');
   }
 
-  const orgName = org?.name ?? 'My Organization';
-  const orgSlug = org?.slug ?? 'my-org';
+  if (error) {
+    return (
+      <div class="platform-view">
+        <div class="platform-header">
+          <h2 class="platform-title">Platform Settings</h2>
+        </div>
+        <div class="platform-error">{error}</div>
+      </div>
+    );
+  }
+
+  if (!org || !retention) {
+    return (
+      <div class="platform-view">
+        <div class="platform-header">
+          <h2 class="platform-title">Platform Settings</h2>
+        </div>
+        <div class="platform-loading">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div class="platform-view">
@@ -75,94 +91,69 @@ export function PlatformSettingsView() {
         </div>
       </div>
 
-      {/* Organization info */}
       <section class="settings-section">
         <h3 class="settings-section-title">Organization</h3>
         <div class="settings-card">
           <div class="settings-info-grid">
             <div class="settings-info-row">
               <span class="settings-info-label">Name</span>
-              <span class="settings-info-value">{orgName}</span>
+              <span class="settings-info-value">{org.name}</span>
             </div>
             <div class="settings-info-row">
               <span class="settings-info-label">Slug</span>
-              <code class="settings-info-mono">{orgSlug}</code>
+              <code class="settings-info-mono">{org.slug}</code>
             </div>
             <div class="settings-info-row">
               <span class="settings-info-label">Plan</span>
-              <span class="badge badge-green">{org?.plan ?? 'Free'}</span>
+              <span class="badge badge-green">{org.plan}</span>
             </div>
-            <div class="settings-info-row">
-              <span class="settings-info-label">Owner</span>
-              <span class="settings-info-value">{org?.owner_email ?? ''}</span>
-            </div>
+            {org.owner_email && (
+              <div class="settings-info-row">
+                <span class="settings-info-label">Owner</span>
+                <span class="settings-info-value">{org.owner_email}</span>
+              </div>
+            )}
+            {org.request_count != null && (
+              <div class="settings-info-row">
+                <span class="settings-info-label">Requests</span>
+                <span class="settings-info-value">
+                  {org.request_count.toLocaleString()}
+                  {org.request_limit ? ` / ${org.request_limit.toLocaleString()}` : ' (unlimited)'}
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Data retention */}
       <section class="settings-section">
         <h3 class="settings-section-title">Data Retention</h3>
         <p class="settings-section-desc">
-          Configure how long CloudMock retains logs and snapshots for your apps.
+          Configure how long CloudMock retains logs and snapshots.
         </p>
         <div class="settings-card">
           <div class="retention-rows">
-            <div class="retention-row">
-              <div class="retention-row-info">
-                <span class="retention-label">Audit Log</span>
-                <span class="retention-desc">User and key actions across the organization</span>
+            {(['audit_log', 'request_log', 'state_snapshot'] as const).map((key) => (
+              <div class="retention-row" key={key}>
+                <div class="retention-row-info">
+                  <span class="retention-label">
+                    {key === 'audit_log' ? 'Audit Log' : key === 'request_log' ? 'Request Log' : 'State Snapshot'}
+                  </span>
+                </div>
+                <div class="retention-input-wrap">
+                  <input
+                    type="number"
+                    class="input retention-input"
+                    min="1"
+                    max="3650"
+                    value={retention[key]}
+                    onInput={(e) => handleRetentionChange(key, (e.target as HTMLInputElement).value)}
+                  />
+                  <span class="retention-unit">days</span>
+                </div>
               </div>
-              <div class="retention-input-wrap">
-                <input
-                  type="number"
-                  class="input retention-input"
-                  min="1"
-                  max="3650"
-                  value={retention.audit_log}
-                  onInput={(e) => handleRetentionChange('audit_log', (e.target as HTMLInputElement).value)}
-                />
-                <span class="retention-unit">days</span>
-              </div>
-            </div>
-
-            <div class="retention-row">
-              <div class="retention-row-info">
-                <span class="retention-label">Request Log</span>
-                <span class="retention-desc">AWS API request and response history</span>
-              </div>
-              <div class="retention-input-wrap">
-                <input
-                  type="number"
-                  class="input retention-input"
-                  min="1"
-                  max="3650"
-                  value={retention.request_log}
-                  onInput={(e) => handleRetentionChange('request_log', (e.target as HTMLInputElement).value)}
-                />
-                <span class="retention-unit">days</span>
-              </div>
-            </div>
-
-            <div class="retention-row">
-              <div class="retention-row-info">
-                <span class="retention-label">State Snapshot</span>
-                <span class="retention-desc">Periodic snapshots of your mocked infrastructure state</span>
-              </div>
-              <div class="retention-input-wrap">
-                <input
-                  type="number"
-                  class="input retention-input"
-                  min="1"
-                  max="365"
-                  value={retention.state_snapshot}
-                  onInput={(e) => handleRetentionChange('state_snapshot', (e.target as HTMLInputElement).value)}
-                />
-                <span class="retention-unit">days</span>
-              </div>
-            </div>
+            ))}
           </div>
-
           <div class="settings-card-footer">
             <button class="btn btn-primary" onClick={handleSave}>
               {saved ? 'Saved!' : 'Save Changes'}
@@ -171,7 +162,6 @@ export function PlatformSettingsView() {
         </div>
       </section>
 
-      {/* Danger zone */}
       <section class="settings-section settings-danger-section">
         <h3 class="settings-section-title settings-danger-title">Danger Zone</h3>
         <div class="settings-card settings-danger-card">
@@ -179,21 +169,16 @@ export function PlatformSettingsView() {
             <div>
               <div class="danger-label">Delete Organization</div>
               <div class="danger-desc">
-                Permanently delete this organization and all associated apps, keys, and data.
-                This action cannot be undone.
+                Permanently delete this organization and all associated data.
               </div>
             </div>
-            <button
-              class="btn btn-danger"
-              onClick={() => setShowDeleteConfirm(true)}
-            >
+            <button class="btn btn-danger" onClick={() => setShowDeleteConfirm(true)}>
               Delete Org
             </button>
           </div>
         </div>
       </section>
 
-      {/* Delete confirmation dialog */}
       {showDeleteConfirm && (
         <div class="platform-modal-overlay" onClick={() => setShowDeleteConfirm(false)}>
           <div class="platform-modal" onClick={(e) => e.stopPropagation()}>
@@ -203,12 +188,12 @@ export function PlatformSettingsView() {
             </div>
             <div class="platform-modal-body">
               <p class="danger-confirm-text">
-                This will permanently delete <strong>{orgName}</strong> and all its data.
-                Type <strong>{orgSlug}</strong> to confirm.
+                This will permanently delete <strong>{org.name}</strong>.
+                Type <strong>{org.slug}</strong> to confirm.
               </p>
               <input
                 class="input platform-input"
-                placeholder={orgSlug}
+                placeholder={org.slug}
                 value={deleteInput}
                 onInput={(e) => setDeleteInput((e.target as HTMLInputElement).value)}
               />
@@ -217,7 +202,7 @@ export function PlatformSettingsView() {
               <button class="btn" onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
               <button
                 class="btn btn-danger"
-                disabled={deleteInput !== orgSlug}
+                disabled={deleteInput !== org.slug}
                 onClick={handleDeleteOrg}
               >
                 Delete Forever

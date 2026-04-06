@@ -49,6 +49,17 @@ func (s *CognitoService) Actions() []service.Action {
 		{Name: "SignUp", Method: http.MethodPost, IAMAction: "cognito-idp:SignUp"},
 		{Name: "InitiateAuth", Method: http.MethodPost, IAMAction: "cognito-idp:InitiateAuth"},
 		{Name: "AdminConfirmSignUp", Method: http.MethodPost, IAMAction: "cognito-idp:AdminConfirmSignUp"},
+		// Groups
+		{Name: "CreateGroup", Method: http.MethodPost, IAMAction: "cognito-idp:CreateGroup"},
+		{Name: "DeleteGroup", Method: http.MethodPost, IAMAction: "cognito-idp:DeleteGroup"},
+		{Name: "GetGroup", Method: http.MethodPost, IAMAction: "cognito-idp:GetGroup"},
+		{Name: "ListGroups", Method: http.MethodPost, IAMAction: "cognito-idp:ListGroups"},
+		{Name: "AdminAddUserToGroup", Method: http.MethodPost, IAMAction: "cognito-idp:AdminAddUserToGroup"},
+		{Name: "AdminRemoveUserFromGroup", Method: http.MethodPost, IAMAction: "cognito-idp:AdminRemoveUserFromGroup"},
+		// Password reset
+		{Name: "ForgotPassword", Method: http.MethodPost, IAMAction: "cognito-idp:ForgotPassword"},
+		{Name: "ConfirmForgotPassword", Method: http.MethodPost, IAMAction: "cognito-idp:ConfirmForgotPassword"},
+		{Name: "ChangePassword", Method: http.MethodPost, IAMAction: "cognito-idp:ChangePassword"},
 	}
 }
 
@@ -141,6 +152,26 @@ func (s *CognitoService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleInitiateAuth(ctx, s.store, s.keys)
 	case "AdminConfirmSignUp":
 		return handleAdminConfirmSignUp(ctx, s.store)
+	// Groups
+	case "CreateGroup":
+		return handleCreateGroup(ctx, s.store)
+	case "DeleteGroup":
+		return handleDeleteGroup(ctx, s.store)
+	case "GetGroup":
+		return handleGetGroup(ctx, s.store)
+	case "ListGroups":
+		return handleListGroups(ctx, s.store)
+	case "AdminAddUserToGroup":
+		return handleAdminAddUserToGroup(ctx, s.store)
+	case "AdminRemoveUserFromGroup":
+		return handleAdminRemoveUserFromGroup(ctx, s.store)
+	// Password reset
+	case "ForgotPassword":
+		return handleForgotPassword(ctx, s.store)
+	case "ConfirmForgotPassword":
+		return handleConfirmForgotPassword(ctx, s.store)
+	case "ChangePassword":
+		return handleChangePassword(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

@@ -728,3 +728,351 @@ func TestKMS_UnknownAction(t *testing.T) {
 		t.Fatalf("unknown action: expected 400, got %d\nbody: %s", w.Code, w.Body.String())
 	}
 }
+
+// ===========================================================================
+// NEW OPERATIONS — fixes for LocalStack's broken KMS
+// ===========================================================================
+
+// ---- GenerateDataKey — real envelope encryption ----
+
+func TestKMS_GenerateDataKey(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create key.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	// GenerateDataKey.
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kmsReq(t, "GenerateDataKey", map[string]any{
+		"KeyId":         keyID,
+		"NumberOfBytes": 32,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GenerateDataKey: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+
+	// Must have both plaintext and ciphertext.
+	ptB64 := m["Plaintext"].(string)
+	ctB64 := m["CiphertextBlob"].(string)
+	if ptB64 == "" || ctB64 == "" {
+		t.Fatal("GenerateDataKey: missing Plaintext or CiphertextBlob")
+	}
+
+	pt, _ := base64.StdEncoding.DecodeString(ptB64)
+	if len(pt) != 32 {
+		t.Errorf("GenerateDataKey: Plaintext length = %d, want 32", len(pt))
+	}
+
+	// Decrypt the ciphertext blob — should recover the same data key.
+	wd := httptest.NewRecorder()
+	handler.ServeHTTP(wd, kmsReq(t, "Decrypt", map[string]string{"CiphertextBlob": ctB64}))
+	if wd.Code != http.StatusOK {
+		t.Fatalf("Decrypt data key: expected 200, got %d\nbody: %s", wd.Code, wd.Body.String())
+	}
+	md := decodeJSON(t, wd.Body.String())
+	decrypted, _ := base64.StdEncoding.DecodeString(md["Plaintext"].(string))
+
+	if !bytes.Equal(pt, decrypted) {
+		t.Error("GenerateDataKey: decrypted ciphertext does not match plaintext data key")
+	}
+}
+
+func TestKMS_GenerateDataKeyWithoutPlaintext(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kmsReq(t, "GenerateDataKeyWithoutPlaintext", map[string]any{
+		"KeyId": keyID,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("GenerateDataKeyWithoutPlaintext: %d %s", w.Code, w.Body.String())
+	}
+	m := decodeJSON(t, w.Body.String())
+	if m["CiphertextBlob"] == "" {
+		t.Error("GenerateDataKeyWithoutPlaintext: missing CiphertextBlob")
+	}
+	if m["Plaintext"] != nil {
+		t.Error("GenerateDataKeyWithoutPlaintext: should not contain Plaintext")
+	}
+}
+
+// ---- HMAC Operations — LocalStack doesn't support these ----
+
+func TestKMS_HMAC_GenerateAndVerify(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create HMAC key.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", map[string]string{
+		"KeyUsage": "GENERATE_VERIFY_MAC",
+		"KeySpec":  "HMAC_256",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateKey HMAC: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	message := base64.StdEncoding.EncodeToString([]byte("HIPAA-critical patient data"))
+
+	// GenerateMac.
+	wm := httptest.NewRecorder()
+	handler.ServeHTTP(wm, kmsReq(t, "GenerateMac", map[string]string{
+		"KeyId":        keyID,
+		"Message":      message,
+		"MacAlgorithm": "HMAC_SHA_256",
+	}))
+	if wm.Code != http.StatusOK {
+		t.Fatalf("GenerateMac: %d %s", wm.Code, wm.Body.String())
+	}
+	mm := decodeJSON(t, wm.Body.String())
+	macB64 := mm["Mac"].(string)
+	if macB64 == "" {
+		t.Fatal("GenerateMac: missing Mac")
+	}
+
+	// VerifyMac — should succeed with correct MAC.
+	wv := httptest.NewRecorder()
+	handler.ServeHTTP(wv, kmsReq(t, "VerifyMac", map[string]string{
+		"KeyId":        keyID,
+		"Message":      message,
+		"Mac":          macB64,
+		"MacAlgorithm": "HMAC_SHA_256",
+	}))
+	if wv.Code != http.StatusOK {
+		t.Fatalf("VerifyMac: %d %s", wv.Code, wv.Body.String())
+	}
+	mv := decodeJSON(t, wv.Body.String())
+	if mv["MacValid"] != true {
+		t.Error("VerifyMac: expected MacValid=true for correct MAC")
+	}
+
+	// VerifyMac — should fail with wrong MAC.
+	badMac := base64.StdEncoding.EncodeToString([]byte("wrong-mac-value-0000000000000000"))
+	wv2 := httptest.NewRecorder()
+	handler.ServeHTTP(wv2, kmsReq(t, "VerifyMac", map[string]string{
+		"KeyId":        keyID,
+		"Message":      message,
+		"Mac":          badMac,
+		"MacAlgorithm": "HMAC_SHA_256",
+	}))
+	if wv2.Code != http.StatusOK {
+		t.Fatalf("VerifyMac bad: %d %s", wv2.Code, wv2.Body.String())
+	}
+	mv2 := decodeJSON(t, wv2.Body.String())
+	if mv2["MacValid"] != false {
+		t.Error("VerifyMac: expected MacValid=false for incorrect MAC")
+	}
+}
+
+// ---- RSA Sign/Verify — LocalStack stubs these ----
+
+func TestKMS_RSA_SignVerify(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	// Create RSA key.
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", map[string]string{
+		"KeyUsage": "SIGN_VERIFY",
+		"KeySpec":  "RSA_2048",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateKey RSA: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	message := base64.StdEncoding.EncodeToString([]byte("document to sign"))
+
+	// Sign.
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, kmsReq(t, "Sign", map[string]string{
+		"KeyId":            keyID,
+		"Message":          message,
+		"SigningAlgorithm": "RSASSA_PKCS1_V1_5_SHA_256",
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("Sign RSA: %d %s", ws.Code, ws.Body.String())
+	}
+	ms := decodeJSON(t, ws.Body.String())
+	sigB64 := ms["Signature"].(string)
+	if sigB64 == "" {
+		t.Fatal("Sign: missing Signature")
+	}
+
+	// Verify — should succeed.
+	wv := httptest.NewRecorder()
+	handler.ServeHTTP(wv, kmsReq(t, "Verify", map[string]string{
+		"KeyId":            keyID,
+		"Message":          message,
+		"Signature":        sigB64,
+		"SigningAlgorithm": "RSASSA_PKCS1_V1_5_SHA_256",
+	}))
+	if wv.Code != http.StatusOK {
+		t.Fatalf("Verify RSA: %d %s", wv.Code, wv.Body.String())
+	}
+	mv := decodeJSON(t, wv.Body.String())
+	if mv["SignatureValid"] != true {
+		t.Error("Verify RSA: expected SignatureValid=true")
+	}
+
+	// Verify with wrong message — should fail.
+	wrongMsg := base64.StdEncoding.EncodeToString([]byte("tampered document"))
+	wv2 := httptest.NewRecorder()
+	handler.ServeHTTP(wv2, kmsReq(t, "Verify", map[string]string{
+		"KeyId":            keyID,
+		"Message":          wrongMsg,
+		"Signature":        sigB64,
+		"SigningAlgorithm": "RSASSA_PKCS1_V1_5_SHA_256",
+	}))
+	mv2 := decodeJSON(t, wv2.Body.String())
+	if mv2["SignatureValid"] != false {
+		t.Error("Verify RSA wrong message: expected SignatureValid=false")
+	}
+}
+
+// ---- ECC Sign/Verify ----
+
+func TestKMS_ECC_SignVerify(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", map[string]string{
+		"KeyUsage": "SIGN_VERIFY",
+		"KeySpec":  "ECC_NIST_P256",
+	}))
+	if wc.Code != http.StatusOK {
+		t.Fatalf("CreateKey ECC: %d %s", wc.Code, wc.Body.String())
+	}
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	message := base64.StdEncoding.EncodeToString([]byte("ECDSA test"))
+
+	ws := httptest.NewRecorder()
+	handler.ServeHTTP(ws, kmsReq(t, "Sign", map[string]string{
+		"KeyId":            keyID,
+		"Message":          message,
+		"SigningAlgorithm": "ECDSA_SHA_256",
+	}))
+	if ws.Code != http.StatusOK {
+		t.Fatalf("Sign ECC: %d %s", ws.Code, ws.Body.String())
+	}
+	ms := decodeJSON(t, ws.Body.String())
+	sigB64 := ms["Signature"].(string)
+
+	wv := httptest.NewRecorder()
+	handler.ServeHTTP(wv, kmsReq(t, "Verify", map[string]string{
+		"KeyId":            keyID,
+		"Message":          message,
+		"Signature":        sigB64,
+		"SigningAlgorithm": "ECDSA_SHA_256",
+	}))
+	mv := decodeJSON(t, wv.Body.String())
+	if mv["SignatureValid"] != true {
+		t.Error("Verify ECC: expected SignatureValid=true")
+	}
+}
+
+// ---- Key Rotation — LocalStack's is broken ----
+
+func TestKMS_KeyRotation(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	// Initially rotation should be disabled.
+	w1 := httptest.NewRecorder()
+	handler.ServeHTTP(w1, kmsReq(t, "GetKeyRotationStatus", map[string]string{"KeyId": keyID}))
+	if w1.Code != http.StatusOK {
+		t.Fatalf("GetKeyRotationStatus: %d %s", w1.Code, w1.Body.String())
+	}
+	m1 := decodeJSON(t, w1.Body.String())
+	if m1["KeyRotationEnabled"] != false {
+		t.Error("expected rotation disabled by default")
+	}
+
+	// Enable rotation.
+	w2 := httptest.NewRecorder()
+	handler.ServeHTTP(w2, kmsReq(t, "EnableKeyRotation", map[string]string{"KeyId": keyID}))
+	if w2.Code != http.StatusOK {
+		t.Fatalf("EnableKeyRotation: %d %s", w2.Code, w2.Body.String())
+	}
+
+	// Check it's enabled.
+	w3 := httptest.NewRecorder()
+	handler.ServeHTTP(w3, kmsReq(t, "GetKeyRotationStatus", map[string]string{"KeyId": keyID}))
+	m3 := decodeJSON(t, w3.Body.String())
+	if m3["KeyRotationEnabled"] != true {
+		t.Error("expected rotation enabled after EnableKeyRotation")
+	}
+
+	// Disable rotation.
+	w4 := httptest.NewRecorder()
+	handler.ServeHTTP(w4, kmsReq(t, "DisableKeyRotation", map[string]string{"KeyId": keyID}))
+	if w4.Code != http.StatusOK {
+		t.Fatalf("DisableKeyRotation: %d %s", w4.Code, w4.Body.String())
+	}
+
+	// Check it's disabled again.
+	w5 := httptest.NewRecorder()
+	handler.ServeHTTP(w5, kmsReq(t, "GetKeyRotationStatus", map[string]string{"KeyId": keyID}))
+	m5 := decodeJSON(t, w5.Body.String())
+	if m5["KeyRotationEnabled"] != false {
+		t.Error("expected rotation disabled after DisableKeyRotation")
+	}
+}
+
+// ---- HMAC on symmetric key should fail ----
+
+func TestKMS_HMAC_OnSymmetricKey_Fails(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", nil))
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	message := base64.StdEncoding.EncodeToString([]byte("test"))
+	wm := httptest.NewRecorder()
+	handler.ServeHTTP(wm, kmsReq(t, "GenerateMac", map[string]string{
+		"KeyId":        keyID,
+		"Message":      message,
+		"MacAlgorithm": "HMAC_SHA_256",
+	}))
+	if wm.Code != http.StatusBadRequest {
+		t.Errorf("GenerateMac on symmetric key: expected 400, got %d", wm.Code)
+	}
+}
+
+// ---- Key rotation on asymmetric key should fail ----
+
+func TestKMS_KeyRotation_OnAsymmetricKey_Fails(t *testing.T) {
+	handler := newKMSGateway(t)
+
+	wc := httptest.NewRecorder()
+	handler.ServeHTTP(wc, kmsReq(t, "CreateKey", map[string]string{
+		"KeyUsage": "SIGN_VERIFY",
+		"KeySpec":  "RSA_2048",
+	}))
+	mc := decodeJSON(t, wc.Body.String())
+	keyID := mc["KeyMetadata"].(map[string]any)["KeyId"].(string)
+
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, kmsReq(t, "EnableKeyRotation", map[string]string{"KeyId": keyID}))
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("EnableKeyRotation on RSA key: expected 400, got %d", w.Code)
+	}
+}

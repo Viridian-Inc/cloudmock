@@ -308,7 +308,8 @@ type LoggingMiddlewareOpts struct {
 	SLOEngine     *SLOEngine
 	DataPlane     *dataplane.DataPlane
 	OnRequest     OnRequestFunc
-	CaptureStacks bool // if true, capture call stacks per-request into trace store (expensive)
+	CaptureStacks bool              // if true, capture call stacks per-request into trace store (expensive)
+	Redaction     *RedactionConfig  // if non-nil, redact sensitive fields before storage
 }
 
 // LoggingMiddleware wraps a gateway handler and records request data.
@@ -394,6 +395,10 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 			for k := range r.Header {
 				reqHeaders[k] = r.Header.Get(k)
 			}
+			// HIPAA/compliance: redact sensitive headers before storage.
+			if opts.Redaction != nil {
+				reqHeaders = opts.Redaction.RedactRequestHeaders(reqHeaders)
+			}
 		}
 
 		// Capture request body (first maxBodyCapture bytes), then restore it.
@@ -410,6 +415,10 @@ func LoggingMiddlewareWithOpts(next http.Handler, log *RequestLog, stats *Reques
 				// Restore the body so downstream handlers can read it.
 				remaining, _ := io.ReadAll(r.Body)
 				r.Body = io.NopCloser(io.MultiReader(bytes.NewReader(bodyBytes), bytes.NewReader(remaining)))
+			}
+			// HIPAA/compliance: redact sensitive body fields before storage.
+			if opts.Redaction != nil {
+				reqBody = opts.Redaction.RedactBody(reqBody)
 			}
 		}
 

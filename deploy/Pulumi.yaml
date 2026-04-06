@@ -1,0 +1,6 @@
+name: cloudmock-deploy
+runtime: nodejs
+description: Deploy CloudMock gateway to AWS using ECS Fargate + ALB
+config:
+  aws:region:
+    default: us-east-1

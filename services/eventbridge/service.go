@@ -62,6 +62,12 @@ func (s *EventBridgeService) Actions() []service.Action {
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "events:ListTagsForResource"},
 		{Name: "EnableRule", Method: http.MethodPost, IAMAction: "events:EnableRule"},
 		{Name: "DisableRule", Method: http.MethodPost, IAMAction: "events:DisableRule"},
+		{Name: "CreateArchive", Method: http.MethodPost, IAMAction: "events:CreateArchive"},
+		{Name: "DescribeArchive", Method: http.MethodPost, IAMAction: "events:DescribeArchive"},
+		{Name: "ListArchives", Method: http.MethodPost, IAMAction: "events:ListArchives"},
+		{Name: "DeleteArchive", Method: http.MethodPost, IAMAction: "events:DeleteArchive"},
+		{Name: "StartReplay", Method: http.MethodPost, IAMAction: "events:StartReplay"},
+		{Name: "DescribeReplay", Method: http.MethodPost, IAMAction: "events:DescribeReplay"},
 	}
 }
 
@@ -195,6 +201,18 @@ func (s *EventBridgeService) HandleRequest(ctx *service.RequestContext) (*servic
 		return handleEnableRule(ctx, s.store)
 	case "DisableRule":
 		return handleDisableRule(ctx, s.store)
+	case "CreateArchive":
+		return handleCreateArchive(ctx, s.store)
+	case "DescribeArchive":
+		return handleDescribeArchive(ctx, s.store)
+	case "ListArchives":
+		return handleListArchives(ctx, s.store)
+	case "DeleteArchive":
+		return handleDeleteArchive(ctx, s.store)
+	case "StartReplay":
+		return handleStartReplay(ctx, s.store)
+	case "DescribeReplay":
+		return handleDescribeReplay(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

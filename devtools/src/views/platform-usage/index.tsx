@@ -15,6 +15,7 @@ interface DayUsage {
 interface UsageData {
   total: number;
   free_limit: number;
+  price_per_10k: number;
   cost: number;
   apps: AppUsage[];
   daily: DayUsage[];
@@ -45,7 +46,7 @@ export function PlatformUsageView() {
     );
   }
 
-  const { total, free_limit, cost, apps, daily } = data;
+  const { total, free_limit, price_per_10k, cost, apps, daily } = data;
   const pct = Math.min(100, (total / free_limit) * 100);
   const maxDay = daily.length > 0 ? Math.max(...daily.map((d) => d.count)) : 1;
 
@@ -80,7 +81,7 @@ export function PlatformUsageView() {
           <div class="usage-card-label">Estimated Cost</div>
           <div class="usage-card-value usage-cost">{formatCost(cost)}</div>
           <div class="usage-cost-note">
-            First {free_limit.toLocaleString()} req/mo free · $0.05 per 10k after
+            First {free_limit.toLocaleString()} req/mo free · ${price_per_10k.toFixed(2)} per 10k after
           </div>
         </div>
       </div>

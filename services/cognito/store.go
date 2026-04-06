@@ -59,6 +59,7 @@ type User struct {
 type Store struct {
 	mu        sync.RWMutex
 	pools     map[string]*UserPool // keyed by UserPoolId
+	groups    map[string]*Group    // keyed by "poolId/groupName"
 	accountID string
 	region    string
 }
@@ -67,9 +68,22 @@ type Store struct {
 func NewStore(accountID, region string) *Store {
 	return &Store{
 		pools:     make(map[string]*UserPool),
+		groups:    make(map[string]*Group),
 		accountID: accountID,
 		region:    region,
 	}
+}
+
+// FindPoolByClientID searches all pools for a client with the given ID.
+func (s *Store) FindPoolByClientID(clientID string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, pool := range s.pools {
+		if _, ok := pool.Clients[clientID]; ok {
+			return pool.Id
+		}
+	}
+	return ""
 }
 
 // newUUID returns a random UUID v4 string.

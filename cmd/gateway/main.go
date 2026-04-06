@@ -30,6 +30,7 @@ import (
 	authdynamo "github.com/neureaux/cloudmock/pkg/auth/dynamostore"
 	authpg "github.com/neureaux/cloudmock/pkg/auth/postgres"
 	"github.com/neureaux/cloudmock/pkg/ratelimit"
+	platformstore "github.com/neureaux/cloudmock/pkg/platform/store"
 	saasclerk "github.com/neureaux/cloudmock/pkg/saas/clerk"
 	"github.com/neureaux/cloudmock/pkg/saas/provisioning"
 	"github.com/neureaux/cloudmock/pkg/saas/quota"
@@ -96,6 +97,7 @@ import (
 	"github.com/neureaux/cloudmock/pkg/integration"
 	"github.com/neureaux/cloudmock/pkg/plugin"
 	argoplugin "github.com/neureaux/cloudmock/plugins/argocd"
+	flyioplugin "github.com/neureaux/cloudmock/plugins/flyio"
 	k8splugin "github.com/neureaux/cloudmock/plugins/kubernetes"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -1634,6 +1636,12 @@ func main() {
 		if err := pluginMgr.RegisterInProcess(rootCtx, argoPlugin); err != nil {
 			slog.Error("failed to register argocd plugin", "error", err)
 		}
+
+		// Register Fly.io Machines API emulation plugin.
+		flyPlugin := flyioplugin.New()
+		if err := pluginMgr.RegisterInProcess(rootCtx, flyPlugin); err != nil {
+			slog.Error("failed to register flyio plugin", "error", err)
+		}
 	}
 
 	// Load external plugins from filesystem.
@@ -1647,10 +1655,16 @@ func main() {
 		if err := plugin.LoadExternalPlugins(rootCtx, pluginMgr, extPluginDir, slog.Default()); err != nil {
 			slog.Warn("failed to load external plugins", "dir", extPluginDir, "error", err)
 		}
+
+		// Plugin installer for marketplace store (npm-style install/uninstall).
+		pluginInstaller := marketplace.NewInstaller(extPluginDir, slog.Default())
+		adminAPI.SetPluginInstaller(pluginInstaller)
+		slog.Info("plugin store initialized", "plugin_dir", extPluginDir)
 	}
 
 	// --- SaaS hosted-tier wiring ---
 	var quotaMiddleware *quota.Middleware
+	var clerkAuth *saasclerk.AuthMiddleware
 	if cfg.SaaS.Enabled {
 		slog.Info("SaaS mode enabled, initializing hosted-tier components")
 
@@ -1687,10 +1701,11 @@ func main() {
 		)
 		adminAPI.SetClerkWebhook(clerkWH)
 
-		// Clerk JWT verifier (for authenticating SaaS requests).
+		// Clerk JWT verifier and auth middleware (for authenticating SaaS requests).
 		if cfg.SaaS.Clerk.Domain != "" {
 			clerkVerifier := saasclerk.NewJWTVerifier(cfg.SaaS.Clerk.Domain, slog.Default())
-			_ = clerkVerifier // Available for auth middleware integration
+			clerkAuth = saasclerk.NewAuthMiddleware(clerkVerifier, slog.Default())
+			adminAPI.SetClerkVerifier(clerkVerifier)
 			slog.Info("Clerk JWT verifier initialized", "domain", cfg.SaaS.Clerk.Domain)
 		}
 
@@ -1717,16 +1732,30 @@ func main() {
 			cfg.SaaS.Cloudflare.ZoneID,
 		)
 		orchestrator := provisioning.NewOrchestrator(flyClient, cfClient, tenantStore)
-		_ = orchestrator // Available for tenant lifecycle operations
+		adminAPI.SetOrchestrator(orchestrator)
+		clerkWH.SetOrchestrator(orchestrator)
 		slog.Info("SaaS provisioning orchestrator initialized")
 
 		// 5. Quota enforcement middleware (applied to gateway handler below).
 		quotaMiddleware = quota.New(tenantStore)
 
+		// 6. Wire platform stores (Postgres-backed apps, keys, audit, usage, retention).
+		if pgPool != nil {
+			adminAPI.SetPlatformStores(
+				platformstore.NewAppStore(pgPool),
+				platformstore.NewAPIKeyStore(pgPool),
+				platformstore.NewAuditStore(pgPool),
+				platformstore.NewUsageStore(pgPool),
+				platformstore.NewRetentionStore(pgPool),
+			)
+			slog.Info("platform stores initialized (postgres)")
+		}
+
 		slog.Info("SaaS mode fully initialized",
 			"tenant_store", mode,
 			"clerk_webhooks", cfg.SaaS.Clerk.WebhookSecret != "",
 			"stripe_webhooks", cfg.SaaS.Stripe.WebhookSecret != "",
+			"platform_db", pgPool != nil,
 		)
 	}
 
@@ -1761,15 +1790,37 @@ func main() {
 		limiter := ratelimit.New(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
 		handler = limiter.Middleware(handler)
 	}
-	// Apply SaaS quota enforcement (after rate limiting, before logging).
+	// Apply SaaS auth → quota enforcement chain.
+	// Clerk auth extracts tenant ID from JWT, quota enforces per-tenant limits.
 	if quotaMiddleware != nil {
 		handler = quotaMiddleware.Handler(handler)
 	}
+	if clerkAuth != nil {
+		handler = clerkAuth.Handler(handler)
+	}
+	// HIPAA/compliance redaction — redact sensitive headers and body fields before storage.
+	var redaction *gateway.RedactionConfig
+	if cfg.Compliance.RedactEnabled || cfg.SaaS.Enabled {
+		redaction = gateway.DefaultRedactionConfig()
+		// Append any user-configured extra fields.
+		if len(cfg.Compliance.RedactHeaders) > 0 {
+			redaction.RedactHeaders = append(redaction.RedactHeaders, cfg.Compliance.RedactHeaders...)
+		}
+		if len(cfg.Compliance.RedactFields) > 0 {
+			redaction.RedactBodyFields = append(redaction.RedactBodyFields, cfg.Compliance.RedactFields...)
+		}
+		slog.Info("compliance: field redaction enabled",
+			"redacted_headers", len(redaction.RedactHeaders),
+			"redacted_body_fields", len(redaction.RedactBodyFields),
+		)
+	}
+
 	loggedGW := gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster:   adminAPI.Broadcaster(),
 		TraceStore:    traceStore,
 		SLOEngine:     sloEngine,
 		DataPlane:     dp,
+		Redaction:     redaction,
 		CaptureStacks: os.Getenv("CLOUDMOCK_CAPTURE_STACKS") == "true",
 		OnRequest: func(service string, latencyMs float64, statusCode int) {
 			// Feed latency and error rate into anomaly detector baselines.

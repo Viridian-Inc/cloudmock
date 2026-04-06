@@ -1,0 +1,11 @@
+version: "3.8"
+services:
+  cloudmock:
+    image: ghcr.io/viridian-inc/cloudmock:latest
+    ports:
+      - "4566:4566"   # AWS gateway
+      - "4500:4500"   # DevTools dashboard
+      - "4599:4599"   # Admin API
+    environment:
+      CLOUDMOCK_PROFILE: minimal
+      CLOUDMOCK_IAM_MODE: none

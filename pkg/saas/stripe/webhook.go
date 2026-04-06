@@ -22,11 +22,15 @@ import (
 // signatureToleranceSeconds is the max age of a Stripe webhook event.
 const signatureToleranceSeconds = 300 // 5 minutes
 
-// tierLimits maps subscription tiers to their request limits.
-var tierLimits = map[string]int64{
-	"free": 1_000,
-	"pro":  100_000,
-	"team": 1_000_000,
+// tierLimit returns the request limit for a given tier.
+// Pay-by-usage model: free tier has a hard cap at 1K requests/mo.
+// All paid tiers (hosted, pro, team, enterprise) have no cap — usage
+// is metered to Stripe and billed per request.
+func tierLimit(tier string) int64 {
+	if tier == "free" || tier == "" {
+		return 1_000 // 1K free requests/mo
+	}
+	return 0 // Unlimited (metered to Stripe)
 }
 
 // WebhookHandler processes Stripe webhook events.
@@ -198,9 +202,7 @@ func (h *WebhookHandler) handleCheckoutCompleted(ctx context.Context, data json.
 	t.StripeSubscriptionID = sess.SubscriptionID
 	t.Tier = tier
 	t.Status = "active"
-	if limit, exists := tierLimits[tier]; exists {
-		t.RequestLimit = limit
-	}
+	t.RequestLimit = tierLimit(tier)
 
 	if err := h.tenants.Update(ctx, t); err != nil {
 		return fmt.Errorf("update tenant %s: %w", tenantID, err)
@@ -256,9 +258,7 @@ func (h *WebhookHandler) handleSubscriptionUpdated(ctx context.Context, data jso
 	// Update tier from metadata if present.
 	if tier, ok := sub.Metadata["tier"]; ok {
 		t.Tier = tier
-		if limit, exists := tierLimits[tier]; exists {
-			t.RequestLimit = limit
-		}
+		t.RequestLimit = tierLimit(tier)
 	}
 
 	// Map Stripe subscription status to tenant status.
@@ -298,9 +298,7 @@ func (h *WebhookHandler) handleSubscriptionDeleted(ctx context.Context, data jso
 
 	t.Status = "canceled"
 	t.Tier = "free"
-	if limit, exists := tierLimits["free"]; exists {
-		t.RequestLimit = limit
-	}
+	t.RequestLimit = tierLimit("free")
 
 	if err := h.tenants.Update(ctx, t); err != nil {
 		return fmt.Errorf("update tenant %s: %w", t.ID, err)

@@ -1,0 +1,6 @@
+config:
+  cloudmock-deploy:domain: cloudmock.dev
+  cloudmock-deploy:containerImage: ghcr.io/neureaux/cloudmock:latest
+  cloudmock-deploy:desiredCount: "2"
+  cloudmock-deploy:cpu: "512"
+  cloudmock-deploy:memory: "1024"

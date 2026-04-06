@@ -1,5 +1,7 @@
 app = "cloudmock-saas"
 primary_region = "iad"
+kill_signal = "SIGTERM"
+kill_timeout = "10s"
 
 [build]
   dockerfile = "Dockerfile"
@@ -12,9 +14,9 @@ primary_region = "iad"
 [http_service]
   internal_port = 4500
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = "off"
   auto_start_machines = true
-  min_machines_running = 1
+  min_machines_running = 2
 
 [[services]]
   internal_port = 4566
@@ -23,6 +25,10 @@ primary_region = "iad"
     type = "connections"
     hard_limit = 100
 
+[restart]
+  policy = "always"
+  max_retries = 5
+
 [checks]
   [checks.health]
     type = "http"
@@ -30,3 +36,5 @@ primary_region = "iad"
     path = "/api/health"
     interval = "10s"
     timeout = "5s"
+    grace_period = "15s"
+    restart_limit = 3

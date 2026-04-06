@@ -59,6 +59,25 @@ func (s *S3Service) Actions() []service.Action {
 		{Name: "PutBucketPolicy", Method: http.MethodPut, IAMAction: "s3:PutBucketPolicy"},
 		{Name: "GetBucketPolicy", Method: http.MethodGet, IAMAction: "s3:GetBucketPolicy"},
 		{Name: "DeleteBucketPolicy", Method: http.MethodDelete, IAMAction: "s3:DeleteBucketPolicy"},
+		// Tagging
+		{Name: "PutBucketTagging", Method: http.MethodPut, IAMAction: "s3:PutBucketTagging"},
+		{Name: "GetBucketTagging", Method: http.MethodGet, IAMAction: "s3:GetBucketTagging"},
+		{Name: "DeleteBucketTagging", Method: http.MethodDelete, IAMAction: "s3:DeleteBucketTagging"},
+		{Name: "PutObjectTagging", Method: http.MethodPut, IAMAction: "s3:PutObjectTagging"},
+		{Name: "GetObjectTagging", Method: http.MethodGet, IAMAction: "s3:GetObjectTagging"},
+		{Name: "DeleteObjectTagging", Method: http.MethodDelete, IAMAction: "s3:DeleteObjectTagging"},
+		// CORS
+		{Name: "PutBucketCors", Method: http.MethodPut, IAMAction: "s3:PutBucketCors"},
+		{Name: "GetBucketCors", Method: http.MethodGet, IAMAction: "s3:GetBucketCors"},
+		{Name: "DeleteBucketCors", Method: http.MethodDelete, IAMAction: "s3:DeleteBucketCors"},
+		// Lifecycle
+		{Name: "PutBucketLifecycleConfiguration", Method: http.MethodPut, IAMAction: "s3:PutLifecycleConfiguration"},
+		{Name: "GetBucketLifecycleConfiguration", Method: http.MethodGet, IAMAction: "s3:GetLifecycleConfiguration"},
+		// Notification
+		{Name: "PutBucketNotificationConfiguration", Method: http.MethodPut, IAMAction: "s3:PutBucketNotification"},
+		{Name: "GetBucketNotificationConfiguration", Method: http.MethodGet, IAMAction: "s3:GetBucketNotification"},
+		// ACL
+		{Name: "GetBucketAcl", Method: http.MethodGet, IAMAction: "s3:GetBucketAcl"},
 	}
 }
 
@@ -138,8 +157,8 @@ var routes = map[routeKey]s3Handler{
 	// DELETE routes
 	{http.MethodDelete, scopeBucket, ""}:                  handleDeleteBucket,
 	{http.MethodDelete, scopeBucket, "policy"}:            handleDeleteBucketPolicy,
-	{http.MethodDelete, scopeBucket, "tagging"}:           handleNoOpBucket,
-	{http.MethodDelete, scopeBucket, "cors"}:              handleNoOpBucket,
+	{http.MethodDelete, scopeBucket, "tagging"}:           handleDeleteBucketTagging,
+	{http.MethodDelete, scopeBucket, "cors"}:              handleDeleteBucketCORS,
 	{http.MethodDelete, scopeBucket, "lifecycle"}:         handleNoOpBucket,
 	{http.MethodDelete, scopeBucket, "encryption"}:        handleNoOpBucket,
 	{http.MethodDelete, scopeBucket, "publicAccessBlock"}: handleNoOpBucket,
@@ -148,30 +167,34 @@ var routes = map[routeKey]s3Handler{
 	{http.MethodHead, scopeBucket, ""}:  handleHeadBucket,
 	{http.MethodHead, scopeObject, ""}: handleHeadObject,
 	// GET subresource stubs (Terraform/Pulumi read these after creating a bucket)
-	{http.MethodGet, scopeBucket, "tagging"}:           handleGetEmptyXML("Tagging", "TagSet"),
-	{http.MethodGet, scopeBucket, "cors"}:              handleGetNoSuchConfig("CORSConfiguration"),
-	{http.MethodGet, scopeBucket, "lifecycle"}:         handleGetNoSuchConfig("LifecycleConfiguration"),
+	{http.MethodGet, scopeBucket, "tagging"}:           handleGetBucketTagging,
+	{http.MethodGet, scopeBucket, "cors"}:              handleGetBucketCORS,
+	{http.MethodGet, scopeBucket, "lifecycle"}:         handleGetBucketLifecycle,
 	{http.MethodGet, scopeBucket, "encryption"}:        handleGetBucketEncryption,
-	{http.MethodGet, scopeBucket, "acl"}:               handleGetBucketACL,
+	{http.MethodGet, scopeBucket, "acl"}:               handleGetBucketACLReal,
 	{http.MethodGet, scopeBucket, "location"}:          handleGetBucketLocation,
 	{http.MethodGet, scopeBucket, "logging"}:           handleGetEmptyXML("BucketLoggingStatus", ""),
-	{http.MethodGet, scopeBucket, "notification"}:      handleGetEmptyXML("NotificationConfiguration", ""),
+	{http.MethodGet, scopeBucket, "notification"}:      handleGetBucketNotification,
 	{http.MethodGet, scopeBucket, "website"}:           handleGetNoSuchConfig("WebsiteConfiguration"),
 	{http.MethodGet, scopeBucket, "accelerate"}:        handleGetEmptyXML("AccelerateConfiguration", ""),
 	{http.MethodGet, scopeBucket, "ownershipControls"}: handleGetOwnershipControls,
 	{http.MethodGet, scopeBucket, "publicAccessBlock"}: handleGetPublicAccessBlock,
 	// PUT subresource stubs
-	{http.MethodPut, scopeBucket, "tagging"}:           handleNoOpBucket,
-	{http.MethodPut, scopeBucket, "cors"}:              handleNoOpBucket,
-	{http.MethodPut, scopeBucket, "lifecycle"}:         handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "tagging"}:           handlePutBucketTagging,
+	{http.MethodPut, scopeBucket, "cors"}:              handlePutBucketCORS,
+	{http.MethodPut, scopeBucket, "lifecycle"}:         handlePutBucketLifecycle,
 	{http.MethodPut, scopeBucket, "encryption"}:        handleNoOpBucket,
 	{http.MethodPut, scopeBucket, "acl"}:               handleNoOpBucket,
 	{http.MethodPut, scopeBucket, "logging"}:           handleNoOpBucket,
-	{http.MethodPut, scopeBucket, "notification"}:      handleNoOpBucket,
+	{http.MethodPut, scopeBucket, "notification"}:      handlePutBucketNotification,
 	{http.MethodPut, scopeBucket, "website"}:           handleNoOpBucket,
 	{http.MethodPut, scopeBucket, "accelerate"}:        handleNoOpBucket,
 	{http.MethodPut, scopeBucket, "ownershipControls"}: handleNoOpBucket,
 	{http.MethodPut, scopeBucket, "publicAccessBlock"}: handleNoOpBucket,
+	// Object-level tagging
+	{http.MethodPut, scopeObject, "tagging"}:    handlePutObjectTagging,
+	{http.MethodGet, scopeObject, "tagging"}:    handleGetObjectTagging,
+	{http.MethodDelete, scopeObject, "tagging"}: handleDeleteObjectTagging,
 }
 
 // HandleRequest routes an incoming S3 request to the appropriate handler.

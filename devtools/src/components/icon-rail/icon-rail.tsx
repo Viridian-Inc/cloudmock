@@ -29,6 +29,7 @@ import {
   UsageIcon,
   AuditIcon,
   PlatformSettingsIcon,
+  GridIcon,
 } from '../icons';
 import './icon-rail.css';
 
@@ -64,6 +65,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: 'AWS',
     items: [
+      { id: 'aws-console', icon: GridIcon, i18nKey: 'nav.aws_console' },
       { id: 's3-browser', icon: BucketIcon, i18nKey: 'nav.s3_browser' },
       { id: 'dynamodb', icon: DatabaseIcon, i18nKey: 'nav.dynamodb' },
       { id: 'sqs-browser', icon: QueueIcon, i18nKey: 'nav.sqs_browser' },

@@ -144,6 +144,20 @@ func (ts *TraceStore) Get(traceID string) *TraceContext {
 	return ts.traces[idx]
 }
 
+// CountInRange returns the number of traces with StartTime in [start, end).
+func (ts *TraceStore) CountInRange(start, end time.Time) int64 {
+	ts.mu.RLock()
+	defer ts.mu.RUnlock()
+
+	var count int64
+	for _, t := range ts.traces {
+		if t != nil && !t.StartTime.Before(start) && t.StartTime.Before(end) {
+			count++
+		}
+	}
+	return count
+}
+
 // Recent returns up to limit traces, newest first.
 // Supports filtering by service and status.
 func (ts *TraceStore) Recent(service string, hasError *bool, limit int) []TraceSummary {

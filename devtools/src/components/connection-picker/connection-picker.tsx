@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { useAuth } from '../../lib/auth';
 import './connection-picker.css';
 
 type ConnectionMode = 'local' | 'hosted' | 'custom';
@@ -31,9 +32,14 @@ interface ConnectionPickerProps {
 }
 
 export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) {
+  const { auth, setToken } = useAuth();
   const [showHosted, setShowHosted] = useState(false);
   const [showCustom, setShowCustom] = useState(false);
   const [customUrl, setCustomUrl] = useState('');
+  const [orgSlug, setOrgSlug] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [hostedError, setHostedError] = useState('');
+  const [connecting, setConnecting] = useState(false);
 
   const handleLocalConnect = () => {
     storeMode('local');
@@ -43,13 +49,45 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
   const handleHostedClick = () => {
     setShowHosted(!showHosted);
     setShowCustom(false);
+    setHostedError('');
   };
 
-  const handleHostedSignIn = () => {
-    storeMode('hosted');
-    // After Clerk sign-in completes (future), the org endpoint URL will be
-    // stored and used for connection. For now, redirect to sign-in page.
-    window.open('https://cloudmock.app/sign-in', '_blank');
+  const handleHostedConnect = async () => {
+    const slug = orgSlug.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+    if (!slug) {
+      setHostedError('Enter your organization slug');
+      return;
+    }
+    if (!apiKey.trim()) {
+      setHostedError('Enter your API key');
+      return;
+    }
+
+    setConnecting(true);
+    setHostedError('');
+
+    const adminUrl = `https://${slug}.cloudmock.app`;
+    const gatewayUrl = `https://${slug}.cloudmock.app`;
+
+    try {
+      // Verify the endpoint is reachable with the API key
+      const res = await fetch(`${adminUrl}/api/health`, {
+        headers: { 'Authorization': `Bearer ${apiKey.trim()}` },
+      });
+      if (!res.ok && res.status === 401) {
+        setHostedError('Invalid API key');
+        setConnecting(false);
+        return;
+      }
+      // Connection works — store token and connect
+      setToken(apiKey.trim(), { org_slug: slug });
+      storeMode('hosted');
+      onConnect(adminUrl, gatewayUrl);
+    } catch {
+      setHostedError(`Cannot reach ${adminUrl} — is the instance running?`);
+    } finally {
+      setConnecting(false);
+    }
   };
 
   const handleCustomConnect = () => {
@@ -87,28 +125,57 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
           <button class="connection-option" onClick={handleHostedClick}>
             <span class="connection-option-icon">☁️</span>
             <div class="connection-option-content">
-              <div class="connection-option-title">cloudmock.app</div>
+              <div class="connection-option-title">CloudMock Cloud</div>
               <div class="connection-option-desc">
                 Connect to a hosted instance
               </div>
             </div>
             <div class="connection-option-tags">
-              <span class="connection-tag">Pro / Team</span>
+              <span class="connection-tag">Pay per use</span>
+              <span class="connection-tag">1K free/mo</span>
             </div>
           </button>
 
           {showHosted && (
             <div class="connection-hosted-panel">
               <p class="connection-hosted-desc">
-                Sign in with your cloudmock.app account to connect to your
-                organization's hosted endpoint.
+                Enter your organization slug and API key.
+                Get these from{' '}
+                <a href="https://app.cloudmock.app" target="_blank" rel="noopener">
+                  app.cloudmock.app
+                </a>
               </p>
+              <input
+                class="input"
+                type="text"
+                placeholder="org slug (e.g. acme)"
+                value={orgSlug}
+                onInput={(e) => setOrgSlug((e.target as HTMLInputElement).value)}
+              />
+              <input
+                class="input"
+                type="password"
+                placeholder="API key (cmk_...)"
+                value={apiKey}
+                onInput={(e) => setApiKey((e.target as HTMLInputElement).value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleHostedConnect(); }}
+              />
+              {hostedError && (
+                <p class="connection-hosted-error">{hostedError}</p>
+              )}
               <button
                 class="btn btn-primary connection-hosted-signin"
-                onClick={handleHostedSignIn}
+                onClick={handleHostedConnect}
+                disabled={connecting}
               >
-                Sign in with Clerk
+                {connecting ? 'Connecting...' : 'Connect'}
               </button>
+              <p class="connection-hosted-signup">
+                Don't have an account?{' '}
+                <a href="https://app.cloudmock.app/sign-up" target="_blank" rel="noopener">
+                  Sign up free
+                </a>
+              </p>
             </div>
           )}
 
@@ -153,7 +220,7 @@ export function ConnectionPicker({ onConnect, onClose }: ConnectionPickerProps) 
           )}
         </div>
 
-        <div class="connection-picker-version">v0.1.0</div>
+        <div class="connection-picker-version">v1.0.0</div>
       </div>
     </div>
   );

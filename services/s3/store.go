@@ -16,6 +16,8 @@ type Bucket struct {
 	Objects          *ObjectStore
 	VersioningStatus string // "", "Enabled", or "Suspended"
 	Policy           []byte // raw JSON policy, nil if unset
+	Configs          map[string][]byte            // bucket-level configs: "tagging", "cors", "lifecycle", etc.
+	ObjectConfigs    map[string]map[string][]byte // objectKey -> configType -> data
 }
 
 // Store is an in-memory store for S3 buckets and multipart uploads.
@@ -44,9 +46,11 @@ func (s *Store) CreateBucket(name string) error {
 			"The requested bucket name is not available.", http.StatusConflict)
 	}
 	s.buckets[name] = &Bucket{
-		Name:         name,
-		CreationDate: time.Now().UTC(),
-		Objects:      NewObjectStore(),
+		Name:          name,
+		CreationDate:  time.Now().UTC(),
+		Objects:       NewObjectStore(),
+		Configs:       make(map[string][]byte),
+		ObjectConfigs: make(map[string]map[string][]byte),
 	}
 	return nil
 }
@@ -268,6 +272,69 @@ func (s *Store) AbortMultipartUpload(uploadId string) error {
 	}
 	delete(s.multipartUploads, uploadId)
 	return nil
+}
+
+// ── Bucket & Object Config Storage ────────────────────────────────────────────
+
+func (s *Store) setBucketConfig(bucket, configType string, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b, ok := s.buckets[bucket]; ok {
+		if b.Configs == nil {
+			b.Configs = make(map[string][]byte)
+		}
+		b.Configs[configType] = data
+	}
+}
+
+func (s *Store) getBucketConfig(bucket, configType string) []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if b, ok := s.buckets[bucket]; ok {
+		return b.Configs[configType]
+	}
+	return nil
+}
+
+func (s *Store) deleteBucketConfig(bucket, configType string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b, ok := s.buckets[bucket]; ok {
+		delete(b.Configs, configType)
+	}
+}
+
+func (s *Store) setObjectConfig(bucket, key, configType string, data []byte) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b, ok := s.buckets[bucket]; ok {
+		if b.ObjectConfigs == nil {
+			b.ObjectConfigs = make(map[string]map[string][]byte)
+		}
+		if b.ObjectConfigs[key] == nil {
+			b.ObjectConfigs[key] = make(map[string][]byte)
+		}
+		b.ObjectConfigs[key][configType] = data
+	}
+}
+
+func (s *Store) getObjectConfig(bucket, key, configType string) []byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if b, ok := s.buckets[bucket]; ok {
+		if b.ObjectConfigs != nil {
+			return b.ObjectConfigs[key][configType]
+		}
+	}
+	return nil
+}
+
+func (s *Store) deleteObjectConfig(bucket, key, configType string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if b, ok := s.buckets[bucket]; ok && b.ObjectConfigs != nil {
+		delete(b.ObjectConfigs[key], configType)
+	}
 }
 
 // ListMultipartUploads returns all pending multipart uploads for the given bucket.

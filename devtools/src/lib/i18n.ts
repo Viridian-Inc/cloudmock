@@ -6,6 +6,7 @@ const strings: Record<string, Record<string, string>> = {
     'nav.traces': 'Traces',
     'nav.metrics': 'Metrics',
     'nav.dashboards': 'Dashboards',
+    'nav.aws_console': 'All Services',
     'nav.s3_browser': 'S3',
     'nav.dynamodb': 'DynamoDB',
     'nav.sqs_browser': 'SQS',

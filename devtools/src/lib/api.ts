@@ -20,6 +20,7 @@ function detectAdminBase(): string {
 }
 
 let _adminBase = detectAdminBase();
+let _authToken: string | null = null;
 
 export function getAdminBase(): string {
   return _adminBase;
@@ -29,15 +30,44 @@ export function setAdminBase(url: string): void {
   _adminBase = url;
 }
 
+/** Set the Bearer token for authenticated API calls (hosted/SaaS mode). */
+export function setAuthToken(token: string | null): void {
+  _authToken = token;
+}
+
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${_adminBase}${path}`;
-  const res = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-  });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    ...(options?.headers as Record<string, string>),
+  };
+
+  // Inject Bearer token for authenticated requests (hosted mode).
+  // Local mode has no token — requests pass through without auth.
+  if (_authToken) {
+    headers['Authorization'] = `Bearer ${_authToken}`;
+  }
+
+  const res = await fetch(url, { ...options, headers });
+
+  if (res.status === 401 && _authToken) {
+    // Token expired or invalid — clear it and notify
+    _authToken = null;
+    localStorage.removeItem('cloudmock:auth-token');
+    document.dispatchEvent(new CustomEvent('cloudmock:auth-expired'));
+    throw new Error('Session expired — please sign in again');
+  }
+
+  if (res.status === 429) {
+    const retryAfter = parseInt(res.headers.get('Retry-After') || '60', 10);
+    const body = await res.json().catch(() => ({})) as any;
+    throw new QuotaExceededError(
+      body.request_count || 0,
+      body.request_limit || 0,
+      body.tier || 'free',
+      retryAfter,
+    );
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
@@ -45,6 +75,19 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   }
 
   return res.json() as Promise<T>;
+}
+
+/** Error thrown when a tenant's request quota is exceeded (HTTP 429). */
+export class QuotaExceededError extends Error {
+  constructor(
+    public requestCount: number,
+    public requestLimit: number,
+    public tier: string,
+    public retryAfter: number,
+  ) {
+    super(`Quota exceeded: ${requestCount}/${requestLimit} requests (${tier} tier). Retry in ${retryAfter}s.`);
+    this.name = 'QuotaExceededError';
+  }
 }
 
 export async function cachedApi<T>(path: string, cacheKey: string, ttlMs?: number): Promise<T> {

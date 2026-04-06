@@ -238,9 +238,10 @@ type SaaSConfig struct {
 
 // ClerkConfig holds Clerk authentication configuration.
 type ClerkConfig struct {
-	SecretKey     string `yaml:"secret_key"`
-	WebhookSecret string `yaml:"webhook_secret"`
-	Domain        string `yaml:"domain"` // Clerk frontend API domain (e.g. "abc.clerk.accounts.dev")
+	SecretKey      string `yaml:"secret_key"`
+	WebhookSecret  string `yaml:"webhook_secret"`
+	Domain         string `yaml:"domain"`          // Clerk frontend API domain (e.g. "abc.clerk.accounts.dev")
+	PublishableKey string `yaml:"publishable_key"` // Clerk publishable key for frontend auth (pk_test_ or pk_live_)
 }
 
 // StripeConfig holds Stripe billing configuration.
@@ -265,6 +266,33 @@ type ProvisioningConfig struct {
 type CloudflareConfig struct {
 	APIToken string `yaml:"api_token"`
 	ZoneID   string `yaml:"zone_id"`
+}
+
+// ComplianceConfig controls data redaction for HIPAA/PCI/GDPR compliance.
+type ComplianceConfig struct {
+	// RedactEnabled turns on field-level redaction for stored traces, requests, and audit entries.
+	RedactEnabled bool     `yaml:"redact_enabled" json:"redact_enabled"`
+	// RedactHeaders is additional header names to redact (beyond defaults).
+	RedactHeaders []string `yaml:"redact_headers" json:"redact_headers"`
+	// RedactFields is additional JSON body field names to redact (beyond defaults).
+	RedactFields  []string `yaml:"redact_fields" json:"redact_fields"`
+}
+
+// BillingConfig holds SaaS billing and usage pricing parameters.
+// These are exposed to the frontend via /api/platform/pricing.
+type BillingConfig struct {
+	FreeRequestLimit int64   `yaml:"free_request_limit" json:"free_request_limit"` // Requests/mo before billing kicks in
+	PricePerTenK     float64 `yaml:"price_per_10k" json:"price_per_10k"`           // USD per 10K requests over free limit
+	DefaultInfraType string  `yaml:"default_infra_type" json:"default_infra_type"` // "shared" or "dedicated"
+	UsageWindowDays  int     `yaml:"usage_window_days" json:"usage_window_days"`   // Rolling window for usage chart
+	MaxAuditEntries  int     `yaml:"max_audit_entries" json:"max_audit_entries"`   // Max entries before truncation
+}
+
+// DefaultRetentionConfig holds default data retention periods (days).
+type DefaultRetentionConfig struct {
+	AuditLog      int `yaml:"audit_log" json:"audit_log"`
+	RequestLog    int `yaml:"request_log" json:"request_log"`
+	StateSnapshot int `yaml:"state_snapshot" json:"state_snapshot"`
 }
 
 // RUMConfig holds Real User Monitoring configuration.
@@ -312,6 +340,9 @@ type Config struct {
 	IaCDir         string                   `yaml:"iac_dir" json:"iac_dir"` // Path to Pulumi/Terraform project
 	IaCEnv         string                   `yaml:"iac_env" json:"iac_env"` // Environment name (dev/stage/prod)
 	SaaS           SaaSConfig               `yaml:"saas"`
+	Compliance     ComplianceConfig         `yaml:"compliance" json:"compliance"`
+	Billing        BillingConfig            `yaml:"billing" json:"billing"`
+	Retention      DefaultRetentionConfig   `yaml:"retention" json:"retention"`
 	Notifications  NotificationsConfig      `yaml:"notifications" json:"notifications"`
 	SCM            SCMConfig                `yaml:"scm" json:"scm"`
 	Services       map[string]ServiceConfig `yaml:"services"`
@@ -437,6 +468,18 @@ func Default() *Config {
 			Enabled: true,
 			Port:    4318,
 		},
+		Billing: BillingConfig{
+			FreeRequestLimit: 1000,
+			PricePerTenK:     0.50,
+			DefaultInfraType: "shared",
+			UsageWindowDays:  30,
+			MaxAuditEntries:  1000,
+		},
+		Retention: DefaultRetentionConfig{
+			AuditLog:      365,
+			RequestLog:    90,
+			StateSnapshot: 30,
+		},
 	}
 }
 
@@ -534,6 +577,11 @@ func (c *Config) ApplyEnv() {
 			c.OTLP.Enabled = b
 		}
 	}
+	if v := os.Getenv("CLOUDMOCK_REDACT_ENABLED"); v != "" {
+		if b, err := strconv.ParseBool(v); err == nil {
+			c.Compliance.RedactEnabled = b
+		}
+	}
 	if v := os.Getenv("CLOUDMOCK_SAAS_ENABLED"); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {
 			c.SaaS.Enabled = b
@@ -547,6 +595,9 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLERK_DOMAIN"); v != "" {
 		c.SaaS.Clerk.Domain = v
+	}
+	if v := os.Getenv("CLERK_PUBLISHABLE_KEY"); v != "" {
+		c.SaaS.Clerk.PublishableKey = v
 	}
 	if v := os.Getenv("STRIPE_SECRET_KEY"); v != "" {
 		c.SaaS.Stripe.SecretKey = v

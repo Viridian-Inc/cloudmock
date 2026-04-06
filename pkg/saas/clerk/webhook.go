@@ -45,12 +45,25 @@ type UserData struct {
 	LastName  string `json:"last_name"`
 }
 
+// Provisioner provisions infrastructure for a tenant.
+type Provisioner interface {
+	Provision(ctx context.Context, t *tenant.Tenant) error
+	Deprovision(ctx context.Context, t *tenant.Tenant) error
+}
+
 // WebhookHandler processes Clerk webhook events.
 type WebhookHandler struct {
 	tenants       tenant.Store
 	users         auth.UserStore
+	orchestrator  Provisioner
 	webhookSecret string
 	logger        *slog.Logger
+}
+
+// SetOrchestrator sets the provisioning orchestrator for auto-provisioning
+// tenants when organizations are created/deleted via Clerk.
+func (h *WebhookHandler) SetOrchestrator(o Provisioner) {
+	h.orchestrator = o
 }
 
 // NewWebhookHandler creates a new Clerk webhook handler.
@@ -146,6 +159,22 @@ func (h *WebhookHandler) handleOrgCreated(ctx context.Context, data json.RawMess
 		"clerk_org_id", org.ID,
 		"slug", org.Slug,
 	)
+
+	// Auto-provision infrastructure (Fly machine + DNS) for paid tenants.
+	if h.orchestrator != nil && t.Slug != "" {
+		go func() {
+			provCtx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+			defer cancel()
+			if err := h.orchestrator.Provision(provCtx, t); err != nil {
+				h.logger.Error("clerk webhook: auto-provision failed",
+					"tenant_id", t.ID,
+					"slug", t.Slug,
+					"error", err,
+				)
+			}
+		}()
+	}
+
 	return nil
 }
 
@@ -158,6 +187,16 @@ func (h *WebhookHandler) handleOrgDeleted(ctx context.Context, data json.RawMess
 	existing, err := h.tenants.GetByClerkOrgID(ctx, org.ID)
 	if err != nil {
 		return fmt.Errorf("find tenant by clerk org id %s: %w", org.ID, err)
+	}
+
+	// Deprovision infrastructure before deleting the tenant record.
+	if h.orchestrator != nil && existing.FlyAppName != "" {
+		if err := h.orchestrator.Deprovision(ctx, existing); err != nil {
+			h.logger.Error("clerk webhook: deprovision failed, continuing with deletion",
+				"tenant_id", existing.ID,
+				"error", err,
+			)
+		}
 	}
 
 	if err := h.tenants.Delete(ctx, existing.ID); err != nil {

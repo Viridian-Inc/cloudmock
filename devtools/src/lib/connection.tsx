@@ -74,12 +74,13 @@ export function ConnectionProvider({ children }: { children: ComponentChildren }
       while (!cancelled) {
         try {
           const res = await fetch(`${state.adminUrl}/api/health`);
-          if (res.ok) {
+          // 200 = healthy, 503 = degraded (still connected, some services down)
+          if (res.ok || res.status === 503) {
             const data = await res.json();
             if (!cancelled) {
               setState((prev) => ({
                 ...prev,
-                connected: data.status === 'ok' || data.status === 'healthy',
+                connected: true,
                 region: data.region || prev.region || 'us-east-1',
                 serviceCount: data.services ? Object.keys(data.services).length : prev.serviceCount,
                 lastHealthCheck: Date.now(),

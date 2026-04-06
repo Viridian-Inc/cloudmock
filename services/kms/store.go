@@ -18,15 +18,35 @@ const (
 	keyStatePendingDeletion keyState = "PendingDeletion"
 )
 
-// Key holds all metadata and the raw AES key material for a KMS key.
+// keySpec describes the type and size of key material.
+type keySpec string
+
+const (
+	keySpecSymmetric256 keySpec = "SYMMETRIC_DEFAULT"
+	keySpecHMAC256      keySpec = "HMAC_256"
+	keySpecHMAC384      keySpec = "HMAC_384"
+	keySpecHMAC512      keySpec = "HMAC_512"
+	keySpecRSA2048      keySpec = "RSA_2048"
+	keySpecRSA3072      keySpec = "RSA_3072"
+	keySpecRSA4096      keySpec = "RSA_4096"
+	keySpecECCNistP256  keySpec = "ECC_NIST_P256"
+	keySpecECCNistP384  keySpec = "ECC_NIST_P384"
+)
+
+// Key holds all metadata and key material for a KMS key.
 type Key struct {
-	KeyId        string
-	Arn          string
-	Description  string
-	KeyState     keyState
-	KeyUsage     string
-	CreationDate time.Time
-	AESKey       [32]byte
+	KeyId           string
+	Arn             string
+	Description     string
+	KeyState        keyState
+	KeyUsage        string
+	KeySpec         keySpec
+	CreationDate    time.Time
+	RotationEnabled bool
+	AESKey          [32]byte    // For SYMMETRIC_DEFAULT
+	HMACKey         []byte      // For HMAC_* key specs
+	RSAPrivateKey   interface{} // *rsa.PrivateKey for RSA_* key specs
+	ECCPrivateKey   interface{} // *ecdsa.PrivateKey for ECC_* key specs
 }
 
 // Alias maps an alias name to a target key.
@@ -66,12 +86,7 @@ func (s *Store) buildAliasArn(aliasName string) string {
 }
 
 // CreateKey adds a new key to the store and returns it.
-func (s *Store) CreateKey(description, keyUsage string) (*Key, error) {
-	aesKey, err := generateAESKey()
-	if err != nil {
-		return nil, err
-	}
-
+func (s *Store) CreateKey(description, keyUsage, spec string) (*Key, error) {
 	keyID := newUUID()
 	key := &Key{
 		KeyId:        keyID,
@@ -79,8 +94,12 @@ func (s *Store) CreateKey(description, keyUsage string) (*Key, error) {
 		Description:  description,
 		KeyState:     keyStateEnabled,
 		KeyUsage:     keyUsage,
+		KeySpec:      keySpec(spec),
 		CreationDate: time.Now().UTC(),
-		AESKey:       aesKey,
+	}
+
+	if err := generateKeyMaterial(key); err != nil {
+		return nil, err
 	}
 
 	s.mu.Lock()
@@ -88,6 +107,45 @@ func (s *Store) CreateKey(description, keyUsage string) (*Key, error) {
 	s.mu.Unlock()
 
 	return key, nil
+}
+
+// EnableKeyRotation enables automatic key rotation.
+func (s *Store) EnableKeyRotation(keyID string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, awsErr := s.getKeyLocked(keyID)
+	if awsErr != nil {
+		return awsErr
+	}
+	if key.KeySpec != keySpecSymmetric256 {
+		return service.NewAWSError("UnsupportedOperationException",
+			"Key rotation is only supported for symmetric keys.", http.StatusBadRequest)
+	}
+	key.RotationEnabled = true
+	return nil
+}
+
+// DisableKeyRotation disables automatic key rotation.
+func (s *Store) DisableKeyRotation(keyID string) *service.AWSError {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	key, awsErr := s.getKeyLocked(keyID)
+	if awsErr != nil {
+		return awsErr
+	}
+	key.RotationEnabled = false
+	return nil
+}
+
+// GetKeyRotationStatus returns whether key rotation is enabled.
+func (s *Store) GetKeyRotationStatus(keyID string) (bool, *service.AWSError) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	key, awsErr := s.getKeyLocked(keyID)
+	if awsErr != nil {
+		return false, awsErr
+	}
+	return key.RotationEnabled, nil
 }
 
 // GetKey looks up a key by KeyId or alias name. Returns AWSError if not found or not usable.

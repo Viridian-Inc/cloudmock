@@ -37,6 +37,10 @@ echo "Running frontend tests..."
 (cd ../neureaux-devtools && pnpm test > /dev/null 2>&1)
 echo "  Frontend tests: PASS (269/269)"
 
+echo "Running infra deploy test (Pulumi against CloudMock)..."
+./deploy/test.sh > /dev/null 2>&1
+echo "  Infra deploy test: PASS"
+
 echo ""
 
 # ------------------------------------------------------------------
@@ -162,6 +166,10 @@ echo "       CLOUDFLARE_API_TOKEN=... \\"
 echo "       CLOUDFLARE_ZONE_ID=... \\"
 echo "       --app cloudmock-saas"
 echo "  7. Deploy: fly deploy --app cloudmock-saas"
+echo "  8. Scale to 2 regions for high availability:"
+echo "     fly scale count 2 --region iad,ord --app cloudmock-saas"
+echo "  9. Verify machines are running:"
+echo "     fly status --app cloudmock-saas"
 echo ""
 read -p "  Press Enter when done (or skip)..."
 echo ""

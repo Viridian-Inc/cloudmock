@@ -151,6 +151,8 @@ export function CognitoView() {
   const [loading, setLoading] = useState(false);
 
   // Modals
+  const [showCreatePool, setShowCreatePool] = useState(false);
+  const [newPoolName, setNewPoolName] = useState('');
   const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -186,6 +188,18 @@ export function CognitoView() {
       setPools([]);
     }
   }, []);
+
+  async function createPool() {
+    if (!newPoolName.trim()) return;
+    try {
+      await cognitoRequest('CreateUserPool', { PoolName: newPoolName.trim() });
+      setShowCreatePool(false);
+      setNewPoolName('');
+      loadPools();
+    } catch {
+      // silently fail
+    }
+  }
 
   useEffect(() => { loadPools(); }, [loadPools]);
 
@@ -305,6 +319,10 @@ export function CognitoView() {
           <div class="flex items-center justify-between mb-4">
             <span style="font-weight:700;font-size:15px">User Pools</span>
             <div class="flex gap-2">
+              <button class="btn btn-primary btn-sm" onClick={() => setShowCreatePool(true)}
+                style="font-size:11px;padding:4px 10px">
+                + New Pool
+              </button>
               <button class="btn-icon" title="Refresh" onClick={loadPools}
                 style="border:1px solid var(--border-default);border-radius:var(--radius-md)">
                 <RefreshIcon />
@@ -478,6 +496,23 @@ export function CognitoView() {
           </div>
         )}
       </div>
+
+      {/* Create Pool Modal */}
+      {showCreatePool && (
+        <Modal title="Create User Pool" onClose={() => setShowCreatePool(false)}
+          footer={<>
+            <button class="btn btn-sm" onClick={() => setShowCreatePool(false)}>Cancel</button>
+            <button class="btn btn-primary btn-sm" onClick={createPool} disabled={!newPoolName.trim()}>Create</button>
+          </>}>
+          <div class="field">
+            <label class="label">Pool Name</label>
+            <input class="input w-full" placeholder="e.g. my-app-users" value={newPoolName}
+              onInput={(e) => setNewPoolName((e.target as HTMLInputElement).value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') createPool(); }}
+              autoFocus />
+          </div>
+        </Modal>
+      )}
 
       {/* Create User Modal */}
       {showCreateUser && (

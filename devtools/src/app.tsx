@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { ConnectionProvider, useConnection } from './lib/connection';
-import { setAdminBase } from './lib/api';
+import { AuthProvider, useAuth } from './lib/auth';
+import { setAdminBase, setAuthToken } from './lib/api';
 import type { Environment } from './lib/environments';
 import { IconRail } from './components/icon-rail/icon-rail';
 import { SourceBar } from './components/source-bar/source-bar';
@@ -38,6 +39,7 @@ import { PlatformKeysView } from './views/platform-keys';
 import { PlatformUsageView } from './views/platform-usage';
 import { PlatformAuditView } from './views/platform-audit';
 import { PlatformSettingsView } from './views/platform-settings';
+import { AWSConsoleView } from './views/aws-console';
 
 export type ViewId =
   | 'activity'
@@ -68,7 +70,8 @@ export type ViewId =
   | 'platform-keys'
   | 'platform-usage'
   | 'platform-audit'
-  | 'platform-settings';
+  | 'platform-settings'
+  | 'aws-console';
 
 const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   activity: ActivityView,
@@ -100,6 +103,7 @@ const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   'platform-usage': PlatformUsageView,
   'platform-audit': PlatformAuditView,
   'platform-settings': PlatformSettingsView,
+  'aws-console': AWSConsoleView,
 };
 
 /** View IDs reachable via Cmd+number shortcuts */
@@ -119,12 +123,29 @@ const SHORTCUT_VIEWS: Record<string, ViewId> = {
 function Workspace() {
   const [activeView, setActiveView] = useState<ViewId>('activity');
   const { state, connect, isFirstLaunch } = useConnection();
+  const { auth, fetchSaaSConfig } = useAuth();
   const [showPicker, setShowPicker] = useState(isFirstLaunch);
 
-  // Sync admin URL to API client
+  // Sync admin URL and auth token to API client
   useEffect(() => {
     setAdminBase(state.adminUrl);
-  }, [state.adminUrl]);
+    // Fetch SaaS config to detect hosted mode
+    if (state.adminUrl) {
+      fetchSaaSConfig(state.adminUrl);
+    }
+  }, [state.adminUrl, fetchSaaSConfig]);
+
+  // Sync auth token to API client whenever it changes
+  useEffect(() => {
+    setAuthToken(auth.token);
+  }, [auth.token]);
+
+  // Listen for auth expiry events from the API client
+  useEffect(() => {
+    const handler = () => setShowPicker(true);
+    document.addEventListener('cloudmock:auth-expired', handler);
+    return () => document.removeEventListener('cloudmock:auth-expired', handler);
+  }, []);
 
   const handleConnect = (adminUrl: string, gatewayUrl: string) => {
     connect(adminUrl, gatewayUrl);
@@ -241,8 +262,10 @@ function Workspace() {
 
 export function App() {
   return (
-    <ConnectionProvider>
-      <Workspace />
-    </ConnectionProvider>
+    <AuthProvider>
+      <ConnectionProvider>
+        <Workspace />
+      </ConnectionProvider>
+    </AuthProvider>
   );
 }

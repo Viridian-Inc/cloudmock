@@ -27,6 +27,7 @@ type Parameter struct {
 type Store struct {
 	mu        sync.RWMutex
 	params    map[string]*Parameter // keyed by name
+	docStore  *DocumentStore
 	accountID string
 	region    string
 }
@@ -35,6 +36,7 @@ type Store struct {
 func NewStore(accountID, region string) *Store {
 	return &Store{
 		params:    make(map[string]*Parameter),
+		docStore:  NewDocumentStore(accountID, region),
 		accountID: accountID,
 		region:    region,
 	}

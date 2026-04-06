@@ -60,7 +60,7 @@
 
   /* Typography — from @neureaux/tokens typography.ts */
   --font-sans: 'Figtree', -apple-system, system-ui, sans-serif;
-  --font-mono: 'Geist Mono', 'JetBrains Mono', ui-monospace, monospace;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   /* Z-Index scale — from tokens */
   --z-hide: -1;

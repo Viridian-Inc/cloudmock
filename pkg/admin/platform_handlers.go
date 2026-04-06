@@ -1,28 +1,32 @@
 package admin
 
 import (
+	"context"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"encoding/json"
+	platformmodel "github.com/neureaux/cloudmock/pkg/platform/model"
+	platformstore "github.com/neureaux/cloudmock/pkg/platform/store"
+	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 )
 
-// PlatformStore is an in-memory store for platform management data.
+// PlatformStore is an in-memory fallback for local mode (no Postgres).
 type PlatformStore struct {
 	mu        sync.RWMutex
 	apps      []PlatformApp
 	keys      []PlatformKey
 	audit     []PlatformAuditEntry
-	retention map[string]int // resource_type -> days
+	retention map[string]int
 }
 
-// PlatformApp represents a CloudMock app instance.
 type PlatformApp struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`
@@ -34,7 +38,6 @@ type PlatformApp struct {
 	CreatedAt string `json:"created_at"`
 }
 
-// PlatformKey represents an API key.
 type PlatformKey struct {
 	ID         string  `json:"id"`
 	Prefix     string  `json:"prefix"`
@@ -44,7 +47,6 @@ type PlatformKey struct {
 	CreatedAt  string  `json:"created_at"`
 }
 
-// PlatformAuditEntry is a single audit log record.
 type PlatformAuditEntry struct {
 	ID         string `json:"id"`
 	Actor      string `json:"actor"`
@@ -56,80 +58,19 @@ type PlatformAuditEntry struct {
 	CreatedAt  string `json:"created_at"`
 }
 
-// newPlatformStore initialises a PlatformStore with realistic seed data.
-func newPlatformStore() *PlatformStore {
-	now := time.Now()
-	ts := func(d time.Duration) string { return now.Add(d).UTC().Format(time.RFC3339) }
-
-	lastUsed := ts(-2 * time.Hour)
-
-	apps := []PlatformApp{
-		{
-			ID:        "app_01",
-			Name:      "staging",
-			Slug:      "staging",
-			Endpoint:  "https://abc123.cloudmock.app",
-			InfraType: "shared",
-			Status:    "running",
-			Requests:  42891,
-			CreatedAt: ts(-60 * 24 * time.Hour),
-		},
-		{
-			ID:        "app_02",
-			Name:      "ci-tests",
-			Slug:      "ci-tests",
-			Endpoint:  "https://def456.cloudmock.app",
-			InfraType: "dedicated",
-			Status:    "running",
-			Requests:  1203,
-			CreatedAt: ts(-30 * 24 * time.Hour),
-		},
-	}
-
-	keys := []PlatformKey{
-		{
-			ID:         "key_01",
-			Prefix:     "cm_live_a1b2",
-			Name:       "CI Pipeline",
-			Role:       "developer",
-			LastUsedAt: &lastUsed,
-			CreatedAt:  ts(-20 * 24 * time.Hour),
-		},
-		{
-			ID:         "key_02",
-			Prefix:     "cm_live_c3d4",
-			Name:       "Local Dev",
-			Role:       "admin",
-			LastUsedAt: nil,
-			CreatedAt:  ts(-3 * 24 * time.Hour),
-		},
-	}
-
-	audit := []PlatformAuditEntry{
-		{ID: "aud_01", Actor: "admin@example.com", ActorType: "user", Action: "app.create", Resource: "app/staging", ResourceID: "app_01", IP: "203.0.113.10", CreatedAt: ts(-10 * time.Minute)},
-		{ID: "aud_02", Actor: "cm_live_a1b2", ActorType: "key", Action: "aws.request", Resource: "s3/my-bucket", ResourceID: "", IP: "198.51.100.5", CreatedAt: ts(-90 * time.Minute)},
-		{ID: "aud_03", Actor: "admin@example.com", ActorType: "user", Action: "key.revoke", Resource: "key/cm_live_e5f6", ResourceID: "key_old", IP: "203.0.113.10", CreatedAt: ts(-30 * time.Hour)},
-		{ID: "aud_04", Actor: "admin@example.com", ActorType: "user", Action: "key.create", Resource: "key/cm_live_c3d4", ResourceID: "key_02", IP: "203.0.113.10", CreatedAt: ts(-3 * 24 * time.Hour)},
-		{ID: "aud_05", Actor: "ci@example.com", ActorType: "user", Action: "app.update", Resource: "app/ci-tests", ResourceID: "app_02", IP: "192.0.2.42", CreatedAt: ts(-5 * 24 * time.Hour)},
-		{ID: "aud_06", Actor: "cm_live_a1b2", ActorType: "key", Action: "aws.request", Resource: "dynamodb/my-table", ResourceID: "", IP: "198.51.100.5", CreatedAt: ts(-6 * 24 * time.Hour)},
-		{ID: "aud_07", Actor: "admin@example.com", ActorType: "user", Action: "org.settings.update", Resource: "org/my-org", ResourceID: "org_01", IP: "203.0.113.10", CreatedAt: ts(-7 * 24 * time.Hour)},
-	}
-
-	retention := map[string]int{
-		"audit_log":      365,
-		"request_log":    90,
-		"state_snapshot": 30,
-	}
-
+func newPlatformStore(retentionAudit, retentionReq, retentionSnap int) *PlatformStore {
 	return &PlatformStore{
-		apps:      apps,
-		keys:      keys,
-		audit:     audit,
-		retention: retention,
+		apps:  []PlatformApp{},
+		keys:  []PlatformKey{},
+		audit: []PlatformAuditEntry{},
+		retention: map[string]int{
+			"audit_log":      retentionAudit,
+			"request_log":    retentionReq,
+			"state_snapshot": retentionSnap,
+		},
 	}
 }
 
-// randHex returns n random hex characters.
 func randHex(n int) string {
 	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
 	b := make([]byte, n)
@@ -139,11 +80,79 @@ func randHex(n int) string {
 	return string(b)
 }
 
+// hasPlatformDB returns true when the real Postgres stores are wired.
+func (a *API) hasPlatformDB() bool {
+	return a.platformApps != nil
+}
+
+// extractAuth reads auth context from headers set by Clerk middleware.
+func extractAuth(r *http.Request) platformmodel.AuthContext {
+	return platformmodel.AuthContext{
+		TenantID:  r.Header.Get("X-Tenant-ID"),
+		ActorID:   r.Header.Get("X-User-ID"),
+		ActorType: "user",
+		Role:      r.Header.Get("X-Org-Role"),
+	}
+}
+
+func extractIP(r *http.Request) net.IP {
+	ip := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		ip = strings.SplitN(fwd, ",", 2)[0]
+	}
+	if host, _, err := net.SplitHostPort(ip); err == nil {
+		ip = host
+	}
+	return net.ParseIP(strings.TrimSpace(ip))
+}
+
+// ── /api/platform/pricing ────────────────────────────────────────────────────
+
+func (a *API) handlePlatformPricing(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"free_request_limit": a.cfg.Billing.FreeRequestLimit,
+		"price_per_10k":      a.cfg.Billing.PricePerTenK,
+		"usage_window_days":  a.cfg.Billing.UsageWindowDays,
+		"default_infra_type": a.cfg.Billing.DefaultInfraType,
+	})
+}
+
 // ── /api/platform/apps ────────────────────────────────────────────────────────
 
 func (a *API) handlePlatformApps(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		// Real DB
+		if a.hasPlatformDB() {
+			auth := extractAuth(r)
+			apps, err := a.platformApps.ListByTenant(r.Context(), auth.TenantID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			// Also get usage counts per app
+			result := make([]map[string]any, 0, len(apps))
+			for _, app := range apps {
+				count, _ := a.platformUsage.GetCurrentPeriodCount(r.Context(), app.TenantID)
+				result = append(result, map[string]any{
+					"id":            app.ID,
+					"name":          app.Name,
+					"slug":          app.Slug,
+					"endpoint":      app.Endpoint,
+					"infra_type":    app.InfraType,
+					"status":        app.Status,
+					"request_count": count,
+					"created_at":    app.CreatedAt.Format(time.RFC3339),
+				})
+			}
+			writeJSON(w, http.StatusOK, result)
+			return
+		}
+		// Fallback: in-memory
 		a.platform.mu.RLock()
 		result := make([]PlatformApp, len(a.platform.apps))
 		copy(result, a.platform.apps)
@@ -164,24 +173,58 @@ func (a *API) handlePlatformApps(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if req.InfraType == "" {
-			req.InfraType = "shared"
+			req.InfraType = a.cfg.Billing.DefaultInfraType
 		}
 		slug := strings.ToLower(strings.ReplaceAll(req.Name, " ", "-"))
+
+		// Real DB
+		if a.hasPlatformDB() {
+			auth := extractAuth(r)
+			app := &platformmodel.App{
+				TenantID:  auth.TenantID,
+				Name:      req.Name,
+				Slug:      slug,
+				Endpoint:  fmt.Sprintf("https://%s.cloudmock.app", slug),
+				InfraType: req.InfraType,
+				Status:    "provisioning",
+			}
+			if err := a.platformApps.Create(r.Context(), app); err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			// Provision infrastructure in background
+			if a.orchestrator != nil {
+				t := &tenant.Tenant{ID: auth.TenantID, Name: req.Name, Slug: slug, Tier: "hosted", Status: "active"}
+				go func() {
+					ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+					defer cancel()
+					if err := a.orchestrator.Provision(ctx, t); err == nil {
+						app.Status = "running"
+						app.FlyAppName = t.FlyAppName
+						app.FlyMachineID = t.FlyMachineID
+						_ = a.platformApps.Update(ctx, app)
+					}
+				}()
+			}
+			a.recordAudit(r, "app.create", "app", app.ID)
+			writeJSON(w, http.StatusCreated, app)
+			return
+		}
+
+		// Fallback: in-memory
 		app := PlatformApp{
 			ID:        fmt.Sprintf("app_%s", randHex(8)),
 			Name:      req.Name,
 			Slug:      slug,
-			Endpoint:  fmt.Sprintf("https://%s.cloudmock.app", randHex(6)),
+			Endpoint:  fmt.Sprintf("https://%s.cloudmock.app", slug),
 			InfraType: req.InfraType,
 			Status:    "running",
-			Requests:  0,
 			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		}
 		a.platform.mu.Lock()
 		a.platform.apps = append(a.platform.apps, app)
 		a.platform.mu.Unlock()
-
-		a.platform.addAudit(r, "app.create", fmt.Sprintf("app/%s", slug), app.ID)
+		a.addAuditFromRequest(r, "app.create", fmt.Sprintf("app/%s", slug), app.ID)
 		writeJSON(w, http.StatusCreated, app)
 
 	default:
@@ -200,6 +243,21 @@ func (a *API) handlePlatformAppByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.hasPlatformDB() {
+		if err := a.platformApps.Delete(r.Context(), id); err != nil {
+			if err == platformstore.ErrNotFound {
+				writeError(w, http.StatusNotFound, "app not found")
+			} else {
+				writeError(w, http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+		a.recordAudit(r, "app.delete", "app", id)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
+		return
+	}
+
+	// Fallback
 	a.platform.mu.Lock()
 	found := false
 	for i, app := range a.platform.apps {
@@ -210,12 +268,11 @@ func (a *API) handlePlatformAppByID(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.platform.mu.Unlock()
-
 	if !found {
 		writeError(w, http.StatusNotFound, "app not found")
 		return
 	}
-	a.platform.addAudit(r, "app.delete", fmt.Sprintf("app/%s", id), id)
+	a.addAuditFromRequest(r, "app.delete", fmt.Sprintf("app/%s", id), id)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted", "id": id})
 }
 
@@ -224,6 +281,21 @@ func (a *API) handlePlatformAppByID(w http.ResponseWriter, r *http.Request) {
 func (a *API) handlePlatformKeys(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		if a.hasPlatformDB() {
+			appID := r.URL.Query().Get("app_id")
+			if appID == "" {
+				writeError(w, http.StatusBadRequest, "app_id query parameter required")
+				return
+			}
+			keys, err := a.platformKeys.ListByApp(r.Context(), appID)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, keys)
+			return
+		}
+		// Fallback
 		a.platform.mu.RLock()
 		result := make([]PlatformKey, len(a.platform.keys))
 		copy(result, a.platform.keys)
@@ -232,8 +304,9 @@ func (a *API) handlePlatformKeys(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var req struct {
-			Name string `json:"name"`
-			Role string `json:"role"`
+			Name  string `json:"name"`
+			Role  string `json:"role"`
+			AppID string `json:"app_id"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
@@ -246,30 +319,48 @@ func (a *API) handlePlatformKeys(w http.ResponseWriter, r *http.Request) {
 		if req.Role == "" {
 			req.Role = "developer"
 		}
-		prefix := fmt.Sprintf("cm_live_%s", randHex(4))
+
+		if a.hasPlatformDB() {
+			auth := extractAuth(r)
+			if req.AppID == "" {
+				writeError(w, http.StatusBadRequest, "app_id is required")
+				return
+			}
+			plaintext, key, err := a.platformKeys.Create(r.Context(), auth.TenantID, req.AppID, req.Name, req.Role)
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			a.recordAudit(r, "key.create", "api_key", key.ID)
+			writeJSON(w, http.StatusCreated, map[string]any{
+				"id":           key.ID,
+				"prefix":       key.Prefix,
+				"name":         key.Name,
+				"role":         key.Role,
+				"last_used_at": key.LastUsedAt,
+				"created_at":   key.CreatedAt,
+				"key":          plaintext, // shown once, never stored
+			})
+			return
+		}
+
+		// Fallback: in-memory
+		prefix := fmt.Sprintf("cmk_%s", randHex(4))
 		plaintext := fmt.Sprintf("%s%s", prefix, randHex(24))
 		key := PlatformKey{
-			ID:         fmt.Sprintf("key_%s", randHex(8)),
-			Prefix:     prefix,
-			Name:       req.Name,
-			Role:       req.Role,
-			LastUsedAt: nil,
-			CreatedAt:  time.Now().UTC().Format(time.RFC3339),
+			ID:        fmt.Sprintf("key_%s", randHex(8)),
+			Prefix:    prefix,
+			Name:      req.Name,
+			Role:      req.Role,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
 		}
 		a.platform.mu.Lock()
 		a.platform.keys = append([]PlatformKey{key}, a.platform.keys...)
 		a.platform.mu.Unlock()
-
-		a.platform.addAudit(r, "key.create", fmt.Sprintf("key/%s", prefix), key.ID)
-		// Return key metadata plus the plaintext (shown once)
+		a.addAuditFromRequest(r, "key.create", fmt.Sprintf("key/%s", prefix), key.ID)
 		writeJSON(w, http.StatusCreated, map[string]any{
-			"id":           key.ID,
-			"prefix":       key.Prefix,
-			"name":         key.Name,
-			"role":         key.Role,
-			"last_used_at": key.LastUsedAt,
-			"created_at":   key.CreatedAt,
-			"key":          plaintext,
+			"id": key.ID, "prefix": key.Prefix, "name": key.Name,
+			"role": key.Role, "created_at": key.CreatedAt, "key": plaintext,
 		})
 
 	default:
@@ -288,24 +379,36 @@ func (a *API) handlePlatformKeyByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if a.hasPlatformDB() {
+		if err := a.platformKeys.Revoke(r.Context(), id); err != nil {
+			if err == platformstore.ErrNotFound {
+				writeError(w, http.StatusNotFound, "key not found")
+			} else {
+				writeError(w, http.StatusInternalServerError, err.Error())
+			}
+			return
+		}
+		a.recordAudit(r, "key.revoke", "api_key", id)
+		writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
+		return
+	}
+
+	// Fallback
 	a.platform.mu.Lock()
 	found := false
-	var prefix string
 	for i, k := range a.platform.keys {
 		if k.ID == id {
-			prefix = k.Prefix
 			a.platform.keys = append(a.platform.keys[:i], a.platform.keys[i+1:]...)
 			found = true
 			break
 		}
 	}
 	a.platform.mu.Unlock()
-
 	if !found {
 		writeError(w, http.StatusNotFound, "key not found")
 		return
 	}
-	a.platform.addAudit(r, "key.revoke", fmt.Sprintf("key/%s", prefix), id)
+	a.addAuditFromRequest(r, "key.revoke", fmt.Sprintf("key/%s", id), id)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "revoked", "id": id})
 }
 
@@ -317,54 +420,117 @@ func (a *API) handlePlatformUsage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	a.platform.mu.RLock()
-	apps := make([]PlatformApp, len(a.platform.apps))
-	copy(apps, a.platform.apps)
-	a.platform.mu.RUnlock()
+	windowDays := a.cfg.Billing.UsageWindowDays
+	if windowDays <= 0 {
+		windowDays = 30
+	}
+	freeLimit := a.cfg.Billing.FreeRequestLimit
+	pricePerTenK := a.cfg.Billing.PricePerTenK
 
-	var total int64
-	appBreakdown := make([]map[string]any, 0, len(apps))
-	for _, app := range apps {
-		total += app.Requests
-		appBreakdown = append(appBreakdown, map[string]any{
-			"name":     app.name(),
-			"requests": app.Requests,
+	if a.hasPlatformDB() {
+		auth := extractAuth(r)
+		now := time.Now().UTC()
+		monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
+		windowStart := now.AddDate(0, 0, -windowDays)
+
+		// Total for current billing period
+		total, _ := a.platformUsage.GetCurrentPeriodCount(r.Context(), auth.TenantID)
+
+		// Per-app breakdown
+		apps, _ := a.platformApps.ListByTenant(r.Context(), auth.TenantID)
+		appBreakdown := make([]map[string]any, 0, len(apps))
+		for _, app := range apps {
+			records, _ := a.platformUsage.GetByTenant(r.Context(), auth.TenantID, monthStart, now)
+			var appCount int64
+			for _, rec := range records {
+				if rec.AppID == app.ID {
+					appCount += rec.RequestCount
+				}
+			}
+			appBreakdown = append(appBreakdown, map[string]any{
+				"name":     app.Name,
+				"requests": appCount,
+			})
+		}
+
+		// Daily breakdown from usage records
+		daily := make([]map[string]any, windowDays)
+		records, _ := a.platformUsage.GetByTenant(r.Context(), auth.TenantID, windowStart, now)
+		dailyCounts := make(map[string]int64)
+		for _, rec := range records {
+			day := rec.PeriodStart.Format("1/2")
+			dailyCounts[day] += rec.RequestCount
+		}
+		for i := windowDays - 1; i >= 0; i-- {
+			d := now.AddDate(0, 0, -i)
+			label := fmt.Sprintf("%d/%d", int(d.Month()), d.Day())
+			daily[windowDays-1-i] = map[string]any{"day": label, "count": dailyCounts[label]}
+		}
+
+		billable := float64(total) - float64(freeLimit)
+		if billable < 0 {
+			billable = 0
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"total":         total,
+			"free_limit":    freeLimit,
+			"price_per_10k": pricePerTenK,
+			"cost":          (billable / 10000.0) * pricePerTenK,
+			"apps":          appBreakdown,
+			"daily":         daily,
 		})
+		return
 	}
 
-	const freeLimit = 1000
-	const pricePerTenK = 0.5
-	billable := float64(total) - freeLimit
+	// Fallback: trace store or in-memory
+	var total int64
+	appBreakdown := make([]map[string]any, 0)
+	if a.tenantStore != nil {
+		tenants, err := a.tenantStore.List(r.Context())
+		if err == nil {
+			for _, t := range tenants {
+				total += t.RequestCount
+				appBreakdown = append(appBreakdown, map[string]any{"name": t.Name, "requests": t.RequestCount})
+			}
+		}
+	}
+	if len(appBreakdown) == 0 {
+		a.platform.mu.RLock()
+		for _, app := range a.platform.apps {
+			total += app.Requests
+			appBreakdown = append(appBreakdown, map[string]any{"name": app.Name, "requests": app.Requests})
+		}
+		a.platform.mu.RUnlock()
+	}
+
+	now := time.Now()
+	daily := make([]map[string]any, windowDays)
+	if a.traceStore != nil {
+		for i := windowDays - 1; i >= 0; i-- {
+			d := now.AddDate(0, 0, -i)
+			dayStart := time.Date(d.Year(), d.Month(), d.Day(), 0, 0, 0, 0, time.UTC)
+			daily[windowDays-1-i] = map[string]any{
+				"day":   fmt.Sprintf("%d/%d", int(d.Month()), d.Day()),
+				"count": a.traceStore.CountInRange(dayStart, dayStart.Add(24*time.Hour)),
+			}
+		}
+	} else {
+		avg := total / int64(windowDays)
+		for i := windowDays - 1; i >= 0; i-- {
+			d := now.AddDate(0, 0, -i)
+			daily[windowDays-1-i] = map[string]any{"day": fmt.Sprintf("%d/%d", int(d.Month()), d.Day()), "count": avg}
+		}
+	}
+
+	billable := float64(total) - float64(freeLimit)
 	if billable < 0 {
 		billable = 0
 	}
-	cost := (billable / 10000.0) * pricePerTenK
-
-	// Build 30-day daily chart data
-	now := time.Now()
-	daily := make([]map[string]any, 30)
-	for i := 29; i >= 0; i-- {
-		d := now.AddDate(0, 0, -i)
-		label := fmt.Sprintf("%d/%d", int(d.Month()), d.Day())
-		// Deterministic-ish fake daily counts derived from total
-		count := int64(float64(total)/30) + int64(rand.Intn(500)) - 250
-		if count < 0 {
-			count = 0
-		}
-		daily[29-i] = map[string]any{"day": label, "count": count}
-	}
-
 	writeJSON(w, http.StatusOK, map[string]any{
-		"total":      total,
-		"free_limit": freeLimit,
-		"cost":       cost,
-		"apps":       appBreakdown,
-		"daily":      daily,
+		"total": total, "free_limit": freeLimit, "price_per_10k": pricePerTenK,
+		"cost": (billable / 10000.0) * pricePerTenK, "apps": appBreakdown, "daily": daily,
 	})
 }
-
-// name is a helper for readability in handlePlatformUsage.
-func (a *PlatformApp) name() string { return a.Name }
 
 // ── /api/platform/audit ───────────────────────────────────────────────────────
 
@@ -375,25 +541,44 @@ func (a *API) handlePlatformAudit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	q := r.URL.Query()
-	actionFilter := q.Get("action")
-	offsetStr := q.Get("offset")
-	limitStr := q.Get("limit")
-
-	offset := 0
-	limit := 50
-	if v, err := strconv.Atoi(offsetStr); err == nil && v >= 0 {
+	offset, limit := 0, 50
+	if v, err := strconv.Atoi(q.Get("offset")); err == nil && v >= 0 {
 		offset = v
 	}
-	if v, err := strconv.Atoi(limitStr); err == nil && v > 0 && v <= 500 {
+	if v, err := strconv.Atoi(q.Get("limit")); err == nil && v > 0 && v <= 500 {
 		limit = v
 	}
 
+	if a.hasPlatformDB() {
+		auth := extractAuth(r)
+		filter := platformstore.AuditFilter{
+			TenantID: auth.TenantID,
+			Action:   q.Get("action"),
+			Limit:    limit,
+			Offset:   offset,
+		}
+		entries, err := a.platformAudit.Query(r.Context(), filter)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		total, _ := a.platformAudit.Count(r.Context(), filter)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"entries": entries,
+			"total":   total,
+			"offset":  offset,
+			"limit":   limit,
+		})
+		return
+	}
+
+	// Fallback: in-memory
+	actionFilter := q.Get("action")
 	a.platform.mu.RLock()
 	all := make([]PlatformAuditEntry, len(a.platform.audit))
 	copy(all, a.platform.audit)
 	a.platform.mu.RUnlock()
 
-	// Filter
 	filtered := all[:0]
 	for _, e := range all {
 		if actionFilter != "" && e.Action != actionFilter {
@@ -401,7 +586,6 @@ func (a *API) handlePlatformAudit(w http.ResponseWriter, r *http.Request) {
 		}
 		filtered = append(filtered, e)
 	}
-
 	total := len(filtered)
 	end := offset + limit
 	if end > total {
@@ -411,13 +595,7 @@ func (a *API) handlePlatformAudit(w http.ResponseWriter, r *http.Request) {
 	if offset < total {
 		page = filtered[offset:end]
 	}
-
-	writeJSON(w, http.StatusOK, map[string]any{
-		"entries": page,
-		"total":   total,
-		"offset":  offset,
-		"limit":   limit,
-	})
+	writeJSON(w, http.StatusOK, map[string]any{"entries": page, "total": total, "offset": offset, "limit": limit})
 }
 
 func (a *API) handlePlatformAuditExport(w http.ResponseWriter, r *http.Request) {
@@ -426,14 +604,27 @@ func (a *API) handlePlatformAuditExport(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	if a.hasPlatformDB() {
+		auth := extractAuth(r)
+		entries, _ := a.platformAudit.Query(r.Context(), platformstore.AuditFilter{TenantID: auth.TenantID, Limit: 10000})
+		w.Header().Set("Content-Type", "text/csv")
+		w.Header().Set("Content-Disposition", `attachment; filename="cloudmock-audit-log.csv"`)
+		cw := csv.NewWriter(w)
+		_ = cw.Write([]string{"Timestamp", "Actor", "ActorType", "Action", "ResourceType", "ResourceID", "IP"})
+		for _, e := range entries {
+			_ = cw.Write([]string{e.CreatedAt.Format(time.RFC3339), e.ActorID, e.ActorType, e.Action, e.ResourceType, e.ResourceID, e.IPAddress.String()})
+		}
+		cw.Flush()
+		return
+	}
+
+	// Fallback
 	a.platform.mu.RLock()
 	entries := make([]PlatformAuditEntry, len(a.platform.audit))
 	copy(entries, a.platform.audit)
 	a.platform.mu.RUnlock()
-
 	w.Header().Set("Content-Type", "text/csv")
 	w.Header().Set("Content-Disposition", `attachment; filename="cloudmock-audit-log.csv"`)
-
 	cw := csv.NewWriter(w)
 	_ = cw.Write([]string{"Timestamp", "Actor", "ActorType", "Action", "Resource", "ResourceID", "IP"})
 	for _, e := range entries {
@@ -447,19 +638,49 @@ func (a *API) handlePlatformAuditExport(w http.ResponseWriter, r *http.Request) 
 func (a *API) handlePlatformSettings(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		a.platform.mu.RLock()
-		ret := map[string]int{
-			"audit_log":      a.platform.retention["audit_log"],
-			"request_log":    a.platform.retention["request_log"],
-			"state_snapshot": a.platform.retention["state_snapshot"],
+		if a.hasPlatformDB() {
+			auth := extractAuth(r)
+			if auth.TenantID != "" {
+				// Get tenant info
+				var tenantName, tenantSlug, tenantPlan string
+				if a.tenantStore != nil {
+					t, err := a.tenantStore.Get(r.Context(), auth.TenantID)
+					if err == nil {
+						tenantName = t.Name
+						tenantSlug = t.Slug
+						tenantPlan = t.Tier
+					}
+				}
+				// Get retention settings
+				retMap := map[string]int{
+					"audit_log": a.cfg.Retention.AuditLog, "request_log": a.cfg.Retention.RequestLog,
+					"state_snapshot": a.cfg.Retention.StateSnapshot,
+				}
+				policies, _ := a.platformRetention.GetByTenant(r.Context(), auth.TenantID)
+				for _, p := range policies {
+					retMap[p.ResourceType] = p.RetentionDays
+				}
+				// Get usage
+				total, _ := a.platformUsage.GetCurrentPeriodCount(r.Context(), auth.TenantID)
+
+				writeJSON(w, http.StatusOK, map[string]any{
+					"name":          tenantName,
+					"slug":          tenantSlug,
+					"plan":          tenantPlan,
+					"owner_email":   r.Header.Get("X-User-Email"),
+					"request_count": total,
+					"retention":     retMap,
+				})
+				return
+			}
 		}
+
+		// Fallback for local mode
+		a.platform.mu.RLock()
+		ret := a.platform.retention
 		a.platform.mu.RUnlock()
 		writeJSON(w, http.StatusOK, map[string]any{
-			"name":        "My Organization",
-			"slug":        "my-org",
-			"plan":        "Free",
-			"owner_email": "admin@example.com",
-			"retention":   ret,
+			"name": a.cfg.Region, "slug": "local", "plan": "local", "retention": ret,
 		})
 
 	case http.MethodPut:
@@ -471,27 +692,28 @@ func (a *API) handlePlatformSettings(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		if a.hasPlatformDB() {
+			auth := extractAuth(r)
+			for resourceType, days := range req.Retention {
+				if days > 0 {
+					_ = a.platformRetention.Upsert(r.Context(), auth.TenantID, resourceType, days)
+				}
+			}
+			a.recordAudit(r, "settings.update", "retention", "")
+			writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
+			return
+		}
+
+		// Fallback
 		a.platform.mu.Lock()
 		for k, v := range req.Retention {
 			if v > 0 {
 				a.platform.retention[k] = v
 			}
 		}
-		ret := map[string]int{
-			"audit_log":      a.platform.retention["audit_log"],
-			"request_log":    a.platform.retention["request_log"],
-			"state_snapshot": a.platform.retention["state_snapshot"],
-		}
 		a.platform.mu.Unlock()
-
-		a.platform.addAudit(r, "org.settings.update", "org/my-org", "org_01")
-		writeJSON(w, http.StatusOK, map[string]any{
-			"name":        "My Organization",
-			"slug":        "my-org",
-			"plan":        "Free",
-			"owner_email": "admin@example.com",
-			"retention":   ret,
-		})
+		a.addAuditFromRequest(r, "org.settings.update", "org/settings", "")
+		writeJSON(w, http.StatusOK, map[string]string{"status": "updated"})
 
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
@@ -505,38 +727,95 @@ func (a *API) handlePlatformEnvironments(w http.ResponseWriter, r *http.Request)
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 		return
 	}
-	// For now, return just local. When cloud is connected,
-	// this will also return cloud environments.
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]any{
-		"environments": []string{"Local"},
-	})
+	envs := []string{"Local"}
+	if a.hasPlatformDB() {
+		auth := extractAuth(r)
+		apps, _ := a.platformApps.ListByTenant(r.Context(), auth.TenantID)
+		for _, app := range apps {
+			if app.Status == "running" {
+				envs = append(envs, app.Name)
+			}
+		}
+	} else if a.tenantStore != nil {
+		tenants, _ := a.tenantStore.List(r.Context())
+		for _, t := range tenants {
+			if t.FlyAppName != "" {
+				envs = append(envs, t.Name)
+			}
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"environments": envs})
 }
 
-// ── helpers ───────────────────────────────────────────────────────────────────
+// ── audit helpers ────────────────────────────────────────────────────────────
 
-// addAudit appends a new audit entry derived from the HTTP request.
-func (ps *PlatformStore) addAudit(r *http.Request, action, resource, resourceID string) {
-	ip := r.RemoteAddr
-	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
-		ip = strings.SplitN(fwd, ",", 2)[0]
+// recordAudit writes to the real audit store (Postgres).
+func (a *API) recordAudit(r *http.Request, action, resourceType, resourceID string) {
+	if a.platformAudit == nil {
+		a.addAuditFromRequest(r, action, resourceType, resourceID)
+		return
 	}
-	// Strip port from RemoteAddr if present
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
+	auth := extractAuth(r)
+	entry := &platformmodel.AuditEntry{
+		TenantID:     auth.TenantID,
+		ActorID:      auth.ActorID,
+		ActorType:    auth.ActorType,
+		Action:       action,
+		ResourceType: resourceType,
+		ResourceID:   resourceID,
+		IPAddress:    extractIP(r),
+		UserAgent:    r.UserAgent(),
+	}
+	_ = a.platformAudit.Append(r.Context(), entry)
+}
+
+// addAuditFromRequest is the in-memory fallback.
+func (a *API) addAuditFromRequest(r *http.Request, action, resource, resourceID string) {
+	actor := r.Header.Get("X-User-Email")
+	actorType := "user"
+	if actor == "" {
+		if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer cmk_") {
+			actor = authHeader[7:]
+			if len(actor) > 15 {
+				actor = actor[:15]
+			}
+			actorType = "key"
+		}
+	}
+	if actor == "" {
+		actor = "local"
+		actorType = "system"
+	}
+
+	maxEntries := a.cfg.Billing.MaxAuditEntries
+	if maxEntries <= 0 {
+		maxEntries = 1000
 	}
 
 	entry := PlatformAuditEntry{
-		ID:         fmt.Sprintf("aud_%s", randHex(8)),
-		Actor:      "admin@example.com",
-		ActorType:  "user",
-		Action:     action,
-		Resource:   resource,
-		ResourceID: resourceID,
-		IP:         ip,
-		CreatedAt:  time.Now().UTC().Format(time.RFC3339),
+		ID: fmt.Sprintf("aud_%s", randHex(8)), Actor: actor, ActorType: actorType,
+		Action: action, Resource: resource, ResourceID: resourceID,
+		IP: extractIP(r).String(), CreatedAt: time.Now().UTC().Format(time.RFC3339),
 	}
+	a.platform.mu.Lock()
+	a.platform.audit = append([]PlatformAuditEntry{entry}, a.platform.audit...)
+	if len(a.platform.audit) > maxEntries {
+		a.platform.audit = a.platform.audit[:maxEntries]
+	}
+	a.platform.mu.Unlock()
+}
 
+// addAudit is the store-level fallback for backward compat.
+func (ps *PlatformStore) addAudit(r *http.Request, action, resource, resourceID string) {
+	actor := r.Header.Get("X-User-Email")
+	if actor == "" {
+		actor = "local"
+	}
+	entry := PlatformAuditEntry{
+		ID: fmt.Sprintf("aud_%s", randHex(8)), Actor: actor, ActorType: "user",
+		Action: action, Resource: resource, ResourceID: resourceID,
+		CreatedAt: time.Now().UTC().Format(time.RFC3339),
+	}
 	ps.mu.Lock()
 	ps.audit = append([]PlatformAuditEntry{entry}, ps.audit...)
 	if len(ps.audit) > 1000 {

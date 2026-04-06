@@ -40,6 +40,8 @@ import (
 	"github.com/neureaux/cloudmock/pkg/report"
 	"github.com/neureaux/cloudmock/pkg/routing"
 	"github.com/neureaux/cloudmock/pkg/saas/clerk"
+	platformstore "github.com/neureaux/cloudmock/pkg/platform/store"
+	"github.com/neureaux/cloudmock/pkg/saas/provisioning"
 	saasstripe "github.com/neureaux/cloudmock/pkg/saas/stripe"
 	"github.com/neureaux/cloudmock/pkg/saas/tenant"
 	"github.com/neureaux/cloudmock/pkg/service"
@@ -153,6 +155,15 @@ type API struct {
 	persistDir         string       // if set, dashboards/views/deploys are persisted here
 	dynamoStore        *DynamoStore // if set, dashboards/views/deploys use DynamoDB
 	platform           *PlatformStore
+	platformApps       *platformstore.AppStore
+	platformKeys       *platformstore.APIKeyStore
+	platformAudit      *platformstore.AuditStore
+
+	platformUsage      *platformstore.UsageStore
+	platformRetention  *platformstore.RetentionStore
+	orchestrator       *provisioning.Orchestrator
+	clerkVerifier      *clerk.JWTVerifier
+	pluginInstaller    *marketplace.Installer
 
 	// Lazy initialization for devtools subsystems (deferred in minimal profile).
 	lazyInitOnce sync.Once
@@ -219,7 +230,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 		stats:       stats,
 		broadcaster: NewEventBroadcaster(),
 		mux:         http.NewServeMux(),
-		platform:    newPlatformStore(),
+		platform:    newPlatformStore(cfg.Retention.AuditLog, cfg.Retention.RequestLog, cfg.Retention.StateSnapshot),
 	}
 
 	a.mux.HandleFunc("/api/version", a.handleVersion)
@@ -274,11 +285,15 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
 	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
+	a.mux.HandleFunc("/api/store", a.handlePluginStore)
+	a.mux.HandleFunc("/api/store/", a.handlePluginStoreAction)
 	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
 	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
 
 	// SaaS hosted-tier endpoints
 	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)
+	a.mux.HandleFunc("/api/saas/config", a.handleSaaSConfig)
+	a.mux.HandleFunc("/api/platform/pricing", a.handlePlatformPricing)
 	a.mux.HandleFunc("/api/usage", a.handleUsage)
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
@@ -359,7 +374,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 		broadcaster: NewEventBroadcaster(),
 		mux:         http.NewServeMux(),
 		dp:          dp,
-		platform:    newPlatformStore(),
+		platform:    newPlatformStore(cfg.Retention.AuditLog, cfg.Retention.RequestLog, cfg.Retention.StateSnapshot),
 	}
 
 	a.mux.HandleFunc("/api/version", a.handleVersion)
@@ -426,11 +441,15 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/preferences", a.handlePreferences)
 	a.mux.HandleFunc("/api/plugins", a.handlePlugins)
 	a.mux.HandleFunc("/api/plugins/", a.handlePluginByName)
+	a.mux.HandleFunc("/api/store", a.handlePluginStore)
+	a.mux.HandleFunc("/api/store/", a.handlePluginStoreAction)
 	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
 	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
 
 	// SaaS hosted-tier endpoints
 	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)
+	a.mux.HandleFunc("/api/saas/config", a.handleSaaSConfig)
+	a.mux.HandleFunc("/api/platform/pricing", a.handlePlatformPricing)
 	a.mux.HandleFunc("/api/usage", a.handleUsage)
 	a.mux.HandleFunc("/api/subscription", a.handleSubscription)
 	a.mux.HandleFunc("/api/webhooks/clerk", a.handleClerkWebhook)
@@ -726,7 +745,11 @@ func (a *API) handleHealth(w http.ResponseWriter, r *http.Request) {
 		resp.Status = status
 	}
 
-	writeJSON(w, http.StatusOK, resp)
+	code := http.StatusOK
+	if status == "degraded" {
+		code = http.StatusServiceUnavailable
+	}
+	writeJSON(w, code, resp)
 }
 
 func (a *API) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -2479,6 +2502,120 @@ func (a *API) handlePluginByName(w http.ResponseWriter, r *http.Request) {
 	writeError(w, http.StatusNotFound, fmt.Sprintf("plugin %q not found", name))
 }
 
+// handlePluginStore serves GET /api/store — search/list marketplace plugins.
+// Query params: q (search), category (filter).
+func (a *API) handlePluginStore(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	if a.marketplace == nil {
+		writeJSON(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	category := r.URL.Query().Get("category")
+
+	listings := a.marketplace.Search(query, category)
+
+	// Enrich with real install status from filesystem
+	if a.pluginInstaller != nil {
+		for i := range listings {
+			if listings[i].InstallCmd != "built-in" {
+				listings[i].Installed = a.pluginInstaller.IsInstalled(listings[i].ID)
+			}
+		}
+	}
+
+	writeJSON(w, http.StatusOK, listings)
+}
+
+// handlePluginStoreAction handles:
+//   POST /api/store/{id}/install   — install a plugin
+//   POST /api/store/{id}/uninstall — uninstall a plugin
+//   GET  /api/store/{id}           — get plugin details
+func (a *API) handlePluginStoreAction(w http.ResponseWriter, r *http.Request) {
+	path := strings.TrimPrefix(r.URL.Path, "/api/store/")
+	parts := strings.SplitN(path, "/", 2)
+	id := parts[0]
+
+	if a.marketplace == nil {
+		writeError(w, http.StatusNotFound, "marketplace not enabled")
+		return
+	}
+
+	listing, ok := a.marketplace.Get(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, fmt.Sprintf("plugin %q not found in store", id))
+		return
+	}
+
+	// GET /api/store/{id}
+	if r.Method == http.MethodGet && len(parts) == 1 {
+		if a.pluginInstaller != nil && listing.InstallCmd != "built-in" {
+			listing.Installed = a.pluginInstaller.IsInstalled(id)
+		}
+		writeJSON(w, http.StatusOK, listing)
+		return
+	}
+
+	if r.Method != http.MethodPost || len(parts) < 2 {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	action := parts[1]
+
+	if a.pluginInstaller == nil {
+		writeError(w, http.StatusServiceUnavailable, "plugin installer not configured")
+		return
+	}
+
+	switch action {
+	case "install":
+		if listing.InstallCmd == "built-in" {
+			writeError(w, http.StatusBadRequest, "built-in plugins cannot be installed (already included)")
+			return
+		}
+		if a.pluginInstaller.IsInstalled(id) {
+			writeError(w, http.StatusConflict, fmt.Sprintf("plugin %q is already installed", id))
+			return
+		}
+		if err := a.pluginInstaller.Install(r.Context(), listing); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("install failed: %v", err))
+			return
+		}
+		_ = a.marketplace.Install(id)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "installed",
+			"plugin":  id,
+			"version": listing.Version,
+			"path":    a.pluginInstaller.PluginDir() + "/" + id,
+			"message": "Restart CloudMock to load the plugin",
+		})
+
+	case "uninstall":
+		if listing.InstallCmd == "built-in" {
+			writeError(w, http.StatusBadRequest, "built-in plugins cannot be uninstalled")
+			return
+		}
+		if err := a.pluginInstaller.Uninstall(id); err != nil {
+			writeError(w, http.StatusInternalServerError, fmt.Sprintf("uninstall failed: %v", err))
+			return
+		}
+		_ = a.marketplace.Uninstall(id)
+		writeJSON(w, http.StatusOK, map[string]any{
+			"status":  "uninstalled",
+			"plugin":  id,
+			"message": "Restart CloudMock to remove the plugin",
+		})
+
+	default:
+		writeError(w, http.StatusNotFound, fmt.Sprintf("unknown action %q", action))
+	}
+}
+
 // SetProfilingEngine sets the profiling engine for the admin API.
 func (a *API) SetProfilingEngine(e *profiling.Engine) {
 	a.profilingEngine = e
@@ -3689,6 +3826,30 @@ func (a *API) SetStripeWebhook(h *saasstripe.WebhookHandler) {
 	a.stripeWebhook = h
 }
 
+// SetOrchestrator sets the provisioning orchestrator for tenant lifecycle.
+func (a *API) SetOrchestrator(o *provisioning.Orchestrator) {
+	a.orchestrator = o
+}
+
+// SetClerkVerifier sets the Clerk JWT verifier for authenticating SaaS requests.
+func (a *API) SetClerkVerifier(v *clerk.JWTVerifier) {
+	a.clerkVerifier = v
+}
+
+// SetPluginInstaller sets the marketplace installer for plugin management.
+func (a *API) SetPluginInstaller(inst *marketplace.Installer) {
+	a.pluginInstaller = inst
+}
+
+// SetPlatformStores wires the Postgres-backed platform stores for apps, keys, audit, usage, retention.
+func (a *API) SetPlatformStores(apps *platformstore.AppStore, keys *platformstore.APIKeyStore, audit *platformstore.AuditStore, usage *platformstore.UsageStore, retention *platformstore.RetentionStore) {
+	a.platformApps = apps
+	a.platformKeys = keys
+	a.platformAudit = audit
+	a.platformUsage = usage
+	a.platformRetention = retention
+}
+
 // SetTrafficEngine sets the traffic recording/replay engine and registers routes.
 func (a *API) SetTrafficEngine(e *traffic.Engine) {
 	a.trafficEngine = e
@@ -4397,6 +4558,29 @@ func (a *API) handleStripeWebhook(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.stripeWebhook.HandleWebhook(w, r)
+}
+
+// handleSaaSConfig returns public SaaS configuration for the frontend.
+// This exposes only safe, non-secret values that the devtools SPA needs
+// to initialize Clerk auth and detect hosted mode.
+func (a *API) handleSaaSConfig(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	resp := map[string]any{
+		"saas_enabled": a.cfg.SaaS.Enabled,
+		"auth_enabled": a.cfg.Auth.Enabled,
+	}
+
+	// Only expose the publishable key (never the secret key).
+	if a.cfg.SaaS.Clerk.PublishableKey != "" {
+		resp["clerk_publishable_key"] = a.cfg.SaaS.Clerk.PublishableKey
+		resp["clerk_domain"] = a.cfg.SaaS.Clerk.Domain
+	}
+
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleCloudTrailReplay accepts a POST with CloudTrail JSON (Records array)

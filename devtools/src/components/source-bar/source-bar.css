@@ -6,6 +6,16 @@
   align-items: center;
   padding: 0 12px;
   gap: 8px;
+  position: relative;
+}
+
+.source-bar-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+  white-space: nowrap;
 }
 
 .source-chip {
@@ -47,6 +57,13 @@
   font-size: 11px;
 }
 
+.source-chip-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding-left: 4px;
+}
+
 .source-bar-spacer {
   flex: 1;
 }
@@ -54,14 +71,44 @@
 .source-add-btn {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
   border-radius: var(--radius-sm);
   background: transparent;
   border: 1px dashed var(--border-default);
-  font-size: 12px;
+  font-size: 14px;
   color: var(--text-tertiary);
-  cursor: not-allowed;
+  cursor: pointer;
   font-family: var(--font-sans);
-  opacity: 0.6;
+  transition: all 0.15s;
+}
+
+.source-add-btn:hover {
+  border-color: var(--border-strong);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.source-add-form {
+  position: absolute;
+  top: calc(var(--source-bar-height) + 4px);
+  left: 12px;
+  display: flex;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-dropdown);
+}
+
+.source-add-input {
+  width: 160px;
+}
+
+.source-add-submit {
+  white-space: nowrap;
 }

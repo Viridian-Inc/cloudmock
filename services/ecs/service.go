@@ -51,6 +51,12 @@ func (s *ECSService) Actions() []service.Action {
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "ecs:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "ecs:UntagResource"},
 		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "ecs:ListTagsForResource"},
+		// Capacity Providers
+		{Name: "CreateCapacityProvider", Method: http.MethodPost, IAMAction: "ecs:CreateCapacityProvider"},
+		{Name: "DescribeCapacityProviders", Method: http.MethodPost, IAMAction: "ecs:DescribeCapacityProviders"},
+		{Name: "DeleteCapacityProvider", Method: http.MethodPost, IAMAction: "ecs:DeleteCapacityProvider"},
+		// Execute Command
+		{Name: "ExecuteCommand", Method: http.MethodPost, IAMAction: "ecs:ExecuteCommand"},
 	}
 }
 
@@ -174,6 +180,16 @@ func (s *ECSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleUntagResource(ctx, s.store)
 	case "ListTagsForResource":
 		return handleListTagsForResource(ctx, s.store)
+	// Capacity Providers
+	case "CreateCapacityProvider":
+		return handleCreateCapacityProvider(ctx, s.store)
+	case "DescribeCapacityProviders":
+		return handleDescribeCapacityProviders(ctx, s.store)
+	case "DeleteCapacityProvider":
+		return handleDeleteCapacityProvider(ctx, s.store)
+	// Execute Command
+	case "ExecuteCommand":
+		return handleExecuteCommand(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

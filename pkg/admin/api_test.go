@@ -213,7 +213,7 @@ func TestHealth_Degraded(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 
 	var resp admin.HealthResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
@@ -257,7 +257,7 @@ func TestHealth_MultipleServices(t *testing.T) {
 	w := httptest.NewRecorder()
 	api.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 
 	var resp admin.HealthResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))

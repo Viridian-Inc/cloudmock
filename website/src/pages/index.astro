@@ -216,30 +216,30 @@ const services = [
           <h2 class="section-title">135x faster than LocalStack. 95x faster than Moto.</h2>
           <p class="section-desc">Verified benchmarks. Endpoint-fingerprinted. Not theoretical — measured with <a href="https://github.com/rakyll/hey" style="color:#52b788">hey</a> on real HTTP requests.</p>
         </div>
-        <div class="steps-grid" style="grid-template-columns: repeat(4, 1fr);">
-          <div class="step">
-            <div class="step-number" style="font-size:1.5rem;">115K</div>
-            <h3>req/s</h3>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-value">115K</div>
+            <div class="stat-label">req/s</div>
             <p>Geometric mean across 8 core AWS operations</p>
           </div>
-          <div class="step">
-            <div class="step-number" style="font-size:1.5rem;">135x</div>
-            <h3>vs LocalStack</h3>
+          <div class="stat-card">
+            <div class="stat-value">135x</div>
+            <div class="stat-label">vs LocalStack</div>
             <p>LocalStack: 858 req/s (Docker + Python)</p>
           </div>
-          <div class="step">
-            <div class="step-number" style="font-size:1.5rem;">95x</div>
-            <h3>vs Moto</h3>
+          <div class="stat-card">
+            <div class="stat-value">95x</div>
+            <div class="stat-label">vs Moto</div>
             <p>Moto: 1,216 req/s (Python + Flask)</p>
           </div>
-          <div class="step">
-            <div class="step-number" style="font-size:1.5rem;">0.1s</div>
-            <h3>per CI build</h3>
+          <div class="stat-card">
+            <div class="stat-value">0.1s</div>
+            <div class="stat-label">per CI build</div>
             <p>5,000 SDK calls in 0.1s vs 18s on LocalStack</p>
           </div>
         </div>
         <div style="text-align:center;margin-top:1.5rem;">
-          <a href="/docs/docs/reference/benchmarks/" class="btn-secondary">Full benchmark results</a>
+          <a href="/docs/reference/benchmarks/" class="btn-secondary">Full benchmark results</a>
         </div>
       </div>
     </section>

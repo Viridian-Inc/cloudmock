@@ -329,6 +329,13 @@ type cancellationReason struct {
 
 // ---- helpers ----
 
+// emptyJSON is the pre-allocated response for operations that return {}.
+var emptyJSONResponse = &service.Response{
+	StatusCode:     http.StatusOK,
+	RawBody:        []byte("{}"),
+	RawContentType: "application/x-amz-json-1.0",
+}
+
 func jsonOK(body any) (*service.Response, error) {
 	raw, err := gojson.Marshal(body)
 	if err != nil {
@@ -339,6 +346,11 @@ func jsonOK(body any) (*service.Response, error) {
 		RawBody:        raw,
 		RawContentType: "application/x-amz-json-1.0",
 	}, nil
+}
+
+// jsonEmpty returns the pre-allocated {} response (for PutItem, DeleteItem, etc.)
+func jsonEmpty() (*service.Response, error) {
+	return emptyJSONResponse, nil
 }
 
 func jsonErr(awsErr *service.AWSError) (*service.Response, error) {
@@ -517,7 +529,7 @@ func handlePutItem(ctx *service.RequestContext, store *TableStore) (*service.Res
 		return jsonErr(awsErr)
 	}
 
-	return jsonOK(struct{}{})
+	return jsonEmpty()
 }
 
 func handleGetItem(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
@@ -528,6 +540,22 @@ func handleGetItem(ctx *service.RequestContext, store *TableStore) (*service.Res
 	if req.TableName == "" {
 		return jsonErr(service.NewAWSError("ValidationException",
 			"TableName is required.", http.StatusBadRequest))
+	}
+
+	// Fast path: no projection → marshal while holding partition lock (skip copyItem).
+	if req.ProjectionExpression == "" {
+		raw, awsErr := store.GetItemRaw(req.TableName, req.Key)
+		if awsErr != nil {
+			return jsonErr(awsErr)
+		}
+		if raw == nil {
+			return jsonEmpty()
+		}
+		return &service.Response{
+			StatusCode:     http.StatusOK,
+			RawBody:        raw,
+			RawContentType: "application/x-amz-json-1.0",
+		}, nil
 	}
 
 	item, awsErr := store.GetItem(req.TableName, req.Key, req.ProjectionExpression, req.ExpressionAttributeNames)
@@ -552,7 +580,7 @@ func handleDeleteItem(ctx *service.RequestContext, store *TableStore) (*service.
 		return jsonErr(awsErr)
 	}
 
-	return jsonOK(struct{}{})
+	return jsonEmpty()
 }
 
 func handleUpdateItem(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
@@ -698,7 +726,7 @@ func handleTransactWriteItems(ctx *service.RequestContext, store *TableStore) (*
 	if awsErr := store.TransactWriteItems(req.TransactItems); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	return jsonOK(struct{}{})
+	return jsonEmpty()
 }
 
 func handleTransactGetItems(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
@@ -907,7 +935,7 @@ func handleTagResource(ctx *service.RequestContext, store *TableStore) (*service
 	for _, t := range req.Tags {
 		table.Tags[t.Key] = t.Value
 	}
-	return jsonOK(struct{}{})
+	return jsonEmpty()
 }
 
 func handleUntagResource(ctx *service.RequestContext, store *TableStore) (*service.Response, error) {
@@ -923,5 +951,5 @@ func handleUntagResource(ctx *service.RequestContext, store *TableStore) (*servi
 	for _, k := range req.TagKeys {
 		delete(table.Tags, k)
 	}
-	return jsonOK(struct{}{})
+	return jsonEmpty()
 }

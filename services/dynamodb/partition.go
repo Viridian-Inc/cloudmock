@@ -15,14 +15,25 @@ func attrString(av AttributeValue) string {
 		return ""
 	}
 	if v, ok := av["S"]; ok {
+		// Fast path: string values are the most common key type.
+		if s, ok := v.(string); ok {
+			return "S:" + s
+		}
 		return "S:" + fmt.Sprint(v)
 	}
 	if v, ok := av["N"]; ok {
-		// Pad numeric values for correct lexicographic ordering.
-		s := fmt.Sprint(v)
+		var s string
+		if str, ok := v.(string); ok {
+			s = str
+		} else {
+			s = fmt.Sprint(v)
+		}
 		return "N:" + padNumber(s)
 	}
 	if v, ok := av["B"]; ok {
+		if s, ok := v.(string); ok {
+			return "B:" + s
+		}
 		return "B:" + fmt.Sprint(v)
 	}
 	return ""

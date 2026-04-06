@@ -7,8 +7,14 @@ import (
 	"sync"
 	"time"
 
+	gojson "github.com/goccy/go-json"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
+
+// getItemResponseRaw is used by GetItemRaw to marshal while holding the lock.
+type getItemResponseRaw struct {
+	Item Item `json:"Item,omitempty"`
+}
 
 // TableStore manages all DynamoDB tables in memory.
 type TableStore struct {
@@ -299,6 +305,38 @@ func (s *TableStore) GetItem(tableName string, key Item, projExpr string, exprNa
 		result = applyProjection(result, projExpr, exprNames)
 	}
 	return result, nil
+}
+
+// GetItemRaw retrieves an item and marshals it to JSON while holding the
+// partition lock, eliminating the need for copyItem. Returns nil for not found.
+func (s *TableStore) GetItemRaw(tableName string, key Item) ([]byte, *service.AWSError) {
+	table, awsErr := s.acquireTable(tableName)
+	if awsErr != nil {
+		return nil, awsErr
+	}
+
+	hk := table.hashKeyName()
+	pkVal := attrString(key[hk])
+
+	table.mu.RLock()
+	part := table.getPartition(pkVal)
+	table.mu.RUnlock()
+
+	if part == nil {
+		return nil, nil
+	}
+
+	part.mu.RLock()
+	item, ok := part.get(key)
+	if !ok {
+		part.mu.RUnlock()
+		return nil, nil
+	}
+	// Marshal while holding the lock — avoids copyItem allocation.
+	raw, _ := gojson.Marshal(getItemResponseRaw{Item: item})
+	part.mu.RUnlock()
+
+	return raw, nil
 }
 
 // DeleteItem removes an item by key from the specified table.

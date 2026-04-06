@@ -62,7 +62,7 @@ runs:
         # Health check with 30s timeout
         echo -n "Waiting for CloudMock..."
         for i in $(seq 1 60); do
-          if curl -sf http://localhost:${{ inputs.port }}/ > /dev/null 2>&1; then
+          if curl -sf http://localhost:4599/api/health > /dev/null 2>&1; then
             echo " ready!"
             break
           fi

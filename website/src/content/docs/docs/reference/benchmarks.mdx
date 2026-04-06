@@ -295,24 +295,24 @@ description: Performance comparison of CloudMock (In-Process and HTTP modes) vs 
 
 {/* ── Hero ── */}
 <div class="bench-hero">
-  <h2>$4.32/yr &nbsp;·&nbsp; 110× faster than Moto</h2>
-  <p class="subtitle">CloudMock In-Process eliminates network overhead entirely. CloudMock HTTP beats LocalStack by up to 1,300× on SQS.</p>
+  <h2>135× faster than LocalStack &nbsp;·&nbsp; 95× faster than Moto</h2>
+  <p class="subtitle">Verified benchmarks using <a href="https://github.com/rakyll/hey" style="color:#b7e4c7">hey</a>. Endpoints fingerprinted via response headers (<code>x-localstack: true</code>, <code>Server: Werkzeug</code>).</p>
   <div class="bench-stats">
     <div class="bench-stat">
-      <div class="value">0.020ms</div>
-      <div class="label">DynamoDB In-Process</div>
+      <div class="value">115K</div>
+      <div class="label">req/s (geo mean)</div>
     </div>
     <div class="bench-stat">
-      <div class="value">110×</div>
-      <div class="label">Faster than Moto (In-Process)</div>
+      <div class="value">135×</div>
+      <div class="label">vs LocalStack</div>
     </div>
     <div class="bench-stat">
-      <div class="value">1ms</div>
-      <div class="label">In-Process Startup</div>
+      <div class="value">95×</div>
+      <div class="label">vs Moto</div>
     </div>
     <div class="bench-stat">
-      <div class="value">$4.32</div>
-      <div class="label">Annual CI Cost (1K builds/day)</div>
+      <div class="value">0.009ms</div>
+      <div class="label">Avg Latency</div>
     </div>
   </div>
 </div>
@@ -519,65 +519,90 @@ P50 latency per key operation. Each service group shows all four providers. Lowe
   In-Process mode is Go-only. SNS, IAM, and STS figures for In-Process are not applicable because those services are typically called through the HTTP endpoint even in Go tests. SQS LocalStack latency reflects its synchronous message routing overhead — ReceiveMessage with long-polling is excluded from all averages.
 </div>
 
-## Speed Multiplier
+## Throughput by Service
 
-How many times faster CloudMock is compared to each competitor.
+Requests per second across 8 core AWS operations. Higher is better. Measured with [hey](https://github.com/rakyll/hey) at 100 concurrent connections (CloudMock) and 20 concurrent (LocalStack/Moto).
 
 <table class="bench-table">
   <thead>
     <tr>
-      <th>Service / Operation</th>
-      <th>In-Process vs Moto</th>
-      <th>In-Process vs LocalStack</th>
-      <th>HTTP vs Moto</th>
-      <th>HTTP vs LocalStack</th>
+      <th>Operation</th>
+      <th class="col-cm-http">CloudMock</th>
+      <th class="col-ls">LocalStack</th>
+      <th class="col-moto">Moto</th>
+      <th>CM / LS</th>
+      <th>CM / Moto</th>
     </tr>
   </thead>
   <tbody>
     <tr>
+      <td><strong>DynamoDB ListTables</strong></td>
+      <td class="col-cm-http">101,636 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">739</td>
+      <td class="col-moto">1,557</td>
+      <td><strong>138×</strong></td>
+      <td><strong>65×</strong></td>
+    </tr>
+    <tr>
+      <td><strong>DynamoDB PutItem</strong></td>
+      <td class="col-cm-http">119,995 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">545</td>
+      <td class="col-moto">1,560</td>
+      <td><strong>220×</strong></td>
+      <td><strong>77×</strong></td>
+    </tr>
+    <tr>
       <td><strong>DynamoDB GetItem</strong></td>
-      <td class="col-cm-ip">121×</td>
-      <td class="col-cm-ip">261×</td>
-      <td class="col-cm-http">5.5×</td>
-      <td class="col-cm-http">11.8×</td>
+      <td class="col-cm-http">110,641 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">656</td>
+      <td class="col-moto">1,520</td>
+      <td><strong>169×</strong></td>
+      <td><strong>73×</strong></td>
     </tr>
     <tr>
-      <td><strong>S3 PutObject</strong></td>
-      <td class="col-cm-ip">73×</td>
-      <td class="col-cm-ip">52×</td>
-      <td class="col-cm-http">2.2×</td>
-      <td class="col-cm-http">1.6×</td>
+      <td><strong>S3 ListBuckets</strong></td>
+      <td class="col-cm-http">132,864 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">1,408</td>
+      <td class="col-moto">1,222</td>
+      <td><strong>94×</strong></td>
+      <td><strong>109×</strong></td>
     </tr>
     <tr>
-      <td><strong>SQS SendMessage</strong></td>
-      <td class="col-cm-ip">172×</td>
-      <td class="col-cm-ip">64,000×</td>
-      <td class="col-cm-http">3.5×</td>
-      <td class="col-cm-http">1,314×</td>
+      <td><strong>SQS ListQueues</strong></td>
+      <td class="col-cm-http">111,962 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">1,363</td>
+      <td class="col-moto">1,118</td>
+      <td><strong>82×</strong></td>
+      <td><strong>100×</strong></td>
     </tr>
     <tr>
-      <td><strong>SNS Publish</strong></td>
-      <td>—</td>
-      <td>—</td>
-      <td class="col-cm-http">2.6×</td>
-      <td class="col-cm-http">2.0×</td>
+      <td><strong>IAM ListUsers</strong></td>
+      <td class="col-cm-http">114,808 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">1,120</td>
+      <td class="col-moto">989</td>
+      <td><strong>103×</strong></td>
+      <td><strong>116×</strong></td>
     </tr>
     <tr>
-      <td><strong>IAM GetRole</strong></td>
-      <td>—</td>
-      <td>—</td>
-      <td class="col-cm-http">3.2×</td>
-      <td class="col-cm-http">2.8×</td>
+      <td><strong>Lambda ListFunctions</strong></td>
+      <td class="col-cm-http">118,653 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">577</td>
+      <td class="col-moto">1,218</td>
+      <td><strong>206×</strong></td>
+      <td><strong>97×</strong></td>
     </tr>
     <tr>
-      <td><strong>STS GetCallerIdentity</strong></td>
-      <td>—</td>
-      <td>—</td>
-      <td class="col-cm-http">5.8×</td>
-      <td class="col-cm-http">8.0×</td>
+      <td><strong>EC2 DescribeInstances</strong></td>
+      <td class="col-cm-http">116,063 <span class="badge badge-best">best</span></td>
+      <td class="col-ls">898</td>
+      <td class="col-moto">787</td>
+      <td><strong>129×</strong></td>
+      <td><strong>147×</strong></td>
     </tr>
   </tbody>
 </table>
+
+**Geometric mean: CloudMock 115,530 req/s — 135× faster than LocalStack (858 req/s), 95× faster than Moto (1,216 req/s).**
 
 ## Startup Time
 
@@ -616,85 +641,105 @@ How long each provider takes to be ready for the first request.
 
 ## CI Cost at Scale
 
-Estimated annual infrastructure cost for a team running **1,000 CI builds per day**. Each build spins up one mock instance running for ~30 seconds on a `c5.large` equivalent instance. In-Process cost reflects only the fractional CPU time used during test execution with no sidecar.
+Annual cost for a team running **1,000 CI builds per day**, with 5,000 AWS SDK calls per build. Includes GitHub Actions compute ($0.008/min) and developer wait time ($75/hr loaded).
 
 <div class="chart-wrap">
-  <h3>Annual CI Cost at 1,000 builds/day — lower is better</h3>
+  <h3>Time per CI build (5,000 SDK calls) — lower is better</h3>
   <div class="legend">
-    <div class="legend-item"><div class="legend-dot cm-ip"></div>CloudMock In-Process</div>
-    <div class="legend-item"><div class="legend-dot cm-http"></div>CloudMock HTTP</div>
+    <div class="legend-item"><div class="legend-dot cm-http"></div>CloudMock (test mode)</div>
     <div class="legend-item"><div class="legend-dot moto"></div>Moto</div>
     <div class="legend-item"><div class="legend-dot ls"></div>LocalStack</div>
   </div>
-  {/* scale: $17,159 = 100% */}
+  {/* scale: 18s = 100% */}
   <div class="bar-row">
-    <div class="bar-label">CloudMock In-Process</div>
-    <div class="bar-track"><div class="bar-fill cm-ip" style="width:0.025%"></div></div>
-    <div class="bar-val">$4.32 / yr <span class="badge badge-best">best</span></div>
-  </div>
-  <div class="bar-row">
-    <div class="bar-label">CloudMock HTTP</div>
-    <div class="bar-track"><div class="bar-fill cm-http" style="width:1.1%"></div></div>
-    <div class="bar-val">$191 / yr</div>
+    <div class="bar-label">CloudMock</div>
+    <div class="bar-track"><div class="bar-fill cm-http" style="width:0.6%"></div></div>
+    <div class="bar-val">0.1s <span class="badge badge-best">best</span></div>
   </div>
   <div class="bar-row">
     <div class="bar-label">Moto</div>
-    <div class="bar-track"><div class="bar-fill moto" style="width:6.2%"></div></div>
-    <div class="bar-val">$1,065 / yr</div>
+    <div class="bar-track"><div class="bar-fill moto" style="width:40%"></div></div>
+    <div class="bar-val">7.2s</div>
   </div>
   <div class="bar-row">
     <div class="bar-label">LocalStack</div>
     <div class="bar-track"><div class="bar-fill ls" style="width:100%"></div></div>
-    <div class="bar-val">$17,159 / yr</div>
+    <div class="bar-val">18.0s</div>
   </div>
 </div>
 
-### Annual Cost Breakdown
+### Annual Savings by Switching to CloudMock
 
 <table class="bench-table">
   <thead>
     <tr>
-      <th>Provider</th>
-      <th>CI Compute</th>
-      <th>Developer Wait</th>
-      <th>Total / Year</th>
-      <th>vs In-Process</th>
+      <th>SDK calls / build</th>
+      <th>vs LocalStack</th>
+      <th>vs Moto</th>
     </tr>
   </thead>
   <tbody>
     <tr>
-      <td class="col-cm-ip">CloudMock In-Process <span class="badge badge-best">best</span></td>
-      <td class="col-cm-ip">$4.32</td>
-      <td class="col-cm-ip">Negligible</td>
-      <td class="col-cm-ip">$4.32</td>
-      <td>—</td>
+      <td>500</td>
+      <td class="col-cm-http"><strong>$95,769</strong> / yr</td>
+      <td class="col-cm-http"><strong>$25,392</strong> / yr</td>
     </tr>
     <tr>
-      <td class="col-cm-http">CloudMock HTTP</td>
-      <td>$191</td>
-      <td>Minimal (65ms startup)</td>
-      <td>$191</td>
-      <td>44×</td>
+      <td>2,000</td>
+      <td class="col-cm-http"><strong>$109,869</strong> / yr</td>
+      <td class="col-cm-http"><strong>$34,987</strong> / yr</td>
     </tr>
     <tr>
-      <td class="col-moto">Moto</td>
-      <td>$1,065</td>
-      <td>Moderate (764ms startup)</td>
-      <td>$1,065</td>
-      <td>246×</td>
+      <td>5,000</td>
+      <td class="col-cm-http"><strong>$138,069</strong> / yr</td>
+      <td class="col-cm-http"><strong>$54,179</strong> / yr</td>
     </tr>
     <tr>
-      <td class="col-ls">LocalStack</td>
-      <td class="col-ls">$17,159</td>
-      <td class="col-ls">High (2,094ms startup + Pro license)</td>
-      <td class="col-ls">$17,159</td>
-      <td class="col-ls">3,972×</td>
+      <td>10,000</td>
+      <td class="col-cm-http"><strong>$185,069</strong> / yr</td>
+      <td class="col-cm-http"><strong>$86,165</strong> / yr</td>
+    </tr>
+  </tbody>
+</table>
+
+### Developer Time Saved
+
+At 5,000 SDK calls per build, 1,000 builds/day:
+
+<table class="bench-table">
+  <thead>
+    <tr>
+      <th>Metric</th>
+      <th>vs LocalStack</th>
+      <th>vs Moto</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Hours saved / year</td>
+      <td class="col-cm-http"><strong>1,810</strong></td>
+      <td class="col-cm-http"><strong>715</strong></td>
+    </tr>
+    <tr>
+      <td>Engineer-years saved</td>
+      <td class="col-cm-http"><strong>0.9</strong></td>
+      <td class="col-cm-http"><strong>0.3</strong></td>
+    </tr>
+    <tr>
+      <td>Working days saved</td>
+      <td class="col-cm-http"><strong>226</strong></td>
+      <td class="col-cm-http"><strong>89</strong></td>
+    </tr>
+    <tr>
+      <td>Cost saved ($75/hr loaded)</td>
+      <td class="col-cm-http"><strong>$135,772</strong></td>
+      <td class="col-cm-http"><strong>$53,647</strong></td>
     </tr>
   </tbody>
 </table>
 
 <div class="note-box">
-  LocalStack cost includes Pro licensing fees ($420/user/year for teams needing advanced features) plus the higher compute cost from heavy JVM memory and slow container startup. Moto has no licensing cost but Python's GIL limits concurrency under load. CloudMock HTTP uses a single lightweight Go binary — no JVM, no GC pauses.
+  Savings include GitHub Actions compute and developer wait time. CloudMock finishes 5,000 SDK calls in 0.1 seconds where LocalStack takes 18 seconds (12s Docker startup + 6s request processing) and Moto takes 7.2 seconds (3s Python startup + 4.2s request processing). That 18-second gap, repeated 1,000 times per day, adds up to 5 hours of cumulative wait time every day.
 </div>
 
 ## Methodology

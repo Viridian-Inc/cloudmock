@@ -208,6 +208,53 @@ const services = [
       </div>
     </section>
 
+    <!-- Performance -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">Performance</p>
+          <h2 class="section-title">135x faster than LocalStack. 95x faster than Moto.</h2>
+          <p class="section-desc">Verified benchmarks. Endpoint-fingerprinted. Not theoretical — measured with <a href="https://github.com/rakyll/hey" style="color:#52b788">hey</a> on real HTTP requests.</p>
+        </div>
+        <div class="steps-grid" style="grid-template-columns: repeat(4, 1fr);">
+          <div class="step">
+            <div class="step-number" style="font-size:1.5rem;">115K</div>
+            <h3>req/s</h3>
+            <p>Geometric mean across 8 core AWS operations</p>
+          </div>
+          <div class="step">
+            <div class="step-number" style="font-size:1.5rem;">135x</div>
+            <h3>vs LocalStack</h3>
+            <p>LocalStack: 858 req/s (Docker + Python)</p>
+          </div>
+          <div class="step">
+            <div class="step-number" style="font-size:1.5rem;">95x</div>
+            <h3>vs Moto</h3>
+            <p>Moto: 1,216 req/s (Python + Flask)</p>
+          </div>
+          <div class="step">
+            <div class="step-number" style="font-size:1.5rem;">0.1s</div>
+            <h3>per CI build</h3>
+            <p>5,000 SDK calls in 0.1s vs 18s on LocalStack</p>
+          </div>
+        </div>
+        <div style="text-align:center;margin-top:1.5rem;">
+          <a href="/docs/docs/reference/benchmarks/" class="btn-secondary">Full benchmark results</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cost Savings -->
+    <section>
+      <div class="container">
+        <div class="section-header-center">
+          <p class="section-label">ROI</p>
+          <h2 class="section-title">Save $138K/yr vs LocalStack at 1,000 CI builds/day.</h2>
+          <p class="section-desc">18 seconds saved per build &times; 1,000 builds/day = 5 hours of developer wait time eliminated every day. That's almost a full engineer-year saved annually.</p>
+        </div>
+      </div>
+    </section>
+
     <!-- Feature Grid -->
     <section>
       <div class="container">

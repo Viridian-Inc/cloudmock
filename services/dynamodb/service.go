@@ -2,15 +2,18 @@ package dynamodb
 
 import (
 	"net/http"
+	"os"
 
+	"github.com/neureaux/cloudmock/pkg/rustddb"
 	"github.com/neureaux/cloudmock/pkg/schema"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
 // DynamoDBService is the cloudmock implementation of the AWS DynamoDB API.
 type DynamoDBService struct {
-	store    *TableStore
-	ttlDone  chan struct{}
+	store     *TableStore
+	rustStore *rustddb.Store // nil unless CLOUDMOCK_RUST_DDB=true
+	ttlDone   chan struct{}
 }
 
 // New returns a new DynamoDBService for the given AWS account ID and region.
@@ -18,10 +21,18 @@ func New(accountID, region string) *DynamoDBService {
 	store := NewTableStore(accountID, region)
 	done := make(chan struct{})
 	store.startTTLReaper(done)
-	return &DynamoDBService{
+
+	svc := &DynamoDBService{
 		store:   store,
 		ttlDone: done,
 	}
+
+	// Enable Rust-accelerated store for hot-path operations.
+	if os.Getenv("CLOUDMOCK_RUST_DDB") == "true" || os.Getenv("CLOUDMOCK_TEST_MODE") == "true" {
+		svc.rustStore = rustddb.New(accountID, region)
+	}
+
+	return svc
 }
 
 // Name returns the AWS service name used for routing.
@@ -113,6 +124,19 @@ func (s *DynamoDBService) ResourceSchemas() []schema.ResourceSchema {
 
 // HandleRequest routes an incoming DynamoDB request to the appropriate handler.
 func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
+	// Rust fast path: try Rust store first for hot-path operations.
+	if s.rustStore != nil {
+		r := s.rustStore.Handle(ctx.Action, ctx.Body)
+		if r.Status != 0 {
+			return &service.Response{
+				StatusCode:     r.Status,
+				RawBody:        r.Body,
+				RawContentType: "application/x-amz-json-1.0",
+			}, nil
+		}
+		// status=0 means Rust doesn't handle this action — fall through to Go.
+	}
+
 	switch ctx.Action {
 	case "CreateTable":
 		return handleCreateTable(ctx, s.store)

@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/tidwall/btree"
 )
@@ -92,9 +93,10 @@ func serializeKey(item Item, hashKeyName, rangeKeyName string) string {
 // For tables without a sort key, it holds at most one item.
 // For tables with a sort key, items are stored in a B-tree sorted by sort key.
 type Partition struct {
-	single Item             // used when there is no sort key
+	mu     sync.RWMutex        // per-partition lock for item operations
+	single Item                // used when there is no sort key
 	tree   *btree.BTreeG[Item] // used when there is a sort key
-	skName string           // sort key attribute name (empty if no sort key)
+	skName string              // sort key attribute name (empty if no sort key)
 	count  int
 }
 

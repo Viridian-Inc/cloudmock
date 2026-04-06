@@ -12,8 +12,8 @@ import (
 
 // TableStore manages all DynamoDB tables in memory.
 type TableStore struct {
-	mu        sync.RWMutex // protects the tables map (create/delete/list/describe)
-	tables    map[string]*Table
+	mu        sync.Mutex // only for operations needing global serialization (e.g. UpdateTable)
+	tables    sync.Map   // map[string]*Table — lock-free for hot-path lookups
 	accountID string
 	region    string
 }
@@ -21,7 +21,6 @@ type TableStore struct {
 // NewTableStore creates an empty TableStore.
 func NewTableStore(accountID, region string) *TableStore {
 	return &TableStore{
-		tables:    make(map[string]*Table),
 		accountID: accountID,
 		region:    region,
 	}
@@ -33,14 +32,6 @@ func (s *TableStore) tableARN(name string) string {
 
 // CreateTable creates a new table. Returns ResourceInUseException if it already exists.
 func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attrDefs []AttributeDefinition, billingMode string, pt *ProvisionedThroughput, gsis []GSI, lsis []LSI, streamSpec *StreamSpecification) (*Table, *service.AWSError) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	if _, ok := s.tables[name]; ok {
-		return nil, service.NewAWSError("ResourceInUseException",
-			fmt.Sprintf("Table already exists: %s", name), http.StatusBadRequest)
-	}
-
 	if billingMode == "" {
 		billingMode = "PROVISIONED"
 	}
@@ -75,37 +66,33 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		table.Stream = newStream(tableARN, name, streamSpec.StreamViewType)
 	}
 
-	s.tables[name] = table
+	if _, loaded := s.tables.LoadOrStore(name, table); loaded {
+		return nil, service.NewAWSError("ResourceInUseException",
+			fmt.Sprintf("Table already exists: %s", name), http.StatusBadRequest)
+	}
 	return table, nil
 }
 
 // DeleteTable removes a table. Returns ResourceNotFoundException if not found.
 func (s *TableStore) DeleteTable(name string) (*Table, *service.AWSError) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	table, ok := s.tables[name]
-	if !ok {
+	v, loaded := s.tables.LoadAndDelete(name)
+	if !loaded {
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
 	}
-
+	table := v.(*Table)
 	table.Status = "DELETING"
-	delete(s.tables, name)
 	return table, nil
 }
 
 // DescribeTable returns table metadata. Returns ResourceNotFoundException if not found.
 func (s *TableStore) DescribeTable(name string) (*Table, *service.AWSError) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	table, ok := s.tables[name]
+	v, ok := s.tables.Load(name)
 	if !ok {
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
 	}
-	return table, nil
+	return v.(*Table), nil
 }
 
 // UpdateTable updates mutable table properties: BillingMode, ProvisionedThroughput,
@@ -113,14 +100,13 @@ func (s *TableStore) DescribeTable(name string) (*Table, *service.AWSError) {
 // All fields are optional; only non-zero values are applied.
 // The table stays ACTIVE throughout (no async state transition in CloudMock).
 func (s *TableStore) UpdateTable(name, billingMode string, pt *ProvisionedThroughput, attrDefs []AttributeDefinition) (*Table, *service.AWSError) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	table, ok := s.tables[name]
-	if !ok {
-		return nil, service.NewAWSError("ResourceNotFoundException",
-			fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
+	table, awsErr := s.acquireTable(name)
+	if awsErr != nil {
+		return nil, awsErr
 	}
+
+	table.mu.Lock()
+	defer table.mu.Unlock()
 
 	if billingMode != "" {
 		table.BillingMode = billingMode
@@ -146,20 +132,20 @@ func (s *TableStore) UpdateTable(name, billingMode string, pt *ProvisionedThroug
 
 // PutResourcePolicy sets a resource-based policy on a table.
 func (s *TableStore) PutResourcePolicy(resourceARN, policy string) (*Table, *service.AWSError) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	// Extract table name from ARN (arn:aws:dynamodb:region:account:table/name)
 	tableName := resourceARN
 	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
 		tableName = resourceARN[idx+1:]
 	}
 
-	table, ok := s.tables[tableName]
-	if !ok {
-		return nil, service.NewAWSError("ResourceNotFoundException",
-			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
+	table, awsErr := s.acquireTable(tableName)
+	if awsErr != nil {
+		return nil, awsErr
 	}
+
+	table.mu.Lock()
+	defer table.mu.Unlock()
+
 	table.ResourcePolicy = policy
 	table.ResourcePolicyRevisionID = fmt.Sprintf("rev-%d", time.Now().UnixNano())
 	return table, nil
@@ -167,37 +153,29 @@ func (s *TableStore) PutResourcePolicy(resourceARN, policy string) (*Table, *ser
 
 // GetResourcePolicy returns the resource policy for a table.
 func (s *TableStore) GetResourcePolicy(resourceARN string) (*Table, *service.AWSError) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
 	tableName := resourceARN
 	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
 		tableName = resourceARN[idx+1:]
 	}
 
-	table, ok := s.tables[tableName]
-	if !ok {
-		return nil, service.NewAWSError("ResourceNotFoundException",
-			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
-	}
-	return table, nil
+	return s.acquireTable(tableName)
 }
 
 // DeleteResourcePolicy removes the resource policy from a table.
 func (s *TableStore) DeleteResourcePolicy(resourceARN string) *service.AWSError {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	tableName := resourceARN
 	if idx := lastIndexByte(resourceARN, '/'); idx >= 0 {
 		tableName = resourceARN[idx+1:]
 	}
 
-	table, ok := s.tables[tableName]
-	if !ok {
-		return service.NewAWSError("ResourceNotFoundException",
-			fmt.Sprintf("Requested resource not found: Table: %s not found", tableName), http.StatusBadRequest)
+	table, awsErr := s.acquireTable(tableName)
+	if awsErr != nil {
+		return awsErr
 	}
+
+	table.mu.Lock()
+	defer table.mu.Unlock()
+
 	table.ResourcePolicy = ""
 	table.ResourcePolicyRevisionID = ""
 	return nil
@@ -214,33 +192,24 @@ func lastIndexByte(s string, b byte) int {
 
 // ListTables returns the names of all tables.
 func (s *TableStore) ListTables() []string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	names := make([]string, 0, len(s.tables))
-	for name := range s.tables {
-		names = append(names, name)
-	}
+	var names []string
+	s.tables.Range(func(key, value any) bool {
+		names = append(names, key.(string))
+		return true
+	})
 	sort.Strings(names)
 	return names
 }
 
-// getTableLocked returns a table by name. Caller must hold at least s.mu.RLock.
-func (s *TableStore) getTableLocked(name string) (*Table, *service.AWSError) {
-	table, ok := s.tables[name]
+// acquireTable looks up a table from the sync.Map and returns it.
+// The caller is responsible for acquiring the table-level lock.
+func (s *TableStore) acquireTable(name string) (*Table, *service.AWSError) {
+	v, ok := s.tables.Load(name)
 	if !ok {
 		return nil, service.NewAWSError("ResourceNotFoundException",
 			fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
 	}
-	return table, nil
-}
-
-// acquireTable looks up a table under the store-level read lock and returns it.
-// The caller is responsible for acquiring the table-level lock.
-func (s *TableStore) acquireTable(name string) (*Table, *service.AWSError) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	return s.getTableLocked(name)
+	return v.(*Table), nil
 }
 
 // PutItem adds or replaces an item in the specified table.
@@ -250,29 +219,44 @@ func (s *TableStore) PutItem(tableName string, item Item, condExpr ...string) *s
 		return awsErr
 	}
 
+	hk := table.hashKeyName()
+	pkVal := attrString(item[hk])
+
+	// Lock only the target partition, not the whole table.
 	table.mu.Lock()
-	defer table.mu.Unlock()
+	part := table.getOrCreatePartition(pkVal)
+	table.mu.Unlock()
+
+	part.mu.Lock()
+	defer part.mu.Unlock()
 
 	// Evaluate condition expression if provided.
 	if len(condExpr) > 0 && condExpr[0] != "" {
 		key := make(Item)
-		key[table.hashKeyName()] = item[table.hashKeyName()]
+		key[hk] = item[hk]
 		if table.rangeKeyName() != "" {
 			key[table.rangeKeyName()] = item[table.rangeKeyName()]
 		}
-		existing, _ := table.getItem(key)
+		existing, _ := part.get(key)
 		if !evaluateCondition(condExpr[0], existing, nil, nil) {
 			return service.NewAWSError("ConditionalCheckFailedException",
 				"The conditional request failed.", 400)
 		}
 	}
 
-	old := table.putItem(item)
+	old, replaced := part.put(item)
+	if !replaced {
+		table.count.Add(1)
+	}
+
+	// Index operations need table-level lock since they touch GSI/LSI stores.
+	table.mu.Lock()
 	if old != nil {
 		table.deindexItem(old)
 	}
 	table.indexItem(item)
-	table.ItemCount = table.itemCount() // sync compat field
+	table.ItemCount = table.itemCount()
+	table.mu.Unlock()
 
 	if table.Stream != nil {
 		if old != nil {
@@ -291,14 +275,26 @@ func (s *TableStore) GetItem(tableName string, key Item, projExpr string, exprNa
 		return nil, awsErr
 	}
 
-	table.mu.RLock()
-	defer table.mu.RUnlock()
+	hk := table.hashKeyName()
+	pkVal := attrString(key[hk])
 
-	item, ok := table.getItem(key)
+	table.mu.RLock()
+	part := table.getPartition(pkVal)
+	table.mu.RUnlock()
+
+	if part == nil {
+		return nil, nil
+	}
+
+	part.mu.RLock()
+	item, ok := part.get(key)
 	if !ok {
+		part.mu.RUnlock()
 		return nil, nil
 	}
 	result := copyItem(item)
+	part.mu.RUnlock()
+
 	if projExpr != "" {
 		result = applyProjection(result, projExpr, exprNames)
 	}
@@ -312,19 +308,54 @@ func (s *TableStore) DeleteItem(tableName string, key Item, condExpr ...string) 
 		return awsErr
 	}
 
-	table.mu.Lock()
-	defer table.mu.Unlock()
+	hk := table.hashKeyName()
+	pkVal := attrString(key[hk])
+
+	table.mu.RLock()
+	part := table.getPartition(pkVal)
+	table.mu.RUnlock()
+
+	if part == nil {
+		// Partition doesn't exist, nothing to delete.
+		if len(condExpr) > 0 && condExpr[0] != "" {
+			if !evaluateCondition(condExpr[0], nil, nil, nil) {
+				return service.NewAWSError("ConditionalCheckFailedException",
+					"The conditional request failed.", 400)
+			}
+		}
+		return nil
+	}
+
+	part.mu.Lock()
 
 	// Evaluate condition expression if provided.
 	if len(condExpr) > 0 && condExpr[0] != "" {
-		existing, _ := table.getItem(key)
+		existing, _ := part.get(key)
 		if !evaluateCondition(condExpr[0], existing, nil, nil) {
+			part.mu.Unlock()
 			return service.NewAWSError("ConditionalCheckFailedException",
 				"The conditional request failed.", 400)
 		}
 	}
 
-	return s.deleteFromTable(table, key)
+	old, deleted := part.delete(key)
+	part.mu.Unlock()
+
+	if deleted {
+		table.count.Add(-1)
+		table.mu.Lock()
+		if part.len() == 0 {
+			delete(table.partitions, pkVal)
+		}
+		table.deindexItem(old)
+		table.ItemCount = table.itemCount()
+		table.mu.Unlock()
+
+		if table.Stream != nil {
+			table.Stream.appendRecord("REMOVE", copyItem(old), nil)
+		}
+	}
+	return nil
 }
 
 // deleteFromTable removes an item by key from the given table. Caller must hold table.mu write lock.
@@ -583,19 +614,15 @@ func (s *TableStore) TransactWriteItems(items []transactWriteItem) *service.AWSE
 	}
 	sort.Strings(sortedNames)
 
-	// Resolve all tables under store-level read lock.
-	s.mu.RLock()
+	// Resolve all tables from sync.Map.
 	tables := make(map[string]*Table, len(sortedNames))
 	for _, name := range sortedNames {
-		table, ok := s.tables[name]
-		if !ok {
-			s.mu.RUnlock()
-			return service.NewAWSError("ResourceNotFoundException",
-				fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
+		table, awsErr := s.acquireTable(name)
+		if awsErr != nil {
+			return awsErr
 		}
 		tables[name] = table
 	}
-	s.mu.RUnlock()
 
 	// Acquire write locks on all involved tables in sorted order (deadlock prevention).
 	for _, name := range sortedNames {
@@ -706,19 +733,15 @@ func (s *TableStore) TransactGetItems(items []transactGetItem) ([]transactGetRes
 	}
 	sort.Strings(sortedNames)
 
-	// Resolve all tables under store-level read lock.
-	s.mu.RLock()
+	// Resolve all tables from sync.Map.
 	tables := make(map[string]*Table, len(sortedNames))
 	for _, name := range sortedNames {
-		table, ok := s.tables[name]
-		if !ok {
-			s.mu.RUnlock()
-			return nil, service.NewAWSError("ResourceNotFoundException",
-				fmt.Sprintf("Requested resource not found: Table: %s not found", name), http.StatusBadRequest)
+		table, awsErr := s.acquireTable(name)
+		if awsErr != nil {
+			return nil, awsErr
 		}
 		tables[name] = table
 	}
-	s.mu.RUnlock()
 
 	// Acquire read locks on all involved tables in sorted order.
 	for _, name := range sortedNames {
@@ -791,15 +814,16 @@ func (s *TableStore) GetStream(tableName string) (*Stream, *service.AWSError) {
 
 // GetStreamByARN returns the stream matching the given ARN, or nil.
 func (s *TableStore) GetStreamByARN(arn string) *Stream {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	for _, table := range s.tables {
+	var found *Stream
+	s.tables.Range(func(key, value any) bool {
+		table := value.(*Table)
 		if table.Stream != nil && table.Stream.arn == arn {
-			return table.Stream
+			found = table.Stream
+			return false
 		}
-	}
-	return nil
+		return true
+	})
+	return found
 }
 
 func formatReasons(reasons []cancellationReason) string {

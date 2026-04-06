@@ -32,19 +32,20 @@ func (s *TableStore) startTTLReaper(done <-chan struct{}) {
 func (s *TableStore) reapExpiredItems() {
 	now := time.Now().Unix()
 
-	// Snapshot the table list under the store-level read lock.
-	s.mu.RLock()
+	// Snapshot the table list from the sync.Map.
 	type tableInfo struct {
 		name  string
 		table *Table
 	}
 	var tablesWithTTL []tableInfo
-	for name, table := range s.tables {
+	s.tables.Range(func(key, value any) bool {
+		name := key.(string)
+		table := value.(*Table)
 		if table.TTL != nil && table.TTL.Enabled {
 			tablesWithTTL = append(tablesWithTTL, tableInfo{name: name, table: table})
 		}
-	}
-	s.mu.RUnlock()
+		return true
+	})
 
 	for _, ti := range tablesWithTTL {
 		table := ti.table

@@ -49,3 +49,4 @@ vendor/
 # Runtime files
 *.pid
 *.log
+allservices

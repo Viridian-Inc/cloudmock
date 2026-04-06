@@ -69,6 +69,10 @@ type Table struct {
 	// Tags holds the table's resource tags (key/value pairs).
 	Tags map[string]string
 
+	// Cached key names (set once at table creation, read-only thereafter).
+	cachedHashKey  string
+	cachedRangeKey string
+
 	// --- New partition-based storage ---
 	partitions map[string]*Partition  // pkValue → partition
 	gsiStores  map[string]*IndexStore // indexName → index store
@@ -85,6 +89,15 @@ type Table struct {
 // initPartitions initializes the partition-based storage for a table.
 // Must be called after KeySchema, GSIs, and LSIs are set.
 func (t *Table) initPartitions() {
+	// Cache key names so hashKeyName()/rangeKeyName() are O(1).
+	for _, ks := range t.KeySchema {
+		if ks.KeyType == "HASH" {
+			t.cachedHashKey = ks.AttributeName
+		} else if ks.KeyType == "RANGE" {
+			t.cachedRangeKey = ks.AttributeName
+		}
+	}
+
 	t.partitions = make(map[string]*Partition)
 	t.gsiStores = make(map[string]*IndexStore)
 	t.lsiStores = make(map[string]*IndexStore)
@@ -101,22 +114,12 @@ func (t *Table) initPartitions() {
 
 // hashKeyName returns the attribute name of the HASH key.
 func (t *Table) hashKeyName() string {
-	for _, ks := range t.KeySchema {
-		if ks.KeyType == "HASH" {
-			return ks.AttributeName
-		}
-	}
-	return ""
+	return t.cachedHashKey
 }
 
 // rangeKeyName returns the attribute name of the RANGE key, or "" if none.
 func (t *Table) rangeKeyName() string {
-	for _, ks := range t.KeySchema {
-		if ks.KeyType == "RANGE" {
-			return ks.AttributeName
-		}
-	}
-	return ""
+	return t.cachedRangeKey
 }
 
 // keyMatchesItem returns true if the given key map matches the item's key attributes.
@@ -259,6 +262,23 @@ func avEqual(a, b AttributeValue) bool {
 }
 
 // --- New partition-based methods ---
+
+// getOrCreatePartition returns the partition for a given hash key value,
+// creating it if it doesn't exist. Caller must hold table.mu at least as RLock
+// for reading, or Lock for creating.
+func (t *Table) getOrCreatePartition(pkVal string) *Partition {
+	part, ok := t.partitions[pkVal]
+	if !ok {
+		part = newPartition(t.cachedRangeKey)
+		t.partitions[pkVal] = part
+	}
+	return part
+}
+
+// getPartition returns the partition for a given hash key value, or nil if not found.
+func (t *Table) getPartition(pkVal string) *Partition {
+	return t.partitions[pkVal]
+}
 
 // putItem inserts or replaces an item. Returns the previous item (nil if new).
 func (t *Table) putItem(item Item) Item {

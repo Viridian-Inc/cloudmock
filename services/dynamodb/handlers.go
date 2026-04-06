@@ -1,9 +1,9 @@
 package dynamodb
 
 import (
-	"encoding/json"
 	"net/http"
 
+	gojson "github.com/goccy/go-json"
 	"github.com/neureaux/cloudmock/pkg/service"
 )
 
@@ -330,10 +330,14 @@ type cancellationReason struct {
 // ---- helpers ----
 
 func jsonOK(body any) (*service.Response, error) {
+	raw, err := gojson.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       body,
-		Format:     service.FormatJSON,
+		StatusCode:     http.StatusOK,
+		RawBody:        raw,
+		RawContentType: "application/x-amz-json-1.0",
 	}, nil
 }
 
@@ -345,7 +349,7 @@ func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
-	if err := json.Unmarshal(body, v); err != nil {
+	if err := gojson.Unmarshal(body, v); err != nil {
 		return service.NewAWSError("ValidationException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}

@@ -125,27 +125,26 @@ func handleGetRecords(ctx *service.RequestContext, store *TableStore) (*service.
 	var nextIterator string
 	found := false
 
-	store.mu.RLock()
-	for _, table := range store.tables {
+	var iterErr error
+	store.tables.Range(func(key, value any) bool {
+		table := value.(*Table)
 		if table.Stream == nil {
-			continue
+			return true
 		}
 		table.Stream.iteratorMu.Lock()
 		_, ok := table.Stream.iterators[req.ShardIterator]
 		table.Stream.iteratorMu.Unlock()
 		if ok {
-			var err error
-			records, nextIterator, err = table.Stream.getRecords(req.ShardIterator, req.Limit)
-			if err != nil {
-				store.mu.RUnlock()
-				return jsonErr(service.NewAWSError("ExpiredIteratorException",
-					err.Error(), http.StatusBadRequest))
-			}
+			records, nextIterator, iterErr = table.Stream.getRecords(req.ShardIterator, req.Limit)
 			found = true
-			break
+			return false
 		}
+		return true
+	})
+	if iterErr != nil {
+		return jsonErr(service.NewAWSError("ExpiredIteratorException",
+			iterErr.Error(), http.StatusBadRequest))
 	}
-	store.mu.RUnlock()
 
 	if !found {
 		return jsonErr(service.NewAWSError("ExpiredIteratorException",

@@ -15,13 +15,17 @@ jobs:
     name: SDK Compatibility (14 services)
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GOPRIVATE: github.com/neureaux/cloudmock
+      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOFLAGS: -mod=mod
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
 
       - uses: ./.github/actions/cloudmock
         id: cloudmock
@@ -78,13 +82,17 @@ jobs:
     name: Terraform Compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      GOPRIVATE: github.com/neureaux/cloudmock
+      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOFLAGS: -mod=mod
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
 
       - uses: ./.github/actions/cloudmock
 
@@ -148,13 +156,17 @@ jobs:
     name: Open Source Repos
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    env:
+      GOPRIVATE: github.com/neureaux/cloudmock
+      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOFLAGS: -mod=mod
 
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.26'
+          go-version-file: go.mod
 
       - uses: actions/setup-python@v5
         with:

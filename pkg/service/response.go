@@ -38,14 +38,9 @@ func WriteXMLResponse(w http.ResponseWriter, statusCode int, body any) error {
 
 // WriteJSONResponse marshals body as JSON and writes it with Content-Type application/x-amz-json-1.1.
 func WriteJSONResponse(w http.ResponseWriter, statusCode int, body any) error {
-	data, err := json.Marshal(body)
-	if err != nil {
-		return err
-	}
 	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 	w.WriteHeader(statusCode)
-	_, err = w.Write(data)
-	return err
+	return json.NewEncoder(w).Encode(body)
 }
 
 // WriteErrorResponse writes an AWSError in the specified format.

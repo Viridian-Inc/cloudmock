@@ -93,15 +93,27 @@ func serviceFromCredential(cred string) string {
 // It checks X-Amz-Target (part after the dot) first, then the ?Action= query parameter.
 // Returns empty string if not detected.
 func DetectAction(r *http.Request) string {
-	// Check X-Amz-Target first.
+	// Check X-Amz-Target first — fast path, no allocation.
 	if target := r.Header.Get("X-Amz-Target"); target != "" {
 		if dot := strings.LastIndex(target, "."); dot >= 0 {
 			return target[dot+1:]
 		}
 	}
 
-	// Fall back to query string.
-	return r.URL.Query().Get("Action")
+	// Fall back to query string — avoid r.URL.Query() allocation when possible.
+	if q := r.URL.RawQuery; q != "" {
+		// Fast scan for Action= in the raw query string.
+		const prefix = "Action="
+		idx := strings.Index(q, prefix)
+		if idx >= 0 {
+			val := q[idx+len(prefix):]
+			if end := strings.IndexByte(val, '&'); end >= 0 {
+				return val[:end]
+			}
+			return val
+		}
+	}
+	return ""
 }
 
 // serviceFromAuthorization extracts the service name from an AWS4-HMAC-SHA256
@@ -117,19 +129,37 @@ func serviceFromAuthorization(auth string) string {
 	}
 	rest := auth[idx+len(prefix):]
 
-	// The credential ends at a comma or whitespace.
-	end := strings.IndexAny(rest, ", ")
-	if end >= 0 {
-		rest = rest[:end]
+	// Walk to the 4th slash-delimited field (AKID/date/region/SERVICE/aws4_request)
+	// without allocating a []string from Split.
+	slashes := 0
+	start := 0
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == '/' {
+			slashes++
+			if slashes == 3 {
+				start = i + 1
+			}
+			if slashes == 4 {
+				svc := rest[start:i]
+				// Lowercase in-place check (avoid ToLower allocation for already-lowercase)
+				allLower := true
+				for j := 0; j < len(svc); j++ {
+					if svc[j] >= 'A' && svc[j] <= 'Z' {
+						allLower = false
+						break
+					}
+				}
+				if allLower {
+					return svc
+				}
+				return strings.ToLower(svc)
+			}
+		}
+		if rest[i] == ',' || rest[i] == ' ' {
+			break
+		}
 	}
-
-	// rest is now AKID/date/region/service/aws4_request
-	parts := strings.Split(rest, "/")
-	if len(parts) < 4 {
-		return ""
-	}
-	// parts[0]=AKID, [1]=date, [2]=region, [3]=service
-	return strings.ToLower(parts[3])
+	return ""
 }
 
 // targetToService maps the lowercased X-Amz-Target service prefix to the
@@ -137,7 +167,9 @@ func serviceFromAuthorization(auth string) string {
 // prefix doesn't match their SigV4 signing name (e.g. Cognito uses
 // "AWSCognitoIdentityProviderService" in X-Amz-Target but "cognito-idp"
 // in the credential scope).
-var targetToService = map[string]string{
+// TargetToService maps the lowercased X-Amz-Target service prefix to the
+// canonical CloudMock service name.
+var TargetToService = map[string]string{
 	"dynamodb":                              "dynamodb",
 	"dax":                                   "dynamodb",
 	"amazonsqs":                             "sqs",
@@ -172,7 +204,7 @@ func serviceFromTarget(target string) string {
 	lower := strings.ToLower(svc)
 
 	// Check for a known mapping (e.g. "awscognitoidentityproviderservice" → "cognito-idp").
-	if mapped, ok := targetToService[lower]; ok {
+	if mapped, ok := TargetToService[lower]; ok {
 		return mapped
 	}
 

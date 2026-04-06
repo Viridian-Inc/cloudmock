@@ -1806,11 +1806,25 @@ func main() {
 		}
 		slog.Info("multi-account support enabled", "accounts", len(cfg.Accounts)+1)
 	}
-	var handler http.Handler = gw
+	corsEnabled := os.Getenv("CLOUDMOCK_CORS")
+	var handler http.Handler
+	if testMode {
+		// Test mode: bypass the entire Gateway/middleware stack.
+		// Pre-resolve all services into a lock-free map and use a minimal handler.
+		rootID := &service.CallerIdentity{
+			AccountID:   cfg.AccountID,
+			ARN:         "arn:aws:iam::" + cfg.AccountID + ":root",
+			UserID:      cfg.AccountID,
+			AccessKeyID: "test",
+			IsRoot:      true,
+		}
+		handler = gateway.TestModeHandler(rootID, cfg.Region, cfg.AccountID, registry)
+	} else {
+	handler = gw
 	// Wrap with chaos middleware for fault injection
 	handler = gateway.ChaosMiddleware(handler, chaosEngine)
 	// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
-	corsEnabled := os.Getenv("CLOUDMOCK_CORS")
+	corsEnabled = os.Getenv("CLOUDMOCK_CORS")
 	if corsEnabled != "false" && corsEnabled != "0" {
 		handler = gateway.CORSMiddleware(handler)
 	}
@@ -1826,11 +1840,18 @@ func main() {
 	if clerkAuth != nil {
 		handler = clerkAuth.Handler(handler)
 	}
+	} // end if !testMode (middleware chain)
+
+	// In test mode, handler is already the TestModeHandler — use it directly.
+	// In normal mode, wrap with the logging middleware.
+	var loggedGW http.Handler
+	if testMode {
+		loggedGW = handler
+	} else {
 	// HIPAA/compliance redaction — redact sensitive headers and body fields before storage.
 	var redaction *gateway.RedactionConfig
 	if cfg.Compliance.RedactEnabled || cfg.SaaS.Enabled {
 		redaction = gateway.DefaultRedactionConfig()
-		// Append any user-configured extra fields.
 		if len(cfg.Compliance.RedactHeaders) > 0 {
 			redaction.RedactHeaders = append(redaction.RedactHeaders, cfg.Compliance.RedactHeaders...)
 		}
@@ -1842,13 +1863,6 @@ func main() {
 			"redacted_body_fields", len(redaction.RedactBodyFields),
 		)
 	}
-
-	// In test mode, skip all observability — the logging middleware "lightweight" path
-	// short-circuits when all deps are nil, adding zero overhead per request.
-	var loggedGW http.Handler
-	if testMode {
-		loggedGW = gateway.LoggingMiddlewareWithOpts(handler, nil, nil, gateway.LoggingMiddlewareOpts{})
-	} else {
 	loggedGW = gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
 		Broadcaster:   adminAPI.Broadcaster(),
 		TraceStore:    traceStore,
@@ -2004,6 +2018,42 @@ func main() {
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)
+
+	// In test mode, use fasthttp for ~2x throughput over net/http.
+	if testMode {
+		rootID := &service.CallerIdentity{
+			AccountID:   cfg.AccountID,
+			ARN:         "arn:aws:iam::" + cfg.AccountID + ":root",
+			UserID:      cfg.AccountID,
+			AccessKeyID: "test",
+			IsRoot:      true,
+		}
+		fastServer := gateway.FastTestModeServer(rootID, cfg.Region, cfg.AccountID, registry)
+		slog.Info("cloudmock gateway starting (fasthttp test mode)",
+			"addr", addr, "region", cfg.Region, "services", len(registry.List()))
+		go func() {
+			if err := fastServer.ListenAndServe(addr); err != nil {
+				log.Fatalf("gateway: %v", err)
+			}
+		}()
+
+		// Startup banner
+		fmt.Printf("\nCloudMock %s\n", version)
+		fmt.Printf("  Mode:       TEST (fasthttp, zero observability)\n")
+		fmt.Printf("  Gateway:    http://localhost:%d\n", cfg.Gateway.Port)
+		fmt.Printf("  Services:   %d active (%s profile)\n", len(registry.List()), cfg.Profile)
+		fmt.Println()
+		fmt.Printf("Ready. Point your AWS SDK at http://localhost:%d\n\n", cfg.Gateway.Port)
+
+		// Wait for signal.
+		sigCh := make(chan os.Signal, 1)
+		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
+		<-sigCh
+		fmt.Println("\nShutting down...")
+		fastServer.Shutdown()
+		return
+	}
+
 	gwServer := &http.Server{
 		Addr:              addr,
 		Handler:           loggedGW,

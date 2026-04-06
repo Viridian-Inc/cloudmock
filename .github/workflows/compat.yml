@@ -27,24 +27,19 @@ jobs:
         id: cloudmock
 
       - name: Run comprehensive SDK compat tests
-        working-directory: /tmp/compat
         env:
           AWS_ENDPOINT_URL: http://localhost:4566
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          # Clone the compat tests
-          if [ -d /Users/megan/work/cloudmock-compat-tests ]; then
-            cp -r /Users/megan/work/cloudmock-compat-tests /tmp/compat
-          else
-            mkdir -p /tmp/compat
-            # The compat tests are in the repo under tests/compat/
-            cp -r $GITHUB_WORKSPACE/tests/compat/* /tmp/compat/ 2>/dev/null || true
-          fi
+          mkdir -p /tmp/compat
+          # The compat tests are in the repo under tests/compat/
+          cp -r $GITHUB_WORKSPACE/tests/compat/* /tmp/compat/ 2>/dev/null || true
 
           # Run the tests if they exist
-          if [ -f main_test.go ]; then
+          if [ -f /tmp/compat/main_test.go ]; then
+            cd /tmp/compat
             go test -v -tags integration -timeout 120s 2>&1 | tee /tmp/compat-results.txt
           fi
 

@@ -73,7 +73,7 @@ cfg, _ := config.LoadDefaultConfig(ctx,
 | **Homebrew** | `brew install viridian-inc/tap/cloudmock` |
 | **Snap** | `sudo snap install cloudmock` |
 | **Docker** | `docker run -p 4566:4566 -p 4500:4500 ghcr.io/viridian-inc/cloudmock:latest` |
-| **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.4.0/cloudmock_1.4.0_amd64.deb && sudo apt install cloudmock_1.4.0_amd64.deb` |
+| **apt/deb** | `curl -LO https://github.com/Viridian-Inc/cloudmock/releases/download/v1.5.1/cloudmock_1.5.1_amd64.deb && sudo apt install cloudmock_1.4.0_amd64.deb` |
 | **Shell** | `curl -fsSL https://cloudmock.app/install.sh \| bash` |
 
 ## Services
@@ -84,37 +84,72 @@ See the full list at [cloudmock.app/docs/services](https://cloudmock.app/docs/).
 
 ## Performance
 
-CloudMock is the fastest AWS mock available. Two modes:
+CloudMock is the fastest AWS mock available — **95-220x faster than LocalStack**, **65-147x faster than Moto**.
 
-**In-Process (Go)** — zero network overhead, sub-millisecond everything:
+### Test Mode
+
+For CI and test suites, test mode strips all observability overhead. Only the gateway runs — no dashboard, no admin API, no tracing:
+
+```bash
+CLOUDMOCK_TEST_MODE=true npx cloudmock  # 0.1s startup, 0.009ms per operation
+```
+
+### Benchmarks (requests/sec, higher is better)
+
+Measured with [hey](https://github.com/rakyll/hey). Endpoints verified via response headers (`x-localstack: true`, `Server: Werkzeug`).
+
+| Operation | CloudMock | LocalStack | Moto | CM/LS | CM/Moto |
+|-----------|-----------|------------|------|-------|---------|
+| **DynamoDB ListTables** | **101,636** | 739 | 1,557 | 138x | 65x |
+| **DynamoDB PutItem** | **119,995** | 545 | 1,560 | 220x | 77x |
+| **DynamoDB GetItem** | **110,641** | 656 | 1,520 | 169x | 73x |
+| **S3 ListBuckets** | **132,864** | 1,408 | 1,222 | 94x | 109x |
+| **SQS ListQueues** | **111,962** | 1,363 | 1,118 | 82x | 100x |
+| **IAM ListUsers** | **114,808** | 1,120 | 989 | 103x | 116x |
+| **Lambda ListFunctions** | **118,653** | 577 | 1,218 | 206x | 97x |
+| **EC2 DescribeInstances** | **116,063** | 898 | 787 | 129x | 147x |
+
+**Geometric mean: CloudMock 115,530 req/s — 135x faster than LocalStack, 95x faster than Moto.**
+
+<details>
+<summary>In-process mode (Go)</summary>
+
+Zero network overhead, sub-millisecond everything:
+
 ```go
 cm := sdk.New()
 cfg := cm.Config()
 client := dynamodb.NewFromConfig(cfg) // 20μs per GetItem
 ```
+</details>
 
-**HTTP (any language)** — native binary or Docker:
-```bash
-npx cloudmock  # 65ms startup, <1ms per operation
-```
+### CI Cost Savings at 1,000 Builds/Day
 
-### Benchmarks (P50 latency)
+A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on CloudMock vs **18 seconds** on LocalStack and **7 seconds** on Moto.
 
-| Service | CloudMock In-Process | CloudMock HTTP | Moto | LocalStack |
-|---------|---------------------|---------------|------|------------|
-| **DynamoDB GetItem** | **0.020ms** | 0.44ms | 2.41ms | 5.21ms |
-| **S3 PutObject** | **0.030ms** | 1.01ms | 2.20ms | 1.57ms |
-| **SQS SendMessage** | **0.015ms** | 0.73ms | 2.58ms | 2.60ms |
-| **SNS Publish** | — | 1.56ms | 4.00ms | 3.18ms |
-| **IAM CreateUser** | — | 0.98ms | 3.10ms | 2.70ms |
-| **Startup** | ~1ms | 65ms | 764ms | 2,094ms |
+| | CloudMock | LocalStack | Moto |
+|---|---|---|---|
+| **Time per build** | **0.1s** | 18.0s | 7.2s |
+| **Annual compute cost** | **$7** | $885 | $352 |
 
-### Cost at 1,000 CI Builds/Day
+#### Annual savings by switching to CloudMock
 
-| | CloudMock (In-Process) | CloudMock (HTTP) | Moto | LocalStack |
-|---|---|---|---|---|
-| **Annual cost** | **$4.32** | $191 | $1,065 | $17,159 |
-| **vs In-Process** | — | 44x more | 247x more | 3,973x more |
+| SDK calls/build | vs LocalStack | vs Moto |
+|----------------|---------------|---------|
+| 500 | **$96K** saved | **$25K** saved |
+| 2,000 | **$110K** saved | **$35K** saved |
+| 5,000 | **$138K** saved | **$54K** saved |
+| 10,000 | **$185K** saved | **$86K** saved |
+
+*Includes GitHub Actions compute ($0.008/min) + developer wait time ($75/hr loaded). See [full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
+
+### What makes CloudMock fast
+
+- **Go + fasthttp** — native binary, zero-copy request handling, no interpreter overhead
+- **Test mode** — strips all observability (tracing, logging, SSE, anomaly detection)
+- **Sharded stores** — per-partition locks in DynamoDB, lock-free service routing via `sync.Map`
+- **Pre-resolved services** — all 100 services resolved into a plain map at startup, no mutex on hot path
+- **go-json + pre-marshaled responses** — zero-alloc for common operations like PutItem
 
 [Full benchmark details and methodology](https://cloudmock.app/docs/reference/benchmarks/)
 
@@ -170,7 +205,15 @@ One line to add CloudMock to your CI:
 - uses: viridian-inc/cloudmock-action@v1
 ```
 
-Auto-installs, starts, health-checks, and sets `AWS_ENDPOINT_URL` for all subsequent steps. Works with Node.js, Python, Go, Java, Rust, and any language with an AWS SDK.
+Auto-installs, starts in test mode (135x faster than LocalStack), health-checks, and sets `AWS_ENDPOINT_URL` for all subsequent steps. Works with Node.js, Python, Go, Java, Rust, and any language with an AWS SDK.
+
+To disable test mode and get full observability in CI:
+
+```yaml
+- uses: viridian-inc/cloudmock-action@v1
+  with:
+    test-mode: 'false'
+```
 
 ## Create a Project
 
@@ -239,8 +282,11 @@ curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
 
 | Feature | CloudMock | LocalStack (Free) | Moto |
 |---|---|---|---|
-| AWS services | 98 | ~25 | ~100 |
-| **Speed vs Moto** | **110x faster** | 0.9x | 1x |
+| AWS services | 100 | ~25 | ~100 |
+| **Throughput** | **115,530 req/s** | 858 req/s | 1,216 req/s |
+| **Speed multiplier** | **baseline** | 135x slower | 95x slower |
+| **Avg latency** | **0.009ms** | 1.2ms | 0.84ms |
+| Test mode (CI) | Built-in | No | No |
 | Distributed tracing | Built-in | No | No |
 | Chaos engineering | Built-in | Pro only | No |
 | DevTools UI | Built-in | Pro only | No |

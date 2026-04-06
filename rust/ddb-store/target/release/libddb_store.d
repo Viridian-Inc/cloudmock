@@ -1,1 +1,0 @@
-/Users/megan/cloudmock/rust/ddb-store/target/release/libddb_store.a: /Users/megan/cloudmock/rust/ddb-store/src/ffi.rs /Users/megan/cloudmock/rust/ddb-store/src/lib.rs /Users/megan/cloudmock/rust/ddb-store/src/store.rs /Users/megan/cloudmock/rust/ddb-store/src/types.rs

@@ -50,3 +50,4 @@ vendor/
 *.pid
 *.log
 allservices
+rust/ddb-store/target/

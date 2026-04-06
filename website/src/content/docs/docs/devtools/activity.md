@@ -11,7 +11,7 @@ The Activity view receives data through two parallel channels:
 
 ### SSE (Server-Sent Events)
 
-The primary data source is a persistent SSE connection to `GET /api/stream`. Each event is a JSON object containing the request details. In development mode (ports 1420 or 4501), the devtools connect directly to the admin API on port 4599. In production mode (port 4500), the SSE endpoint is served from the same origin.
+The primary data source is a persistent SSE connection to `GET /api/stream`. Each event is a JSON object containing the request details. In development mode (port 1420), the devtools connect directly to the admin API on port 4599. In production mode (port 4500), the SSE endpoint is served from the same origin.
 
 ### Polling fallback
 

@@ -40,10 +40,10 @@ export function ActivityView() {
   // === DATA SOURCE 1: SSE stream (same pattern as working cloudmock dashboard) ===
   useEffect(() => {
     // SSE connection — use same pattern as cloudmock dashboard:
-    // In dev (port 1420/4501), connect to admin port 4599 directly
+    // In dev (port 1420), connect to admin port 4599 directly
     // In production (port 4500), use relative URL (same-origin)
     const port = window.location.port;
-    const adminBase = (port === '1420' || port === '4501')
+    const adminBase = port === '1420'
       ? `${window.location.protocol}//${window.location.hostname}:4599`
       : '';
     const es = new EventSource(`${adminBase}/api/stream`);

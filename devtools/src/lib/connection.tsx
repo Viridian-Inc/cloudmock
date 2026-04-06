@@ -22,10 +22,10 @@ interface ConnectionContextValue {
 }
 
 const DEFAULT_STATE: ConnectionState = {
-  adminUrl: typeof window !== 'undefined' && (window.location.port === '1420' || window.location.port === '4501')
+  adminUrl: typeof window !== 'undefined' && window.location.port === '1420'
     ? `${window.location.protocol}//${window.location.hostname}:4599`
     : '',
-  gatewayUrl: typeof window !== 'undefined' && (window.location.port === '1420' || window.location.port === '4501')
+  gatewayUrl: typeof window !== 'undefined' && window.location.port === '1420'
     ? `${window.location.protocol}//${window.location.hostname}:4566`
     : 'http://localhost:4566',
   connected: false,

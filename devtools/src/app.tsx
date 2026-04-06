@@ -39,8 +39,6 @@ import { PlatformKeysView } from './views/platform-keys';
 import { PlatformUsageView } from './views/platform-usage';
 import { PlatformAuditView } from './views/platform-audit';
 import { PlatformSettingsView } from './views/platform-settings';
-import { AWSConsoleView } from './views/aws-console';
-
 export type ViewId =
   | 'activity'
   | 'topology'
@@ -70,8 +68,7 @@ export type ViewId =
   | 'platform-keys'
   | 'platform-usage'
   | 'platform-audit'
-  | 'platform-settings'
-  | 'aws-console';
+  | 'platform-settings';
 
 const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   activity: ActivityView,
@@ -103,7 +100,6 @@ const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   'platform-usage': PlatformUsageView,
   'platform-audit': PlatformAuditView,
   'platform-settings': PlatformSettingsView,
-  'aws-console': AWSConsoleView,
 };
 
 /** View IDs reachable via Cmd+number shortcuts */

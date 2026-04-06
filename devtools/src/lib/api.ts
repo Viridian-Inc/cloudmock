@@ -7,12 +7,12 @@ import type {
 import { cacheSet, cacheGet } from './cache';
 
 // Port-based admin API detection:
-// Vite dev server (1420) or old dashboard (4501) → proxy to admin API on :4599
+// Vite dev server (1420) → proxy to admin API on :4599
 // Production: UI + API on same origin (:4500) → no base needed
 function detectAdminBase(): string {
   if (typeof window === 'undefined') return '';
   const port = window.location.port;
-  if (port === '1420' || port === '4501') {
+  if (port === '1420') {
     return `${window.location.protocol}//${window.location.hostname}:4599`;
   }
   // Production: UI + API on same origin (:4500)

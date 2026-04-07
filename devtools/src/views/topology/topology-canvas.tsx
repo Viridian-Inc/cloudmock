@@ -60,6 +60,8 @@ interface CanvasProps {
   metricsHistory?: Map<string, number[]>;
   inactiveNodeIds?: Set<string>;
   onApplyLayout?: (layout: SavedLayout) => void;
+  layoutMode?: 'layered' | 'tree' | 'force';
+  treeHierarchy?: Record<string, string[]>;
 }
 
 // Assign colors by group — auto-generated from hash if not listed
@@ -112,25 +114,51 @@ function MiniSparkline({ data, color }: { data: number[]; color: string }) {
   );
 }
 
-async function runLayout(nodes: TopoNode[], edges: TopoEdge[]) {
+const getLayoutOptions = (mode: string): Record<string, string> => {
+  const base: Record<string, string> = {
+    'elk.direction': 'DOWN',
+    'elk.spacing.nodeNode': '50',
+    'elk.spacing.edgeEdge': '20',
+    'elk.padding': '[top=50,left=50,bottom=50,right=50]',
+  };
+  switch (mode) {
+    case 'tree':
+      return {
+        ...base,
+        'elk.algorithm': 'mrtree',
+        'elk.mrtree.weighting': 'CONSTRAINT',
+        'elk.spacing.nodeNode': '40',
+      };
+    case 'force':
+      return {
+        ...base,
+        'elk.algorithm': 'force',
+        'elk.force.iterations': '300',
+        'elk.spacing.nodeNode': '80',
+      };
+    default:
+      return {
+        ...base,
+        'elk.algorithm': 'layered',
+        'elk.layered.spacing.nodeNodeBetweenLayers': '80',
+        'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+        'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+      };
+  }
+};
+
+async function runLayout(nodes: TopoNode[], edges: TopoEdge[], layoutMode?: string) {
   const elk = new ELK();
   // Only include edges whose source+target both exist
   const nodeIds = new Set(nodes.map((n) => n.id));
   const validEdges = edges.filter((e) => nodeIds.has(e.source) && nodeIds.has(e.target) && e.source !== e.target);
 
+  const layoutOptions = getLayoutOptions(layoutMode || 'layered');
+
   const result = await elk.layout({
     id: 'root',
-    layoutOptions: {
-      'elk.algorithm': 'layered',
-      'elk.direction': 'DOWN',
-      'elk.spacing.nodeNode': '50',
-      'elk.layered.spacing.nodeNodeBetweenLayers': '80',
-      'elk.spacing.edgeEdge': '20',
-      'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
-      'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-      'elk.padding': '[top=50,left=50,bottom=50,right=50]',
-      'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-    },
+    layoutOptions,
     children: nodes.map((n) => ({ id: n.id, width: NODE_W, height: NODE_H })),
     edges: validEdges.map((e, i) => ({ id: `e${i}`, sources: [e.source], targets: [e.target] })),
   } as any);
@@ -220,6 +248,7 @@ const MINIMAP_H = 100;
 export const TopologyCanvas = forwardRef<TopologyCanvasHandle, CanvasProps>(function TopologyCanvas({
   nodes: rawNodes, edges, selectedNodeId, onSelectNode, loading,
   metrics, deploys, incidents, metricsHistory, inactiveNodeIds, onApplyLayout,
+  layoutMode, treeHierarchy,
 }: CanvasProps, ref) {
   const [elkLayout, setElkLayout] = useState<{ nodes: LayoutNode[]; edges: LayoutEdge[]; w: number; h: number } | null>(null);
   const [pan, setPan] = useState({ x: 20, y: 20 });
@@ -252,8 +281,8 @@ export const TopologyCanvas = forwardRef<TopologyCanvasHandle, CanvasProps>(func
 
   useEffect(() => {
     if (rawNodes.length === 0) { setElkLayout(null); return; }
-    runLayout(rawNodes, edges).then(setElkLayout).catch(() => setElkLayout(null));
-  }, [rawNodes, edges]);
+    runLayout(rawNodes, edges, layoutMode).then(setElkLayout).catch(() => setElkLayout(null));
+  }, [rawNodes, edges, layoutMode]);
 
   // Compute effective layout: ELK positions with pinned overrides
   const layout = useMemo(() => {

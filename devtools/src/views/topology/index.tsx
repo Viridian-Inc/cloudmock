@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'preact/hooks';
 import { SplitPanel } from '../../components/panels/split-panel';
 import { api, cachedApi, getAdminBase } from '../../lib/api';
+import { LayoutPicker, type LayoutMode } from './layout-picker';
 import { useTopologyMetrics, type TimeWindow } from '../../hooks/use-topology-metrics';
 import { loadDomainConfig, type DomainConfig } from '../../lib/domains';
 import type { ServiceMetrics, DeployEvent } from '../../lib/health';
@@ -353,6 +354,11 @@ export function TopologyView() {
   const [collapseAWS, setCollapseAWS] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [timelineDeployDetail, setTimelineDeployDetail] = useState<DeployEvent | null>(null);
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    return (localStorage.getItem('cloudmock:topo-layout') as LayoutMode) || 'layered';
+  });
+  const [treeData, setTreeData] = useState<any>(null);
+  const [treeAvailable, setTreeAvailable] = useState(false);
 
   // --- Layouts state ---
   const canvasRef = useRef<TopologyCanvasHandle>(null);
@@ -529,6 +535,22 @@ export function TopologyView() {
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, [layoutDropdownOpen]);
+
+  useEffect(() => {
+    api<any>('/api/topology/tree')
+      .then((data) => {
+        setTreeData(data);
+        setTreeAvailable(true);
+      })
+      .catch(() => {
+        setTreeAvailable(false);
+      });
+  }, []);
+
+  const handleLayoutChange = (mode: LayoutMode) => {
+    setLayoutMode(mode);
+    localStorage.setItem('cloudmock:topo-layout', mode);
+  };
 
   // Load topology — always fetch fresh (no localStorage cache).
   // Re-fetches on SSE topology_updated events and polls every 30s as fallback.
@@ -843,6 +865,8 @@ export function TopologyView() {
                     incidents={incidents}
                     metricsHistory={metricsHistory}
                     inactiveNodeIds={inactiveNodeIds}
+                    layoutMode={layoutMode}
+                    treeHierarchy={treeData?.hierarchy}
                   />
                 </div>
                 <Timeline
@@ -952,6 +976,8 @@ export function TopologyView() {
                       </div>
                     )}
                   </div>
+
+                  <LayoutPicker value={layoutMode} onChange={handleLayoutChange} treeAvailable={treeAvailable} />
 
                   {/* Divider */}
                   <div style={{ width: '1px', height: '18px', background: 'var(--border-subtle, rgba(74,229,248,0.06))' }} />

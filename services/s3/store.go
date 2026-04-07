@@ -22,8 +22,8 @@ type Bucket struct {
 
 // Store is an in-memory store for S3 buckets and multipart uploads.
 type Store struct {
-	mu               sync.RWMutex
-	buckets          map[string]*Bucket
+	buckets          sync.Map                    // string -> *Bucket
+	mu               sync.Mutex                  // only for multipart uploads
 	multipartUploads map[string]*MultipartUpload // uploadId -> upload
 	nextUploadID     int
 }
@@ -31,7 +31,6 @@ type Store struct {
 // NewStore returns an empty Store.
 func NewStore() *Store {
 	return &Store{
-		buckets:          make(map[string]*Bucket),
 		multipartUploads: make(map[string]*MultipartUpload),
 	}
 }
@@ -39,18 +38,17 @@ func NewStore() *Store {
 // CreateBucket creates a bucket with the given name.
 // Returns an AWSError if the bucket already exists.
 func (s *Store) CreateBucket(name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if _, ok := s.buckets[name]; ok {
-		return service.NewAWSError("BucketAlreadyExists",
-			"The requested bucket name is not available.", http.StatusConflict)
-	}
-	s.buckets[name] = &Bucket{
+	newBucket := &Bucket{
 		Name:          name,
 		CreationDate:  time.Now().UTC(),
 		Objects:       NewObjectStore(),
 		Configs:       make(map[string][]byte),
 		ObjectConfigs: make(map[string]map[string][]byte),
+	}
+	_, loaded := s.buckets.LoadOrStore(name, newBucket)
+	if loaded {
+		return service.NewAWSError("BucketAlreadyExists",
+			"The requested bucket name is not available.", http.StatusConflict)
 	}
 	return nil
 }
@@ -58,26 +56,23 @@ func (s *Store) CreateBucket(name string) error {
 // DeleteBucket removes the bucket with the given name.
 // Returns an AWSError if the bucket does not exist or is not empty.
 func (s *Store) DeleteBucket(name string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	b, ok := s.buckets[name]
+	value, ok := s.buckets.Load(name)
 	if !ok {
 		return service.NewAWSError("NoSuchBucket",
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
+	b := value.(*Bucket)
 	if b.Objects.Len() > 0 {
 		return service.NewAWSError("BucketNotEmpty",
 			"The bucket you tried to delete is not empty.", http.StatusConflict)
 	}
-	delete(s.buckets, name)
+	s.buckets.Delete(name)
 	return nil
 }
 
 // HeadBucket returns an error if the bucket does not exist.
 func (s *Store) HeadBucket(name string) error {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if _, ok := s.buckets[name]; !ok {
+	if _, ok := s.buckets.Load(name); !ok {
 		return service.NewAWSError("NoSuchBucket",
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
@@ -86,38 +81,33 @@ func (s *Store) HeadBucket(name string) error {
 
 // ListBuckets returns all buckets in the store.
 func (s *Store) ListBuckets() []*Bucket {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	out := make([]*Bucket, 0, len(s.buckets))
-	for _, b := range s.buckets {
-		out = append(out, b)
-	}
+	var out []*Bucket
+	s.buckets.Range(func(key, value any) bool {
+		out = append(out, value.(*Bucket))
+		return true
+	})
 	return out
 }
 
 // bucketObjects returns the ObjectStore for the named bucket, or an AWSError
 // if the bucket does not exist.
 func (s *Store) bucketObjects(name string) (*ObjectStore, error) {
-	s.mu.RLock()
-	b, ok := s.buckets[name]
-	s.mu.RUnlock()
+	value, ok := s.buckets.Load(name)
 	if !ok {
 		return nil, service.NewAWSError("NoSuchBucket",
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
-	return b.Objects, nil
+	return value.(*Bucket).Objects, nil
 }
 
 // getBucket returns the bucket for the given name, or an AWSError if not found.
 func (s *Store) getBucket(name string) (*Bucket, error) {
-	s.mu.RLock()
-	b, ok := s.buckets[name]
-	s.mu.RUnlock()
+	value, ok := s.buckets.Load(name)
 	if !ok {
 		return nil, service.NewAWSError("NoSuchBucket",
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
-	return b, nil
+	return value.(*Bucket), nil
 }
 
 // SetVersioning sets the versioning status for the named bucket.
@@ -126,9 +116,7 @@ func (s *Store) SetVersioning(name, status string) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
 	b.VersioningStatus = status
-	s.mu.Unlock()
 	return nil
 }
 
@@ -138,10 +126,7 @@ func (s *Store) GetVersioning(name string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	s.mu.RLock()
-	status := b.VersioningStatus
-	s.mu.RUnlock()
-	return status, nil
+	return b.VersioningStatus, nil
 }
 
 // SetBucketPolicy stores a raw JSON policy for the named bucket.
@@ -150,9 +135,7 @@ func (s *Store) SetBucketPolicy(name string, policy []byte) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
 	b.Policy = policy
-	s.mu.Unlock()
 	return nil
 }
 
@@ -162,14 +145,11 @@ func (s *Store) GetBucketPolicy(name string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	s.mu.RLock()
-	policy := b.Policy
-	s.mu.RUnlock()
-	if policy == nil {
+	if b.Policy == nil {
 		return nil, service.NewAWSError("NoSuchBucketPolicy",
 			"The bucket policy does not exist.", http.StatusNotFound)
 	}
-	return policy, nil
+	return b.Policy, nil
 }
 
 // DeleteBucketPolicy removes the policy from the named bucket.
@@ -178,9 +158,7 @@ func (s *Store) DeleteBucketPolicy(name string) error {
 	if err != nil {
 		return err
 	}
-	s.mu.Lock()
 	b.Policy = nil
-	s.mu.Unlock()
 	return nil
 }
 
@@ -190,8 +168,6 @@ func (s *Store) IsVersioningEnabled(name string) bool {
 	if err != nil {
 		return false
 	}
-	s.mu.RLock()
-	defer s.mu.RUnlock()
 	return b.VersioningStatus == "Enabled"
 }
 
@@ -220,8 +196,8 @@ func (s *Store) CreateMultipartUpload(bucket, key string) *MultipartUpload {
 
 // GetMultipartUpload returns the multipart upload for the given ID, or an error if not found.
 func (s *Store) GetMultipartUpload(uploadId string) (*MultipartUpload, error) {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	upload, ok := s.multipartUploads[uploadId]
 	if !ok {
@@ -277,70 +253,71 @@ func (s *Store) AbortMultipartUpload(uploadId string) error {
 // ── Bucket & Object Config Storage ────────────────────────────────────────────
 
 func (s *Store) setBucketConfig(bucket, configType string, data []byte) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if b, ok := s.buckets[bucket]; ok {
-		if b.Configs == nil {
-			b.Configs = make(map[string][]byte)
-		}
-		b.Configs[configType] = data
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return
 	}
+	if b.Configs == nil {
+		b.Configs = make(map[string][]byte)
+	}
+	b.Configs[configType] = data
 }
 
 func (s *Store) getBucketConfig(bucket, configType string) []byte {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if b, ok := s.buckets[bucket]; ok {
-		return b.Configs[configType]
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return nil
 	}
-	return nil
+	return b.Configs[configType]
 }
 
 func (s *Store) deleteBucketConfig(bucket, configType string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if b, ok := s.buckets[bucket]; ok {
-		delete(b.Configs, configType)
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return
 	}
+	delete(b.Configs, configType)
 }
 
 func (s *Store) setObjectConfig(bucket, key, configType string, data []byte) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if b, ok := s.buckets[bucket]; ok {
-		if b.ObjectConfigs == nil {
-			b.ObjectConfigs = make(map[string]map[string][]byte)
-		}
-		if b.ObjectConfigs[key] == nil {
-			b.ObjectConfigs[key] = make(map[string][]byte)
-		}
-		b.ObjectConfigs[key][configType] = data
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return
 	}
+	if b.ObjectConfigs == nil {
+		b.ObjectConfigs = make(map[string]map[string][]byte)
+	}
+	if b.ObjectConfigs[key] == nil {
+		b.ObjectConfigs[key] = make(map[string][]byte)
+	}
+	b.ObjectConfigs[key][configType] = data
 }
 
 func (s *Store) getObjectConfig(bucket, key, configType string) []byte {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	if b, ok := s.buckets[bucket]; ok {
-		if b.ObjectConfigs != nil {
-			return b.ObjectConfigs[key][configType]
-		}
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return nil
+	}
+	if b.ObjectConfigs != nil {
+		return b.ObjectConfigs[key][configType]
 	}
 	return nil
 }
 
 func (s *Store) deleteObjectConfig(bucket, key, configType string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if b, ok := s.buckets[bucket]; ok && b.ObjectConfigs != nil {
+	b, err := s.getBucket(bucket)
+	if err != nil {
+		return
+	}
+	if b.ObjectConfigs != nil {
 		delete(b.ObjectConfigs[key], configType)
 	}
 }
 
 // ListMultipartUploads returns all pending multipart uploads for the given bucket.
 func (s *Store) ListMultipartUploads(bucket string) []*MultipartUpload {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	var out []*MultipartUpload
 	for _, u := range s.multipartUploads {

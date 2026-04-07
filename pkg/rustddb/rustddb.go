@@ -4,10 +4,14 @@
 // with simd-json parsing and lock-free DashMap storage. For unsupported actions
 // (Query, Scan, BatchWrite, etc.), it returns status=0 and the caller falls
 // back to the Go implementation.
+//
+//go:build cgo && rustddb
+
 package rustddb
 
 /*
-#cgo LDFLAGS: -L${SRCDIR}/../../rust/ddb-store/target/release -lddb_store -lm -ldl -framework Security -framework SystemConfiguration
+#cgo darwin LDFLAGS: -L${SRCDIR}/../../rust/ddb-store/target/release -lddb_store -lm -ldl -framework Security -framework SystemConfiguration
+#cgo linux LDFLAGS: -L${SRCDIR}/../../rust/ddb-store/target/release -lddb_store -lm -ldl -lpthread
 #include <stdint.h>
 #include <stdlib.h>
 

@@ -3,7 +3,7 @@ package account
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // stubService is a minimal service.Service implementation for testing.

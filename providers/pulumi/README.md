@@ -67,7 +67,7 @@ table = cloudmock.dynamodb.Table("my-table", table_name="users", hash_key="id")
 ### Go
 
 ```go
-import "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock/s3"
+import "github.com/Viridian-Inc/cloudmock/providers/pulumi/sdk/go/cloudmock/s3"
 
 bucket, _ := s3.NewBucket(ctx, "my-bucket", &s3.BucketArgs{
     Bucket: pulumi.String("my-test-bucket"),

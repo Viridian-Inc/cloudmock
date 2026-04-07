@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // MetricStore wraps gateway.RequestStats and RequestLog to satisfy the

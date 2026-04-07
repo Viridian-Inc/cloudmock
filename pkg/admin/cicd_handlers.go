@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/cicd"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/cicd"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // handlePipelines handles listing and creating pipelines.

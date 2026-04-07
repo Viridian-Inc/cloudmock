@@ -215,7 +215,7 @@ provider "aws" {
 Wraps the Terraform provider automatically. Generates language SDKs:
 - TypeScript: `@cloudmock/pulumi` (npm)
 - Python: `pulumi-cloudmock` (PyPI)
-- Go: `github.com/neureaux/cloudmock/providers/pulumi/sdk/go`
+- Go: `github.com/Viridian-Inc/cloudmock/providers/pulumi/sdk/go`
 - C#, Java, YAML
 
 ### Usage

@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // reconcileInstancesViaEC2 adjusts ASG instances by creating/terminating real

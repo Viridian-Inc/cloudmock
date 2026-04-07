@@ -3,7 +3,7 @@ package admin
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/security"
+	"github.com/Viridian-Inc/cloudmock/pkg/security"
 )
 
 // SetSecurityScanner sets the security scanner on the admin API and registers routes.

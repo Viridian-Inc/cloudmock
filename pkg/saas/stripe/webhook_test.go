@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 const testStripeSecret = "whsec_test_stripe_secret_key"

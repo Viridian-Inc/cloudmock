@@ -3,8 +3,8 @@ package ecs
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ECSService is the cloudmock implementation of the AWS Elastic Container Service API.

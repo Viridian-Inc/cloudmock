@@ -7,7 +7,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // TopologyStore implements dataplane.TopologyStore against PostgreSQL.

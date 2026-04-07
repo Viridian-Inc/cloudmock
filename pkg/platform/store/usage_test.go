@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/platform/model"
-	"github.com/neureaux/cloudmock/pkg/platform/store"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/store"
 )
 
 func setupUsageFixture(t *testing.T) (tenantID, appID string, us *store.UsageStore) {

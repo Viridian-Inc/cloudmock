@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
-	"github.com/neureaux/cloudmock/pkg/sqlparse"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/sqlparse"
 )
 
 // ClusterSchema tracks databases → schemas → tables → columns for a cluster.

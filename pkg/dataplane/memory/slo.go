@@ -3,9 +3,9 @@ package memory
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // SLOStore wraps gateway.SLOEngine to satisfy the dataplane.SLOStore interface

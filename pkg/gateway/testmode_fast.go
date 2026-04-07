@@ -9,8 +9,8 @@ import (
 	"github.com/valyala/fasthttp"
 	"github.com/valyala/fasthttp/fasthttpadaptor"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // stdReqPool pools *http.Request objects for the fasthttp→net/http adapter.

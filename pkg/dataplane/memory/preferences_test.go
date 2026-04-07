@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
 )
 
 func TestPreferenceStore_SetGetRoundtrip(t *testing.T) {

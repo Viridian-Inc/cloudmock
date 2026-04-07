@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/replay"
+	"github.com/Viridian-Inc/cloudmock/pkg/replay"
 )
 
 // Store is an in-memory circular-buffer replay session store.

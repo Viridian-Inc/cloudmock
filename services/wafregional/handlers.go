@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // WAF Regional uses JSON protocol despite historical query protocol.

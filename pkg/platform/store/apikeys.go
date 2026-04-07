@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
 )
 
 // APIKeyStore handles persistence for APIKey records.

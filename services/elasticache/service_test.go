@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ecsvc "github.com/neureaux/cloudmock/services/elasticache"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ecsvc "github.com/Viridian-Inc/cloudmock/services/elasticache"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

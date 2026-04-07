@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // DAXService is the cloudmock implementation of the Amazon DynamoDB Accelerator (DAX) API.

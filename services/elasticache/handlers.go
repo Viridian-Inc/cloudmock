@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const ecXmlns = "http://elasticache.amazonaws.com/doc/2015-02-02/"

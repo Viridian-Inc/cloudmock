@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const esXmlns = "http://es.amazonaws.com/doc/2015-01-01/"

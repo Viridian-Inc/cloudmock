@@ -70,7 +70,7 @@ npx cloudmock
 pip install terraform-local && tflocal init && tflocal apply
 
 # After
-go install github.com/neureaux/cloudmock/tools/cloudmock-terraform@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-terraform@latest
 cloudmock-terraform init && cloudmock-terraform apply
 ```
 
@@ -81,7 +81,7 @@ cloudmock-terraform init && cloudmock-terraform apply
 pip install aws-cdk-local && cdklocal deploy
 
 # After
-go install github.com/neureaux/cloudmock/tools/cloudmock-cdk@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-cdk@latest
 cloudmock-cdk deploy
 ```
 

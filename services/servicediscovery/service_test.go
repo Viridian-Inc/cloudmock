@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/service"
-	svc "github.com/neureaux/cloudmock/services/servicediscovery"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	svc "github.com/Viridian-Inc/cloudmock/services/servicediscovery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

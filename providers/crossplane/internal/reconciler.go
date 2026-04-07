@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
 )
 
 // Reconciler handles CRUD operations for a single cloudmock resource type

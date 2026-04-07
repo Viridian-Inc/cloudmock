@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	duckstore "github.com/neureaux/cloudmock/pkg/dataplane/duckdb"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	duckstore "github.com/Viridian-Inc/cloudmock/pkg/dataplane/duckdb"
 )
 
 func TestRequestWriteAndQuery(t *testing.T) {

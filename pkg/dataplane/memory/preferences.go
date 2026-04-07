@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // PreferenceStore satisfies the dataplane.PreferenceStore interface using

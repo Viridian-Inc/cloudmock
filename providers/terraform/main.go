@@ -4,7 +4,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 
-	provider "github.com/neureaux/cloudmock/providers/terraform/internal"
+	provider "github.com/Viridian-Inc/cloudmock/providers/terraform/internal"
 )
 
 func main() {

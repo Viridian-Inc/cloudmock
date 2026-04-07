@@ -3,7 +3,7 @@ package textract
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // TextractService is the cloudmock implementation of the AWS Textract API.

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // bodyBufPool reuses byte slices for reading request bodies.

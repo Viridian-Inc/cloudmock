@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 // ContractProxy is a dual-mode proxy that sends each incoming request to both

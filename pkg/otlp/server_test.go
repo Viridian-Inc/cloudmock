@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
 )
 
 func newTestServer() (*Server, *gateway.TraceStore, *gateway.RequestLog) {

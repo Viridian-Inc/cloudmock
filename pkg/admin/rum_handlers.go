@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/rum"
+	"github.com/Viridian-Inc/cloudmock/pkg/rum"
 )
 
 // SetRUMEngine wires the RUM engine to the admin API.

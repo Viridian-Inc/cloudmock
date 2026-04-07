@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 )
 
 // SetEventBus sets the event bus for cross-service event recording.

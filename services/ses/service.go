@@ -3,7 +3,7 @@ package ses
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // SESService is the cloudmock implementation of the AWS Simple Email Service API.

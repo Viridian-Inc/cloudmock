@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // MultipartUpload holds the state of an in-progress multipart upload.

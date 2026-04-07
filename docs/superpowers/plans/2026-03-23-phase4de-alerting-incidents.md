@@ -53,7 +53,7 @@ package incident
 import (
     "context"
     "time"
-    "github.com/neureaux/cloudmock/pkg/regression"
+    "github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 type AlertSink interface {

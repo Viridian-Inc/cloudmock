@@ -1,0 +1,54 @@
+<h2>How should the view toggle work?</h2>
+<p class="subtitle">Switching between runtime flow and dependency tree in the topology view</p>
+
+<div class="options">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Tab bar inside topology view</h3>
+      <p>Two tabs at the top of the existing topology view: <strong>"Runtime Flow"</strong> and <strong>"Dependencies"</strong>. Same view, same nav item, two modes. The graph re-layouts when you switch but keeps the same canvas, minimap, and inspector sidebar.</p>
+      <div style="margin-top:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-family:monospace;font-size:13px;">
+        <div style="display:flex;gap:0;margin-bottom:12px;">
+          <div style="padding:6px 16px;background:#52b788;color:#0a0e14;border-radius:6px 0 0 6px;font-weight:700;">Runtime Flow</div>
+          <div style="padding:6px 16px;background:rgba(255,255,255,0.1);border-radius:0 6px 6px 0;color:#8b949e;">Dependencies</div>
+        </div>
+        <div style="height:120px;border:1px dashed #30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#6e7681;">Same canvas — layout changes, nodes stay</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Separate nav item in sidebar</h3>
+      <p>A new <strong>"Dependencies"</strong> entry in the icon rail under the "Observe" group, next to Topology. Completely separate view with its own state, layout, and inspector. Can have both open in memory and switch instantly.</p>
+      <div style="margin-top:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-family:monospace;font-size:13px;">
+        <div style="display:flex;gap:8px;">
+          <div style="width:48px;display:flex;flex-direction:column;gap:4px;align-items:center;">
+            <div style="width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#8b949e;">⚡</div>
+            <div style="width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#8b949e;">🔀</div>
+            <div style="width:32px;height:32px;border-radius:6px;background:#52b788;display:flex;align-items:center;justify-content:center;font-size:11px;color:#0a0e14;">🌳</div>
+            <div style="width:32px;height:32px;border-radius:6px;background:rgba(255,255,255,0.1);display:flex;align-items:center;justify-content:center;font-size:11px;color:#8b949e;">📊</div>
+          </div>
+          <div style="flex:1;height:120px;border:1px dashed #30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#6e7681;">Dedicated dependency tree canvas</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Dropdown in topology toolbar</h3>
+      <p>A layout picker dropdown in the topology view's toolbar: <strong>Layered → Tree → Force</strong>. Same data, different ELK algorithm. "Tree" uses the IaC hierarchy for parent-child ordering. Lightweight, no new view needed.</p>
+      <div style="margin-top:12px;padding:12px;background:rgba(255,255,255,0.05);border-radius:8px;font-family:monospace;font-size:13px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+          <span style="color:#8b949e;font-size:12px;">Layout:</span>
+          <div style="padding:4px 12px;background:rgba(82,183,136,0.2);border:1px solid #52b788;border-radius:4px;color:#52b788;font-size:12px;">Tree ▾</div>
+          <span style="color:#6e7681;font-size:11px;">← picks ELK algorithm</span>
+        </div>
+        <div style="height:90px;border:1px dashed #30363d;border-radius:6px;display:flex;align-items:center;justify-content:center;color:#6e7681;">Same canvas, different layout algorithm</div>
+      </div>
+    </div>
+  </div>
+</div>

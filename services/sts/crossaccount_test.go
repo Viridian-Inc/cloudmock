@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/account"
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	stssvc "github.com/neureaux/cloudmock/services/sts"
+	"github.com/Viridian-Inc/cloudmock/pkg/account"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
 )
 
 // newCrossAccountGateway builds a gateway with multi-account support enabled.

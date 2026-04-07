@@ -11,7 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // Broadcaster is the subset of admin.EventBroadcaster the engine needs.

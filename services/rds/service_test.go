@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	rdssvc "github.com/neureaux/cloudmock/services/rds"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	rdssvc "github.com/Viridian-Inc/cloudmock/services/rds"
 )
 
 // newRDSGateway builds a full gateway stack with the RDS service registered and IAM disabled.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // Orchestrator coordinates Fly Machine provisioning and DNS setup

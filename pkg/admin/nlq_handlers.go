@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/nlq"
+	"github.com/Viridian-Inc/cloudmock/pkg/nlq"
 )
 
 // handleAsk handles POST /api/ask — natural language query.

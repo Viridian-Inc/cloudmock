@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/neureaux/cloudmock/pkg/dynamostore"
-	"github.com/neureaux/cloudmock/pkg/monitor"
+	"github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
+	"github.com/Viridian-Inc/cloudmock/pkg/monitor"
 )
 
 const (

@@ -3,7 +3,7 @@ package firehose
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // FirehoseService is the cloudmock implementation of the AWS Data Firehose API.

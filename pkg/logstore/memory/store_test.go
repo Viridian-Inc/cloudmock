@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/logstore"
+	"github.com/Viridian-Inc/cloudmock/pkg/logstore"
 )
 
 func TestWriteAndQuery(t *testing.T) {

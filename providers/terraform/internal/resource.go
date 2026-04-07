@@ -10,7 +10,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	tfschema "github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
 )
 
 // serviceProtocols maps service names to their wire protocol.

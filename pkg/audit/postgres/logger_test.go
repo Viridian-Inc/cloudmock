@@ -12,8 +12,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/neureaux/cloudmock/pkg/audit"
-	auditpg "github.com/neureaux/cloudmock/pkg/audit/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit"
+	auditpg "github.com/Viridian-Inc/cloudmock/pkg/audit/postgres"
 )
 
 // setupPostgres starts a PostgreSQL container, applies schema files 01–04, and

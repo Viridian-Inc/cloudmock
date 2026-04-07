@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // xmlHeader is the standard XML declaration prepended to all XML responses.

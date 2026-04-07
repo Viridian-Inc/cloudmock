@@ -3,7 +3,7 @@ package cost
 import (
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 // Type aliases for config pricing types so cost-package callers do not need to

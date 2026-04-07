@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	pkgprom "github.com/neureaux/cloudmock/pkg/dataplane/prometheus"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	pkgprom "github.com/Viridian-Inc/cloudmock/pkg/dataplane/prometheus"
 )
 
 // promResponse is a minimal Prometheus HTTP API envelope.

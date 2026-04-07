@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 )
 
 // Server handles OTLP/HTTP ingestion for traces, metrics, and logs.

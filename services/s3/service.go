@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // S3Service is the cloudmock implementation of the Amazon S3 API.

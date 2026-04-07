@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/platform/middleware"
-	"github.com/neureaux/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/middleware"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
 )
 
 // ---------------------------------------------------------------------------

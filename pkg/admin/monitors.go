@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/monitor"
+	"github.com/Viridian-Inc/cloudmock/pkg/monitor"
 )
 
 // handleMonitors serves the /api/monitors collection endpoints:

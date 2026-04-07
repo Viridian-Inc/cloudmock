@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // mockSnapshotService implements both service.Service and service.Snapshotable.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
 )
 
 // GeneratePulumiSchema builds a Pulumi package schema JSON structure from
@@ -90,10 +90,10 @@ func GeneratePulumiSchema(reg *cmschema.Registry) map[string]any {
 		"version":     "0.1.0",
 		"description": "A Pulumi provider for cloudmock — local AWS service emulation.",
 		"keywords":    []any{"pulumi", "cloudmock", "aws", "mock", "testing"},
-		"homepage":    "https://github.com/neureaux/cloudmock",
+		"homepage":    "https://github.com/Viridian-Inc/cloudmock",
 		"publisher":   "neureaux",
 		"license":     "Apache-2.0",
-		"repository":  "https://github.com/neureaux/cloudmock",
+		"repository":  "https://github.com/Viridian-Inc/cloudmock",
 		"config": map[string]any{
 			"variables": configProps,
 		},
@@ -109,7 +109,7 @@ func GeneratePulumiSchema(reg *cmschema.Registry) map[string]any {
 				"packageName": "neureaux_pulumi_cloudmock",
 			},
 			"go": map[string]any{
-				"importBasePath": "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock",
+				"importBasePath": "github.com/Viridian-Inc/cloudmock/providers/pulumi/sdk/go/cloudmock",
 			},
 		},
 	}

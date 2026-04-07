@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"net/url"
 
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // IAMService is the cloudmock implementation of the AWS IAM API.

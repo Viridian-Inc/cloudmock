@@ -3,7 +3,7 @@ package mocklog
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 type fakeLogsService struct {

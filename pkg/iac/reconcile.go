@@ -3,7 +3,7 @@ package iac
 import (
 	"log/slog"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Reconciler compares a new IaC scan result against what's currently provisioned

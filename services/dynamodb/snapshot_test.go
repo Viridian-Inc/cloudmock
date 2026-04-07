@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	ddbsvc "github.com/neureaux/cloudmock/services/dynamodb"
+	ddbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
 )
 
 const (

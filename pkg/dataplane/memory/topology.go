@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // TopologyStore satisfies the dataplane.TopologyStore interface using

@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/rum"
-	rummemory "github.com/neureaux/cloudmock/pkg/rum/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/rum"
+	rummemory "github.com/Viridian-Inc/cloudmock/pkg/rum/memory"
 )
 
 // Store wraps the in-memory RUM store with file persistence.

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ecrsvc "github.com/neureaux/cloudmock/services/ecr"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ecrsvc "github.com/Viridian-Inc/cloudmock/services/ecr"
 )
 
 // newECRGateway builds a full gateway stack with the ECR service registered and IAM disabled.

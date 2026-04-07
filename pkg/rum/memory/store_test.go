@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/rum"
+	"github.com/Viridian-Inc/cloudmock/pkg/rum"
 )
 
 func makeEvent(typ rum.EventType, sessionID string) rum.RUMEvent {

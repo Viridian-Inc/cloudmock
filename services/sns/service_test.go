@@ -8,11 +8,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	snssvc "github.com/neureaux/cloudmock/services/sns"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	snssvc "github.com/Viridian-Inc/cloudmock/services/sns"
 )
 
 // newSNSGateway builds a full gateway stack with the SNS service registered and IAM disabled.

@@ -6,8 +6,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	pgImpl "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	pgImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 )
 
 // jsonEqual compares two JSON values semantically (ignoring whitespace differences).

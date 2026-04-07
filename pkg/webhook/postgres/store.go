@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/webhook"
+	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
 )
 
 // Store implements webhook.Store against PostgreSQL.

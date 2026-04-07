@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
 )
 
 // ErrNotFound is returned when a requested resource does not exist.

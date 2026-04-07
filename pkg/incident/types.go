@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // AlertSink receives notifications when regressions or SLO breaches are

@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/platform/model"
-	"github.com/neureaux/cloudmock/pkg/platform/store"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/store"
 )
 
 func setupAPIKeyFixture(t *testing.T) (tenantID, appID string, ts *store.TenantStore, as *store.AppStore, ks *store.APIKeyStore) {

@@ -7,7 +7,7 @@ import (
 	"math"
 	"sort"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // Comparer compares two traces or a trace against a synthesised baseline.

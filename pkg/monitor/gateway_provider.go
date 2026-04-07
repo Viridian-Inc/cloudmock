@@ -3,7 +3,7 @@ package monitor
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // GatewayProvider reads live metrics from the gateway SLO engine and request

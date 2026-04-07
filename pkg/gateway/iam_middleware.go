@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net/http"
 
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/service"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // unauthenticatedActions lists AWS API actions that do not require an

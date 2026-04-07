@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ec2svc "github.com/neureaux/cloudmock/services/ec2"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ec2svc "github.com/Viridian-Inc/cloudmock/services/ec2"
 )
 
 // newEC2Gateway builds a full gateway stack with the EC2 service registered and IAM disabled.

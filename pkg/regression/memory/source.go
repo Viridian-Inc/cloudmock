@@ -4,8 +4,8 @@ import (
 	"context"
 	"sort"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // MetricSource implements regression.MetricSource by computing WindowMetrics

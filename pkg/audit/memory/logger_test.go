@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/audit"
-	"github.com/neureaux/cloudmock/pkg/audit/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit/memory"
 )
 
 func TestLogAndQuery(t *testing.T) {

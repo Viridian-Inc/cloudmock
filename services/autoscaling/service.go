@@ -3,8 +3,8 @@ package autoscaling
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceLocator provides access to other services for cross-service communication.

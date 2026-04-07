@@ -8,8 +8,8 @@ import (
 	"net/url"
 	"strconv"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const asXmlns = "http://autoscaling.amazonaws.com/doc/2011-01-01/"

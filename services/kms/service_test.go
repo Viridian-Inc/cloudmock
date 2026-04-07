@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	kmssvc "github.com/neureaux/cloudmock/services/kms"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	kmssvc "github.com/Viridian-Inc/cloudmock/services/kms"
 )
 
 // newKMSGateway builds a full gateway stack with the KMS service registered and IAM disabled.

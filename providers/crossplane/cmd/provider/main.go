@@ -16,11 +16,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
-	cpinternal "github.com/neureaux/cloudmock/providers/crossplane/internal"
-	"github.com/neureaux/cloudmock/services/dynamodb"
-	"github.com/neureaux/cloudmock/services/ec2"
-	"github.com/neureaux/cloudmock/services/s3"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
+	cpinternal "github.com/Viridian-Inc/cloudmock/providers/crossplane/internal"
+	"github.com/Viridian-Inc/cloudmock/services/dynamodb"
+	"github.com/Viridian-Inc/cloudmock/services/ec2"
+	"github.com/Viridian-Inc/cloudmock/services/s3"
 	"gopkg.in/yaml.v3"
 )
 

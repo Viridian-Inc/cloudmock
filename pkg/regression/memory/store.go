@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // Store implements regression.RegressionStore using a mutex-protected slice.

@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 func WriteMarkdown(results *harness.BenchmarkResults, path string) error {

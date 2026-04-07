@@ -7,7 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // Middleware enforces request quotas per tenant. It reads the tenant

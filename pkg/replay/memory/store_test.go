@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/replay"
+	"github.com/Viridian-Inc/cloudmock/pkg/replay"
 )
 
 func makeSession(id string) replay.Session {

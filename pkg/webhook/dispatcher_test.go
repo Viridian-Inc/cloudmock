@@ -13,9 +13,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
-	"github.com/neureaux/cloudmock/pkg/webhook"
-	whmemory "github.com/neureaux/cloudmock/pkg/webhook/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
+	whmemory "github.com/Viridian-Inc/cloudmock/pkg/webhook/memory"
 )
 
 // captureServer captures the last request body and returns a given status code.

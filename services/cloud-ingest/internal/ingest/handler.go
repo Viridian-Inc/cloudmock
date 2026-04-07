@@ -17,7 +17,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/services/cloud-ingest/internal/store"
+	"github.com/Viridian-Inc/cloudmock/services/cloud-ingest/internal/store"
 )
 
 const (

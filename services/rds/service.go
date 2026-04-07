@@ -3,8 +3,8 @@ package rds
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // RDSService is the cloudmock implementation of the AWS Relational Database Service API.

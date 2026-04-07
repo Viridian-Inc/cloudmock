@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/tools/common"
+	"github.com/Viridian-Inc/cloudmock/tools/common"
 )
 
 func main() {

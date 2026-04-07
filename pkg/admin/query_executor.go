@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // ExecuteQuery runs a MetricQuery against the request log in either timeseries

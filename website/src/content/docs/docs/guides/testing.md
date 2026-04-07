@@ -13,7 +13,7 @@ Your tests start CloudMock as a local HTTP server on port 4566 and point AWS SDK
 
 ### In-process mode (Go only, ~20 μs/op)
 
-For Go projects, the `github.com/neureaux/cloudmock/sdk` package embeds the CloudMock engine directly in your test binary. There is no HTTP server, no network round-trip, and no process to start. Operations run at ~20 μs each — over 110x faster than Moto and faster than any HTTP-based alternative. Ideal for large test suites or CI environments where startup time matters.
+For Go projects, the `github.com/Viridian-Inc/cloudmock/sdk` package embeds the CloudMock engine directly in your test binary. There is no HTTP server, no network round-trip, and no process to start. Operations run at ~20 μs each — over 110x faster than Moto and faster than any HTTP-based alternative. Ideal for large test suites or CI environments where startup time matters.
 
 ---
 
@@ -22,7 +22,7 @@ For Go projects, the `github.com/neureaux/cloudmock/sdk` package embeds the Clou
 Add the SDK:
 
 ```bash
-go get github.com/neureaux/cloudmock/sdk
+go get github.com/Viridian-Inc/cloudmock/sdk
 ```
 
 Use `sdk.New()` in `TestMain` to start a shared instance for the entire test binary, then call `cm.Config()` to get an `aws.Config` pre-configured to talk to the embedded engine.
@@ -40,7 +40,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "github.com/aws/aws-sdk-go-v2/service/s3"
-    "github.com/neureaux/cloudmock/sdk"
+    "github.com/Viridian-Inc/cloudmock/sdk"
 )
 
 var cm *sdk.CloudMock

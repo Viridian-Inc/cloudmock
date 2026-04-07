@@ -1,6 +1,6 @@
 package sdk
 
-import "github.com/neureaux/cloudmock/pkg/gateway"
+import "github.com/Viridian-Inc/cloudmock/pkg/gateway"
 
 // ChaosOption configures a fault injection rule.
 type ChaosOption func(*chaosOpts)

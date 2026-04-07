@@ -200,7 +200,7 @@ var serviceTemplate = `package {{.Package}}
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Service is the cloudmock implementation of the AWS {{.SigningName}} service.
@@ -253,7 +253,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Store is the in-memory data store for {{.Package}} resources.
@@ -339,7 +339,7 @@ import (
 	"time"
 {{- end}}
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ── Generated request/response types ─────────────────────────────────────────
@@ -391,10 +391,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	svc "github.com/neureaux/cloudmock/services/{{.Package}}"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	svc "github.com/Viridian-Inc/cloudmock/services/{{.Package}}"
 )
 
 func newGateway(t *testing.T) http.Handler {
@@ -450,7 +450,7 @@ var appendHandlersTemplate = `package {{.Package}}
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 /*

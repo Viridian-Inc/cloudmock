@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // ServiceMetrics holds computed latency percentiles and error rate for a single service.

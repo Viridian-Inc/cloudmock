@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceLocator resolves other services by name.

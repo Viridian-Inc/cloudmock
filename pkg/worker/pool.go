@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
 )
 
 // Pool manages background goroutines for service work.

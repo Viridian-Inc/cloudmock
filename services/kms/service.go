@@ -3,8 +3,8 @@ package kms
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // KMSService is the cloudmock implementation of the AWS Key Management Service API.

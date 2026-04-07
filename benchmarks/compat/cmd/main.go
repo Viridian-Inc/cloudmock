@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/neureaux/cloudmock/benchmarks/compat"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/compat"
 )
 
 // go run ./benchmarks/compat/ --input benchmarks/results/full-cloudmock/results.json --output website/src/data/compat.json

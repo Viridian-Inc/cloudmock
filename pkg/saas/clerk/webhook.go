@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/auth"
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/auth"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // Svix signature tolerance window.

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	logssvc "github.com/neureaux/cloudmock/services/cloudwatchlogs"
+	logssvc "github.com/Viridian-Inc/cloudmock/services/cloudwatchlogs"
 )
 
 const (

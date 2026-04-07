@@ -69,7 +69,7 @@ This sends spans to any OpenTelemetry-compatible backend (Jaeger, Zipkin, Datado
 The Go SDK supports tracing via the `WithTracing()` option:
 
 ```go
-import "github.com/neureaux/cloudmock/sdk"
+import "github.com/Viridian-Inc/cloudmock/sdk"
 
 cm := sdk.New(sdk.WithTracing())
 defer cm.Close()

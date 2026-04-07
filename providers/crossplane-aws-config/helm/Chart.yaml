@@ -4,9 +4,9 @@ description: A Helm chart for deploying cloudmock in Kubernetes for use with Cro
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
-home: https://github.com/neureaux/cloudmock
+home: https://github.com/Viridian-Inc/cloudmock
 sources:
-  - https://github.com/neureaux/cloudmock
+  - https://github.com/Viridian-Inc/cloudmock
 maintainers:
   - name: neureaux
     url: https://github.com/neureaux

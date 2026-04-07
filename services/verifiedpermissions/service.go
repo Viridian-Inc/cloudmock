@@ -3,7 +3,7 @@ package verifiedpermissions
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // VerifiedPermissionsService is the cloudmock implementation of the Amazon Verified Permissions API.

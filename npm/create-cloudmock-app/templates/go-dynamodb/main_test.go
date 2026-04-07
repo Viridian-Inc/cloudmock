@@ -11,7 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
-	sdk "github.com/neureaux/cloudmock/sdk"
+	sdk "github.com/Viridian-Inc/cloudmock/sdk"
 )
 
 func setupTest(t *testing.T) (*httptest.Server, func()) {

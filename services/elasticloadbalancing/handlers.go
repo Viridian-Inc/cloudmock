@@ -9,8 +9,8 @@ import (
 	"sort"
 	"strconv"
 
-	"github.com/neureaux/cloudmock/pkg/pagination"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/pagination"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const elbXmlns = "http://elasticloadbalancing.amazonaws.com/doc/2015-12-01/"

@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	errs "github.com/neureaux/cloudmock/pkg/errors"
+	errs "github.com/Viridian-Inc/cloudmock/pkg/errors"
 )
 
 // Store is an in-memory implementation of errs.ErrorStore using a circular

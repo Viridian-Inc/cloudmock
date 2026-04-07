@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/rum"
+	"github.com/Viridian-Inc/cloudmock/pkg/rum"
 )
 
 // Store is an in-memory circular-buffer RUM event store.

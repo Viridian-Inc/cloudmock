@@ -3,7 +3,7 @@ package wafv2
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // WAFv2Service is the cloudmock implementation of the AWS WAFv2 API.

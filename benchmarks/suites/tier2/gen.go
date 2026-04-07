@@ -85,8 +85,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/wafv2"
 	wafv2types "github.com/aws/aws-sdk-go-v2/service/wafv2/types"
 	"github.com/aws/aws-sdk-go-v2/service/xray"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // sdkSuite implements harness.Suite for tier-2 services using real AWS SDK clients.

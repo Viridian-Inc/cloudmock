@@ -6,7 +6,7 @@
 //
 // Usage:
 //
-//	import cloudmock "github.com/neureaux/cloudmock-sdk-go"
+//	import cloudmock "github.com/Viridian-Inc/cloudmock-sdk-go"
 //
 //	func main() {
 //	    cloudmock.Init(cloudmock.Options{AppName: "my-service"})

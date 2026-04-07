@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
 )
 
 // SQSEnqueuer is implemented by the SQS service for direct message delivery.

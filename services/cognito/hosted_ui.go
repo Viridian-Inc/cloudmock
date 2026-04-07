@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const loginPageHTML = `<!DOCTYPE html>

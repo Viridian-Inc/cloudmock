@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/neureaux/cloudmock/pkg/rustddb"
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/rustddb"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // DynamoDBService is the cloudmock implementation of the AWS DynamoDB API.

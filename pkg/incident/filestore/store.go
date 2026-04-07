@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
 )
 
 // Store implements incident.IncidentStore using JSON file persistence.

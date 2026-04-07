@@ -4,8 +4,8 @@ import (
 	"context"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // ConfigStore satisfies the dataplane.ConfigStore interface using in-memory

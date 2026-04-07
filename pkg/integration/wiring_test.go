@@ -5,10 +5,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/integration"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/integration"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

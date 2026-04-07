@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/codebuild"
 	codebuildtypes "github.com/aws/aws-sdk-go-v2/service/codebuild/types"
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type codeBuildSuite struct{}

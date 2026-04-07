@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	stssvc "github.com/neureaux/cloudmock/services/sts"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
 )
 
 // newSTSGateway builds a full gateway stack with the STS service registered and IAM disabled.

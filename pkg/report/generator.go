@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/incident"
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // Report is the assembled data for an incident report.

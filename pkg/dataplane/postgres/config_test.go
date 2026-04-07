@@ -8,9 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	pgstore "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	pgstore "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 )
 
 func TestConfigStore_GetSetConfig(t *testing.T) {

@@ -14,8 +14,8 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
-	"github.com/neureaux/cloudmock/pkg/platform/middleware"
-	"github.com/neureaux/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/middleware"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
 )
 
 // ---------------------------------------------------------------------------

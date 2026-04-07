@@ -13,8 +13,8 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
-	sdk "github.com/neureaux/cloudmock/sdk/go"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	sdk "github.com/Viridian-Inc/cloudmock/sdk/go"
 )
 
 type examplePlugin struct{}

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/logstore"
+	"github.com/Viridian-Inc/cloudmock/pkg/logstore"
 )
 
 // Store is an in-memory implementation of logstore.LogStore using a circular

@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/account"
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/plugin"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/account"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Gateway is the main HTTP handler that routes AWS API requests to service mocks.

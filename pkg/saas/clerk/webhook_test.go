@@ -13,8 +13,8 @@ import (
 	"testing"
 	"time"
 
-	authmemory "github.com/neureaux/cloudmock/pkg/auth/memory"
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	authmemory "github.com/Viridian-Inc/cloudmock/pkg/auth/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // testWebhookSecret is a base64-encoded HMAC key used in tests.

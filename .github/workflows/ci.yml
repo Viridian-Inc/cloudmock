@@ -5,8 +5,8 @@ jobs:
   test:
     runs-on: ubuntu-latest
     env:
-      GOPRIVATE: github.com/neureaux/cloudmock
-      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
       GOFLAGS: -mod=mod
     steps:
       - uses: actions/checkout@v4

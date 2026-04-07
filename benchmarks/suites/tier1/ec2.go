@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type ec2Suite struct{}

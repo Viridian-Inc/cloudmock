@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // ---------------------------------------------------------------------------

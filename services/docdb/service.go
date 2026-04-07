@@ -3,7 +3,7 @@ package docdb
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // DocDBService is the cloudmock implementation of the AWS DocumentDB API.

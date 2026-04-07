@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ec2svc "github.com/neureaux/cloudmock/services/ec2"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ec2svc "github.com/Viridian-Inc/cloudmock/services/ec2"
 )
 
 // setupEC2Gateway builds a full gateway with the Tier 1 EC2 service registered

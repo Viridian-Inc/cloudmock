@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // SourceServer accepts TCP connections from @cloudmock/node (and other SDKs)

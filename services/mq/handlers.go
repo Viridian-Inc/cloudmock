@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 func jsonOK(body any) (*service.Response, error) {

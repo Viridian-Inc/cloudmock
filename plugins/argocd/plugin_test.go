@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
-	"github.com/neureaux/cloudmock/plugins/argocd/internal"
-	k8splugin "github.com/neureaux/cloudmock/plugins/kubernetes"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/plugins/argocd/internal"
+	k8splugin "github.com/Viridian-Inc/cloudmock/plugins/kubernetes"
 )
 
 func TestDescribe(t *testing.T) {

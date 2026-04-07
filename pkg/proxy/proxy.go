@@ -13,7 +13,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 // serviceEndpoints maps AWS service names to their endpoint format strings.

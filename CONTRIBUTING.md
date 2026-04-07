@@ -18,7 +18,7 @@ By participating in this project, you agree to maintain a respectful and inclusi
 ### Clone and Build
 
 ```bash
-git clone https://github.com/neureaux/cloudmock.git
+git clone https://github.com/Viridian-Inc/cloudmock.git
 cd cloudmock
 make build
 ```
@@ -176,7 +176,7 @@ Large PRs are hard to review. If your change is big, consider splitting it into 
 
 ## Reporting Bugs
 
-Use [GitHub Issues](https://github.com/neureaux/cloudmock/issues) with the bug report template. Include:
+Use [GitHub Issues](https://github.com/Viridian-Inc/cloudmock/issues) with the bug report template. Include:
 
 - CloudMock version (`cloudmock --version`)
 - Steps to reproduce
@@ -185,7 +185,7 @@ Use [GitHub Issues](https://github.com/neureaux/cloudmock/issues) with the bug r
 
 ## Requesting Features
 
-Use [GitHub Issues](https://github.com/neureaux/cloudmock/issues) with the feature request template. Describe the use case, not just the solution.
+Use [GitHub Issues](https://github.com/Viridian-Inc/cloudmock/issues) with the feature request template. Describe the use case, not just the solution.
 
 ## License
 

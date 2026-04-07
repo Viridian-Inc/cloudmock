@@ -26,7 +26,7 @@
   },
   "description": "A Pulumi provider for cloudmock — local AWS service emulation.",
   "displayName": "CloudMock",
-  "homepage": "https://github.com/neureaux/cloudmock",
+  "homepage": "https://github.com/Viridian-Inc/cloudmock",
   "keywords": [
     "pulumi",
     "cloudmock",
@@ -36,7 +36,7 @@
   ],
   "language": {
     "go": {
-      "importBasePath": "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock"
+      "importBasePath": "github.com/Viridian-Inc/cloudmock/providers/pulumi/sdk/go/cloudmock"
     },
     "nodejs": {
       "packageName": "@neureaux/pulumi-cloudmock"
@@ -73,7 +73,7 @@
     }
   },
   "publisher": "neureaux",
-  "repository": "https://github.com/neureaux/cloudmock",
+  "repository": "https://github.com/Viridian-Inc/cloudmock",
   "resources": {
     "cloudmock:dynamodb:Table": {
       "description": "Manages a AWS::DynamoDB::Table resource in cloudmock.",

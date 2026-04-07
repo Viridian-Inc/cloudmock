@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	r53svc "github.com/neureaux/cloudmock/services/route53"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	r53svc "github.com/Viridian-Inc/cloudmock/services/route53"
 )
 
 // newR53Gateway builds a full gateway stack with the Route 53 service registered and IAM disabled.

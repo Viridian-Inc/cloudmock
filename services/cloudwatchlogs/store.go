@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // LogEvent is a single log event with timestamp (epoch millis) and message.

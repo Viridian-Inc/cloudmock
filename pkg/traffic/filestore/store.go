@@ -20,7 +20,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 // Store implements traffic.RecordingStore backed by JSON files on disk.

@@ -3,7 +3,7 @@ package organizations
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // OrganizationsService is the cloudmock implementation of the AWS Organizations API.

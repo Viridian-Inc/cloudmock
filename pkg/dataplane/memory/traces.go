@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // TraceStore wraps gateway.TraceStore to satisfy the dataplane.TraceReader

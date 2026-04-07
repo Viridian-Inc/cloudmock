@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
 )
 
 // VaultLock represents a vault lock policy.

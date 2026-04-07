@@ -308,7 +308,7 @@ import (
     "context"
     "time"
 
-    "github.com/neureaux/cloudmock/pkg/config"
+    "github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 type SLORuleChange struct {
@@ -339,7 +339,7 @@ import (
     "context"
     "time"
 
-    "github.com/neureaux/cloudmock/pkg/config"
+    "github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 type DeployEvent struct {
@@ -491,9 +491,9 @@ import (
     "testing"
     "time"
 
-    "github.com/neureaux/cloudmock/pkg/dataplane"
-    "github.com/neureaux/cloudmock/pkg/dataplane/memory"
-    "github.com/neureaux/cloudmock/pkg/gateway"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
+    "github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 func TestTraceReaderGet(t *testing.T) {
@@ -563,8 +563,8 @@ package memory
 import (
     "context"
 
-    "github.com/neureaux/cloudmock/pkg/dataplane"
-    "github.com/neureaux/cloudmock/pkg/gateway"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+    "github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 type traceReader struct {
@@ -948,7 +948,7 @@ import (
 
     "github.com/ClickHouse/clickhouse-go/v2"
     "github.com/ClickHouse/clickhouse-go/v2/lib/driver"
-    "github.com/neureaux/cloudmock/pkg/config"
+    "github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 type Client struct {
@@ -1179,7 +1179,7 @@ import (
     "go.opentelemetry.io/otel/sdk/resource"
     sdktrace "go.opentelemetry.io/otel/sdk/trace"
     semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-    "github.com/neureaux/cloudmock/pkg/config"
+    "github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 func InitTracer(ctx context.Context, cfg config.OTelConfig) (func(context.Context) error, error) {
@@ -1327,9 +1327,9 @@ import (
     "fmt"
     "log"
 
-    "github.com/neureaux/cloudmock/pkg/config"
-    "github.com/neureaux/cloudmock/pkg/dataplane"
-    "github.com/neureaux/cloudmock/pkg/dataplane/postgres"
+    "github.com/Viridian-Inc/cloudmock/pkg/config"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 )
 
 func main() {

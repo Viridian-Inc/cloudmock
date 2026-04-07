@@ -11,8 +11,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
-	"github.com/neureaux/cloudmock/pkg/sqlparse"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/sqlparse"
 )
 
 // WorkGroup represents an Athena workgroup.

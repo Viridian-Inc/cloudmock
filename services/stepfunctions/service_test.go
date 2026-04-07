@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	sfnsvc "github.com/neureaux/cloudmock/services/stepfunctions"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	sfnsvc "github.com/Viridian-Inc/cloudmock/services/stepfunctions"
 )
 
 // newSFNGateway builds a full gateway stack with the Step Functions service registered and IAM disabled.

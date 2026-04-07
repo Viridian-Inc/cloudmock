@@ -3,7 +3,7 @@ package glue
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // GlueService is the cloudmock implementation of the AWS Glue API.

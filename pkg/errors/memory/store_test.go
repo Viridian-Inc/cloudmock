@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	errs "github.com/neureaux/cloudmock/pkg/errors"
+	errs "github.com/Viridian-Inc/cloudmock/pkg/errors"
 )
 
 func TestIngestAndGetGroups(t *testing.T) {

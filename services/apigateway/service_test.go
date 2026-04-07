@@ -8,10 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	apigwsvc "github.com/neureaux/cloudmock/services/apigateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	apigwsvc "github.com/Viridian-Inc/cloudmock/services/apigateway"
 )
 
 // newAPIGatewayHandler builds a full gateway stack with API Gateway registered and IAM disabled.

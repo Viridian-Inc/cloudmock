@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
-	incmemory "github.com/neureaux/cloudmock/pkg/incident/memory"
-	regmemory "github.com/neureaux/cloudmock/pkg/regression/memory"
+	incmemory "github.com/Viridian-Inc/cloudmock/pkg/incident/memory"
+	regmemory "github.com/Viridian-Inc/cloudmock/pkg/regression/memory"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
-	"github.com/neureaux/cloudmock/pkg/regression"
-	"github.com/neureaux/cloudmock/pkg/report"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/report"
 )
 
 func newTestIncident(id string) *incident.Incident {

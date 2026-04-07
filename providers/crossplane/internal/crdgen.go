@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
 )
 
 // CRD represents a Kubernetes CustomResourceDefinition for a Crossplane

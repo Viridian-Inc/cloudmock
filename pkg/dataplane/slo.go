@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 type SLOWindowStatus struct {

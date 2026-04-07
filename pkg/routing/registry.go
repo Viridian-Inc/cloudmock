@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceFactory is a function that constructs and returns a Service.

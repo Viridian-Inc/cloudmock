@@ -8,7 +8,7 @@ import (
 	"os/exec"
 	"time"
 
-	"github.com/neureaux/cloudmock/tools/common"
+	"github.com/Viridian-Inc/cloudmock/tools/common"
 )
 
 // RunResult captures the outcome of a tool execution.

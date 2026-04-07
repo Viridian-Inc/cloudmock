@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/audit"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit"
 )
 
 // Logger implements audit.Logger against PostgreSQL.

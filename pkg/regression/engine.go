@@ -5,7 +5,7 @@ import (
 	"math"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 type pendingDeploy struct {

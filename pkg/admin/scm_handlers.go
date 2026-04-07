@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/scm"
+	"github.com/Viridian-Inc/cloudmock/pkg/scm"
 )
 
 // scmState holds the current SCM configuration and provider.

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	errs "github.com/neureaux/cloudmock/pkg/errors"
+	errs "github.com/Viridian-Inc/cloudmock/pkg/errors"
 )
 
 // SetErrorStore wires the error store to the admin API and registers routes.

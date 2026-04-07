@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 func TestSLOStore_Rules(t *testing.T) {

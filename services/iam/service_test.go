@@ -7,11 +7,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	iamsvc "github.com/neureaux/cloudmock/services/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	iamsvc "github.com/Viridian-Inc/cloudmock/services/iam"
 )
 
 // newIAMGateway builds a full gateway stack with the IAM service registered and IAM auth disabled.

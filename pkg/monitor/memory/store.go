@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/neureaux/cloudmock/pkg/monitor"
+	"github.com/Viridian-Inc/cloudmock/pkg/monitor"
 )
 
 // Store implements both monitor.MonitorStore and monitor.AlertStore

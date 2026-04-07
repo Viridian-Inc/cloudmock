@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // handleJSON dispatches a JSON-protocol SNS request based on X-Amz-Target.

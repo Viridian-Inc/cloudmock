@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceLocator provides access to other cloudmock services for resource provisioning.

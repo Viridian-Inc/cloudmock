@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const ec2Xmlns = "http://ec2.amazonaws.com/doc/2016-11-15/"

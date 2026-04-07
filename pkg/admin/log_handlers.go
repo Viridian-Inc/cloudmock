@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/logstore"
+	"github.com/Viridian-Inc/cloudmock/pkg/logstore"
 )
 
 // SetLogStore wires the log store to the admin API and registers routes.

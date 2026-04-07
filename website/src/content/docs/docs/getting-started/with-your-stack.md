@@ -102,16 +102,16 @@ Each client or resource call takes its own `endpoint_url`. If you prefer a singl
 
 ## Go (aws-sdk-go-v2)
 
-Go is the highest-performance target for CloudMock. The `github.com/neureaux/cloudmock/sdk` package supports two modes:
+Go is the highest-performance target for CloudMock. The `github.com/Viridian-Inc/cloudmock/sdk` package supports two modes:
 
 **In-process mode (~20 μs/op)** — the CloudMock engine runs embedded in your process. No HTTP server, no network round-trip, no startup time. Ideal for tests.
 
 ```bash
-go get github.com/neureaux/cloudmock/sdk
+go get github.com/Viridian-Inc/cloudmock/sdk
 ```
 
 ```go
-import "github.com/neureaux/cloudmock/sdk"
+import "github.com/Viridian-Inc/cloudmock/sdk"
 
 cm := sdk.New()
 defer cm.Close()
@@ -317,7 +317,7 @@ CloudMock works with your existing IaC tools — no code changes needed. Because
 Install the wrapper and use your existing `.tf` files without modification:
 
 ```bash
-go install github.com/neureaux/cloudmock/tools/cloudmock-terraform@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-terraform@latest
 
 cloudmock-terraform init
 cloudmock-terraform plan
@@ -346,7 +346,7 @@ See the [Terraform guide](/docs/guides/terraform/) for full details.
 Install the CDK wrapper and deploy your existing CDK apps:
 
 ```bash
-go install github.com/neureaux/cloudmock/tools/cloudmock-cdk@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-cdk@latest
 
 cloudmock-cdk deploy --all
 cloudmock-cdk destroy --all
@@ -361,7 +361,7 @@ See the [CDK guide](/docs/guides/cdk/) for full details.
 Install the Pulumi wrapper and run your existing Pulumi programs:
 
 ```bash
-go install github.com/neureaux/cloudmock/tools/cloudmock-pulumi@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-pulumi@latest
 
 cloudmock-pulumi up
 cloudmock-pulumi destroy

@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/worker"
+	"github.com/Viridian-Inc/cloudmock/pkg/worker"
 )
 
 // FailureCallback is called when a check has N consecutive failures.

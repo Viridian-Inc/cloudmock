@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ecssvc "github.com/neureaux/cloudmock/services/ecs"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ecssvc "github.com/Viridian-Inc/cloudmock/services/ecs"
 )
 
 // newECSGateway builds a full gateway stack with the ECS service registered and IAM disabled.

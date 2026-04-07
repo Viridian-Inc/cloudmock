@@ -3,7 +3,7 @@ package suites
 import (
 	"sort"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type Registry struct {

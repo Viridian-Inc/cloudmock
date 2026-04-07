@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceFactory creates a service instance for a given account ID and region.

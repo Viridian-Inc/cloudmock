@@ -160,7 +160,7 @@ CloudMock provides native SDK adapters for every major language:
 
 | Language | Package | Install |
 |----------|---------|---------|
-| **Go** | `github.com/neureaux/cloudmock/sdk` | `go get` (in-process, 20μs/op) |
+| **Go** | `github.com/Viridian-Inc/cloudmock/sdk` | `go get` (in-process, 20μs/op) |
 | **Python** | `cloudmock` | `pip install cloudmock` |
 | **Node.js** | `@cloudmock/sdk` | `npm install @cloudmock/sdk` |
 | **Java** | `dev.cloudmock:cloudmock-sdk` | Maven Central |

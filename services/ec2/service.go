@@ -3,8 +3,8 @@ package ec2
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // EC2Service is the cloudmock implementation of the AWS EC2 API.

@@ -8,8 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/eks"
 	ekstypes "github.com/aws/aws-sdk-go-v2/service/eks/types"
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type eksSuite struct{}

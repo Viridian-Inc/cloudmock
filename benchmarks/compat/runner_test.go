@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/compat"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/compat"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // buildBenchmarkFile writes a minimal BenchmarkResults JSON to a temp file and

@@ -8,7 +8,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // CompatReport is the top-level compatibility report.

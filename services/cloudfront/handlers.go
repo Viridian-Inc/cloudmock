@@ -9,8 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/pagination"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/pagination"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // CloudFront uses REST-XML protocol. Requests are XML in body, responses are XML.

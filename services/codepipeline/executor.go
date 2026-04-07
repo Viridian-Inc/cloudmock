@@ -6,7 +6,7 @@ import (
 	"net/http/httptest"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceLocatorForExec is the interface used by the executor to call other services.

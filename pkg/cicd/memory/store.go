@@ -3,7 +3,7 @@ package memory
 import (
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/cicd"
+	"github.com/Viridian-Inc/cloudmock/pkg/cicd"
 )
 
 const maxPipelines = 500

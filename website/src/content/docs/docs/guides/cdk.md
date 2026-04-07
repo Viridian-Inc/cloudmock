@@ -83,7 +83,7 @@ export class ExampleStack extends cdk.Stack {
 }
 ```
 
-A complete working example is in [`examples/cdk-typescript/`](https://github.com/neureaux/cloudmock/tree/main/examples/cdk-typescript) in the repository.
+A complete working example is in [`examples/cdk-typescript/`](https://github.com/Viridian-Inc/cloudmock/tree/main/examples/cdk-typescript) in the repository.
 
 ## Supported constructs
 

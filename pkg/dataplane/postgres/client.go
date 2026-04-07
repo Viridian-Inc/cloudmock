@@ -6,7 +6,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 // NewPool creates a PostgreSQL connection pool from the given config.

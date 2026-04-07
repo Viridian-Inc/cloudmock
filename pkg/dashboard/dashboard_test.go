@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/dashboard"
+	"github.com/Viridian-Inc/cloudmock/pkg/dashboard"
 )
 
 // getHTML fetches the dashboard HTML via an httptest.Server so redirects

@@ -11,7 +11,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // mockFlyServer creates a Fly mock that handles app and machine operations.

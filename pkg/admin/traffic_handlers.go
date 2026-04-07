@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 // --- handler: GET/POST /api/traffic/recordings ---

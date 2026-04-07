@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	appsvc "github.com/neureaux/cloudmock/services/appsync"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	appsvc "github.com/Viridian-Inc/cloudmock/services/appsync"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

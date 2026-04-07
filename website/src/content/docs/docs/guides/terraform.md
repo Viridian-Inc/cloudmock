@@ -103,7 +103,7 @@ resource "aws_sqs_queue" "example" {
 }
 ```
 
-A complete working example is in [`examples/terraform/`](https://github.com/neureaux/cloudmock/tree/main/examples/terraform) in the repository.
+A complete working example is in [`examples/terraform/`](https://github.com/Viridian-Inc/cloudmock/tree/main/examples/terraform) in the repository.
 
 ## State management
 

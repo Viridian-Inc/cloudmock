@@ -3,8 +3,8 @@ package security
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // mockService satisfies the service.Service interface for testing.

@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	sqssvc "github.com/neureaux/cloudmock/services/sqs"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	sqssvc "github.com/Viridian-Inc/cloudmock/services/sqs"
 )
 
 // newSQSGateway builds a full gateway stack with the SQS service registered and IAM disabled.

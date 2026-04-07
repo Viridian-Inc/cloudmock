@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	r53svc "github.com/neureaux/cloudmock/services/route53"
+	r53svc "github.com/Viridian-Inc/cloudmock/services/route53"
 )
 
 const (

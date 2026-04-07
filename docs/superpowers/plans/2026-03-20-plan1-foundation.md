@@ -160,7 +160,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -287,7 +287,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -562,7 +562,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -864,7 +864,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1002,8 +1002,8 @@ package routing_test
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1056,7 +1056,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Registry holds all registered services and provides lookup by name.
@@ -1131,10 +1131,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1222,9 +1222,9 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Gateway is the main HTTP server that routes AWS API requests to services.
@@ -1376,9 +1376,9 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
 )
 
 func main() {
@@ -1445,7 +1445,7 @@ package iam_test
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/iam"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1531,7 +1531,7 @@ package iam_test
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/iam"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -1841,7 +1841,7 @@ package iam_test
 import (
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/iam"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2071,7 +2071,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/iam"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2193,10 +2193,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	s3svc "github.com/neureaux/cloudmock/services/s3"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2364,7 +2364,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 type ListAllMyBucketsResult struct {
@@ -2466,7 +2466,7 @@ package s3
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 type S3Service struct {
@@ -2656,8 +2656,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	s3svc "github.com/neureaux/cloudmock/services/s3"
-	"github.com/neureaux/cloudmock/pkg/service"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 func main() {
@@ -2881,11 +2881,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -2971,8 +2971,8 @@ Expected: FAIL — NewWithIAM not defined
 package gateway
 
 import (
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/service"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	"net/http"
 )
 
@@ -3079,11 +3079,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	s3svc "github.com/neureaux/cloudmock/services/s3"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

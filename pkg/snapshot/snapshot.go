@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/routing"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Export serialises the state of all Snapshotable services in the registry

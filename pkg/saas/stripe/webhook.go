@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // signatureToleranceSeconds is the max age of a Stripe webhook event.

@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
 )
 
 // SLOAlertFunc is called when a breaching window is detected during Record.

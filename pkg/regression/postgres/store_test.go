@@ -14,8 +14,8 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/neureaux/cloudmock/pkg/regression"
-	pgstore "github.com/neureaux/cloudmock/pkg/regression/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
+	pgstore "github.com/Viridian-Inc/cloudmock/pkg/regression/postgres"
 )
 
 // setupPostgres starts a PostgreSQL container, applies both schema files, and

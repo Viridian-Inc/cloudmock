@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // CapacityProvider holds ECS capacity provider metadata.

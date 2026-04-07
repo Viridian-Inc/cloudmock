@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // handleS3Control routes S3 Control API requests (/v20180820/...).

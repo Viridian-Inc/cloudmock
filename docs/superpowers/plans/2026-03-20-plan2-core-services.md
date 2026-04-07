@@ -39,10 +39,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	stssvc "github.com/neureaux/cloudmock/services/sts"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -503,14 +503,14 @@ git commit -m "feat: add DynamoDB service — tables, items, query, scan, expres
 Register all new services in the gateway startup:
 ```go
 import (
-    stssvc "github.com/neureaux/cloudmock/services/sts"
-    kmssvc "github.com/neureaux/cloudmock/services/kms"
-    secretssvc "github.com/neureaux/cloudmock/services/secretsmanager"
-    ssmsvc "github.com/neureaux/cloudmock/services/ssm"
-    sqssvc "github.com/neureaux/cloudmock/services/sqs"
-    snssvc "github.com/neureaux/cloudmock/services/sns"
-    dynamodbsvc "github.com/neureaux/cloudmock/services/dynamodb"
-    s3svc "github.com/neureaux/cloudmock/services/s3"
+    stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
+    kmssvc "github.com/Viridian-Inc/cloudmock/services/kms"
+    secretssvc "github.com/Viridian-Inc/cloudmock/services/secretsmanager"
+    ssmsvc "github.com/Viridian-Inc/cloudmock/services/ssm"
+    sqssvc "github.com/Viridian-Inc/cloudmock/services/sqs"
+    snssvc "github.com/Viridian-Inc/cloudmock/services/sns"
+    dynamodbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
+    s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
 )
 
 // Register services

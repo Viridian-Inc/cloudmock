@@ -10,7 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
 )
 
 // Store implements incident.IncidentStore against PostgreSQL.

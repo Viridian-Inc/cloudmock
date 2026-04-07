@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 const stripeAPIBase = "https://api.stripe.com/v1"

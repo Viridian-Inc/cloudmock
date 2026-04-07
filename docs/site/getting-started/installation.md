@@ -55,7 +55,7 @@ See [Docker deployment](../deployment/docker.md) for Docker Compose examples.
 
 ## Binary Download
 
-Download prebuilt binaries from the [releases page](https://github.com/neureaux/cloudmock/releases):
+Download prebuilt binaries from the [releases page](https://github.com/Viridian-Inc/cloudmock/releases):
 
 | Platform | Architecture | File |
 |----------|-------------|------|
@@ -67,7 +67,7 @@ Download prebuilt binaries from the [releases page](https://github.com/neureaux/
 
 ```bash
 # Example: macOS Apple Silicon
-curl -L https://github.com/neureaux/cloudmock/releases/latest/download/cloudmock-darwin-arm64.tar.gz | tar xz
+curl -L https://github.com/Viridian-Inc/cloudmock/releases/latest/download/cloudmock-darwin-arm64.tar.gz | tar xz
 sudo mv cloudmock /usr/local/bin/
 cmk start
 ```
@@ -77,7 +77,7 @@ cmk start
 Requires Go 1.26+ and Node.js 20+.
 
 ```bash
-git clone https://github.com/neureaux/cloudmock.git
+git clone https://github.com/Viridian-Inc/cloudmock.git
 cd cloudmock
 make build
 ./bin/cmk start

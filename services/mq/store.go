@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 type BrokerState string

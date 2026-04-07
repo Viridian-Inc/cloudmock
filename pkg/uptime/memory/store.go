@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/uptime"
+	"github.com/Viridian-Inc/cloudmock/pkg/uptime"
 )
 
 const defaultBufferSize = 1000

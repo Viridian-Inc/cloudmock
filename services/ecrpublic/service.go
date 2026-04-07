@@ -3,7 +3,7 @@ package ecrpublic
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Service is the cloudmock implementation of the AWS ecr-public service.

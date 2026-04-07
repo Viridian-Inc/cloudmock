@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/uptime"
+	"github.com/Viridian-Inc/cloudmock/pkg/uptime"
 )
 
 func testCheck(id string) uptime.Check {

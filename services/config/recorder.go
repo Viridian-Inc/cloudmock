@@ -4,7 +4,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 )
 
 // ConfigurationItem represents a snapshot of resource configuration at a point in time.

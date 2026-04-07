@@ -146,7 +146,7 @@ import (
     "net/http/httptest"
     "testing"
 
-    "github.com/neureaux/cloudmock/pkg/proxy"
+    "github.com/Viridian-Inc/cloudmock/pkg/proxy"
     "github.com/stretchr/testify/assert"
 )
 

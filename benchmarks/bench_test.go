@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
-	"github.com/neureaux/cloudmock/benchmarks/suites"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier1"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

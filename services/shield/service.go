@@ -3,7 +3,7 @@ package shield
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ShieldService is the cloudmock implementation of the AWS Shield API.

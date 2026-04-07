@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/iac"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/iac"
 )
 
 // ---- Topology response types ----

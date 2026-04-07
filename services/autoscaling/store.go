@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 )
 
 // LaunchConfiguration represents an Auto Scaling launch configuration.

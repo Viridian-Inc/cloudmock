@@ -83,7 +83,7 @@ import (
 	shimv2 "github.com/pulumi/pulumi-terraform-bridge/v3/pkg/tfshim/sdk-v2"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/tokens"
 
-	terraform "github.com/neureaux/cloudmock/providers/terraform/internal"
+	terraform "github.com/Viridian-Inc/cloudmock/providers/terraform/internal"
 )
 
 const (
@@ -138,11 +138,11 @@ func ProviderInfo() tfbridge.ProviderInfo {
 		DisplayName: "CloudMock",
 		Publisher:   "neureaux",
 		GitHubOrg:   "neureaux",
-		Repository:  "https://github.com/neureaux/cloudmock",
+		Repository:  "https://github.com/Viridian-Inc/cloudmock",
 		Description: "A Pulumi provider for cloudmock — local AWS service emulation.",
 		Keywords:    []string{"pulumi", "cloudmock", "aws", "mock", "testing"},
 		License:     "Apache-2.0",
-		Homepage:    "https://github.com/neureaux/cloudmock",
+		Homepage:    "https://github.com/Viridian-Inc/cloudmock",
 
 		Config: map[string]*tfbridge.SchemaInfo{
 			"endpoint": {
@@ -168,7 +168,7 @@ func ProviderInfo() tfbridge.ProviderInfo {
 			PackageName: "neureaux_pulumi_cloudmock",
 		},
 		Golang: &tfbridge.GolangInfo{
-			ImportBasePath: "github.com/neureaux/cloudmock/providers/pulumi/sdk/go/cloudmock",
+			ImportBasePath: "github.com/Viridian-Inc/cloudmock/providers/pulumi/sdk/go/cloudmock",
 		},
 		CSharp: &tfbridge.CSharpInfo{
 			PackageReferences: map[string]string{

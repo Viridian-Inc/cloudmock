@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/auth"
+	"github.com/Viridian-Inc/cloudmock/pkg/auth"
 )
 
 func TestStore_CreateAndGet(t *testing.T) {

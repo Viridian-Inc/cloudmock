@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/platform/model"
-	"github.com/neureaux/cloudmock/pkg/platform/store"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/model"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/store"
 )
 
 func setupRetentionFixture(t *testing.T) (tenantID string, rs *store.RetentionStore) {

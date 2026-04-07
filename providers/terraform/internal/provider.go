@@ -7,10 +7,10 @@ import (
 	"github.com/hashicorp/terraform-plugin-sdk/v2/diag"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
-	cmschema "github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/services/dynamodb"
-	"github.com/neureaux/cloudmock/services/ec2"
-	"github.com/neureaux/cloudmock/services/s3"
+	cmschema "github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/services/dynamodb"
+	"github.com/Viridian-Inc/cloudmock/services/ec2"
+	"github.com/Viridian-Inc/cloudmock/services/s3"
 )
 
 // Provider returns the cloudmock Terraform provider.

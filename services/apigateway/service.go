@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // APIGatewayService is the cloudmock implementation of the AWS API Gateway REST API.

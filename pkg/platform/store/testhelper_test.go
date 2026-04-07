@@ -10,7 +10,7 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
-	"github.com/neureaux/cloudmock/pkg/platform/database"
+	"github.com/Viridian-Inc/cloudmock/pkg/platform/database"
 )
 
 func setupTestDB(t *testing.T) *pgxpool.Pool {

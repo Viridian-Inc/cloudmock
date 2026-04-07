@@ -3,8 +3,8 @@ package stepfunctions
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // StepFunctionsService is the cloudmock implementation of the AWS Step Functions API.

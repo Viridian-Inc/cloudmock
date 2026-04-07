@@ -6,7 +6,7 @@ import (
 	"encoding/xml"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ServiceAdapter wraps an existing service.Service to implement the Plugin interface.

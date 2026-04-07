@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/notify"
+	"github.com/Viridian-Inc/cloudmock/pkg/notify"
 )
 
 // handleNotifyRoutes handles GET /api/notify/routes and POST /api/notify/routes.

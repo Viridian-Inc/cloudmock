@@ -4,7 +4,7 @@ package testutil
 import (
 	"fmt"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // MockLocator is a ServiceLocator for unit tests that returns pre-configured services.

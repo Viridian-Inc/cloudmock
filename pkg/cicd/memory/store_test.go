@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/cicd"
+	"github.com/Viridian-Inc/cloudmock/pkg/cicd"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

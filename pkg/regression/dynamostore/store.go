@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	ds "github.com/neureaux/cloudmock/pkg/dynamostore"
-	"github.com/neureaux/cloudmock/pkg/regression"
+	ds "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 const featureRegression = "REGRESSION"

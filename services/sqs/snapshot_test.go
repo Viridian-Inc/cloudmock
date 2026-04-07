@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	sqssvc "github.com/neureaux/cloudmock/services/sqs"
+	sqssvc "github.com/Viridian-Inc/cloudmock/services/sqs"
 )
 
 const (

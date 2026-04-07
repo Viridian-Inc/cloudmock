@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
-	"github.com/neureaux/cloudmock/pkg/incident/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident/memory"
 )
 
 func sampleIncident(service string) *incident.Incident {

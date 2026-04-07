@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/pkg/auth"
+	"github.com/Viridian-Inc/cloudmock/pkg/auth"
 )
 
 // Store is an in-memory implementation of auth.UserStore.

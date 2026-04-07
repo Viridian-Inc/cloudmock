@@ -95,7 +95,7 @@ import (
 
     "github.com/aws/aws-sdk-go-v2/config"
     "github.com/aws/aws-sdk-go-v2/service/s3"
-    cmsdk "github.com/neureaux/cloudmock/sdk"
+    cmsdk "github.com/Viridian-Inc/cloudmock/sdk"
 )
 
 func main() {

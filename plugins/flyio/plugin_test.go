@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
 )
 
 func TestDescribe(t *testing.T) {

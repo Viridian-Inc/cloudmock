@@ -7,7 +7,7 @@ import (
 	"context"
 	"log/slog"
 
-	ds "github.com/neureaux/cloudmock/pkg/dynamostore"
+	ds "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
 )
 
 const (

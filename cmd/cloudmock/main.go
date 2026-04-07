@@ -15,9 +15,9 @@ import (
 	"text/tabwriter"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/cloudtrail"
-	"github.com/neureaux/cloudmock/pkg/proxy"
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/cloudtrail"
+	"github.com/Viridian-Inc/cloudmock/pkg/proxy"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 const (

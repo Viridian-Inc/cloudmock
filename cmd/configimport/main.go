@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 )
 
 func main() {

@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/schema"
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/schema"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Route53Service is the cloudmock implementation of the AWS Route 53 DNS API.

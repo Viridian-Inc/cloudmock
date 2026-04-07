@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	smsvc "github.com/neureaux/cloudmock/services/secretsmanager"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	smsvc "github.com/Viridian-Inc/cloudmock/services/secretsmanager"
 )
 
 // newSMGateway builds a full gateway stack with the Secrets Manager service registered and IAM disabled.

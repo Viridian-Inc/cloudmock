@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-	errs "github.com/neureaux/cloudmock/pkg/errors"
+	errs "github.com/Viridian-Inc/cloudmock/pkg/errors"
 )
 
 const defaultEventCap = 10000

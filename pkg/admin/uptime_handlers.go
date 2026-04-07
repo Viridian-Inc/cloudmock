@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/uptime"
+	"github.com/Viridian-Inc/cloudmock/pkg/uptime"
 )
 
 // SetUptimeEngine wires the uptime engine to the admin API.

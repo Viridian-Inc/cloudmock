@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // PinpointService is the cloudmock implementation of the Amazon Pinpoint API.

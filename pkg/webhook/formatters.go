@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
 )
 
 // slackPayload is the JSON structure sent to a Slack incoming webhook.

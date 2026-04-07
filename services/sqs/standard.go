@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/collections"
+	"github.com/Viridian-Inc/cloudmock/pkg/collections"
 )
 
 // inflightEntry tracks an inflight message and its visibility deadline.

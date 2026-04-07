@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	logssvc "github.com/neureaux/cloudmock/services/cloudwatchlogs"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	logssvc "github.com/Viridian-Inc/cloudmock/services/cloudwatchlogs"
 )
 
 // newLogsGateway builds a full gateway stack with the CloudWatch Logs service registered and IAM disabled.

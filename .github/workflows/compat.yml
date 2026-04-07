@@ -16,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GOPRIVATE: github.com/neureaux/cloudmock
-      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
       GOFLAGS: -mod=mod
 
     steps:
@@ -83,8 +83,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
-      GOPRIVATE: github.com/neureaux/cloudmock
-      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
       GOFLAGS: -mod=mod
 
     steps:
@@ -160,8 +160,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     env:
-      GOPRIVATE: github.com/neureaux/cloudmock
-      GONOSUMCHECK: github.com/neureaux/cloudmock
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
       GOFLAGS: -mod=mod
 
     steps:

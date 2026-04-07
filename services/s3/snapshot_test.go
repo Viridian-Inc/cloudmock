@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	s3svc "github.com/neureaux/cloudmock/services/s3"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
 )
 
 func TestS3_ExportState_Empty(t *testing.T) {

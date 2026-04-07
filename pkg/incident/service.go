@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/regression"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
 )
 
 // WebhookDispatcher is the interface used by the incident service to fire

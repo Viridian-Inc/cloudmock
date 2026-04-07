@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ddbsvc "github.com/neureaux/cloudmock/services/dynamodb"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ddbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
 )
 
 // newDDBGateway builds a full gateway stack with the DynamoDB service registered and IAM disabled.

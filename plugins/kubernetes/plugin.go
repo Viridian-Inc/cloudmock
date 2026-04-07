@@ -3,8 +3,8 @@ package kubernetes
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
-	"github.com/neureaux/cloudmock/plugins/kubernetes/internal"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/plugins/kubernetes/internal"
 )
 
 // Plugin implements the CloudMock plugin interface for Kubernetes API emulation.

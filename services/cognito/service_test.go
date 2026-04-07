@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	cognitosvc "github.com/neureaux/cloudmock/services/cognito"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	cognitosvc "github.com/Viridian-Inc/cloudmock/services/cognito"
 )
 
 // newCognitoGateway builds a full gateway stack with the Cognito service registered and IAM disabled.

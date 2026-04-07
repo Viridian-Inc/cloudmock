@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // Group represents a Cognito user pool group.

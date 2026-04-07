@@ -16,7 +16,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // iacCtx creates a RequestContext for IaC provisioning calls.

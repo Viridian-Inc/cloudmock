@@ -30,7 +30,7 @@ Every request flows through the gateway, which routes to the correct service bas
 
 **HTTP mode** (any language): Start CloudMock as a server. Every AWS SDK works. Sub-millisecond latency.
 
-**In-process mode** (Go only): Import `github.com/neureaux/cloudmock/sdk`. Zero network. 20 microseconds per operation. The AWS SDK doesn't know it's not hitting a real server.
+**In-process mode** (Go only): Import `github.com/Viridian-Inc/cloudmock/sdk`. Zero network. 20 microseconds per operation. The AWS SDK doesn't know it's not hitting a real server.
 
 ## The full toolkit
 

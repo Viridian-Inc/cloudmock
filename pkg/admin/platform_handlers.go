@@ -13,9 +13,9 @@ import (
 	"sync"
 	"time"
 
-	platformmodel "github.com/neureaux/cloudmock/pkg/platform/model"
-	platformstore "github.com/neureaux/cloudmock/pkg/platform/store"
-	"github.com/neureaux/cloudmock/pkg/saas/tenant"
+	platformmodel "github.com/Viridian-Inc/cloudmock/pkg/platform/model"
+	platformstore "github.com/Viridian-Inc/cloudmock/pkg/platform/store"
+	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 )
 
 // PlatformStore is an in-memory fallback for local mode (no Postgres).

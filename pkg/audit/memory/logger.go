@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/audit"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit"
 )
 
 // Logger is an in-memory audit logger backed by a mutex-protected slice.

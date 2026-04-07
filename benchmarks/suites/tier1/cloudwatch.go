@@ -7,8 +7,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type cloudWatchSuite struct{}

@@ -776,7 +776,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -848,7 +848,7 @@ package suites
 import (
 	"sort"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // Registry holds all registered benchmark suites.
@@ -1397,8 +1397,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type s3Suite struct{}
@@ -1742,8 +1742,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type dynamoDBSuite struct{}
@@ -2093,8 +2093,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
-	"github.com/neureaux/cloudmock/benchmarks/awsclient"
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/awsclient"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 type sqsSuite struct{}
@@ -2447,9 +2447,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
-	"github.com/neureaux/cloudmock/services/stubs"
-	"github.com/neureaux/cloudmock/pkg/stub"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/services/stubs"
+	"github.com/Viridian-Inc/cloudmock/pkg/stub"
 )
 
 // GenerateAll creates benchmark suites for all Tier 2 stub services.
@@ -2609,7 +2609,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2684,7 +2684,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // WriteJSON writes benchmark results to a JSON file.
@@ -2734,7 +2734,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -2833,7 +2833,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 )
 
 // WriteMarkdown generates a markdown summary from benchmark results.
@@ -3051,12 +3051,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
-	"github.com/neureaux/cloudmock/benchmarks/report"
-	"github.com/neureaux/cloudmock/benchmarks/suites"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier1"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier2"
-	"github.com/neureaux/cloudmock/benchmarks/target"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/report"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier1"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier2"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/target"
 )
 
 func main() {
@@ -3525,9 +3525,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
-	"github.com/neureaux/cloudmock/benchmarks/suites"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier1"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

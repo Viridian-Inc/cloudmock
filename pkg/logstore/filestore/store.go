@@ -10,8 +10,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/logstore"
-	logmemory "github.com/neureaux/cloudmock/pkg/logstore/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/logstore"
+	logmemory "github.com/Viridian-Inc/cloudmock/pkg/logstore/memory"
 )
 
 const defaultCap = 50000

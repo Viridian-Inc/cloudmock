@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/neureaux/cloudmock/tools/common"
+	"github.com/Viridian-Inc/cloudmock/tools/common"
 )
 
 func runWait(args []string) error {

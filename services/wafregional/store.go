@@ -8,7 +8,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // WebACL holds a legacy WAF Web ACL.

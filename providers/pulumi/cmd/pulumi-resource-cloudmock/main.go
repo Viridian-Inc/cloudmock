@@ -13,7 +13,7 @@
 package main
 
 import (
-	provider "github.com/neureaux/cloudmock/providers/pulumi/internal"
+	provider "github.com/Viridian-Inc/cloudmock/providers/pulumi/internal"
 )
 
 func main() {

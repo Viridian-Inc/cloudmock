@@ -16,7 +16,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/neureaux/cloudmock/tools/cloudmock-agent/sdk"
+	"github.com/Viridian-Inc/cloudmock/tools/cloudmock-agent/sdk"
 )
 
 func main() {

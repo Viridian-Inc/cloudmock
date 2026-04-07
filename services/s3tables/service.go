@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // S3TablesService is the cloudmock implementation of the Amazon S3 Tables API.

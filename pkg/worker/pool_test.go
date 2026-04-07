@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
 )
 
 func TestScheduleOnce_InstantMode(t *testing.T) {

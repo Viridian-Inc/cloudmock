@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
 )
 
 // IAMUser represents an IAM user with metadata.

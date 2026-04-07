@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	iamsvc "github.com/neureaux/cloudmock/services/iam"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	iamsvc "github.com/Viridian-Inc/cloudmock/services/iam"
 )
 
 const (

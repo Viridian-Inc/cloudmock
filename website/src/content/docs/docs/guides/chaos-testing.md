@@ -24,7 +24,7 @@ The Go SDK injects faults directly into the embedded gateway engine — no HTTP 
 ### Basic usage
 
 ```go
-import "github.com/neureaux/cloudmock/sdk"
+import "github.com/Viridian-Inc/cloudmock/sdk"
 
 func TestRetryOnThrottle(t *testing.T) {
     cm := sdk.New()

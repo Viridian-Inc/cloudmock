@@ -10,10 +10,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	sessvc "github.com/neureaux/cloudmock/services/ses"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	sessvc "github.com/Viridian-Inc/cloudmock/services/ses"
 )
 
 // newSESGateway builds a full gateway stack with the SES service registered and IAM disabled.

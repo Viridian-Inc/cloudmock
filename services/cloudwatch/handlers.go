@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const cwXmlns = "http://monitoring.amazonaws.com/doc/2010-08-01/"

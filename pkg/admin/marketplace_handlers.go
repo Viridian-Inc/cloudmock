@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/marketplace"
+	"github.com/Viridian-Inc/cloudmock/pkg/marketplace"
 )
 
 // SetMarketplace sets the marketplace registry on the admin API and registers routes.

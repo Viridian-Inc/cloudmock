@@ -3,7 +3,7 @@ package kinesisanalytics
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // KinesisAnalyticsService is the cloudmock implementation of the AWS Kinesis Analytics API.

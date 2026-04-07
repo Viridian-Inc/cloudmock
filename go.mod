@@ -1,4 +1,4 @@
-module github.com/neureaux/cloudmock
+module github.com/Viridian-Inc/cloudmock
 
 go 1.26.1
 

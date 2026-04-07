@@ -163,7 +163,7 @@ import (
     "fmt"
     "sort"
 
-    "github.com/neureaux/cloudmock/pkg/dataplane"
+    "github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 type Comparer struct {
@@ -329,7 +329,7 @@ tc := tracecompare.New(dp.Traces)
 adminAPI.SetTraceComparer(tc)
 ```
 
-Add import: `"github.com/neureaux/cloudmock/pkg/tracecompare"`
+Add import: `"github.com/Viridian-Inc/cloudmock/pkg/tracecompare"`
 
 - [ ] **Step 2: Verify full build**
 

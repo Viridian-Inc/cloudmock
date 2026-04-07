@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
+	lambdasvc "github.com/Viridian-Inc/cloudmock/services/lambda"
 )
 
 const (

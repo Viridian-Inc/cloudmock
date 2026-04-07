@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/replay"
+	"github.com/Viridian-Inc/cloudmock/pkg/replay"
 )
 
 // SetReplayStore wires the replay session store to the admin API and registers routes.

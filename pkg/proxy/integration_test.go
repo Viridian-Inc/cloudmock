@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/traffic"
+	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
 // mockAWSServer creates a fake "AWS" server that handles S3, DynamoDB, and SQS

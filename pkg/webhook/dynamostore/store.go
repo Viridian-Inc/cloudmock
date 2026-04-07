@@ -5,8 +5,8 @@ package dynamostore
 import (
 	"context"
 
-	ds "github.com/neureaux/cloudmock/pkg/dynamostore"
-	"github.com/neureaux/cloudmock/pkg/webhook"
+	ds "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
+	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
 )
 
 const featureWebhook = "WEBHOOK"

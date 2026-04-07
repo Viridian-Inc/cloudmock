@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ---- shared XML types ----

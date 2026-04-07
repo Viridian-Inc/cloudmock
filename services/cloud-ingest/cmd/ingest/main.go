@@ -16,9 +16,9 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/neureaux/cloudmock/services/cloud-ingest/internal/ingest"
-	"github.com/neureaux/cloudmock/services/cloud-ingest/internal/query"
-	"github.com/neureaux/cloudmock/services/cloud-ingest/internal/store"
+	"github.com/Viridian-Inc/cloudmock/services/cloud-ingest/internal/ingest"
+	"github.com/Viridian-Inc/cloudmock/services/cloud-ingest/internal/query"
+	"github.com/Viridian-Inc/cloudmock/services/cloud-ingest/internal/store"
 )
 
 func main() {

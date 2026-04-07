@@ -3,8 +3,8 @@ package memory
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 // RequestStore wraps gateway.RequestLog to satisfy the dataplane.RequestReader

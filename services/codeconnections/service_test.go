@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/service"
-	svc "github.com/neureaux/cloudmock/services/codeconnections"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	svc "github.com/Viridian-Inc/cloudmock/services/codeconnections"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

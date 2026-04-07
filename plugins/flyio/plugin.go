@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
 )
 
 // Plugin implements the CloudMock plugin interface for Fly.io Machines API emulation.

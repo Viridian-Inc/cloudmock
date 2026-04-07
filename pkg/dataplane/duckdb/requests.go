@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // RequestStore implements dataplane.RequestReader and dataplane.RequestWriter

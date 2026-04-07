@@ -16,15 +16,15 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/eventbus"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	iampkg "github.com/neureaux/cloudmock/pkg/iam"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	dynamodbsvc "github.com/neureaux/cloudmock/services/dynamodb"
-	s3svc "github.com/neureaux/cloudmock/services/s3"
-	sqssvc "github.com/neureaux/cloudmock/services/sqs"
-	stssvc "github.com/neureaux/cloudmock/services/sts"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	dynamodbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
+	sqssvc "github.com/Viridian-Inc/cloudmock/services/sqs"
+	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
 )
 
 // Option configures a CloudMock instance.

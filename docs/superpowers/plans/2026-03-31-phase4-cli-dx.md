@@ -109,7 +109,7 @@ git commit -m "feat: add cmk CLI wrapper (like awslocal for LocalStack)"
   "bin": { "cloudmock": "bin/cloudmock.mjs" },
   "files": ["bin/"],
   "license": "Apache-2.0",
-  "repository": { "type": "git", "url": "https://github.com/neureaux/cloudmock" },
+  "repository": { "type": "git", "url": "https://github.com/Viridian-Inc/cloudmock" },
   "keywords": ["aws", "mock", "local", "development", "testing", "s3", "dynamodb", "lambda"]
 }
 ```
@@ -121,7 +121,7 @@ git commit -m "feat: add cmk CLI wrapper (like awslocal for LocalStack)"
 1. Detect `process.platform` (darwin/linux/win32) and `process.arch` (arm64/x64)
 2. Map to GitHub release binary name (e.g., `cloudmock-darwin-arm64`)
 3. Check cache at `~/.cloudmock/bin/cloudmock-{version}-{platform}-{arch}`
-4. If not cached: download from `https://github.com/neureaux/cloudmock/releases/latest/download/{binary}`
+4. If not cached: download from `https://github.com/Viridian-Inc/cloudmock/releases/latest/download/{binary}`
 5. Make executable (`chmod +x`)
 6. Spawn the binary with `process.argv.slice(2)` as args, inheriting stdio
 
@@ -158,22 +158,22 @@ class Cloudmock < Formula
 
   on_macos do
     on_arm do
-      url "https://github.com/neureaux/cloudmock/releases/download/v1.0.0/cloudmock-darwin-arm64.tar.gz"
+      url "https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.0/cloudmock-darwin-arm64.tar.gz"
       sha256 "PLACEHOLDER"
     end
     on_intel do
-      url "https://github.com/neureaux/cloudmock/releases/download/v1.0.0/cloudmock-darwin-amd64.tar.gz"
+      url "https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.0/cloudmock-darwin-amd64.tar.gz"
       sha256 "PLACEHOLDER"
     end
   end
 
   on_linux do
     on_arm do
-      url "https://github.com/neureaux/cloudmock/releases/download/v1.0.0/cloudmock-linux-arm64.tar.gz"
+      url "https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.0/cloudmock-linux-arm64.tar.gz"
       sha256 "PLACEHOLDER"
     end
     on_intel do
-      url "https://github.com/neureaux/cloudmock/releases/download/v1.0.0/cloudmock-linux-amd64.tar.gz"
+      url "https://github.com/Viridian-Inc/cloudmock/releases/download/v1.0.0/cloudmock-linux-amd64.tar.gz"
       sha256 "PLACEHOLDER"
     end
   end

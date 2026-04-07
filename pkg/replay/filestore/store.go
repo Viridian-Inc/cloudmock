@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/neureaux/cloudmock/pkg/filestore"
-	"github.com/neureaux/cloudmock/pkg/replay"
+	"github.com/Viridian-Inc/cloudmock/pkg/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/replay"
 )
 
 // Store implements replay.Store using JSON file persistence.

@@ -21,7 +21,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
 )
 
 // Serve starts an HTTP server that bridges incoming requests to the given plugin.

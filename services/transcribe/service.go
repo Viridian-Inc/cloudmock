@@ -3,7 +3,7 @@ package transcribe
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // TranscribeService is the cloudmock implementation of the AWS Transcribe API.

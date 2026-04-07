@@ -4,7 +4,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/collections"
+	"github.com/Viridian-Inc/cloudmock/pkg/collections"
 )
 
 // messageGroup holds messages for a single FIFO message group.

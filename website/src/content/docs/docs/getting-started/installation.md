@@ -95,9 +95,9 @@ Install the IaC tool wrappers to use CloudMock with Terraform, CDK, or Pulumi:
 
 ```bash
 # Install IaC wrappers
-go install github.com/neureaux/cloudmock/tools/cloudmock-terraform@latest
-go install github.com/neureaux/cloudmock/tools/cloudmock-pulumi@latest
-go install github.com/neureaux/cloudmock/tools/cloudmock-cdk@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-terraform@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-pulumi@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-cdk@latest
 ```
 
 See the [IaC section of the stack guide](/docs/getting-started/with-your-stack/#infrastructure-as-code) for usage instructions.

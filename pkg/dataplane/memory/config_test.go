@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
 )
 
 func TestConfigStore_GetSetConfig(t *testing.T) {

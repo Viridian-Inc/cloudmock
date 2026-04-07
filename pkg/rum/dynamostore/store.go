@@ -7,8 +7,8 @@ import (
 	"sort"
 	"time"
 
-	ds "github.com/neureaux/cloudmock/pkg/dynamostore"
-	"github.com/neureaux/cloudmock/pkg/rum"
+	ds "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
+	"github.com/Viridian-Inc/cloudmock/pkg/rum"
 )
 
 const featureRUM = "RUM"

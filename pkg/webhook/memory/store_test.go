@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/neureaux/cloudmock/pkg/webhook"
-	whmemory "github.com/neureaux/cloudmock/pkg/webhook/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
+	whmemory "github.com/Viridian-Inc/cloudmock/pkg/webhook/memory"
 )
 
 func sampleConfig(url string) *webhook.Config {

@@ -3,8 +3,8 @@ package argocd
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/plugin"
-	"github.com/neureaux/cloudmock/plugins/argocd/internal"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/plugins/argocd/internal"
 )
 
 // K8sSync defines the interface the ArgoCD plugin needs from the Kubernetes

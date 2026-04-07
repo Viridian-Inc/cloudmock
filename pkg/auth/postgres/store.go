@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/neureaux/cloudmock/pkg/auth"
+	"github.com/Viridian-Inc/cloudmock/pkg/auth"
 )
 
 // Store is a PostgreSQL-backed implementation of auth.UserStore.

@@ -8,10 +8,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	ssmsvc "github.com/neureaux/cloudmock/services/ssm"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	ssmsvc "github.com/Viridian-Inc/cloudmock/services/ssm"
 )
 
 // newSSMGateway builds a full gateway stack with the SSM service registered and IAM disabled.

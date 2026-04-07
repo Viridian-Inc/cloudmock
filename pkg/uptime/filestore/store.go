@@ -11,7 +11,7 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/neureaux/cloudmock/pkg/uptime"
+	"github.com/Viridian-Inc/cloudmock/pkg/uptime"
 )
 
 const defaultMaxResults = 1000

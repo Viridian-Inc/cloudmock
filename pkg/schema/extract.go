@@ -4,7 +4,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // ExtractFromServices takes a list of service.Service instances and extracts

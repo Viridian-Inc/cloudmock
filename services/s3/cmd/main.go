@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
-	s3svc "github.com/neureaux/cloudmock/services/s3"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
 )
 
 func main() {

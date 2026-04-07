@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/synthetics"
+	"github.com/Viridian-Inc/cloudmock/pkg/synthetics"
 )
 
 // SetSyntheticsEngine sets the synthetics engine on the admin API and registers routes.

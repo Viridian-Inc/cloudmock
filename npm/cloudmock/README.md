@@ -47,7 +47,7 @@ CloudMock works with your existing IaC tools — no code changes needed.
 
 ```bash
 # Install the wrapper
-go install github.com/neureaux/cloudmock/tools/cloudmock-terraform@latest
+go install github.com/Viridian-Inc/cloudmock/tools/cloudmock-terraform@latest
 
 # Use your existing .tf files — they just work
 cloudmock-terraform init
@@ -145,5 +145,5 @@ cloudmock contract \
 ## Links
 
 - [Documentation](https://cloudmock.app/docs)
-- [GitHub](https://github.com/neureaux/cloudmock)
-- [License](https://github.com/neureaux/cloudmock/blob/main/LICENSE) (Apache-2.0)
+- [GitHub](https://github.com/Viridian-Inc/cloudmock)
+- [License](https://github.com/Viridian-Inc/cloudmock/blob/main/LICENSE) (Apache-2.0)

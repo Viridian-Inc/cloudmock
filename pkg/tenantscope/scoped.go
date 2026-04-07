@@ -8,8 +8,8 @@ package tenantscope
 import (
 	"context"
 
-	"github.com/neureaux/cloudmock/pkg/auth"
-	"github.com/neureaux/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/auth"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 )
 
 // ---------------------------------------------------------------------------

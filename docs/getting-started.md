@@ -13,7 +13,7 @@
 ### Option 1: Build from source
 
 ```bash
-git clone https://github.com/neureaux/cloudmock
+git clone https://github.com/Viridian-Inc/cloudmock
 cd cloudmock
 make build
 # Produces: ./bin/cloudmock and ./bin/gateway
@@ -22,13 +22,13 @@ make build
 ### Option 2: go install
 
 ```bash
-go install github.com/neureaux/cloudmock/cmd/cloudmock@latest
+go install github.com/Viridian-Inc/cloudmock/cmd/cloudmock@latest
 ```
 
 ### Option 3: Docker Compose
 
 ```bash
-git clone https://github.com/neureaux/cloudmock
+git clone https://github.com/Viridian-Inc/cloudmock
 cd cloudmock
 docker compose up -d
 ```

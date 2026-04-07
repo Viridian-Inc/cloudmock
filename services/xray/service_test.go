@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	xraysvc "github.com/neureaux/cloudmock/services/xray"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	xraysvc "github.com/Viridian-Inc/cloudmock/services/xray"
 )
 
 // newXRayGateway builds a full gateway stack with the XRay service registered and IAM disabled.

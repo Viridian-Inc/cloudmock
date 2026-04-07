@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane"
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
 )
 
 func TestTopologyStore_RecordEdge_And_GetTopology(t *testing.T) {

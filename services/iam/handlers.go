@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 const iamXmlns = "https://iam.amazonaws.com/doc/2010-05-08/"

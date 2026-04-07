@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/neureaux/cloudmock/services/cloud-ingest/internal/store"
+	"github.com/Viridian-Inc/cloudmock/services/cloud-ingest/internal/store"
 )
 
 // Handler holds the span store used by all query endpoints.

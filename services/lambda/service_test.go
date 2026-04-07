@@ -11,10 +11,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/neureaux/cloudmock/pkg/config"
-	"github.com/neureaux/cloudmock/pkg/gateway"
-	"github.com/neureaux/cloudmock/pkg/routing"
-	lambdasvc "github.com/neureaux/cloudmock/services/lambda"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	lambdasvc "github.com/Viridian-Inc/cloudmock/services/lambda"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

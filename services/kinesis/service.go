@@ -3,7 +3,7 @@ package kinesis
 import (
 	"net/http"
 
-	"github.com/neureaux/cloudmock/pkg/service"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
 // KinesisService is the cloudmock implementation of the AWS Kinesis Data Streams API.

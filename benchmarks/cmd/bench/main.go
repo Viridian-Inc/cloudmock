@@ -12,12 +12,12 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/benchmarks/harness"
-	"github.com/neureaux/cloudmock/benchmarks/report"
-	"github.com/neureaux/cloudmock/benchmarks/suites"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier1"
-	"github.com/neureaux/cloudmock/benchmarks/suites/tier2"
-	"github.com/neureaux/cloudmock/benchmarks/target"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/report"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier1"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier2"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/target"
 )
 
 func main() {

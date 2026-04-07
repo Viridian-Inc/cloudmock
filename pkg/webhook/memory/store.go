@@ -6,7 +6,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/neureaux/cloudmock/pkg/webhook"
+	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
 )
 
 // Store implements webhook.Store using a mutex-protected slice.

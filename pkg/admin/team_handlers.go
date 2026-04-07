@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/annotations"
-	"github.com/neureaux/cloudmock/pkg/incident"
+	"github.com/Viridian-Inc/cloudmock/pkg/annotations"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
 )
 
 // handleIncidentComments handles comment operations on incidents.

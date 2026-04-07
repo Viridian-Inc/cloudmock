@@ -138,7 +138,7 @@ Or add to your project:
 ```bash
 npm install @cloudmock/pulumi    # TypeScript / JavaScript
 pip install pulumi-cloudmock     # Python
-go get github.com/neureaux/cloudmock/sdk/go/cloudmock  # Go
+go get github.com/Viridian-Inc/cloudmock/sdk/go/cloudmock  # Go
 ```
 
 ### Usage (TypeScript)
@@ -170,7 +170,7 @@ Or use Pulumi Cloud (the default) — it works with CloudMock because the state 
 
 ## Example project
 
-A complete working example is in [`examples/pulumi-typescript/`](https://github.com/neureaux/cloudmock/tree/main/examples/pulumi-typescript) in the repository.
+A complete working example is in [`examples/pulumi-typescript/`](https://github.com/Viridian-Inc/cloudmock/tree/main/examples/pulumi-typescript) in the repository.
 
 ## Troubleshooting
 

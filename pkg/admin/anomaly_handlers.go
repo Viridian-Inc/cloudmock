@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/neureaux/cloudmock/pkg/anomaly"
+	"github.com/Viridian-Inc/cloudmock/pkg/anomaly"
 )
 
 // SetAnomalyDetector wires the anomaly detector to the admin API and registers routes.

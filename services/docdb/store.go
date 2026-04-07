@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/lifecycle"
+	"github.com/Viridian-Inc/cloudmock/pkg/lifecycle"
 )
 
 // DBCluster represents a DocumentDB cluster.

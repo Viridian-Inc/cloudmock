@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/worker"
+	"github.com/Viridian-Inc/cloudmock/pkg/worker"
 )
 
 // SyntheticTest defines a scheduled HTTP test with assertions.

@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/neureaux/cloudmock/pkg/dataplane/memory"
-	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
 )
 
 func TestMetricStore_Record_And_ServiceStats(t *testing.T) {

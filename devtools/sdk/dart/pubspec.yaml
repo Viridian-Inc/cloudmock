@@ -1,7 +1,7 @@
 name: cloudmock
 description: CloudMock devtools SDK for Dart/Flutter. Captures HTTP traffic, logs, and errors.
 version: 0.1.0
-homepage: https://github.com/neureaux/cloudmock-sdk-dart
+homepage: https://github.com/Viridian-Inc/cloudmock-sdk-dart
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

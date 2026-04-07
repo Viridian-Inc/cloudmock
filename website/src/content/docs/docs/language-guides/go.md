@@ -10,7 +10,7 @@ Go is a first-class language for CloudMock (CloudMock itself is written in Go). 
 ### Install
 
 ```bash
-go get github.com/neureaux/cloudmock/sdk
+go get github.com/Viridian-Inc/cloudmock/sdk
 ```
 
 ### In-process mode (tests)
@@ -32,7 +32,7 @@ import (
     "github.com/aws/aws-sdk-go-v2/service/dynamodb"
     "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
     "github.com/aws/aws-sdk-go-v2/service/s3"
-    "github.com/neureaux/cloudmock/sdk"
+    "github.com/Viridian-Inc/cloudmock/sdk"
 )
 
 var cm *sdk.CloudMock
@@ -118,7 +118,7 @@ package main
 
 import (
     "log"
-    cloudmock "github.com/neureaux/cloudmock/sdk"
+    cloudmock "github.com/Viridian-Inc/cloudmock/sdk"
 )
 
 func main() {
@@ -148,7 +148,7 @@ client := &http.Client{
 For HTTP servers, the SDK provides middleware that traces inbound requests:
 
 ```go
-import cloudmock "github.com/neureaux/cloudmock/sdk"
+import cloudmock "github.com/Viridian-Inc/cloudmock/sdk"
 
 mux := http.NewServeMux()
 mux.HandleFunc("/users", handleUsers)

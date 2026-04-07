@@ -224,7 +224,7 @@ Already works. Update image to include embedded devtools.
 
 **go install:**
 ```bash
-go install github.com/neureaux/cloudmock/cmd/gateway@latest
+go install github.com/Viridian-Inc/cloudmock/cmd/gateway@latest
 ```
 Already works. Note: dashboard won't be embedded (requires separate build step). Document this limitation.
 

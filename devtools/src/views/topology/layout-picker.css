@@ -1,0 +1,37 @@
+.layout-picker {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-surface, #1a1a2e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.layout-picker-btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-secondary, #888);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.layout-picker-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary, #eee);
+}
+
+.layout-picker-btn.active {
+  background: var(--accent, #52b788);
+  color: #0a0e14;
+  font-weight: 600;
+}
+
+.layout-picker-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}

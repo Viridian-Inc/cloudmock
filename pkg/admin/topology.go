@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/neureaux/cloudmock/pkg/gateway"
+	"github.com/neureaux/cloudmock/pkg/iac"
 )
 
 // ---- Topology response types ----
@@ -42,6 +43,13 @@ type TopologyResponseV2 struct {
 	Nodes  []TopologyNodeV2  `json:"nodes"`
 	Edges  []TopologyEdgeV2  `json:"edges"`
 	Groups []TopologyGroupV2 `json:"groups"`
+}
+
+// TopologyTreeResponse is the response for GET /api/topology/tree.
+type TopologyTreeResponse struct {
+	Nodes           []iac.DependencyNode `json:"nodes"`
+	Hierarchy       map[string][]string  `json:"hierarchy"`
+	DependencyEdges []iac.DependencyEdge `json:"dependencyEdges"`
 }
 
 // ---- Static group definitions ----

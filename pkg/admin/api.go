@@ -110,6 +110,7 @@ type API struct {
 	iacTopology      *IaCTopologyConfig
 	iacTopologyMu    sync.RWMutex
 	iacMicroservices []iac.MicroserviceDef
+	depGraph         *iac.DependencyGraph
 	deploys        []DeployEvent
 	deploysMu      sync.RWMutex
 	sloEngine      *gateway.SLOEngine
@@ -250,6 +251,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
 	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
+	a.mux.HandleFunc("/api/topology/tree", a.handleTopologyTree)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
@@ -394,6 +396,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/ses/emails/", a.handleSESEmailByID)
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
 	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
+	a.mux.HandleFunc("/api/topology/tree", a.handleTopologyTree)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/compare", a.handleTraceCompare)
@@ -528,6 +531,13 @@ func (a *API) Broadcaster() *EventBroadcaster {
 // SetMicroservices sets the IaC-extracted microservice definitions for topology.
 func (a *API) SetMicroservices(ms []iac.MicroserviceDef) {
 	a.iacMicroservices = ms
+}
+
+// SetDependencyGraph sets the IaC dependency graph for the topology tree endpoint.
+func (a *API) SetDependencyGraph(g *iac.DependencyGraph) {
+	a.iacTopologyMu.Lock()
+	defer a.iacTopologyMu.Unlock()
+	a.depGraph = g
 }
 
 // SetTopologyFromIaC sets the topology config from IaC-discovered nodes and edges.
@@ -1355,6 +1365,27 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}
+}
+
+// handleTopologyTree returns the IaC dependency graph as nodes, hierarchy, and edges.
+// GET /api/topology/tree
+func (a *API) handleTopologyTree(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+	a.iacTopologyMu.RLock()
+	g := a.depGraph
+	a.iacTopologyMu.RUnlock()
+	if g == nil {
+		writeError(w, http.StatusNotFound, "no dependency graph available")
+		return
+	}
+	writeJSON(w, http.StatusOK, TopologyTreeResponse{
+		Nodes:           g.Nodes,
+		Hierarchy:       g.Hierarchy(),
+		DependencyEdges: g.Edges,
+	})
 }
 
 // ResourcesResponse is the response body for the /api/resources/:service endpoint.

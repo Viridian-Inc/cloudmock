@@ -108,6 +108,54 @@ func TestParseDynamoTablesWithLSI(t *testing.T) {
 	}
 }
 
+func TestExtractDependencyGraph(t *testing.T) {
+	src := `
+export class TablesModule extends pulumi.ComponentResource {
+  constructor(name: string, args: any, opts: pulumi.ComponentResourceOptions) {
+    super("app:modules:TablesModule", name, {}, opts);
+
+    this.users = new aws.dynamodb.Table("users-dev", {
+      attributes: [{ name: "pk", type: "S" }],
+      hashKey: "pk",
+      billingMode: "PAY_PER_REQUEST",
+    }, { parent: this });
+
+    this.orders = new aws.dynamodb.Table("orders-dev", {
+      attributes: [{ name: "pk", type: "S" }],
+      hashKey: "pk",
+      billingMode: "PAY_PER_REQUEST",
+    }, { parent: this, dependsOn: [this.users] });
+  }
+}
+`
+	graph := ExtractDependencyGraph(src, "dev")
+	if graph == nil {
+		t.Fatal("expected non-nil graph")
+	}
+	if len(graph.Nodes) < 2 {
+		t.Fatalf("expected at least 2 nodes, got %d", len(graph.Nodes))
+	}
+	h := graph.Hierarchy()
+	found := false
+	for _, children := range h {
+		if len(children) >= 2 {
+			found = true
+		}
+	}
+	if !found {
+		t.Error("expected a parent with at least 2 children in hierarchy")
+	}
+	hasDep := false
+	for _, e := range graph.Edges {
+		if e.Type == "dependsOn" {
+			hasDep = true
+		}
+	}
+	if !hasDep {
+		t.Error("expected at least one dependsOn edge")
+	}
+}
+
 func TestImportPulumiDir(t *testing.T) {
 	// Test against the real autotend-infra if available
 	dir := "/Users/megan/work/neureaux/autotend-infra/pulumi/modules"

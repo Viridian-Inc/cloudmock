@@ -941,3 +941,250 @@ func isAlreadyExists(err error) bool {
 		strings.Contains(msg, "AlreadyExists") ||
 		strings.Contains(msg, "BucketAlreadyOwnedByYou")
 }
+
+// mapResourceType converts an AWS service name and resource class to a simplified type string.
+func mapResourceType(svc, resClass string) string {
+	switch strings.ToLower(svc) {
+	case "dynamodb":
+		return "table"
+	case "lambda":
+		return "function"
+	case "sqs":
+		return "queue"
+	case "sns":
+		return "topic"
+	case "s3":
+		return "bucket"
+	case "cognito":
+		return "userpool"
+	case "apigateway", "apigatewayv2":
+		return "api"
+	}
+	// Fallback: use the resource class name lowercased
+	return strings.ToLower(resClass)
+}
+
+// componentClassRe matches: class X extends pulumi.ComponentResource {
+var componentClassRe = regexp.MustCompile(`class\s+(\w+)\s+extends\s+pulumi\.ComponentResource`)
+
+// awsResourceRe matches: new aws.SERVICE.RESOURCE("name", {...}, { ... })
+// It captures service, resource class, and the resource name (double-quoted or backtick).
+var awsResourceRe = regexp.MustCompile("new\\s+aws\\.(\\w+)\\.(\\w+)\\s*\\(\\s*(?:`([^`]+)`|\"([^\"]+)\")\\s*,")
+
+// dependsOnRe matches: dependsOn: [this.foo] inside an options block.
+var dependsOnRe = regexp.MustCompile(`dependsOn:\s*\[([^\]]+)\]`)
+
+// dependsOnRefRe matches references like this.fieldName inside a dependsOn list.
+var dependsOnRefRe = regexp.MustCompile(`this\.(\w+)`)
+
+// ExtractDependencyGraph parses Pulumi TypeScript source and returns a DependencyGraph
+// with module nodes (ComponentResource classes) and resource nodes (aws.* constructors),
+// plus parent and dependsOn edges.
+func ExtractDependencyGraph(src string, env string) *DependencyGraph {
+	g := NewDependencyGraph()
+
+	// --- Pass 1: Find ComponentResource classes and their boundaries ---
+	type moduleBlock struct {
+		id    string
+		label string
+		start int
+		end   int
+	}
+	var modules []moduleBlock
+
+	classMatches := componentClassRe.FindAllStringSubmatchIndex(src, -1)
+	for _, cm := range classMatches {
+		className := src[cm[2]:cm[3]]
+		moduleID := "module:" + className
+
+		// Find the opening brace of the class body.
+		braceStart := strings.Index(src[cm[1]:], "{")
+		if braceStart < 0 {
+			continue
+		}
+		braceStart += cm[1]
+		braceEnd := findMatchingBrace(src, braceStart)
+		if braceEnd < 0 {
+			continue
+		}
+
+		g.AddNode(DependencyNode{
+			ID:      moduleID,
+			Label:   className,
+			Type:    "module",
+			Service: "pulumi",
+		})
+
+		modules = append(modules, moduleBlock{
+			id:    moduleID,
+			label: className,
+			start: braceStart,
+			end:   braceEnd,
+		})
+	}
+
+	// --- Pass 2: Find aws.* resource constructors ---
+	// Track field → nodeID mapping per module for dependsOn resolution.
+	// fieldAssignRe matches: this.FIELD = new aws...
+	fieldAssignRe := regexp.MustCompile(`this\.(\w+)\s*=\s*new\s+aws\.(\w+)\.(\w+)\s*\(`)
+
+	// nodesByField[moduleID][fieldName] = nodeID
+	nodesByField := make(map[string]map[string]string)
+
+	allResourceMatches := awsResourceRe.FindAllStringSubmatchIndex(src, -1)
+	for _, rm := range allResourceMatches {
+		svc := src[rm[2]:rm[3]]
+		resClass := src[rm[4]:rm[5]]
+
+		// Determine the resource name (backtick or double-quoted).
+		var rawName string
+		if rm[6] >= 0 {
+			rawName = src[rm[6]:rm[7]] // backtick
+		} else if rm[8] >= 0 {
+			rawName = src[rm[8]:rm[9]] // double-quoted
+		}
+		if rawName == "" {
+			continue
+		}
+		resName := resolveTemplateName(rawName, env)
+		if strings.Contains(resName, "${") {
+			continue // unresolvable template variable
+		}
+
+		resType := mapResourceType(svc, resClass)
+		nodeID := resType + ":" + resName
+
+		// Find which module contains this resource (if any).
+		matchPos := rm[0]
+		parentModuleID := ""
+		for _, mod := range modules {
+			if matchPos > mod.start && matchPos < mod.end {
+				parentModuleID = mod.id
+				break
+			}
+		}
+
+		g.AddNode(DependencyNode{
+			ID:      nodeID,
+			Label:   resName,
+			Type:    resType,
+			Service: svc,
+			Parent:  parentModuleID,
+		})
+
+		// Record field assignment for dependsOn resolution.
+		if parentModuleID != "" {
+			// Search backwards from the resource constructor for a this.FIELD = assignment.
+			// Look within a small window before the match.
+			windowStart := matchPos
+			if windowStart > 200 {
+				windowStart = matchPos - 200
+			}
+			window := src[windowStart:matchPos]
+			if fa := fieldAssignRe.FindStringSubmatch(window); fa != nil {
+				fieldName := fa[1]
+				if nodesByField[parentModuleID] == nil {
+					nodesByField[parentModuleID] = make(map[string]string)
+				}
+				nodesByField[parentModuleID][fieldName] = nodeID
+			}
+		}
+	}
+
+	// --- Pass 3: Extract dependsOn edges ---
+	// Find the options block (3rd argument) of each aws.* constructor.
+	// Pattern: new aws.SVC.RES(`name`, { config }, { options })
+	// We look for dependsOn: [...] inside the options block.
+	fullConstructorRe := regexp.MustCompile("new\\s+aws\\.(\\w+)\\.(\\w+)\\s*\\(\\s*(?:`[^`]+`|\"[^\"]+\")\\s*,\\s*\\{")
+	constructorMatches := fullConstructorRe.FindAllStringSubmatchIndex(src, -1)
+	for _, cm := range constructorMatches {
+		svc := src[cm[2]:cm[3]]
+		resClass := src[cm[4]:cm[5]]
+
+		// The config block starts at the last {
+		configStart := cm[1] - 1
+		configEnd := findMatchingBrace(src, configStart)
+		if configEnd < 0 {
+			continue
+		}
+
+		// After configEnd, look for an options block: , { ... }
+		afterConfig := src[configEnd+1:]
+		commaIdx := strings.Index(afterConfig, ",")
+		if commaIdx < 0 {
+			continue
+		}
+		braceIdx := strings.Index(afterConfig[commaIdx:], "{")
+		if braceIdx < 0 {
+			continue
+		}
+		optStart := configEnd + 1 + commaIdx + braceIdx
+		optEnd := findMatchingBrace(src, optStart)
+		if optEnd < 0 {
+			continue
+		}
+		optBlock := src[optStart : optEnd+1]
+
+		// Check for dependsOn.
+		doMatch := dependsOnRe.FindStringSubmatch(optBlock)
+		if doMatch == nil {
+			continue
+		}
+		depList := doMatch[1]
+
+		// Determine the resource name to find the source node ID.
+		// Re-parse from the constructor match start.
+		constructorSnippet := src[cm[0] : cm[1]+1]
+		nameRe := regexp.MustCompile("(?:`([^`]+)`|\"([^\"]+)\")")
+		nameMatch := nameRe.FindStringSubmatch(constructorSnippet)
+		if nameMatch == nil {
+			continue
+		}
+		rawName := nameMatch[1]
+		if rawName == "" {
+			rawName = nameMatch[2]
+		}
+		resName := resolveTemplateName(rawName, env)
+		resType := mapResourceType(svc, resClass)
+		sourceID := resType + ":" + resName
+
+		// Find parent module to resolve field names.
+		matchPos := cm[0]
+		parentModuleID := ""
+		for _, mod := range modules {
+			if matchPos > mod.start && matchPos < mod.end {
+				parentModuleID = mod.id
+				break
+			}
+		}
+
+		// Extract this.FIELD references.
+		refs := dependsOnRefRe.FindAllStringSubmatch(depList, -1)
+		for _, ref := range refs {
+			fieldName := ref[1]
+			targetID := ""
+			if parentModuleID != "" {
+				if nf, ok := nodesByField[parentModuleID]; ok {
+					targetID = nf[fieldName]
+				}
+			}
+			if targetID == "" {
+				// Fallback: use field name as a best-effort target.
+				targetID = "unknown:" + fieldName
+			}
+			g.AddEdge(DependencyEdge{
+				Source: sourceID,
+				Target: targetID,
+				Type:   "dependsOn",
+			})
+		}
+	}
+
+	// --- Fallback: flat resources (no ComponentResource) ---
+	// If no modules were found, resources are already added without a parent above.
+
+	if len(g.Nodes) == 0 {
+		return nil
+	}
+	return g
+}

@@ -1115,6 +1115,15 @@ func main() {
 			slog.Info("topology built from IaC", "nodes", len(topoNodes), "edges", len(topoEdges))
 		}
 	}
+	// Extract dependency graph from IaC source for tree view
+	if *iacDir != "" {
+		depGraph := iac.ExtractDependencyGraphFromDir(*iacDir, *iacEnv)
+		if depGraph != nil {
+			adminAPI.SetDependencyGraph(depGraph)
+			slog.Info("IaC dependency graph loaded", "nodes", len(depGraph.Nodes), "edges", len(depGraph.Edges))
+		}
+	}
+
 	// Start IaC file watcher for hot-reload (re-scans on .ts/.tf file changes).
 	if *iacDir != "" {
 		reconciler := iac.NewReconciler(registry, slog.Default())

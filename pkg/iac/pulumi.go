@@ -1188,3 +1188,37 @@ func ExtractDependencyGraph(src string, env string) *DependencyGraph {
 	}
 	return g
 }
+
+// ExtractDependencyGraphFromDir scans a Pulumi project directory and builds a DependencyGraph.
+func ExtractDependencyGraphFromDir(dir string, environment string) *DependencyGraph {
+	merged := NewDependencyGraph()
+
+	// Check modules subdirectory first, then root
+	patterns := []string{
+		filepath.Join(dir, "modules", "*.ts"),
+		filepath.Join(dir, "*.ts"),
+	}
+
+	var allFiles []string
+	for _, pattern := range patterns {
+		files, _ := filepath.Glob(pattern)
+		allFiles = append(allFiles, files...)
+	}
+
+	for _, f := range allFiles {
+		data, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		g := ExtractDependencyGraph(string(data), environment)
+		if g != nil {
+			merged.Nodes = append(merged.Nodes, g.Nodes...)
+			merged.Edges = append(merged.Edges, g.Edges...)
+		}
+	}
+
+	if len(merged.Nodes) == 0 {
+		return nil
+	}
+	return merged
+}

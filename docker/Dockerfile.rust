@@ -1,0 +1,27 @@
+# Stage 1: Build Rust static library
+FROM rust:1.87-bookworm AS rust-builder
+WORKDIR /rust
+COPY rust/ddb-store/ .
+RUN cargo build --release
+# Output: target/release/libddb_store.a
+
+# Stage 2: Build Go binary with CGO + Rust DDB store
+FROM golang:1.26-bookworm AS builder
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# Place the Rust static lib where CGO expects it
+COPY --from=rust-builder /rust/target/release/libddb_store.a ./rust/ddb-store/target/release/libddb_store.a
+RUN CGO_ENABLED=1 GOOS=linux go build -tags rustddb -ldflags="-s -w" -o /cloudmock ./cmd/gateway
+
+# Stage 3: Runtime
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /cloudmock /usr/local/bin/cloudmock
+COPY cloudmock.yml /etc/cloudmock/cloudmock.yml
+EXPOSE 4566 4500 4599 4318
+ENV CLOUDMOCK_TEST_MODE=true
+ENTRYPOINT ["cloudmock"]
+CMD ["--config", "/etc/cloudmock/cloudmock.yml"]

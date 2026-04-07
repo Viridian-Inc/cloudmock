@@ -313,7 +313,7 @@ func buildIaCTopology(result *iac.IaCImportResult) ([]admin.TopologyNodeV2, []ad
 	return nodes, edges
 }
 
-const version = "1.5.2"
+const version = "1.5.3"
 
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.

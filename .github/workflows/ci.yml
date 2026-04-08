@@ -33,3 +33,38 @@ jobs:
           wait $PID_VET   || FAIL=1
           wait $PID_TEST  || FAIL=1
           exit $FAIL
+
+  perfgate:
+    runs-on: ubuntu-latest
+    needs: test
+    env:
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
+      GOFLAGS: -mod=mod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Download modules
+        run: go mod download
+      - name: Start CloudMock
+        run: |
+          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_PROFILE=full go run ./cmd/gateway/ &
+          sleep 5
+          curl -sf http://localhost:4566/ || true
+          echo "CloudMock started"
+      - name: Run Performance Gate
+        env:
+          PERFGATE_ENDPOINT: http://localhost:4566
+        run: |
+          go test ./benchmarks/ -tags perfgate -timeout 120s -v 2>&1 | tee perfgate-results.txt
+          echo ""
+          echo "=== Performance Gate Summary ==="
+          grep -E "PASS|FAIL|p50=" perfgate-results.txt | tail -30
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perfgate-results
+          path: perfgate-results.txt

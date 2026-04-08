@@ -2,12 +2,13 @@ package dax
 
 import (
 	"crypto/sha256"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"sort"
 	"strings"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	dynamodbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
@@ -74,7 +75,7 @@ func (dp *DataPlane) handleGetItem(w http.ResponseWriter, body []byte, cache *Ca
 		TableName string         `json:"TableName"`
 		Key       map[string]any `json:"Key"`
 	}
-	if err := json.Unmarshal(body, &req); err != nil {
+	if err := gojson.Unmarshal(body, &req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -103,7 +104,7 @@ func (dp *DataPlane) handleWriteThrough(w http.ResponseWriter, action string, bo
 		Key       map[string]any `json:"Key"`
 		Item      map[string]any `json:"Item"`
 	}
-	json.Unmarshal(body, &req)
+	gojson.Unmarshal(body, &req)
 	strategy := dp.daxService.GetStore().GetWriteStrategy(cluster)
 
 	if action == "PutItem" && req.Item != nil {
@@ -128,7 +129,7 @@ func (dp *DataPlane) handleQueryReadThrough(w http.ResponseWriter, action string
 	var req struct {
 		TableName string `json:"TableName"`
 	}
-	json.Unmarshal(body, &req)
+	gojson.Unmarshal(body, &req)
 	qKey := req.TableName + "|" + queryHash(body)
 
 	if cached := cache.GetQuery(qKey); cached != nil {
@@ -169,7 +170,7 @@ func (dp *DataPlane) forwardToDynamo(action string, body []byte) any {
 	// DynamoDB handlers return RawBody ([]byte) rather than Body.
 	if len(resp.RawBody) > 0 {
 		var parsed any
-		if err := json.Unmarshal(resp.RawBody, &parsed); err != nil {
+		if err := gojson.Unmarshal(resp.RawBody, &parsed); err != nil {
 			return nil
 		}
 		return parsed
@@ -209,5 +210,5 @@ func queryHash(body []byte) string {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/x-amz-json-1.0")
-	json.NewEncoder(w).Encode(v)
+	gojson.NewEncoder(w).Encode(v)
 }

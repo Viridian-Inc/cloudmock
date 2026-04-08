@@ -6,6 +6,52 @@ import (
 	"strings"
 )
 
+// extractEqualityValue extracts the partition key value from a resolved KeyConditionExpression.
+// Handles patterns like "pk = :val", ":val = pk", "pk=:val AND sk > :sk".
+// Returns the attrString-formatted value (e.g. "S:user1") for direct partition lookup,
+// or "" if the expression can't be parsed.
+func extractEqualityValue(resolvedExpr string, hashKeyName string, exprValues map[string]AttributeValue) string {
+	// Split on AND to isolate conditions.
+	parts := strings.SplitN(strings.ToUpper(resolvedExpr), " AND ", 2)
+	original := resolvedExpr
+	if len(parts) > 1 {
+		// Use original casing for the first part.
+		original = strings.TrimSpace(resolvedExpr[:len(parts[0])])
+	}
+
+	// Try "attrName = :placeholder" and ":placeholder = attrName"
+	for _, sep := range []string{" = ", "= ", " ="} {
+		idx := strings.Index(original, sep)
+		if idx < 0 {
+			continue
+		}
+		lhs := strings.TrimSpace(original[:idx])
+		rhs := strings.TrimSpace(original[idx+len(sep):])
+
+		var placeholder string
+		if lhs == hashKeyName && strings.HasPrefix(rhs, ":") {
+			placeholder = rhs
+		} else if rhs == hashKeyName && strings.HasPrefix(lhs, ":") {
+			placeholder = lhs
+		}
+		if placeholder == "" {
+			continue
+		}
+
+		// Trim any trailing tokens (e.g. from bad split).
+		if spaceIdx := strings.IndexByte(placeholder, ' '); spaceIdx >= 0 {
+			placeholder = placeholder[:spaceIdx]
+		}
+
+		val, ok := exprValues[placeholder]
+		if !ok {
+			return ""
+		}
+		return attrString(val)
+	}
+	return ""
+}
+
 // resolveNames substitutes ExpressionAttributeNames (#name -> actualName) in a string.
 func resolveNames(expr string, names map[string]string) string {
 	if names == nil {

@@ -1057,10 +1057,14 @@ func parseASGTags(form url.Values) []Tag {
 }
 
 func xmlOK(body any) (*service.Response, error) {
+	data, err := xml.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       body,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
 	}, nil
 }
 

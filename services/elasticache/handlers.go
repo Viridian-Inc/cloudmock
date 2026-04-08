@@ -970,10 +970,14 @@ func parseTagKeys(form url.Values) []string {
 }
 
 func xmlOK(body any) (*service.Response, error) {
+	data, err := xml.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       body,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
 	}, nil
 }
 
@@ -982,6 +986,17 @@ func xmlErr(awsErr *service.AWSError) (*service.Response, error) {
 }
 
 // ---- TestFailover ----
+
+type xmlTestFailoverResponse struct {
+	XMLName xml.Name                `xml:"TestFailoverResponse"`
+	Xmlns   string                  `xml:"xmlns,attr"`
+	Result  xmlTestFailoverResult   `xml:"TestFailoverResult"`
+	Meta    xmlResponseMetadata     `xml:"ResponseMetadata"`
+}
+
+type xmlTestFailoverResult struct {
+	ReplicationGroup xmlReplicationGroup `xml:"ReplicationGroup"`
+}
 
 func handleTestFailover(ctx *service.RequestContext, store *Store) (*service.Response, error) {
 	form := parseForm(ctx)
@@ -995,10 +1010,10 @@ func handleTestFailover(ctx *service.RequestContext, store *Store) (*service.Res
 		return xmlErr(service.NewAWSError("ReplicationGroupNotFoundFault",
 			"ReplicationGroup "+rgID+" not found", http.StatusNotFound))
 	}
-	return xmlOK(map[string]any{
-		"ReplicationGroupId": rg.ID,
-		"Status":             rg.Status,
-		"MemberClusters":     rg.MemberClusters,
+	return xmlOK(&xmlTestFailoverResponse{
+		Xmlns:  ecXmlns,
+		Result: xmlTestFailoverResult{ReplicationGroup: toXMLReplicationGroup(rg)},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
 	})
 }
 

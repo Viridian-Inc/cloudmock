@@ -1,7 +1,6 @@
 package elasticbeanstalk_test
 
 import (
-	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -37,13 +36,13 @@ func TestEB_CreateAndDescribeApplication(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
-	// Marshal XML to check response
-	data, _ := xml.Marshal(resp.Body)
+	// Check XML response from RawBody (xmlOK pre-serializes)
+	data := resp.RawBody
 	body := string(data)
 	assert.Contains(t, body, "my-app")
 
 	descResp, _ := s.HandleRequest(queryCtx("DescribeApplications", nil))
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.Contains(t, string(descData), "my-app")
 }
 
@@ -55,7 +54,7 @@ func TestEB_DeleteApplication(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	descResp, _ := s.HandleRequest(queryCtx("DescribeApplications", nil))
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.NotContains(t, string(descData), "del-app")
 }
 
@@ -68,11 +67,11 @@ func TestEB_CreateApplicationVersion(t *testing.T) {
 		"SourceBundle.S3Bucket": "my-bucket", "SourceBundle.S3Key": "app.zip",
 	}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	assert.Contains(t, string(data), "v1.0")
 
 	descResp, _ := s.HandleRequest(queryCtx("DescribeApplicationVersions", map[string]string{"ApplicationName": "ver-app"}))
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.Contains(t, string(descData), "v1.0")
 }
 
@@ -85,13 +84,13 @@ func TestEB_CreateAndDescribeEnvironment(t *testing.T) {
 		"SolutionStackName": "64bit Amazon Linux 2 v3.5.0 running Docker",
 	}))
 	require.NoError(t, err)
-	envData, _ := xml.Marshal(envResp.Body)
+	envData := envResp.RawBody
 	envBody := string(envData)
 	assert.Contains(t, envBody, "my-env")
 	assert.Contains(t, envBody, "Launching")
 
 	descResp, _ := s.HandleRequest(queryCtx("DescribeEnvironments", map[string]string{"ApplicationName": "env-app"}))
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.Contains(t, string(descData), "my-env")
 }
 
@@ -104,7 +103,7 @@ func TestEB_TerminateEnvironment(t *testing.T) {
 
 	resp, err := s.HandleRequest(queryCtx("TerminateEnvironment", map[string]string{"EnvironmentName": "term-env"}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	assert.Contains(t, string(data), "Terminating")
 }
 
@@ -117,13 +116,13 @@ func TestEB_ConfigurationTemplate(t *testing.T) {
 		"SolutionStackName": "64bit Amazon Linux 2", "Description": "Test template",
 	}))
 	require.NoError(t, err)
-	tmplData, _ := xml.Marshal(tmplResp.Body)
+	tmplData := tmplResp.RawBody
 	assert.Contains(t, string(tmplData), "my-tmpl")
 
 	descResp, _ := s.HandleRequest(queryCtx("DescribeConfigurationSettings", map[string]string{
 		"ApplicationName": "tmpl-app", "TemplateName": "my-tmpl",
 	}))
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.Contains(t, string(descData), "my-tmpl")
 
 	s.HandleRequest(queryCtx("DeleteConfigurationTemplate", map[string]string{
@@ -172,7 +171,7 @@ func TestEB_EnvironmentURLFormat(t *testing.T) {
 		"ApplicationName": "url-app", "EnvironmentName": "prod-env",
 	}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(envResp.Body)
+	data := envResp.RawBody
 	body := string(data)
 	// URL should follow pattern: {env-name}.{region}.elasticbeanstalk.com
 	assert.Contains(t, body, "prod-env.us-east-1.elasticbeanstalk.com")
@@ -185,7 +184,7 @@ func TestEB_EnvironmentHealthTracking(t *testing.T) {
 		"ApplicationName": "health-app", "EnvironmentName": "health-env",
 	}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(envResp.Body)
+	data := envResp.RawBody
 	body := string(data)
 	// Initial state should be Launching with Grey health
 	assert.Contains(t, body, "<Health>Grey</Health>")
@@ -202,9 +201,7 @@ func TestEB_EnvironmentRequiresApp(t *testing.T) {
 
 func xmlBody(t *testing.T, resp *service.Response) string {
 	t.Helper()
-	b, err := xml.Marshal(resp.Body)
-	require.NoError(t, err)
-	return string(b)
+	return string(resp.RawBody)
 }
 
 func TestEB_UpdateApplication(t *testing.T) {

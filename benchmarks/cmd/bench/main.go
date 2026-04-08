@@ -15,6 +15,7 @@ import (
 	"github.com/Viridian-Inc/cloudmock/benchmarks/harness"
 	"github.com/Viridian-Inc/cloudmock/benchmarks/report"
 	"github.com/Viridian-Inc/cloudmock/benchmarks/suites"
+	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/stress"
 	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier1"
 	"github.com/Viridian-Inc/cloudmock/benchmarks/suites/tier2"
 	"github.com/Viridian-Inc/cloudmock/benchmarks/target"
@@ -231,6 +232,9 @@ func buildRegistry() *suites.Registry {
 	reg.Register(tier1.NewSNSSuite())
 	reg.Register(tier1.NewSQSSuite())
 	reg.Register(tier1.NewSTSSuite())
+
+	// Stress suites.
+	reg.Register(stress.NewDynamoDBStressSuite())
 
 	// Tier 2 generated suites.
 	for _, s := range tier2.GenerateAll() {

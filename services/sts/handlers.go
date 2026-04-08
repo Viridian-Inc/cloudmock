@@ -84,10 +84,14 @@ func handleGetCallerIdentity(ctx *service.RequestContext) (*service.Response, er
 		Meta: xmlResponseMetadata{RequestID: newRequestID()},
 	}
 
+	data, err := xml.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       resp,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
 	}, nil
 }
 
@@ -145,10 +149,14 @@ func handleAssumeRole(ctx *service.RequestContext, accountID string, credMapper 
 		Meta: xmlResponseMetadata{RequestID: newRequestID()},
 	}
 
+	data, err := xml.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       resp,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
 	}, nil
 }
 
@@ -168,9 +176,13 @@ func handleGetSessionToken(ctx *service.RequestContext) (*service.Response, erro
 		Meta: xmlResponseMetadata{RequestID: newRequestID()},
 	}
 
+	data, err := xml.Marshal(resp)
+	if err != nil {
+		return nil, err
+	}
 	return &service.Response{
-		StatusCode: http.StatusOK,
-		Body:       resp,
-		Format:     service.FormatXML,
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
 	}, nil
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
@@ -106,11 +107,14 @@ func (dp *DataPlane) handleWriteThrough(w http.ResponseWriter, action string, bo
 	strategy := dp.daxService.GetStore().GetWriteStrategy(cluster)
 
 	if action == "PutItem" && req.Item != nil {
-		pk, sk := extractKeyStrings(req.Item)
+		// PutItem includes non-key attributes in Item, so we cannot reliably
+		// extract only key attributes without the table schema.  Invalidate
+		// the entire table to guarantee correctness.
 		if strategy == "update-cache" {
+			pk, sk := extractKeyStrings(req.Item)
 			cache.SetItem(req.TableName, pk, sk, resp)
 		} else {
-			cache.InvalidateItem(req.TableName, pk, sk)
+			cache.InvalidateTable(req.TableName)
 		}
 	} else if req.Key != nil {
 		pk, sk := extractKeyStrings(req.Key)
@@ -174,14 +178,23 @@ func (dp *DataPlane) forwardToDynamo(action string, body []byte) any {
 }
 
 func extractKeyStrings(key map[string]any) (string, string) {
+	// Sort attribute names for deterministic key extraction.
+	names := make([]string, 0, len(key))
+	for k := range key {
+		names = append(names, k)
+	}
+	sort.Strings(names)
+
 	pk, sk := "", ""
-	for _, v := range key {
+	for _, name := range names {
+		v := key[name]
 		if m, ok := v.(map[string]any); ok {
 			for _, val := range m {
 				if pk == "" {
 					pk = fmt.Sprintf("%v", val)
-				} else {
+				} else if sk == "" {
 					sk = fmt.Sprintf("%v", val)
+					return pk, sk
 				}
 			}
 		}

@@ -49,14 +49,14 @@ func (g *Gateway) authenticateRequest(r *http.Request) (*service.CallerIdentity,
 		}, nil
 	}
 
-	// Presigned URL requests carry auth in query params — treat as valid.
+	// Presigned URL requests carry auth in query params — grant limited identity.
 	if r.URL.Query().Get("X-Amz-Algorithm") != "" {
 		return &service.CallerIdentity{
 			AccountID:   g.cfg.AccountID,
-			ARN:         fmt.Sprintf("arn:aws:iam::%s:root", g.cfg.AccountID),
-			UserID:      g.cfg.AccountID,
+			ARN:         fmt.Sprintf("arn:aws:iam::%s:user/presigned-user", g.cfg.AccountID),
+			UserID:      "AIDAPRESIGNED",
 			AccessKeyID: "presigned",
-			IsRoot:      true,
+			IsRoot:      false,
 		}, nil
 	}
 

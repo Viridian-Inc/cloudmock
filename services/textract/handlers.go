@@ -1,7 +1,7 @@
 package textract
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"net/http"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
@@ -33,7 +33,7 @@ func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
-	if err := json.Unmarshal(body, v); err != nil {
+	if err := gojson.Unmarshal(body, v); err != nil {
 		return service.NewAWSError("ValidationException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}

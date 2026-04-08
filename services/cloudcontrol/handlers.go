@@ -1,7 +1,7 @@
 package cloudcontrol
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"net/http"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
@@ -87,14 +87,14 @@ func tryProxyCreate(typeName, identifier, properties string, locator ServiceLoca
 	// Override with parsed properties if available.
 	if properties != "" {
 		var parsed map[string]any
-		if json.Unmarshal([]byte(properties), &parsed) == nil {
+		if gojson.Unmarshal([]byte(properties), &parsed) == nil {
 			for k, v := range parsed {
 				proxyBody[k] = v
 			}
 		}
 	}
 
-	bodyBytes, _ := json.Marshal(proxyBody)
+	bodyBytes, _ := gojson.Marshal(proxyBody)
 	proxyCtx := &service.RequestContext{
 		Action:     proxyAction,
 		Region:     ctx.Region,

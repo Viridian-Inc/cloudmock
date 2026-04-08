@@ -3,7 +3,7 @@ package lambda
 import (
 	"crypto/sha256"
 	"encoding/base64"
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"fmt"
 	"net/http"
 
@@ -92,7 +92,7 @@ type createFunctionRequest struct {
 
 func handleCreateFunction(ctx *service.RequestContext, store *FunctionStore, executor *Executor, locator ServiceLocator) (*service.Response, error) {
 	var req createFunctionRequest
-	if err := json.Unmarshal(ctx.Body, &req); err != nil {
+	if err := gojson.Unmarshal(ctx.Body, &req); err != nil {
 		return jsonErr(service.ErrValidation("invalid request body: " + err.Error()))
 	}
 
@@ -219,7 +219,7 @@ type updateFunctionCodeRequest struct {
 
 func handleUpdateFunctionCode(ctx *service.RequestContext, store *FunctionStore, executor *Executor, locator ServiceLocator, name string) (*service.Response, error) {
 	var req updateFunctionCodeRequest
-	if err := json.Unmarshal(ctx.Body, &req); err != nil {
+	if err := gojson.Unmarshal(ctx.Body, &req); err != nil {
 		return jsonErr(service.ErrValidation("invalid request body: " + err.Error()))
 	}
 
@@ -270,7 +270,7 @@ func handleGetFunctionConfiguration(ctx *service.RequestContext, store *Function
 
 func handleUpdateFunctionConfiguration(ctx *service.RequestContext, store *FunctionStore, name string) (*service.Response, error) {
 	var updates map[string]any
-	if err := json.Unmarshal(ctx.Body, &updates); err != nil {
+	if err := gojson.Unmarshal(ctx.Body, &updates); err != nil {
 		return jsonErr(service.ErrValidation("invalid request body: " + err.Error()))
 	}
 
@@ -325,7 +325,7 @@ func handleInvoke(ctx *service.RequestContext, store *FunctionStore, executor *E
 
 	// Check if result contains an error.
 	var resultMap map[string]any
-	if json.Unmarshal(result, &resultMap) == nil {
+	if gojson.Unmarshal(result, &resultMap) == nil {
 		if _, hasErr := resultMap["errorMessage"]; hasErr {
 			headers["X-Amz-Function-Error"] = "Unhandled"
 		}

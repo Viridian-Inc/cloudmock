@@ -45,7 +45,7 @@ func WriteJSONResponse(w http.ResponseWriter, statusCode int, body any) error {
 	if err != nil {
 		return err
 	}
-	w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	w.WriteHeader(statusCode)
 	_, err = w.Write(data)

@@ -1,7 +1,7 @@
 package bedrock
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"fmt"
 	"net/http"
 	"time"
@@ -446,7 +446,7 @@ func handleInvokeModel(params map[string]any, store *Store) (*service.Response, 
 	prompt := "Hello"
 	if body != "" {
 		var bodyMap map[string]any
-		if json.Unmarshal([]byte(body), &bodyMap) == nil {
+		if gojson.Unmarshal([]byte(body), &bodyMap) == nil {
 			if p, ok := bodyMap["prompt"].(string); ok {
 				prompt = p
 			} else if msgs, ok := bodyMap["messages"].([]any); ok && len(msgs) > 0 {
@@ -469,7 +469,7 @@ func handleInvokeModel(params map[string]any, store *Store) (*service.Response, 
 		},
 	}
 
-	responseBytes, _ := json.Marshal(mockResponse)
+	responseBytes, _ := gojson.Marshal(mockResponse)
 	return jsonOK(map[string]any{
 		"body":        string(responseBytes),
 		"contentType": "application/json",

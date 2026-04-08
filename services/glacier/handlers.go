@@ -1,7 +1,7 @@
 package glacier
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -96,7 +96,7 @@ func handleDeleteArchive(vaultName, archiveID string, store *Store) (*service.Re
 func handleInitiateJob(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if len(ctx.Body) > 0 {
-		json.Unmarshal(ctx.Body, &params)
+		gojson.Unmarshal(ctx.Body, &params)
 	}
 
 	action, _ := params["Type"].(string)
@@ -140,12 +140,12 @@ func handleListJobs(vaultName string, store *Store) (*service.Response, error) {
 func handleInitiateVaultLock(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if len(ctx.Body) > 0 {
-		json.Unmarshal(ctx.Body, &params)
+		gojson.Unmarshal(ctx.Body, &params)
 	}
 	policy, _ := params["policy"].(string)
 	if policy == "" {
 		// Accept any structure
-		policyBytes, _ := json.Marshal(params["policy"])
+		policyBytes, _ := gojson.Marshal(params["policy"])
 		policy = string(policyBytes)
 	}
 
@@ -177,7 +177,7 @@ func handleCompleteVaultLock(vaultName, lockID string, store *Store) (*service.R
 func handleSetVaultNotifications(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
 	var params map[string]any
 	if len(ctx.Body) > 0 {
-		json.Unmarshal(ctx.Body, &params)
+		gojson.Unmarshal(ctx.Body, &params)
 	}
 	config, _ := params["vaultNotificationConfig"].(map[string]any)
 	if config == nil {
@@ -299,7 +299,7 @@ func handleGetVaultLock(vaultName string, store *Store) (*service.Response, erro
 func handleAddTagsToVault(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
 	var body map[string]any
 	if len(ctx.Body) > 0 {
-		_ = json.Unmarshal(ctx.Body, &body)
+		_ = gojson.Unmarshal(ctx.Body, &body)
 	}
 	tags := make(map[string]string)
 	if body != nil {
@@ -320,7 +320,7 @@ func handleAddTagsToVault(ctx *service.RequestContext, vaultName string, store *
 func handleRemoveTagsFromVault(ctx *service.RequestContext, vaultName string, store *Store) (*service.Response, error) {
 	var body map[string]any
 	if len(ctx.Body) > 0 {
-		_ = json.Unmarshal(ctx.Body, &body)
+		_ = gojson.Unmarshal(ctx.Body, &body)
 	}
 	keys := make([]string, 0)
 	if body != nil {

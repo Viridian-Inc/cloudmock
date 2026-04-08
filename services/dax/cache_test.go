@@ -41,3 +41,22 @@ func TestCache_ItemExpiry(t *testing.T) {
 	assert.Equal(t, int64(1), c.Stats().ItemHits)
 	assert.Equal(t, int64(1), c.Stats().ItemMisses)
 }
+
+func TestCache_LRUEviction(t *testing.T) {
+	c := NewCache(3, 300000, 300000) // max 3 items
+	c.SetItem("t", "k1", "", "v1")
+	c.SetItem("t", "k2", "", "v2")
+	c.SetItem("t", "k3", "", "v3")
+
+	// Access k1 to make it recently used
+	c.GetItem("t", "k1", "")
+
+	// Insert k4 — should evict k2 (least recently used)
+	c.SetItem("t", "k4", "", "v4")
+
+	assert.NotNil(t, c.GetItem("t", "k1", ""), "k1 should survive (recently accessed)")
+	assert.Nil(t, c.GetItem("t", "k2", ""), "k2 should be evicted (LRU)")
+	assert.NotNil(t, c.GetItem("t", "k3", ""))
+	assert.NotNil(t, c.GetItem("t", "k4", ""))
+	assert.True(t, c.Stats().Evictions >= 1)
+}

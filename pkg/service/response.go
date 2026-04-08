@@ -33,6 +33,7 @@ func WriteXMLResponse(w http.ResponseWriter, statusCode int, body any) error {
 		return err
 	}
 	w.Header().Set("Content-Type", "text/xml")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	w.WriteHeader(statusCode)
 	_, err = w.Write(data)
 	return err

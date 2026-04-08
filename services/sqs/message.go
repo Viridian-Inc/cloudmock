@@ -2,9 +2,9 @@ package sqs
 
 import (
 	"crypto/md5"
-	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"sync/atomic"
 	"time"
 )
 
@@ -56,15 +56,23 @@ func md5Hex(s string) string {
 	return hex.EncodeToString(h[:])
 }
 
+// uuidCounter is an atomic counter for fast UUID generation.
+// Combined with a timestamp prefix, produces unique IDs without crypto/rand.
+var uuidCounter atomic.Uint64
+
 func newUUID() string {
-	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	n := uuidCounter.Add(1)
+	t := uint64(time.Now().UnixNano())
 	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+		t>>32, (t>>16)&0xFFFF, n&0xFFFF, (n>>16)&0xFFFF, t&0xFFFFFFFFFFFF)
 }
 
+// receiptCounter generates receipt handles without crypto/rand.
+var receiptCounter atomic.Uint64
+
 func newReceiptHandle() string {
-	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	return hex.EncodeToString(b)
+	n := receiptCounter.Add(1)
+	t := uint64(time.Now().UnixNano())
+	// 32 hex chars = 16 bytes equivalent, matching original format.
+	return fmt.Sprintf("%016x%016x", t, n)
 }

@@ -8,16 +8,28 @@ import (
 	"github.com/tidwall/btree"
 )
 
+// pkPool interns partition key strings to avoid repeat allocations.
+// DynamoDB workloads repeatedly access the same partition keys, so caching
+// the "S:value" string avoids a new allocation on every request.
+// Uses sync.Map for lock-free reads on the hot path.
+var pkPool sync.Map // string → string (interned "TYPE:value")
+
 // attrString converts an AttributeValue to a comparable string representation.
 // The format is "TYPE:value" to ensure different types don't collide.
+// Uses string interning for the common string-key case.
 func attrString(av AttributeValue) string {
 	if av == nil {
 		return ""
 	}
 	if v, ok := av["S"]; ok {
-		// Fast path: string values are the most common key type.
 		if s, ok := v.(string); ok {
-			return "S:" + s
+			// Hot path: check intern pool first (zero-alloc on cache hit).
+			if interned, ok := pkPool.Load(s); ok {
+				return interned.(string)
+			}
+			result := "S:" + s
+			pkPool.Store(s, result)
+			return result
 		}
 		return "S:" + fmt.Sprint(v)
 	}

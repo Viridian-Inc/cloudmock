@@ -139,3 +139,79 @@ CloudMock provides the following default DAX parameters:
 - Availability zone placement is simulated
 - Cluster encryption (SSE) is tracked but not enforced
 - No VPC subnet validation is performed
+
+## Data-Plane (Caching Proxy)
+
+CloudMock includes a DAX data-plane HTTP server on port `8111` that acts as a caching proxy for DynamoDB operations. Unlike real DAX (which uses a proprietary binary protocol), CloudMock's data-plane accepts standard DynamoDB JSON requests over HTTP.
+
+### Supported Data-Plane Operations
+
+| Operation | Caching Behavior |
+|-----------|-----------------|
+| GetItem | Read-through: cache miss forwards to DynamoDB, result cached |
+| Query | Read-through: full result set cached by request hash |
+| Scan | Read-through: full result set cached by request hash |
+| PutItem | Write-through: writes to DynamoDB, then invalidates/updates cache |
+| UpdateItem | Write-through: writes to DynamoDB, then invalidates cache |
+| DeleteItem | Write-through: writes to DynamoDB, then invalidates cache |
+
+### Quick Start
+
+Point your standard DynamoDB SDK at port `8111` instead of `4566`:
+
+```typescript
+import { DynamoDBClient, GetItemCommand } from '@aws-sdk/client-dynamodb';
+
+const client = new DynamoDBClient({
+  endpoint: 'http://localhost:8111',
+  region: 'us-east-1',
+  credentials: { accessKeyId: 'test', secretAccessKey: 'test' },
+});
+
+// First call: cache miss → reads from DynamoDB → caches result
+// Second call: cache hit → returns from cache
+const result = await client.send(new GetItemCommand({
+  TableName: 'users',
+  Key: { pk: { S: 'user1' } },
+}));
+```
+
+### Cluster Selection
+
+Use the `X-Dax-Cluster` header to route to a specific cluster's cache:
+
+```bash
+curl -X POST http://localhost:8111 \
+  -H 'X-Amz-Target: DynamoDB_20120810.GetItem' \
+  -H 'X-Dax-Cluster: my-cluster' \
+  -d '{"TableName":"users","Key":{"pk":{"S":"user1"}}}'
+```
+
+If omitted, a default cache with 5-minute TTLs is used.
+
+### Cache Configuration
+
+Controlled through DAX parameter groups (via control-plane API on port `4566`):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `record-ttl-millis` | 300000 | TTL for cached items (5 minutes) |
+| `query-ttl-millis` | 300000 | TTL for cached query results |
+| `write-strategy` | `invalidate` | `invalidate` (matches AWS) or `update-cache` |
+
+### Cache Statistics
+
+```bash
+curl http://localhost:8111/stats/my-cluster
+```
+
+Returns:
+```json
+{"itemHits":1520,"itemMisses":340,"queryHits":200,"queryMisses":80,"itemSize":890,"querySize":45,"evictions":12,"writeThroughs":150,"invalidations":150}
+```
+
+### Environment Variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `CLOUDMOCK_DAX_PORT` | `8111` | Port for the DAX data-plane server |

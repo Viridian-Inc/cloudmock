@@ -467,7 +467,17 @@ func main() {
 		})
 	}
 
-	_ = registerOrDefer("dynamodb", func() service.Service { return dynamodbsvc.New(cfg.AccountID, cfg.Region) })
+	// DynamoDB — keep a typed reference for DAX data-plane wiring.
+	var ddbService *dynamodbsvc.DynamoDBService
+	if eagerAll || minimalSet["dynamodb"] {
+		ddbService = dynamodbsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(ddbService)
+	} else {
+		registry.RegisterLazy("dynamodb", func() service.Service {
+			ddbService = dynamodbsvc.New(cfg.AccountID, cfg.Region)
+			return ddbService
+		})
+	}
 	_ = registerOrDefer("logs", func() service.Service { return logssvc.New(cfg.AccountID, cfg.Region) })
 	// CloudWatch — needs a locator for alarm → SNS delivery; wire after registration.
 	var cwService *cwsvc.CloudWatchService
@@ -778,7 +788,16 @@ func main() {
 	_ = registerOrDefer("iot-data", func() service.Service { return iotdatasvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("iot-wireless", func() service.Service { return iotwirelesssvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("dms", func() service.Service { return dmssvc.New(cfg.AccountID, cfg.Region) })
-	_ = registerOrDefer("dax", func() service.Service { return daxsvc.New(cfg.AccountID, cfg.Region) })
+	var daxService *daxsvc.DAXService
+	if eagerAll || minimalSet["dax"] {
+		daxService = daxsvc.New(cfg.AccountID, cfg.Region)
+		registry.Register(daxService)
+	} else {
+		registry.RegisterLazy("dax", func() service.Service {
+			daxService = daxsvc.New(cfg.AccountID, cfg.Region)
+			return daxService
+		})
+	}
 	_ = registerOrDefer("transfer", func() service.Service { return transfersvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("glacier", func() service.Service { return glaciersvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("s3tables", func() service.Service { return s3tablessvc.New(cfg.AccountID, cfg.Region) })
@@ -2062,6 +2081,36 @@ func main() {
 		fastServer.Shutdown()
 		return
 	}
+
+	// DAX Data-Plane server on :8111
+	go func() {
+		daxPort := os.Getenv("CLOUDMOCK_DAX_PORT")
+		if daxPort == "" {
+			daxPort = "8111"
+		}
+		if daxService == nil {
+			daxService = daxsvc.New(cfg.AccountID, cfg.Region)
+		}
+		// Find the DynamoDB service from registry
+		if ddbService == nil {
+			ddbSvcRaw, err := registry.Lookup("dynamodb")
+			if err != nil {
+				slog.Warn("DAX data-plane: DynamoDB service not registered, skipping")
+				return
+			}
+			var ok bool
+			ddbService, ok = ddbSvcRaw.(*dynamodbsvc.DynamoDBService)
+			if !ok {
+				slog.Warn("DAX data-plane: DynamoDB service type mismatch, skipping")
+				return
+			}
+		}
+		dp := daxsvc.NewDataPlane(daxService, ddbService)
+		slog.Info("DAX data-plane listening", "port", daxPort)
+		if err := http.ListenAndServe(":"+daxPort, dp); err != nil {
+			slog.Error("DAX data-plane server failed", "error", err)
+		}
+	}()
 
 	gwServer := &http.Server{
 		Addr:              addr,

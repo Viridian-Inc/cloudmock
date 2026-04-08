@@ -1,9 +1,11 @@
 package service
 
 import (
-	"encoding/json"
 	"encoding/xml"
+	"fmt"
 	"net/http"
+
+	gojson "github.com/goccy/go-json"
 )
 
 // ResponseFormat indicates the wire format for a response.
@@ -38,9 +40,15 @@ func WriteXMLResponse(w http.ResponseWriter, statusCode int, body any) error {
 
 // WriteJSONResponse marshals body as JSON and writes it with Content-Type application/x-amz-json-1.1.
 func WriteJSONResponse(w http.ResponseWriter, statusCode int, body any) error {
-	w.Header().Set("Content-Type", "application/x-amz-json-1.1")
+	data, err := gojson.Marshal(body)
+	if err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/x-amz-json-1.0")
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 	w.WriteHeader(statusCode)
-	return json.NewEncoder(w).Encode(body)
+	_, err = w.Write(data)
+	return err
 }
 
 // WriteErrorResponse writes an AWSError in the specified format.

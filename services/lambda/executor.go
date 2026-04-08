@@ -10,10 +10,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
 )
+
+// validHandlerPattern matches handler names allowed by AWS Lambda.
+var validHandlerPattern = regexp.MustCompile(`^[a-zA-Z0-9_.\-/]+$`)
 
 // Executor manages function code extraction and execution.
 type Executor struct {
@@ -145,6 +149,10 @@ func (e *Executor) Invoke(fn *Function, event []byte) ([]byte, error) {
 
 	runtime := fn.Runtime
 	handler := fn.Handler
+
+	if !validHandlerPattern.MatchString(handler) {
+		return nil, fmt.Errorf("invalid handler name: must match [a-zA-Z0-9_.\\-/]+")
+	}
 
 	timeout := fn.Timeout
 	if timeout <= 0 {

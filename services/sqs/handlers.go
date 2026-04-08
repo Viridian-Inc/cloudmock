@@ -349,6 +349,9 @@ func handleReceiveMessage(ctx *service.RequestContext, store *QueueStore) (*serv
 	waitTime := 0
 	if s := form.Get("WaitTimeSeconds"); s != "" {
 		if v, err := strconv.Atoi(s); err == nil && v >= 0 {
+			if v > 20 {
+				v = 20 // AWS maximum
+			}
 			waitTime = v
 		}
 	}

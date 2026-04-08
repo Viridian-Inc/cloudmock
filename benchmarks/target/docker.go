@@ -18,6 +18,7 @@ var imageMap = map[string]string{
 	"cloudmock":      "ghcr.io/viridian-inc/cloudmock:latest",
 	"localstack":     "localstack/localstack:latest",
 	"localstack-pro": "localstack/localstack-pro:latest",
+	"moto":           "motoserver/moto:latest",
 }
 
 type DockerTarget struct {
@@ -60,17 +61,24 @@ func (d *DockerTarget) Start(ctx context.Context) error {
 	if d.apiKey != "" && d.name == "localstack-pro" {
 		env = append(env, "LOCALSTACK_API_KEY="+d.apiKey)
 	}
+	if d.name == "moto" {
+		d.port = 5000
+	}
 
 	hostPort := fmt.Sprintf("%d", d.port)
+	containerPort := "4566"
+	if d.name == "moto" {
+		containerPort = "5000"
+	}
 	resp, err := d.cli.ContainerCreate(ctx, &container.Config{
 		Image: d.image,
 		Env:   env,
 		ExposedPorts: nat.PortSet{
-			nat.Port("4566/tcp"): struct{}{},
+			nat.Port(containerPort + "/tcp"): struct{}{},
 		},
 	}, &container.HostConfig{
 		PortBindings: nat.PortMap{
-			nat.Port("4566/tcp"): []nat.PortBinding{{HostPort: hostPort}},
+			nat.Port(containerPort + "/tcp"): []nat.PortBinding{{HostPort: hostPort}},
 		},
 	}, nil, nil, fmt.Sprintf("bench-%s", d.name))
 	if err != nil {

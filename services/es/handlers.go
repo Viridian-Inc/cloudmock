@@ -68,7 +68,15 @@ func parseTagKeys(form url.Values) []string {
 }
 
 func xmlOK(body any) (*service.Response, error) {
-	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatXML}, nil
+	data, err := xml.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	return &service.Response{
+		StatusCode:     http.StatusOK,
+		RawBody:        data,
+		RawContentType: "text/xml",
+	}, nil
 }
 
 func xmlErr(awsErr *service.AWSError) (*service.Response, error) {

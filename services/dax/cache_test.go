@@ -60,3 +60,37 @@ func TestCache_LRUEviction(t *testing.T) {
 	assert.NotNil(t, c.GetItem("t", "k4", ""))
 	assert.True(t, c.Stats().Evictions >= 1)
 }
+
+func TestCache_QueryCacheHit(t *testing.T) {
+	c := NewCache(1000, 300000, 300000)
+	results := []any{map[string]any{"pk": "1"}, map[string]any{"pk": "2"}}
+	c.SetQuery("users|idx|pk=1", results)
+	val := c.GetQuery("users|idx|pk=1")
+	assert.NotNil(t, val)
+	assert.Len(t, val.([]any), 2)
+	assert.Equal(t, int64(1), c.Stats().QueryHits)
+}
+
+func TestCache_InvalidateTable(t *testing.T) {
+	c := NewCache(1000, 300000, 300000)
+	c.SetItem("users", "pk1", "", "val1")
+	c.SetItem("users", "pk2", "", "val2")
+	c.SetItem("orders", "pk1", "", "val3")
+	c.SetQuery("users|idx|pk=1", []any{"result"})
+	c.InvalidateTable("users")
+	assert.Nil(t, c.GetItem("users", "pk1", ""))
+	assert.Nil(t, c.GetItem("users", "pk2", ""))
+	assert.NotNil(t, c.GetItem("orders", "pk1", ""))
+	assert.Nil(t, c.GetQuery("users|idx|pk=1"))
+}
+
+func TestCache_InvalidateItem(t *testing.T) {
+	c := NewCache(1000, 300000, 300000)
+	c.SetItem("users", "pk1", "sk1", "val1")
+	c.SetItem("users", "pk2", "", "val2")
+	c.SetQuery("users|idx|pk=1", []any{"result"})
+	c.InvalidateItem("users", "pk1", "sk1")
+	assert.Nil(t, c.GetItem("users", "pk1", "sk1"))
+	assert.NotNil(t, c.GetItem("users", "pk2", ""))
+	assert.Nil(t, c.GetQuery("users|idx|pk=1"))
+}

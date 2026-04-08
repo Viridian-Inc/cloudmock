@@ -1,0 +1,83 @@
+{
+  "_comment": "Performance baseline — CI fails if any operation exceeds max_p50_ms. Thresholds set at 3x local p50 to account for CI runner variability. Ratchet down as performance improves.",
+  "_updated": "2026-04-08",
+  "thresholds": {
+    "dynamodb": {
+      "CreateTable":      { "max_p50_ms": 3.0 },
+      "PutItem":          { "max_p50_ms": 2.0 },
+      "GetItem":          { "max_p50_ms": 2.0 },
+      "Query":            { "max_p50_ms": 2.0 },
+      "Scan":             { "max_p50_ms": 2.0 },
+      "UpdateItem":       { "max_p50_ms": 2.0 },
+      "DeleteItem":       { "max_p50_ms": 2.0 }
+    },
+    "dynamodb-stress": {
+      "BulkPutItem":       { "max_p50_ms": 200.0 },
+      "GetItemAtScale":    { "max_p50_ms": 3.0 },
+      "QueryAtScale":      { "max_p50_ms": 5.0 },
+      "ConcurrentMixedOps":{ "max_p50_ms": 5.0 }
+    },
+    "s3": {
+      "CreateBucket":     { "max_p50_ms": 3.0 },
+      "PutObject":        { "max_p50_ms": 3.0 },
+      "GetObject":        { "max_p50_ms": 3.0 },
+      "ListObjects":      { "max_p50_ms": 3.0 },
+      "CopyObject":       { "max_p50_ms": 3.0 },
+      "DeleteObject":     { "max_p50_ms": 3.0 },
+      "DeleteBucket":     { "max_p50_ms": 3.0 }
+    },
+    "sqs": {
+      "CreateQueue":      { "max_p50_ms": 3.0 },
+      "SendMessage":      { "max_p50_ms": 2.0 },
+      "DeleteMessage":    { "max_p50_ms": 3.0 },
+      "DeleteQueue":      { "max_p50_ms": 3.0 }
+    },
+    "sns": {
+      "CreateTopic":      { "max_p50_ms": 3.0 },
+      "ListTopics":       { "max_p50_ms": 3.0 }
+    },
+    "iam": {
+      "CreateUser":       { "max_p50_ms": 3.0 },
+      "GetUser":          { "max_p50_ms": 2.0 },
+      "ListUsers":        { "max_p50_ms": 2.0 },
+      "CreateRole":       { "max_p50_ms": 3.0 },
+      "DeleteUser":       { "max_p50_ms": 2.0 },
+      "DeleteRole":       { "max_p50_ms": 2.0 }
+    },
+    "sts": {
+      "GetCallerIdentity":{ "max_p50_ms": 2.0 },
+      "AssumeRole":       { "max_p50_ms": 2.0 }
+    },
+    "cognito": {
+      "CreateUserPool":   { "max_p50_ms": 3.0 },
+      "DescribeUserPool": { "max_p50_ms": 3.0 },
+      "ListUserPools":    { "max_p50_ms": 2.0 },
+      "DeleteUserPool":   { "max_p50_ms": 3.0 }
+    },
+    "ec2": {
+      "DescribeInstances":      { "max_p50_ms": 3.0 },
+      "DescribeVpcs":           { "max_p50_ms": 2.0 },
+      "DescribeSubnets":        { "max_p50_ms": 2.0 },
+      "DescribeSecurityGroups": { "max_p50_ms": 2.0 }
+    },
+    "kms": {
+      "CreateKey":        { "max_p50_ms": 2.0 },
+      "Encrypt":          { "max_p50_ms": 2.0 },
+      "Decrypt":          { "max_p50_ms": 2.0 },
+      "ListKeys":         { "max_p50_ms": 2.0 }
+    },
+    "lambda": {
+      "CreateFunction":   { "max_p50_ms": 3.0 },
+      "GetFunction":      { "max_p50_ms": 2.0 },
+      "ListFunctions":    { "max_p50_ms": 2.0 },
+      "DeleteFunction":   { "max_p50_ms": 2.0 }
+    }
+  },
+  "gatling": {
+    "_comment": "Minimum sustained req/s at 200 concurrent connections over 30s",
+    "dynamodb_GetItem":  { "min_rps": 100000 },
+    "dynamodb_PutItem":  { "min_rps": 100000 },
+    "sqs_SendMessage":   { "min_rps": 100000 },
+    "s3_PutObject":      { "min_rps": 80000 }
+  }
+}

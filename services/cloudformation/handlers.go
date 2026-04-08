@@ -1,7 +1,7 @@
 package cloudformation
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -650,7 +650,7 @@ func parseStackStatusFilters(form url.Values) []string {
 // extractTemplateParameters reads parameter definitions from a raw template body.
 func extractTemplateParameters(templateBody string) []xmlTemplateParameter {
 	var tmpl cfnTemplate
-	if err := json.Unmarshal([]byte(templateBody), &tmpl); err != nil {
+	if err := gojson.Unmarshal([]byte(templateBody), &tmpl); err != nil {
 		return nil
 	}
 	params := make([]xmlTemplateParameter, 0, len(tmpl.Parameters))
@@ -658,7 +658,7 @@ func extractTemplateParameters(templateBody string) []xmlTemplateParameter {
 		var defVal string
 		if defn.Default != nil {
 			var s string
-			if err := json.Unmarshal(defn.Default, &s); err == nil {
+			if err := gojson.Unmarshal(defn.Default, &s); err == nil {
 				defVal = s
 			} else {
 				defVal = string(defn.Default)

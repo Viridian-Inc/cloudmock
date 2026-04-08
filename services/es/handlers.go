@@ -2,7 +2,7 @@ package es
 
 import (
 	"crypto/rand"
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -338,7 +338,7 @@ func parseJSONBody(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
-	if err := json.Unmarshal(body, v); err != nil {
+	if err := gojson.Unmarshal(body, v); err != nil {
 		return service.NewAWSError("ValidationException", "Invalid JSON.", http.StatusBadRequest)
 	}
 	return nil

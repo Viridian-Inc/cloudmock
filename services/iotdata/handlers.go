@@ -1,7 +1,7 @@
 package iotdata
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"net/http"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
@@ -74,7 +74,7 @@ func handleUpdateThingShadow(p map[string]any, body []byte, store *Store) (*serv
 	// Parse state from body.
 	var payload map[string]any
 	if len(body) > 0 {
-		json.Unmarshal(body, &payload)
+		gojson.Unmarshal(body, &payload)
 	}
 	state := getMap(payload, "state")
 	if state == nil {

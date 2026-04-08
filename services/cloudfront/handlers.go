@@ -2,7 +2,7 @@ package cloudfront
 
 import (
 	"crypto/rand"
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"encoding/xml"
 	"fmt"
 	"net/http"
@@ -1278,7 +1278,7 @@ func parseJSON(body []byte, v any) *service.AWSError {
 	if len(body) == 0 {
 		return nil
 	}
-	if err := json.Unmarshal(body, v); err != nil {
+	if err := gojson.Unmarshal(body, v); err != nil {
 		return service.ErrValidation("Invalid JSON request body.")
 	}
 	return nil
@@ -1296,7 +1296,7 @@ func validateOrigin(origin Origin, locator ServiceLocator) *service.AWSError {
 		if bucketName != "" {
 			s3Svc, err := locator.Lookup("s3")
 			if err == nil {
-				body, _ := json.Marshal(map[string]any{
+				body, _ := gojson.Marshal(map[string]any{
 					"Bucket": bucketName,
 				})
 				_, err := s3Svc.HandleRequest(&service.RequestContext{
@@ -1320,7 +1320,7 @@ func validateOrigin(origin Origin, locator ServiceLocator) *service.AWSError {
 		if err == nil {
 			// Try to describe load balancers; if the ELB service is up but
 			// no matching LB is found, treat as invalid origin.
-			body, _ := json.Marshal(map[string]any{})
+			body, _ := gojson.Marshal(map[string]any{})
 			_, err := elbSvc.HandleRequest(&service.RequestContext{
 				Action:     "DescribeLoadBalancers",
 				Body:       body,

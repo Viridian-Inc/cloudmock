@@ -1,7 +1,7 @@
 package gateway
 
 import (
-	"encoding/json"
+	gojson "github.com/goccy/go-json"
 	"fmt"
 	"net/http"
 	"time"
@@ -101,7 +101,7 @@ func (g *Gateway) handleServices(w http.ResponseWriter, r *http.Request) {
 		names = append(names, svc.Name())
 	}
 
-	data, err := json.Marshal(names)
+	data, err := gojson.Marshal(names)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return

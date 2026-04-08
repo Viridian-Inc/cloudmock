@@ -47,7 +47,7 @@ func createCluster(t *testing.T, s *svc.EMRService, name string) string {
 		"Applications.member.1.Name": "Spark",
 	}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	var result runJobFlowResult
 	require.NoError(t, xml.Unmarshal(data, &result))
 	return result.Result.JobFlowId
@@ -226,7 +226,7 @@ func TestStepExecution_TransitionsToCompleted(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 
 	// Parse step IDs
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	var addResult struct {
 		XMLName xml.Name `xml:"AddJobFlowStepsResponse"`
 		Result  struct {
@@ -242,7 +242,7 @@ func TestStepExecution_TransitionsToCompleted(t *testing.T) {
 			"ClusterId": id, "StepId": stepID,
 		}))
 		require.NoError(t, err)
-		stepData, _ := xml.Marshal(stepResp.Body)
+		stepData := stepResp.RawBody
 		var descResult struct {
 			XMLName xml.Name `xml:"DescribeStepResponse"`
 			Result  struct {
@@ -284,7 +284,7 @@ func TestModifyInstanceGroups_CountUpdate(t *testing.T) {
 	require.NoError(t, err)
 
 	// Parse IG ID
-	data, _ := xml.Marshal(addResp.Body)
+	data := addResp.RawBody
 	var addResult struct {
 		XMLName xml.Name `xml:"AddInstanceGroupsResponse"`
 		Result  struct {
@@ -305,7 +305,7 @@ func TestModifyInstanceGroups_CountUpdate(t *testing.T) {
 	// Verify the count changed
 	listResp, err := s.HandleRequest(queryCtx("ListInstanceGroups", map[string]string{"ClusterId": id}))
 	require.NoError(t, err)
-	listData, _ := xml.Marshal(listResp.Body)
+	listData := listResp.RawBody
 	var listResult struct {
 		XMLName xml.Name `xml:"ListInstanceGroupsResponse"`
 		Result  struct {
@@ -330,7 +330,7 @@ func TestClusterLifecycle_NoLocator(t *testing.T) {
 	// With default instant transitions, cluster should reach final state
 	resp, err := s.HandleRequest(queryCtx("DescribeCluster", map[string]string{"ClusterId": id}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	var result struct {
 		XMLName xml.Name `xml:"DescribeClusterResponse"`
 		Result  struct {
@@ -355,7 +355,7 @@ func TestEMR_SecurityConfigurationCRUD(t *testing.T) {
 		"SecurityConfiguration": `{"EncryptionConfiguration":{"EnableInTransitEncryption":true}}`,
 	}))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	assert.Contains(t, string(data), "my-sec-config")
 
 	// Describe
@@ -363,13 +363,13 @@ func TestEMR_SecurityConfigurationCRUD(t *testing.T) {
 		"Name": "my-sec-config",
 	}))
 	require.NoError(t, err)
-	descData, _ := xml.Marshal(descResp.Body)
+	descData := descResp.RawBody
 	assert.Contains(t, string(descData), "my-sec-config")
 
 	// List
 	listResp, err := s.HandleRequest(queryCtx("ListSecurityConfigurations", nil))
 	require.NoError(t, err)
-	listData, _ := xml.Marshal(listResp.Body)
+	listData := listResp.RawBody
 	assert.Contains(t, string(listData), "my-sec-config")
 
 	// Delete
@@ -416,6 +416,6 @@ func TestEMR_ListSecurityConfigurations_Empty(t *testing.T) {
 	s := newService()
 	resp, err := s.HandleRequest(queryCtx("ListSecurityConfigurations", nil))
 	require.NoError(t, err)
-	data, _ := xml.Marshal(resp.Body)
+	data := resp.RawBody
 	assert.Contains(t, string(data), "ListSecurityConfigurationsResponse")
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -496,16 +497,20 @@ func (s *TableStore) Query(tableName string, indexName string, keyCondExpr strin
 	table.mu.RLock()
 	defer table.mu.RUnlock()
 
-	// Determine source items and range key based on index.
-	var sourceItems []Item
-	var rk string
+	// Resolve expression attribute names upfront.
+	resolvedKeyExpr := resolveNames(keyCondExpr, exprNames)
+
+	// Determine hash key name and range key name based on index.
+	var hk, rk string
+	var partitions map[string]*Partition
 	if indexName != "" {
 		found := false
 		for _, gsi := range table.GSIs {
 			if gsi.IndexName == indexName {
 				if store, ok := table.gsiStores[indexName]; ok {
-					sourceItems = store.allItems()
+					partitions = store.partitions
 				}
+				hk = gsiHashKeyName(gsi.KeySchema)
 				rk = gsiRangeKeyName(gsi.KeySchema)
 				found = true
 				break
@@ -515,8 +520,9 @@ func (s *TableStore) Query(tableName string, indexName string, keyCondExpr strin
 			for _, lsi := range table.LSIs {
 				if lsi.IndexName == indexName {
 					if store, ok := table.lsiStores[indexName]; ok {
-						sourceItems = store.allItems()
+						partitions = store.partitions
 					}
+					hk = gsiHashKeyName(lsi.KeySchema)
 					rk = gsiRangeKeyName(lsi.KeySchema)
 					found = true
 					break
@@ -528,22 +534,58 @@ func (s *TableStore) Query(tableName string, indexName string, keyCondExpr strin
 				fmt.Sprintf("The table does not have the specified index: %s", indexName), http.StatusBadRequest)
 		}
 	} else {
-		sourceItems = table.scanAll(0)
+		partitions = table.partitions
+		hk = table.hashKeyName()
 		rk = table.rangeKeyName()
 	}
 
-	// Find items matching key condition.
+	// Fast path: extract the partition key value from the key condition expression
+	// and look up the partition directly instead of scanning all items.
+	var sourceItems []Item
+	pkValue := extractEqualityValue(resolvedKeyExpr, hk, exprValues)
+	hasSortKeyCondition := pkValue != "" && strings.Contains(strings.ToUpper(resolvedKeyExpr), " AND ")
+	if pkValue != "" && partitions != nil {
+		part, ok := partitions[pkValue]
+		if !ok {
+			return []Item{}, 0, 0, nil
+		}
+		forward := true
+		if scanForward != nil {
+			forward = *scanForward
+		}
+		// If PK-only condition with no filter, pass limit directly to B-tree scan
+		// to avoid copying the entire partition.
+		scanLimit := 0
+		if !hasSortKeyCondition && filterExpr == "" && limit > 0 {
+			scanLimit = limit
+		}
+		sourceItems = part.scan(forward, scanLimit)
+	} else {
+		// Fallback: full scan (e.g. if we can't parse the partition key)
+		for _, part := range partitions {
+			sourceItems = append(sourceItems, part.scan(true, 0)...)
+		}
+	}
+
+	// Evaluate key condition on source items.
+	// If we did a direct partition lookup with only a PK equality condition (no sort key condition),
+	// all items in the partition match — skip expensive per-item expression evaluation.
 	var matched []Item
-	for _, item := range sourceItems {
-		if evaluateCondition(keyCondExpr, item, exprNames, exprValues) {
-			matched = append(matched, item)
+	if pkValue != "" && !hasSortKeyCondition {
+		// Direct partition lookup, PK-only condition — all items match.
+		matched = sourceItems
+	} else {
+		for _, item := range sourceItems {
+			if evaluateCondition(keyCondExpr, item, exprNames, exprValues) {
+				matched = append(matched, item)
+			}
 		}
 	}
 
 	scannedCount := len(matched)
 
-	// Sort by sort key if present.
-	if rk != "" {
+	// Sort by sort key if we didn't use partition direct lookup (already sorted).
+	if pkValue == "" && rk != "" {
 		forward := true
 		if scanForward != nil {
 			forward = *scanForward
@@ -577,13 +619,15 @@ func (s *TableStore) Query(tableName string, indexName string, keyCondExpr strin
 		filtered = filtered[:limit]
 	}
 
-	// Apply projection.
-	results := make([]Item, len(filtered))
-	for i, item := range filtered {
-		results[i] = copyItem(item)
-		if projExpr != "" {
-			results[i] = applyProjection(results[i], projExpr, exprNames)
+	// Apply projection. Skip copyItem when no projection is needed (hot path).
+	var results []Item
+	if projExpr != "" {
+		results = make([]Item, len(filtered))
+		for i, item := range filtered {
+			results[i] = applyProjection(copyItem(item), projExpr, exprNames)
 		}
+	} else {
+		results = filtered
 	}
 
 	return results, len(results), scannedCount, nil

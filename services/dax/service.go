@@ -23,6 +23,9 @@ func New(accountID, region string) *DAXService {
 	}
 }
 
+// GetStore returns the DAX store for data-plane access.
+func (s *DAXService) GetStore() *Store { return s.store }
+
 // Name returns the AWS service name used for routing.
 func (s *DAXService) Name() string { return "dax" }
 

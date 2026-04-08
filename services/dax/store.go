@@ -2,6 +2,7 @@ package dax
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 
@@ -83,6 +84,7 @@ type Store struct {
 	clusters        map[string]*Cluster
 	subnetGroups    map[string]*SubnetGroup
 	parameterGroups map[string]*ParameterGroup
+	caches          map[string]*Cache
 	accountID       string
 	region          string
 	lcConfig        *lifecycle.Config
@@ -94,6 +96,7 @@ func NewStore(accountID, region string) *Store {
 		clusters:        make(map[string]*Cluster),
 		subnetGroups:    make(map[string]*SubnetGroup),
 		parameterGroups: make(map[string]*ParameterGroup),
+		caches:          make(map[string]*Cache),
 		accountID:       accountID,
 		region:          region,
 		lcConfig:        lifecycle.DefaultConfig(),
@@ -464,4 +467,47 @@ func (s *Store) ListTags(arn string) (map[string]string, bool) {
 		}
 	}
 	return nil, false
+}
+
+// GetClusterCache returns the cache for a cluster, creating on first access.
+func (s *Store) GetClusterCache(clusterName string) *Cache {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if c, ok := s.caches[clusterName]; ok {
+		return c
+	}
+	recordTTL := int64(300000)
+	queryTTL := int64(300000)
+	maxSize := 10000
+	if cluster, ok := s.clusters[clusterName]; ok && cluster.ParameterGroupName != "" {
+		if pg, ok := s.parameterGroups[cluster.ParameterGroupName]; ok {
+			if v, ok := pg.Parameters["record-ttl-millis"]; ok {
+				if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+					recordTTL = parsed
+				}
+			}
+			if v, ok := pg.Parameters["query-ttl-millis"]; ok {
+				if parsed, err := strconv.ParseInt(v, 10, 64); err == nil {
+					queryTTL = parsed
+				}
+			}
+		}
+	}
+	cache := NewCache(maxSize, recordTTL, queryTTL)
+	s.caches[clusterName] = cache
+	return cache
+}
+
+// GetWriteStrategy returns "invalidate" or "update-cache" for a cluster.
+func (s *Store) GetWriteStrategy(clusterName string) string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if cluster, ok := s.clusters[clusterName]; ok && cluster.ParameterGroupName != "" {
+		if pg, ok := s.parameterGroups[cluster.ParameterGroupName]; ok {
+			if v, ok := pg.Parameters["write-strategy"]; ok {
+				return v
+			}
+		}
+	}
+	return "invalidate"
 }

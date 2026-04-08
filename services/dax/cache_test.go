@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCache_GetMiss(t *testing.T) {
@@ -93,4 +94,16 @@ func TestCache_InvalidateItem(t *testing.T) {
 	assert.Nil(t, c.GetItem("users", "pk1", "sk1"))
 	assert.NotNil(t, c.GetItem("users", "pk2", ""))
 	assert.Nil(t, c.GetQuery("users|idx|pk=1"))
+}
+
+func TestStore_GetClusterCache(t *testing.T) {
+	s := NewStore("123456789012", "us-east-1")
+	_, err := s.CreateCluster("test-cluster", "", "dax.r4.large", 1, "", "", "arn:aws:iam::123456789012:role/r", nil, nil, false, nil)
+	require.NoError(t, err)
+	cache := s.GetClusterCache("test-cluster")
+	assert.NotNil(t, cache)
+	cache.SetItem("t", "pk", "", "val")
+	assert.NotNil(t, cache.GetItem("t", "pk", ""))
+	defaultCache := s.GetClusterCache("nonexistent")
+	assert.NotNil(t, defaultCache)
 }

@@ -66,6 +66,30 @@ func itemKey(table, pk, sk string) string {
 	return table + "\x00" + pk + "\x00" + sk
 }
 
+// SetItem stores an item in the cache with record TTL.
+func (c *Cache) SetItem(table, pk, sk string, value any) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	key := itemKey(table, pk, sk)
+	c.items[key] = &cacheEntry{
+		value:     value,
+		expiresAt: time.Now().Add(time.Duration(c.recordTTLMs) * time.Millisecond),
+		key:       key,
+	}
+	c.evictIfNeeded()
+}
+
+func (c *Cache) evictIfNeeded() {
+	for len(c.items) > c.maxSize {
+		for k := range c.items {
+			delete(c.items, k)
+			atomic.AddInt64(&c.stats.Evictions, 1)
+			break
+		}
+	}
+}
+
 // GetItem returns a cached item or nil on miss.
 func (c *Cache) GetItem(table, pk, sk string) any {
 	c.mu.Lock()

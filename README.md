@@ -4,6 +4,8 @@
 ![Compat Tests](https://github.com/Viridian-Inc/cloudmock/actions/workflows/compat.yml/badge.svg)
 ![CI](https://github.com/Viridian-Inc/cloudmock/actions/workflows/ci.yml/badge.svg)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/X8X81XIEIV)
+
 **Local AWS emulation with built-in observability.**
 
 100 AWS services + distributed tracing + error tracking + alerting — in one binary. Language-agnostic via OpenTelemetry.

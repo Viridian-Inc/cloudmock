@@ -127,17 +127,17 @@ client := dynamodb.NewFromConfig(cfg) // 43ns per GetItem, 0 allocs
 ```
 </details>
 
-### Developer Cost Savings
+### Developer Time Saved
 
-A team of 10 developers running 20-25 test runs/day saves **6 minutes per run** vs LocalStack.
+How much wait time CloudMock eliminates vs LocalStack (20-25 test runs/day, 6 min saved per run):
 
-| Team Size | Wait Time Eliminated | Developer Cost Saved | With Context Switching |
+| Team Size | Per Dev / Day | Per Dev / Year | Team / Year |
 |---|---|---|---|
-| 10 devs | 5,625 hrs/yr | **$422K**/yr | **$1.3M**/yr |
-| 50 devs | 28,125 hrs/yr | **$2.1M**/yr | **$6.3M**/yr |
-| 200 devs | 112,500 hrs/yr | **$8.4M**/yr | **$25.3M**/yr |
+| 10 devs | 2.25 hrs | 562 hrs | **5,625 hrs** |
+| 50 devs | 2.25 hrs | 562 hrs | **28,125 hrs** |
+| 200 devs | 2.25 hrs | 562 hrs | **112,500 hrs** |
 
-*Based on $75/hr loaded cost, 250 working days/year. Context switching multiplier based on Microsoft/Google research showing 15-25 min productivity loss per interruption. [Full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
+At 0.5ms per operation, tests feel instant. No context switching, no waiting, no tab-switching while your suite runs.
 
 ### What makes CloudMock fast
 

@@ -94,63 +94,62 @@ For CI and test suites, test mode strips all observability overhead and uses a R
 CLOUDMOCK_TEST_MODE=true npx cloudmock  # 0.1s startup, 0.009ms per operation
 ```
 
-### Benchmarks (requests/sec, higher is better)
+### Benchmarks (requests/sec — 200 concurrent, 30s sustained)
 
-Measured with [hey](https://github.com/rakyll/hey). Endpoints verified via response headers (`x-localstack: true`, `Server: Werkzeug`).
+Gatling gun tests using [hey](https://github.com/rakyll/hey). All three running on the same machine.
 
-| Operation | CloudMock | LocalStack | Moto | CM/LS | CM/Moto |
-|-----------|-----------|------------|------|-------|---------|
-| **DynamoDB ListTables** | **98,150** | 662 | 1,526 | 148x | 64x |
-| **DynamoDB PutItem** | **128,164** | 449 | 1,492 | 285x | 85x |
-| **DynamoDB GetItem** | **134,714** | 723 | 1,569 | 186x | 85x |
-| **S3 ListBuckets** | **102,010** | 506 | 1,129 | 201x | 90x |
-| **SQS ListQueues** | **102,880** | 554 | 387 | 185x | 265x |
-| **IAM ListUsers** | **115,341** | 294 | 355 | 392x | 325x |
-| **Lambda ListFunctions** | **117,876** | 601 | 1,330 | 196x | 88x |
-| **EC2 DescribeInstances** | **117,161** | 179 | 217 | 653x | 539x |
+| Operation | CloudMock | Moto | LocalStack | vs Moto | vs LS |
+|---|---|---|---|---|---|
+| **DynamoDB GetItem** | **188,652** | 849 | 791 | 222x | 238x |
+| **DynamoDB PutItem** | **178,858** | 940 | 742 | 190x | 241x |
+| **DynamoDB Query** | **179,983** | 721 | 780 | 250x | 231x |
+| **DynamoDB Scan (100 items)** | **43,395** | 98 | 472 | 442x | 92x |
+| **SQS SendMessage** | **186,356** | 759 | 1,178 | 246x | 158x |
+| **S3 PutObject (1KB)** | **150,946** | 806 | 1,795 | 187x | 84x |
+| **S3 GetObject (1KB)** | **188,223** | 834 | 1,240 | 226x | 152x |
+| **SNS Publish** | **177,929** | 458 | 1,231 | 388x | 144x |
+| **STS GetCallerIdentity** | **167,015** | 741 | 1,229 | 225x | 136x |
+| **IAM ListUsers** | **177,417** | 717 | 1,234 | 247x | 144x |
+| **EC2 DescribeInstances** | **176,531** | 506 | 1,229 | 349x | 144x |
+| **KMS Encrypt** | **183,387** | 812 | 1,168 | 226x | 157x |
 
-**Geometric mean: CloudMock 113,901 req/s — 249x faster than LocalStack (457 req/s), 143x faster than Moto (795 req/s).**
+**Geometric mean: CloudMock 163,224 req/s — 250x faster than Moto (654 req/s), 162x faster than LocalStack (1,007 req/s).**
 
 <details>
-<summary>In-process mode (Go)</summary>
+<summary>In-process mode (Go) — 7,366x faster</summary>
 
-Zero network overhead, sub-millisecond everything:
+Zero network overhead. DynamoDB GetItem at 43ns with zero allocations (frozen JSON cache):
 
 ```go
 cm := sdk.New()
 cfg := cm.Config()
-client := dynamodb.NewFromConfig(cfg) // 20μs per GetItem
+client := dynamodb.NewFromConfig(cfg) // 43ns per GetItem, 0 allocs
 ```
 </details>
 
-### CI Cost Savings at 1,000 Builds/Day
+### Developer Cost Savings
 
-A test suite making 5,000 AWS SDK calls per build finishes in **0.1 seconds** on CloudMock vs **23 seconds** on LocalStack and **9 seconds** on Moto.
+A team of 10 developers running 20-25 test runs/day saves **6 minutes per run** vs LocalStack.
 
-| | CloudMock | LocalStack | Moto |
+| Team Size | Wait Time Eliminated | Developer Cost Saved | With Context Switching |
 |---|---|---|---|
-| **Time per build** | **0.1s** | 22.9s | 9.3s |
-| **Annual compute cost** | **$7** | $1,393 | $565 |
+| 10 devs | 5,625 hrs/yr | **$422K**/yr | **$1.3M**/yr |
+| 50 devs | 28,125 hrs/yr | **$2.1M**/yr | **$6.3M**/yr |
+| 200 devs | 112,500 hrs/yr | **$8.4M**/yr | **$25.3M**/yr |
 
-#### Annual savings by switching to CloudMock
-
-| SDK calls/build | vs LocalStack | vs Moto |
-|----------------|---------------|---------|
-| 500 | **$99K** saved | **$27K** saved |
-| 2,000 | **$124K** saved | **$41K** saved |
-| 5,000 | **$174K** saved | **$70K** saved |
-| 10,000 | **$258K** saved | **$118K** saved |
-
-*Includes GitHub Actions compute ($0.008/min) + developer wait time ($75/hr loaded). See [full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
+*Based on $75/hr loaded cost, 250 working days/year. Context switching multiplier based on Microsoft/Google research showing 15-25 min productivity loss per interruption. [Full methodology](https://cloudmock.app/docs/reference/benchmarks/).*
 
 ### What makes CloudMock fast
 
-- **Rust-accelerated DynamoDB** — hot-path operations (PutItem, GetItem) use a Rust shared library with serde_json + DashMap via CGO
+- **Frozen JSON cache** — items pre-serialized to JSON at write time; reads return cached bytes with zero marshaling (43ns, 0 allocs)
 - **Go + fasthttp** — native binary, zero-copy request handling, no interpreter overhead
-- **Test mode** — strips all observability (tracing, logging, SSE, anomaly detection)
-- **Sharded stores** — per-partition locks in DynamoDB, lock-free service routing via `sync.Map`
-- **Pre-resolved services** — all 100 services resolved into a plain map at startup, no mutex on hot path
-- **go-json + pre-marshaled responses** — zero-alloc for common operations like PutItem
+- **Rust-accelerated DynamoDB** — hot-path PutItem/GetItem via Rust shared library with serde_json + DashMap
+- **Direct partition lookup** — O(1) hash key resolution from KeyConditionExpression, limit pushdown to B-tree
+- **String-interned keys** — sync.Map intern pool eliminates repeat allocations for partition key lookups
+- **Pre-serialized XML** — all 19 XML services serialize to RawBody at handler level, bypassing gateway marshal
+- **goccy/go-json everywhere** — 2-3x faster than encoding/json across all 73 JSON services
+- **Lock-free SQS** — atomic counter UUID/receipt generation, no crypto/rand syscall per message
+- **Test mode** — fasthttp server, all observability stripped, 100 services pre-resolved into plain map
 
 [Full benchmark details and methodology](https://cloudmock.app/docs/reference/benchmarks/)
 
@@ -284,9 +283,9 @@ curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
 | Feature | CloudMock | LocalStack (Free) | Moto |
 |---|---|---|---|
 | AWS services | 100 | ~25 | ~100 |
-| **Throughput** | **113,901 req/s** | 457 req/s | 795 req/s |
-| **Speed multiplier** | **baseline** | 249x slower | 143x slower |
-| **Avg latency** | **0.009ms** | 2.2ms | 1.26ms |
+| **Throughput** | **163,224 req/s** | 1,007 req/s | 654 req/s |
+| **Speed multiplier** | **baseline** | 162x slower | 250x slower |
+| **Avg latency** | **1.1ms** | 170ms | 264ms |
 | Test mode (CI) | Built-in | No | No |
 | Distributed tracing | Built-in | No | No |
 | Chaos engineering | Built-in | Pro only | No |

@@ -55,10 +55,10 @@ func NewStandardQueue(name, url string, attrs map[string]string) *StandardQueue 
 
 	// Set defaults.
 	defaults := map[string]string{
-		"VisibilityTimeout":            "30",
-		"MessageRetentionPeriod":       "345600",
-		"MaximumMessageSize":           "262144",
-		"DelaySeconds":                 "0",
+		"VisibilityTimeout":             "30",
+		"MessageRetentionPeriod":        "345600",
+		"MaximumMessageSize":            "262144",
+		"DelaySeconds":                  "0",
 		"ReceiveMessageWaitTimeSeconds": "0",
 	}
 	for k, v := range defaults {
@@ -88,9 +88,9 @@ func NewStandardQueue(name, url string, attrs map[string]string) *StandardQueue 
 	return q
 }
 
-func (q *StandardQueue) QueueName() string   { return q.name }
-func (q *StandardQueue) QueueURL() string    { return q.url }
-func (q *StandardQueue) IsFIFOQueue() bool   { return false }
+func (q *StandardQueue) QueueName() string { return q.name }
+func (q *StandardQueue) QueueURL() string  { return q.url }
+func (q *StandardQueue) IsFIFOQueue() bool { return false }
 
 func (q *StandardQueue) GetAttributes() map[string]string {
 	q.mu.Lock()

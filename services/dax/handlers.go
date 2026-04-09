@@ -94,17 +94,17 @@ func clusterToJSON(c *Cluster) map[string]any {
 // ---- CreateCluster ----
 
 type createClusterRequest struct {
-	ClusterName       string            `json:"ClusterName"`
-	Description       string            `json:"Description"`
-	NodeType          string            `json:"NodeType"`
-	ReplicationFactor int               `json:"ReplicationFactor"`
-	SubnetGroupName   string            `json:"SubnetGroupName"`
-	ParameterGroupName string           `json:"ParameterGroupName"`
-	IamRoleArn        string            `json:"IamRoleArn"`
-	AvailabilityZones []string          `json:"AvailabilityZones"`
-	SecurityGroupIds  []string          `json:"SecurityGroupIds"`
-	SSESpecification  *sseSpec          `json:"SSESpecification"`
-	Tags              []tagPair         `json:"Tags"`
+	ClusterName        string    `json:"ClusterName"`
+	Description        string    `json:"Description"`
+	NodeType           string    `json:"NodeType"`
+	ReplicationFactor  int       `json:"ReplicationFactor"`
+	SubnetGroupName    string    `json:"SubnetGroupName"`
+	ParameterGroupName string    `json:"ParameterGroupName"`
+	IamRoleArn         string    `json:"IamRoleArn"`
+	AvailabilityZones  []string  `json:"AvailabilityZones"`
+	SecurityGroupIds   []string  `json:"SecurityGroupIds"`
+	SSESpecification   *sseSpec  `json:"SSESpecification"`
+	Tags               []tagPair `json:"Tags"`
 }
 
 type sseSpec struct {
@@ -214,9 +214,9 @@ func handleDeleteCluster(ctx *service.RequestContext, store *Store) (*service.Re
 // ---- IncreaseReplicationFactor ----
 
 type increaseReplicationFactorRequest struct {
-	ClusterName              string   `json:"ClusterName"`
-	NewReplicationFactor     int      `json:"NewReplicationFactor"`
-	AvailabilityZones        []string `json:"AvailabilityZones"`
+	ClusterName          string   `json:"ClusterName"`
+	NewReplicationFactor int      `json:"NewReplicationFactor"`
+	AvailabilityZones    []string `json:"AvailabilityZones"`
 }
 
 func handleIncreaseReplicationFactor(ctx *service.RequestContext, store *Store) (*service.Response, error) {
@@ -388,8 +388,8 @@ type parameterNameValue struct {
 }
 
 type updateParameterGroupRequest struct {
-	ParameterGroupName   string               `json:"ParameterGroupName"`
-	ParameterNameValues  []parameterNameValue `json:"ParameterNameValues"`
+	ParameterGroupName  string               `json:"ParameterGroupName"`
+	ParameterNameValues []parameterNameValue `json:"ParameterNameValues"`
 }
 
 func handleUpdateParameterGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {

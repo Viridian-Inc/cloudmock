@@ -11,35 +11,35 @@ import (
 
 // Cluster represents a DAX cluster.
 type Cluster struct {
-	ClusterName           string
-	ClusterArn            string
-	Description           string
-	NodeType              string
-	ReplicationFactor     int
-	Status                string // creating, available, modifying, deleting
-	SubnetGroupName       string
-	ParameterGroupName    string
-	SecurityGroupIds      []string
-	AvailabilityZones     []string
-	Nodes                 []*Node
+	ClusterName                string
+	ClusterArn                 string
+	Description                string
+	NodeType                   string
+	ReplicationFactor          int
+	Status                     string // creating, available, modifying, deleting
+	SubnetGroupName            string
+	ParameterGroupName         string
+	SecurityGroupIds           []string
+	AvailabilityZones          []string
+	Nodes                      []*Node
 	PreferredMaintenanceWindow string
-	NotificationTopicArn  string
-	IamRoleArn            string
-	SSEDescription        *SSEDescription
-	Tags                  map[string]string
-	CreateTime            time.Time
-	Endpoint              *Endpoint
-	lifecycle             *lifecycle.Machine
+	NotificationTopicArn       string
+	IamRoleArn                 string
+	SSEDescription             *SSEDescription
+	Tags                       map[string]string
+	CreateTime                 time.Time
+	Endpoint                   *Endpoint
+	lifecycle                  *lifecycle.Machine
 }
 
 // Node represents a single DAX node.
 type Node struct {
-	NodeId                    string
-	Endpoint                  *Endpoint
-	NodeCreateTime            time.Time
-	AvailabilityZone          string
-	NodeStatus                string
-	ParameterGroupStatus      string
+	NodeId               string
+	Endpoint             *Endpoint
+	NodeCreateTime       time.Time
+	AvailabilityZone     string
+	NodeStatus           string
+	ParameterGroupStatus string
 }
 
 // Endpoint represents a DAX endpoint.
@@ -167,23 +167,23 @@ func (s *Store) CreateCluster(name, description, nodeType string, replicationFac
 	}
 
 	cluster := &Cluster{
-		ClusterName:       name,
-		ClusterArn:        s.clusterARN(name),
-		Description:       description,
-		NodeType:          nodeType,
-		ReplicationFactor: replicationFactor,
-		Status:            "creating",
-		SubnetGroupName:   subnetGroupName,
+		ClusterName:        name,
+		ClusterArn:         s.clusterARN(name),
+		Description:        description,
+		NodeType:           nodeType,
+		ReplicationFactor:  replicationFactor,
+		Status:             "creating",
+		SubnetGroupName:    subnetGroupName,
 		ParameterGroupName: parameterGroupName,
-		IamRoleArn:        iamRoleArn,
-		SecurityGroupIds:  securityGroupIds,
-		AvailabilityZones: azs,
-		Nodes:             buildNodes(name, nodeType, replicationFactor, azs, s.region),
-		SSEDescription:    sse,
-		Tags:              tags,
-		CreateTime:        time.Now().UTC(),
-		Endpoint:          clusterEndpoint,
-		lifecycle:         lm,
+		IamRoleArn:         iamRoleArn,
+		SecurityGroupIds:   securityGroupIds,
+		AvailabilityZones:  azs,
+		Nodes:              buildNodes(name, nodeType, replicationFactor, azs, s.region),
+		SSEDescription:     sse,
+		Tags:               tags,
+		CreateTime:         time.Now().UTC(),
+		Endpoint:           clusterEndpoint,
+		lifecycle:          lm,
 	}
 
 	lm.OnTransition(func(from, to lifecycle.State) {

@@ -300,7 +300,7 @@ type jsonMessageAttrVal struct {
 }
 
 type jsonSendMessageOutput struct {
-	MessageId      string `json:"MessageId"`
+	MessageId        string `json:"MessageId"`
 	MD5OfMessageBody string `json:"MD5OfMessageBody"`
 }
 
@@ -333,7 +333,7 @@ func jsonSendMessage(ctx *service.RequestContext, store *QueueStore) (*service.R
 	}
 
 	return jsonOK(&jsonSendMessageOutput{
-		MessageId:      msgID,
+		MessageId:        msgID,
 		MD5OfMessageBody: md5Hex(input.MessageBody),
 	})
 }
@@ -387,9 +387,9 @@ func jsonReceiveMessage(ctx *service.RequestContext, store *QueueStore) (*servic
 	outMsgs := make([]jsonMessageOut, 0, len(msgs))
 	for _, m := range msgs {
 		attrs := map[string]string{
-			"SentTimestamp":                     strconv.FormatInt(m.SentTimestamp.UnixMilli(), 10),
-			"ApproximateReceiveCount":           strconv.Itoa(m.ReceiveCount),
-			"ApproximateFirstReceiveTimestamp":  strconv.FormatInt(m.FirstReceiveTimestamp.UnixMilli(), 10),
+			"SentTimestamp":                    strconv.FormatInt(m.SentTimestamp.UnixMilli(), 10),
+			"ApproximateReceiveCount":          strconv.Itoa(m.ReceiveCount),
+			"ApproximateFirstReceiveTimestamp": strconv.FormatInt(m.FirstReceiveTimestamp.UnixMilli(), 10),
 		}
 		outMsgs = append(outMsgs, jsonMessageOut{
 			MessageId:     m.MessageId,
@@ -488,8 +488,8 @@ func jsonChangeMessageVisibility(ctx *service.RequestContext, store *QueueStore)
 // ---- SendMessageBatch ----
 
 type jsonSendMessageBatchInput struct {
-	QueueUrl string                         `json:"QueueUrl"`
-	Entries  []jsonSendMessageBatchEntry    `json:"Entries"`
+	QueueUrl string                      `json:"QueueUrl"`
+	Entries  []jsonSendMessageBatchEntry `json:"Entries"`
 }
 
 type jsonSendMessageBatchEntry struct {
@@ -568,8 +568,8 @@ func jsonSendMessageBatch(ctx *service.RequestContext, store *QueueStore) (*serv
 // ---- DeleteMessageBatch ----
 
 type jsonDeleteMessageBatchInput struct {
-	QueueUrl string                          `json:"QueueUrl"`
-	Entries  []jsonDeleteMessageBatchEntry   `json:"Entries"`
+	QueueUrl string                        `json:"QueueUrl"`
+	Entries  []jsonDeleteMessageBatchEntry `json:"Entries"`
 }
 
 type jsonDeleteMessageBatchEntry struct {

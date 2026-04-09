@@ -88,7 +88,7 @@ func (s *QueueStore) wireDLQLocked(q Queue) {
 		return
 	}
 	var rp struct {
-		DeadLetterTargetArn string `json:"deadLetterTargetArn"`
+		DeadLetterTargetArn string      `json:"deadLetterTargetArn"`
 		MaxReceiveCount     json.Number `json:"maxReceiveCount"`
 	}
 	if err := json.Unmarshal([]byte(rpJSON), &rp); err != nil {

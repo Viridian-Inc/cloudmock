@@ -39,7 +39,7 @@ type getRecordsResponse struct {
 // ---- TTL request/response types ----
 
 type updateTimeToLiveRequest struct {
-	TableName               string           `json:"TableName"`
+	TableName               string            `json:"TableName"`
 	TimeToLiveSpecification *TTLSpecification `json:"TimeToLiveSpecification"`
 }
 

@@ -2,8 +2,9 @@
 // Measures true server throughput without Go HTTP client overhead.
 //
 // Usage:
-//   guntest -addr localhost:4566 -c 200 -d 15s              # TCP
-//   guntest -unix /tmp/cloudmock.sock -c 200 -d 15s         # Unix socket
+//
+//	guntest -addr localhost:4566 -c 200 -d 15s              # TCP
+//	guntest -unix /tmp/cloudmock.sock -c 200 -d 15s         # Unix socket
 package main
 
 import (
@@ -26,8 +27,10 @@ var getItemReq = "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC
 var putItemReq = "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/dynamodb/aws4_request\r\nX-Amz-Target: DynamoDB_20120810.PutItem\r\nContent-Type: application/x-amz-json-1.0\r\nContent-Length: 64\r\nConnection: keep-alive\r\n\r\n" +
 	`{"TableName":"gun","Item":{"pk":{"S":"k"},"d":{"S":"v"}}}`
 
-var sqsSendReq = "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/sqs/aws4_request\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: 89\r\nConnection: keep-alive\r\n\r\n" +
-	"Action=SendMessage&QueueUrl=http://localhost:4566/123456789012/gun-queue&MessageBody=hello"
+func sqsSendReq(addr string) string {
+	body := "Action=SendMessage&QueueUrl=http://" + addr + "/123456789012/gun-queue&MessageBody=hello"
+	return "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/sqs/aws4_request\r\nContent-Type: application/x-www-form-urlencoded\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\nConnection: keep-alive\r\n\r\n" + body
+}
 
 func main() {
 	addr := flag.String("addr", "localhost:4566", "TCP address")
@@ -44,7 +47,7 @@ func main() {
 	case "PutItem":
 		reqBytes = []byte(putItemReq)
 	case "SQSSend":
-		reqBytes = []byte(sqsSendReq)
+		reqBytes = []byte(sqsSendReq(*addr))
 	default:
 		fmt.Fprintf(os.Stderr, "unknown op: %s\n", *op)
 		os.Exit(1)

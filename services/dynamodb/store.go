@@ -8,8 +8,8 @@ import (
 	"sync"
 	"time"
 
-	gojson "github.com/goccy/go-json"
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	gojson "github.com/goccy/go-json"
 )
 
 // getItemResponseRaw is used by GetItemRaw to marshal while holding the lock.

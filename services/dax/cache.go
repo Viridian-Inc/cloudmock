@@ -3,7 +3,6 @@ package dax
 import (
 	"container/list"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -57,15 +56,15 @@ func (c *Cache) Stats() CacheStats {
 	querySize := int64(len(c.queries))
 	c.mu.Unlock()
 	return CacheStats{
-		ItemHits:      atomic.LoadInt64(&c.stats.ItemHits),
-		ItemMisses:    atomic.LoadInt64(&c.stats.ItemMisses),
-		QueryHits:     atomic.LoadInt64(&c.stats.QueryHits),
-		QueryMisses:   atomic.LoadInt64(&c.stats.QueryMisses),
+		ItemHits:      c.stats.ItemHits,
+		ItemMisses:    c.stats.ItemMisses,
+		QueryHits:     c.stats.QueryHits,
+		QueryMisses:   c.stats.QueryMisses,
 		ItemSize:      itemSize,
 		QuerySize:     querySize,
-		Evictions:     atomic.LoadInt64(&c.stats.Evictions),
-		WriteThroughs: atomic.LoadInt64(&c.stats.WriteThroughs),
-		Invalidations: atomic.LoadInt64(&c.stats.Invalidations),
+		Evictions:     c.stats.Evictions,
+		WriteThroughs: c.stats.WriteThroughs,
+		Invalidations: c.stats.Invalidations,
 	}
 }
 
@@ -104,7 +103,7 @@ func (c *Cache) evictIfNeeded() {
 		entry := back.Value.(*cacheEntry)
 		c.itemList.Remove(back)
 		delete(c.items, entry.key)
-		atomic.AddInt64(&c.stats.Evictions, 1)
+		c.stats.Evictions++
 	}
 }
 
@@ -116,18 +115,18 @@ func (c *Cache) GetItem(table, pk, sk string) any {
 	key := itemKey(table, pk, sk)
 	el, ok := c.items[key]
 	if !ok {
-		atomic.AddInt64(&c.stats.ItemMisses, 1)
+		c.stats.ItemMisses++
 		return nil
 	}
 	entry := el.Value.(*cacheEntry)
 	if time.Now().After(entry.expiresAt) {
 		c.itemList.Remove(el)
 		delete(c.items, key)
-		atomic.AddInt64(&c.stats.ItemMisses, 1)
+		c.stats.ItemMisses++
 		return nil
 	}
 	c.itemList.MoveToFront(el)
-	atomic.AddInt64(&c.stats.ItemHits, 1)
+	c.stats.ItemHits++
 	return entry.value
 }
 
@@ -140,10 +139,10 @@ func (c *Cache) GetQuery(queryKey string) any {
 		if ok {
 			delete(c.queries, queryKey)
 		}
-		atomic.AddInt64(&c.stats.QueryMisses, 1)
+		c.stats.QueryMisses++
 		return nil
 	}
-	atomic.AddInt64(&c.stats.QueryHits, 1)
+	c.stats.QueryHits++
 	return entry.value
 }
 
@@ -166,7 +165,7 @@ func (c *Cache) InvalidateItem(table, pk, sk string) {
 		delete(c.items, key)
 	}
 	c.invalidateQueriesForTable(table)
-	atomic.AddInt64(&c.stats.Invalidations, 1)
+	c.stats.Invalidations++
 }
 
 // InvalidateTable removes all items and queries for a table.
@@ -181,12 +180,14 @@ func (c *Cache) InvalidateTable(table string) {
 		}
 	}
 	c.invalidateQueriesForTable(table)
-	atomic.AddInt64(&c.stats.Invalidations, 1)
+	c.stats.Invalidations++
 }
 
 // IncrWriteThroughs increments the write-through counter.
 func (c *Cache) IncrWriteThroughs() {
-	atomic.AddInt64(&c.stats.WriteThroughs, 1)
+	c.mu.Lock()
+	c.stats.WriteThroughs++
+	c.mu.Unlock()
 }
 
 func (c *Cache) invalidateQueriesForTable(table string) {

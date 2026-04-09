@@ -32,26 +32,26 @@ type Shard struct {
 
 // StreamDescription holds metadata about a table's stream.
 type StreamDescription struct {
-	StreamARN         string  `json:"StreamArn"`
-	StreamLabel       string  `json:"StreamLabel"`
-	StreamStatus      string  `json:"StreamStatus"` // ENABLED, DISABLED
-	StreamViewType    string  `json:"StreamViewType"`
-	TableName         string  `json:"TableName"`
-	Shards            []Shard `json:"Shards"`
+	StreamARN      string  `json:"StreamArn"`
+	StreamLabel    string  `json:"StreamLabel"`
+	StreamStatus   string  `json:"StreamStatus"` // ENABLED, DISABLED
+	StreamViewType string  `json:"StreamViewType"`
+	TableName      string  `json:"TableName"`
+	Shards         []Shard `json:"Shards"`
 }
 
 // Stream holds the in-memory state for a table's DynamoDB Stream.
 type Stream struct {
-	mu             sync.RWMutex
-	arn            string
-	label          string
-	viewType       string
-	tableName      string
-	records        []*StreamRecord
-	seqCounter     atomic.Int64
-	shardId        string
-	iterators      map[string]int // iteratorId → position in records slice
-	iteratorMu     sync.Mutex
+	mu         sync.RWMutex
+	arn        string
+	label      string
+	viewType   string
+	tableName  string
+	records    []*StreamRecord
+	seqCounter atomic.Int64
+	shardId    string
+	iterators  map[string]int // iteratorId → position in records slice
+	iteratorMu sync.Mutex
 }
 
 // newStream creates a new Stream for the given table.

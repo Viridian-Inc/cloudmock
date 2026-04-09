@@ -38,11 +38,11 @@ func handleExecuteStatement(ctx *service.RequestContext, store *TableStore) (*se
 // ── Backups ──────────────────────────────────────────────────────────────────
 
 type Backup struct {
-	BackupArn         string    `json:"BackupArn"`
-	BackupName        string    `json:"BackupName"`
-	BackupStatus      string    `json:"BackupStatus"`
-	TableName         string    `json:"TableName"`
-	TableArn          string    `json:"TableArn"`
+	BackupArn              string  `json:"BackupArn"`
+	BackupName             string  `json:"BackupName"`
+	BackupStatus           string  `json:"BackupStatus"`
+	TableName              string  `json:"TableName"`
+	TableArn               string  `json:"TableArn"`
 	BackupCreationDateTime float64 `json:"BackupCreationDateTime"`
 }
 
@@ -143,11 +143,11 @@ func handleDescribeBackup(ctx *service.RequestContext, store *TableStore) (*serv
 // ── Global Tables ────────────────────────────────────────────────────────────
 
 type GlobalTable struct {
-	GlobalTableName  string              `json:"GlobalTableName"`
-	ReplicationGroup []map[string]string `json:"ReplicationGroup"`
-	GlobalTableArn   string              `json:"GlobalTableArn"`
-	GlobalTableStatus string             `json:"GlobalTableStatus"`
-	CreationDateTime float64             `json:"CreationDateTime"`
+	GlobalTableName   string              `json:"GlobalTableName"`
+	ReplicationGroup  []map[string]string `json:"ReplicationGroup"`
+	GlobalTableArn    string              `json:"GlobalTableArn"`
+	GlobalTableStatus string              `json:"GlobalTableStatus"`
+	CreationDateTime  float64             `json:"CreationDateTime"`
 }
 
 var (
@@ -209,7 +209,7 @@ func handleListGlobalTables(ctx *service.RequestContext, store *TableStore) (*se
 	var items []map[string]any
 	for _, gt := range globalTables {
 		items = append(items, map[string]any{
-			"GlobalTableName": gt.GlobalTableName,
+			"GlobalTableName":  gt.GlobalTableName,
 			"ReplicationGroup": gt.ReplicationGroup,
 		})
 	}

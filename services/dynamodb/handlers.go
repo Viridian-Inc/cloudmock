@@ -3,27 +3,27 @@ package dynamodb
 import (
 	"net/http"
 
-	gojson "github.com/goccy/go-json"
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	gojson "github.com/goccy/go-json"
 )
 
 // ---- JSON request/response types ----
 
 type createTableRequest struct {
 	TableName              string                 `json:"TableName"`
-	KeySchema              []KeySchemaElement      `json:"KeySchema"`
-	AttributeDefinitions   []AttributeDefinition   `json:"AttributeDefinitions"`
-	BillingMode            string                  `json:"BillingMode"`
-	ProvisionedThroughput  *ProvisionedThroughput  `json:"ProvisionedThroughput"`
-	GlobalSecondaryIndexes []GSI                   `json:"GlobalSecondaryIndexes"`
-	LocalSecondaryIndexes  []LSI                   `json:"LocalSecondaryIndexes"`
-	StreamSpecification    *StreamSpecification    `json:"StreamSpecification"`
+	KeySchema              []KeySchemaElement     `json:"KeySchema"`
+	AttributeDefinitions   []AttributeDefinition  `json:"AttributeDefinitions"`
+	BillingMode            string                 `json:"BillingMode"`
+	ProvisionedThroughput  *ProvisionedThroughput `json:"ProvisionedThroughput"`
+	GlobalSecondaryIndexes []GSI                  `json:"GlobalSecondaryIndexes"`
+	LocalSecondaryIndexes  []LSI                  `json:"LocalSecondaryIndexes"`
+	StreamSpecification    *StreamSpecification   `json:"StreamSpecification"`
 }
 
 type gsiDescription struct {
 	IndexName             string                 `json:"IndexName"`
-	KeySchema             []KeySchemaElement      `json:"KeySchema"`
-	Projection            map[string]any `json:"Projection"`
+	KeySchema             []KeySchemaElement     `json:"KeySchema"`
+	Projection            map[string]any         `json:"Projection"`
 	IndexStatus           string                 `json:"IndexStatus"`
 	ItemCount             int64                  `json:"ItemCount"`
 	IndexSizeBytes        int64                  `json:"IndexSizeBytes"`
@@ -32,12 +32,12 @@ type gsiDescription struct {
 }
 
 type lsiDescription struct {
-	IndexName      string                 `json:"IndexName"`
-	KeySchema      []KeySchemaElement      `json:"KeySchema"`
-	Projection     map[string]any `json:"Projection"`
-	ItemCount      int64                  `json:"ItemCount"`
-	IndexSizeBytes int64                  `json:"IndexSizeBytes"`
-	IndexArn       string                 `json:"IndexArn"`
+	IndexName      string             `json:"IndexName"`
+	KeySchema      []KeySchemaElement `json:"KeySchema"`
+	Projection     map[string]any     `json:"Projection"`
+	ItemCount      int64              `json:"ItemCount"`
+	IndexSizeBytes int64              `json:"IndexSizeBytes"`
+	IndexArn       string             `json:"IndexArn"`
 }
 
 // warmThroughput is the WarmThroughput sub-struct returned in DescribeTable.
@@ -52,8 +52,8 @@ type warmThroughput struct {
 type tableDescription struct {
 	TableName              string                 `json:"TableName"`
 	TableStatus            string                 `json:"TableStatus"`
-	KeySchema              []KeySchemaElement      `json:"KeySchema"`
-	AttributeDefinitions   []AttributeDefinition   `json:"AttributeDefinitions"`
+	KeySchema              []KeySchemaElement     `json:"KeySchema"`
+	AttributeDefinitions   []AttributeDefinition  `json:"AttributeDefinitions"`
 	CreationDateTime       float64                `json:"CreationDateTime"`
 	ItemCount              int64                  `json:"ItemCount"`
 	TableSizeBytes         int64                  `json:"TableSizeBytes"`
@@ -67,7 +67,7 @@ type tableDescription struct {
 	LatestStreamLabel      string                 `json:"LatestStreamLabel,omitempty"`
 	// WarmThroughput is always returned as ACTIVE in CloudMock (no async warm-up period).
 	// The Terraform AWS provider v6 polls this field when on_demand_throughput is set.
-	WarmThroughput         *warmThroughput        `json:"WarmThroughput,omitempty"`
+	WarmThroughput *warmThroughput `json:"WarmThroughput,omitempty"`
 }
 
 type billingModeSummary struct {
@@ -90,16 +90,16 @@ type deleteTableResponse struct {
 // Fields related to on_demand_throughput, GSI updates, stream changes, etc. are accepted
 // but treated as no-ops (CloudMock is always ACTIVE and doesn't enforce capacity limits).
 type updateTableRequest struct {
-	TableName                  string                 `json:"TableName"`
-	BillingMode                string                 `json:"BillingMode,omitempty"`
-	ProvisionedThroughput      *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
-	AttributeDefinitions       []AttributeDefinition  `json:"AttributeDefinitions,omitempty"`
+	TableName             string                 `json:"TableName"`
+	BillingMode           string                 `json:"BillingMode,omitempty"`
+	ProvisionedThroughput *ProvisionedThroughput `json:"ProvisionedThroughput,omitempty"`
+	AttributeDefinitions  []AttributeDefinition  `json:"AttributeDefinitions,omitempty"`
 	// The following fields are parsed but largely ignored — CloudMock stays ACTIVE.
-	GlobalSecondaryIndexUpdates []any                 `json:"GlobalSecondaryIndexUpdates,omitempty"`
-	StreamSpecification         *StreamSpecification  `json:"StreamSpecification,omitempty"`
-	OnDemandThroughput          map[string]any        `json:"OnDemandThroughput,omitempty"`
-	TableClass                  string                `json:"TableClass,omitempty"`
-	DeletionProtectionEnabled   *bool                 `json:"DeletionProtectionEnabled,omitempty"`
+	GlobalSecondaryIndexUpdates []any                `json:"GlobalSecondaryIndexUpdates,omitempty"`
+	StreamSpecification         *StreamSpecification `json:"StreamSpecification,omitempty"`
+	OnDemandThroughput          map[string]any       `json:"OnDemandThroughput,omitempty"`
+	TableClass                  string               `json:"TableClass,omitempty"`
+	DeletionProtectionEnabled   *bool                `json:"DeletionProtectionEnabled,omitempty"`
 }
 
 type updateTableResponse struct {
@@ -172,12 +172,12 @@ type deleteItemRequest struct {
 }
 
 type updateItemRequest struct {
-	TableName                 string                     `json:"TableName"`
-	Key                       Item                       `json:"Key"`
-	UpdateExpression          string                     `json:"UpdateExpression"`
-	ExpressionAttributeNames  map[string]string          `json:"ExpressionAttributeNames"`
-	ExpressionAttributeValues map[string]AttributeValue  `json:"ExpressionAttributeValues"`
-	ReturnValues              string                     `json:"ReturnValues"`
+	TableName                 string                    `json:"TableName"`
+	Key                       Item                      `json:"Key"`
+	UpdateExpression          string                    `json:"UpdateExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+	ReturnValues              string                    `json:"ReturnValues"`
 }
 
 type updateItemResponse struct {
@@ -185,15 +185,15 @@ type updateItemResponse struct {
 }
 
 type queryRequest struct {
-	TableName                 string                     `json:"TableName"`
-	IndexName                 string                     `json:"IndexName"`
-	KeyConditionExpression    string                     `json:"KeyConditionExpression"`
-	FilterExpression          string                     `json:"FilterExpression"`
-	ProjectionExpression      string                     `json:"ProjectionExpression"`
-	ExpressionAttributeNames  map[string]string          `json:"ExpressionAttributeNames"`
-	ExpressionAttributeValues map[string]AttributeValue  `json:"ExpressionAttributeValues"`
-	ScanIndexForward          *bool                      `json:"ScanIndexForward"`
-	Limit                     int                        `json:"Limit"`
+	TableName                 string                    `json:"TableName"`
+	IndexName                 string                    `json:"IndexName"`
+	KeyConditionExpression    string                    `json:"KeyConditionExpression"`
+	FilterExpression          string                    `json:"FilterExpression"`
+	ProjectionExpression      string                    `json:"ProjectionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+	ScanIndexForward          *bool                     `json:"ScanIndexForward"`
+	Limit                     int                       `json:"Limit"`
 }
 
 type queryResponse struct {
@@ -203,12 +203,12 @@ type queryResponse struct {
 }
 
 type scanRequest struct {
-	TableName                 string                     `json:"TableName"`
-	FilterExpression          string                     `json:"FilterExpression"`
-	ProjectionExpression      string                     `json:"ProjectionExpression"`
-	ExpressionAttributeNames  map[string]string          `json:"ExpressionAttributeNames"`
-	ExpressionAttributeValues map[string]AttributeValue  `json:"ExpressionAttributeValues"`
-	Limit                     int                        `json:"Limit"`
+	TableName                 string                    `json:"TableName"`
+	FilterExpression          string                    `json:"FilterExpression"`
+	ProjectionExpression      string                    `json:"ProjectionExpression"`
+	ExpressionAttributeNames  map[string]string         `json:"ExpressionAttributeNames"`
+	ExpressionAttributeValues map[string]AttributeValue `json:"ExpressionAttributeValues"`
+	Limit                     int                       `json:"Limit"`
 }
 
 type scanResponse struct {
@@ -228,8 +228,8 @@ type batchGetTableRequest struct {
 }
 
 type batchGetItemResponse struct {
-	Responses        map[string][]Item                    `json:"Responses"`
-	UnprocessedKeys  map[string]batchGetTableRequest      `json:"UnprocessedKeys"`
+	Responses       map[string][]Item               `json:"Responses"`
+	UnprocessedKeys map[string]batchGetTableRequest `json:"UnprocessedKeys"`
 }
 
 type batchWriteItemRequest struct {
@@ -799,8 +799,8 @@ func handleDeleteResourcePolicy(ctx *service.RequestContext, store *TableStore) 
 // continuousBackupsDescription is the response body for DescribeContinuousBackups.
 // CloudMock always reports PITR as disabled and backups as ENABLED (available).
 type continuousBackupsDescription struct {
-	ContinuousBackupsStatus          string `json:"ContinuousBackupsStatus"`
-	PointInTimeRecoveryDescription   struct {
+	ContinuousBackupsStatus        string `json:"ContinuousBackupsStatus"`
+	PointInTimeRecoveryDescription struct {
 		PointInTimeRecoveryStatus string `json:"PointInTimeRecoveryStatus"`
 	} `json:"PointInTimeRecoveryDescription"`
 }
@@ -814,7 +814,7 @@ type describeContinuousBackupsResponse struct {
 }
 
 type updateContinuousBackupsRequest struct {
-	TableName                  string `json:"TableName"`
+	TableName                        string `json:"TableName"`
 	PointInTimeRecoverySpecification struct {
 		PointInTimeRecoveryEnabled bool `json:"PointInTimeRecoveryEnabled"`
 	} `json:"PointInTimeRecoverySpecification"`

@@ -80,10 +80,10 @@ type Table struct {
 	count      atomic.Int64
 
 	// --- Backward-compat shims for store.go / handlers.go (Task 4 removes these) ---
-	Items    []Item            // Deprecated: kept for store.go compatibility
-	ItemCount int64            // Deprecated: kept for handlers.go compatibility
-	GSIItems map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
-	LSIItems map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
+	Items     []Item            // Deprecated: kept for store.go compatibility
+	ItemCount int64             // Deprecated: kept for handlers.go compatibility
+	GSIItems  map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
+	LSIItems  map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
 }
 
 // initPartitions initializes the partition-based storage for a table.

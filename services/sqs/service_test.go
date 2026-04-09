@@ -339,10 +339,10 @@ func TestSQS_FIFOQueue(t *testing.T) {
 	// Send a message with a deduplication ID.
 	ws := httptest.NewRecorder()
 	handler.ServeHTTP(ws, sqsReq(t, "SendMessage", url.Values{
-		"QueueUrl":                {queueURL},
-		"MessageBody":             {"fifo message"},
-		"MessageGroupId":          {"group-1"},
-		"MessageDeduplicationId":  {"dedup-1"},
+		"QueueUrl":               {queueURL},
+		"MessageBody":            {"fifo message"},
+		"MessageGroupId":         {"group-1"},
+		"MessageDeduplicationId": {"dedup-1"},
 	}))
 	if ws.Code != http.StatusOK {
 		t.Fatalf("SendMessage FIFO: %d %s", ws.Code, ws.Body.String())
@@ -463,13 +463,13 @@ func TestSQS_BatchOperations(t *testing.T) {
 	// SendMessageBatch with 3 entries.
 	wb := httptest.NewRecorder()
 	handler.ServeHTTP(wb, sqsReq(t, "SendMessageBatch", url.Values{
-		"QueueUrl":                                    {queueURL},
-		"SendMessageBatchRequestEntry.1.Id":           {"msg1"},
-		"SendMessageBatchRequestEntry.1.MessageBody":  {"body one"},
-		"SendMessageBatchRequestEntry.2.Id":           {"msg2"},
-		"SendMessageBatchRequestEntry.2.MessageBody":  {"body two"},
-		"SendMessageBatchRequestEntry.3.Id":           {"msg3"},
-		"SendMessageBatchRequestEntry.3.MessageBody":  {"body three"},
+		"QueueUrl":                                   {queueURL},
+		"SendMessageBatchRequestEntry.1.Id":          {"msg1"},
+		"SendMessageBatchRequestEntry.1.MessageBody": {"body one"},
+		"SendMessageBatchRequestEntry.2.Id":          {"msg2"},
+		"SendMessageBatchRequestEntry.2.MessageBody": {"body two"},
+		"SendMessageBatchRequestEntry.3.Id":          {"msg3"},
+		"SendMessageBatchRequestEntry.3.MessageBody": {"body three"},
 	}))
 	if wb.Code != http.StatusOK {
 		t.Fatalf("SendMessageBatch: expected 200, got %d\nbody: %s", wb.Code, wb.Body.String())
@@ -518,13 +518,13 @@ func TestSQS_BatchOperations(t *testing.T) {
 
 	// Build the batch delete request manually to avoid the above awkward code.
 	delVals := url.Values{
-		"QueueUrl":                                         {queueURL},
-		"DeleteMessageBatchRequestEntry.1.Id":              {"del1"},
-		"DeleteMessageBatchRequestEntry.1.ReceiptHandle":   {recvResp.Result.Messages[0].ReceiptHandle},
-		"DeleteMessageBatchRequestEntry.2.Id":              {"del2"},
-		"DeleteMessageBatchRequestEntry.2.ReceiptHandle":   {recvResp.Result.Messages[1].ReceiptHandle},
-		"DeleteMessageBatchRequestEntry.3.Id":              {"del3"},
-		"DeleteMessageBatchRequestEntry.3.ReceiptHandle":   {recvResp.Result.Messages[2].ReceiptHandle},
+		"QueueUrl":                                       {queueURL},
+		"DeleteMessageBatchRequestEntry.1.Id":            {"del1"},
+		"DeleteMessageBatchRequestEntry.1.ReceiptHandle": {recvResp.Result.Messages[0].ReceiptHandle},
+		"DeleteMessageBatchRequestEntry.2.Id":            {"del2"},
+		"DeleteMessageBatchRequestEntry.2.ReceiptHandle": {recvResp.Result.Messages[1].ReceiptHandle},
+		"DeleteMessageBatchRequestEntry.3.Id":            {"del3"},
+		"DeleteMessageBatchRequestEntry.3.ReceiptHandle": {recvResp.Result.Messages[2].ReceiptHandle},
 	}
 	wdel := httptest.NewRecorder()
 	handler.ServeHTTP(wdel, sqsReq(t, "DeleteMessageBatch", delVals))
@@ -1101,15 +1101,15 @@ func TestSQS_SendMessageBatch_FIFODedup(t *testing.T) {
 	// Send a batch with two entries having the same dedup ID.
 	wb := httptest.NewRecorder()
 	handler.ServeHTTP(wb, sqsReq(t, "SendMessageBatch", url.Values{
-		"QueueUrl":                                                       {queueURL},
-		"SendMessageBatchRequestEntry.1.Id":                              {"entry1"},
-		"SendMessageBatchRequestEntry.1.MessageBody":                     {"body one"},
-		"SendMessageBatchRequestEntry.1.MessageGroupId":                  {"grp"},
-		"SendMessageBatchRequestEntry.1.MessageDeduplicationId":          {"same-dedup"},
-		"SendMessageBatchRequestEntry.2.Id":                              {"entry2"},
-		"SendMessageBatchRequestEntry.2.MessageBody":                     {"body two different"},
-		"SendMessageBatchRequestEntry.2.MessageGroupId":                  {"grp"},
-		"SendMessageBatchRequestEntry.2.MessageDeduplicationId":          {"same-dedup"},
+		"QueueUrl":                                              {queueURL},
+		"SendMessageBatchRequestEntry.1.Id":                     {"entry1"},
+		"SendMessageBatchRequestEntry.1.MessageBody":            {"body one"},
+		"SendMessageBatchRequestEntry.1.MessageGroupId":         {"grp"},
+		"SendMessageBatchRequestEntry.1.MessageDeduplicationId": {"same-dedup"},
+		"SendMessageBatchRequestEntry.2.Id":                     {"entry2"},
+		"SendMessageBatchRequestEntry.2.MessageBody":            {"body two different"},
+		"SendMessageBatchRequestEntry.2.MessageGroupId":         {"grp"},
+		"SendMessageBatchRequestEntry.2.MessageDeduplicationId": {"same-dedup"},
 	}))
 	if wb.Code != http.StatusOK {
 		t.Fatalf("SendMessageBatch FIFO dedup: %d %s", wb.Code, wb.Body.String())
@@ -1205,11 +1205,11 @@ func TestSQS_SendMessageWithAttributes(t *testing.T) {
 
 	ws := httptest.NewRecorder()
 	handler.ServeHTTP(ws, sqsReq(t, "SendMessage", url.Values{
-		"QueueUrl":                              {queueURL},
-		"MessageBody":                           {"body with attrs"},
-		"MessageAttribute.1.Name":               {"CustomAttr"},
-		"MessageAttribute.1.Value.DataType":     {"String"},
-		"MessageAttribute.1.Value.StringValue":  {"custom-value"},
+		"QueueUrl":                             {queueURL},
+		"MessageBody":                          {"body with attrs"},
+		"MessageAttribute.1.Name":              {"CustomAttr"},
+		"MessageAttribute.1.Value.DataType":    {"String"},
+		"MessageAttribute.1.Value.StringValue": {"custom-value"},
 	}))
 	if ws.Code != http.StatusOK {
 		t.Fatalf("SendMessage with attrs: %d %s", ws.Code, ws.Body.String())

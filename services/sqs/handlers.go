@@ -20,9 +20,9 @@ type xmlResponseMetadata struct {
 // ---- CreateQueue ----
 
 type xmlCreateQueueResponse struct {
-	XMLName xml.Name              `xml:"CreateQueueResponse"`
-	Result  xmlCreateQueueResult  `xml:"CreateQueueResult"`
-	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+	XMLName xml.Name             `xml:"CreateQueueResponse"`
+	Result  xmlCreateQueueResult `xml:"CreateQueueResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
 }
 
 type xmlCreateQueueResult struct {
@@ -73,9 +73,9 @@ func handleDeleteQueue(ctx *service.RequestContext, store *QueueStore) (*service
 // ---- ListQueues ----
 
 type xmlListQueuesResponse struct {
-	XMLName xml.Name              `xml:"ListQueuesResponse"`
-	Result  xmlListQueuesResult   `xml:"ListQueuesResult"`
-	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+	XMLName xml.Name            `xml:"ListQueuesResponse"`
+	Result  xmlListQueuesResult `xml:"ListQueuesResult"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
 }
 
 type xmlListQueuesResult struct {
@@ -98,9 +98,9 @@ func handleListQueues(ctx *service.RequestContext, store *QueueStore) (*service.
 // ---- GetQueueUrl ----
 
 type xmlGetQueueUrlResponse struct {
-	XMLName xml.Name              `xml:"GetQueueUrlResponse"`
-	Result  xmlGetQueueUrlResult  `xml:"GetQueueUrlResult"`
-	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+	XMLName xml.Name             `xml:"GetQueueUrlResponse"`
+	Result  xmlGetQueueUrlResult `xml:"GetQueueUrlResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
 }
 
 type xmlGetQueueUrlResult struct {
@@ -130,9 +130,9 @@ func handleGetQueueUrl(ctx *service.RequestContext, store *QueueStore) (*service
 // ---- GetQueueAttributes ----
 
 type xmlGetQueueAttributesResponse struct {
-	XMLName xml.Name                     `xml:"GetQueueAttributesResponse"`
-	Result  xmlGetQueueAttributesResult  `xml:"GetQueueAttributesResult"`
-	Meta    xmlResponseMetadata          `xml:"ResponseMetadata"`
+	XMLName xml.Name                    `xml:"GetQueueAttributesResponse"`
+	Result  xmlGetQueueAttributesResult `xml:"GetQueueAttributesResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
 }
 
 type xmlGetQueueAttributesResult struct {
@@ -239,9 +239,9 @@ func handleSetQueueAttributes(ctx *service.RequestContext, store *QueueStore) (*
 // ---- SendMessage ----
 
 type xmlSendMessageResponse struct {
-	XMLName xml.Name              `xml:"SendMessageResponse"`
-	Result  xmlSendMessageResult  `xml:"SendMessageResult"`
-	Meta    xmlResponseMetadata   `xml:"ResponseMetadata"`
+	XMLName xml.Name             `xml:"SendMessageResponse"`
+	Result  xmlSendMessageResult `xml:"SendMessageResult"`
+	Meta    xmlResponseMetadata  `xml:"ResponseMetadata"`
 }
 
 type xmlSendMessageResult struct {
@@ -308,11 +308,11 @@ type xmlReceiveMessageResult struct {
 }
 
 type xmlMessage struct {
-	MessageId     string              `xml:"MessageId"`
-	ReceiptHandle string              `xml:"ReceiptHandle"`
-	MD5OfBody     string              `xml:"MD5OfBody"`
-	Body          string              `xml:"Body"`
-	Attributes    []xmlAttribute      `xml:"Attribute,omitempty"`
+	MessageId     string         `xml:"MessageId"`
+	ReceiptHandle string         `xml:"ReceiptHandle"`
+	MD5OfBody     string         `xml:"MD5OfBody"`
+	Body          string         `xml:"Body"`
+	Attributes    []xmlAttribute `xml:"Attribute,omitempty"`
 }
 
 func handleReceiveMessage(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
@@ -484,9 +484,9 @@ func handleChangeMessageVisibility(ctx *service.RequestContext, store *QueueStor
 // ---- SendMessageBatch ----
 
 type xmlSendMessageBatchResponse struct {
-	XMLName xml.Name                       `xml:"SendMessageBatchResponse"`
-	Result  xmlSendMessageBatchResult      `xml:"SendMessageBatchResult"`
-	Meta    xmlResponseMetadata            `xml:"ResponseMetadata"`
+	XMLName xml.Name                  `xml:"SendMessageBatchResponse"`
+	Result  xmlSendMessageBatchResult `xml:"SendMessageBatchResult"`
+	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
 }
 
 type xmlSendMessageBatchResult struct {
@@ -567,9 +567,9 @@ func handleSendMessageBatch(ctx *service.RequestContext, store *QueueStore) (*se
 // ---- DeleteMessageBatch ----
 
 type xmlDeleteMessageBatchResponse struct {
-	XMLName xml.Name                       `xml:"DeleteMessageBatchResponse"`
-	Result  xmlDeleteMessageBatchResult    `xml:"DeleteMessageBatchResult"`
-	Meta    xmlResponseMetadata            `xml:"ResponseMetadata"`
+	XMLName xml.Name                    `xml:"DeleteMessageBatchResponse"`
+	Result  xmlDeleteMessageBatchResult `xml:"DeleteMessageBatchResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
 }
 
 type xmlDeleteMessageBatchResult struct {

@@ -26,7 +26,7 @@ type FIFOQueue struct {
 	groups     map[string]*messageGroup // groupID -> group
 	groupOrder []string                 // insertion order of group IDs for round-robin
 
-	inflight map[string]*Message          // receiptHandle -> message
+	inflight map[string]*Message // receiptHandle -> message
 	visHeap  *collections.MinHeap[time.Time, *inflightEntry]
 
 	// Dedup: dedupID -> expiry time
@@ -52,12 +52,12 @@ func NewFIFOQueue(name, url string, attrs map[string]string) *FIFOQueue {
 	}
 
 	defaults := map[string]string{
-		"VisibilityTimeout":            "30",
-		"MessageRetentionPeriod":       "345600",
-		"MaximumMessageSize":           "262144",
-		"DelaySeconds":                 "0",
+		"VisibilityTimeout":             "30",
+		"MessageRetentionPeriod":        "345600",
+		"MaximumMessageSize":            "262144",
+		"DelaySeconds":                  "0",
 		"ReceiveMessageWaitTimeSeconds": "0",
-		"FifoQueue":                    "true",
+		"FifoQueue":                     "true",
 	}
 	for k, v := range defaults {
 		if _, ok := attrs[k]; !ok {
@@ -89,9 +89,9 @@ func NewFIFOQueue(name, url string, attrs map[string]string) *FIFOQueue {
 	return q
 }
 
-func (q *FIFOQueue) QueueName() string   { return q.name }
-func (q *FIFOQueue) QueueURL() string    { return q.url }
-func (q *FIFOQueue) IsFIFOQueue() bool   { return true }
+func (q *FIFOQueue) QueueName() string { return q.name }
+func (q *FIFOQueue) QueueURL() string  { return q.url }
+func (q *FIFOQueue) IsFIFOQueue() bool { return true }
 
 func (q *FIFOQueue) GetAttributes() map[string]string {
 	q.mu.Lock()

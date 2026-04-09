@@ -131,11 +131,11 @@ client := dynamodb.NewFromConfig(cfg) // 43ns per GetItem, 0 allocs
 
 How much wait time CloudMock eliminates vs LocalStack (20-25 test runs/day, 6 min saved per run):
 
-| Team Size | Per Dev / Day | Per Dev / Year | Team / Year |
-|---|---|---|---|
-| 10 devs | 2.25 hrs | 562 hrs | **5,625 hrs** |
-| 50 devs | 2.25 hrs | 562 hrs | **28,125 hrs** |
-| 200 devs | 2.25 hrs | 562 hrs | **112,500 hrs** |
+| | Per Day | Per Year |
+|---|---|---|
+| **1 developer** | **2.25 hrs saved** | **562 hrs saved** |
+| Team of 10 | 22.5 hrs | 5,625 hrs |
+| Team of 50 | 112.5 hrs | 28,125 hrs |
 
 At 0.5ms per operation, tests feel instant. No context switching, no waiting, no tab-switching while your suite runs.
 

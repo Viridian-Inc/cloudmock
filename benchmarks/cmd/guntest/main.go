@@ -21,11 +21,17 @@ import (
 	"time"
 )
 
-var getItemReq = "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/dynamodb/aws4_request\r\nX-Amz-Target: DynamoDB_20120810.GetItem\r\nContent-Type: application/x-amz-json-1.0\r\nContent-Length: 48\r\nConnection: keep-alive\r\n\r\n" +
-	`{"TableName":"gun","Key":{"pk":{"S":"key-50"}}}`
+// buildDDBReq assembles a raw HTTP/1.1 DynamoDB request with a correctly
+// computed Content-Length header. Hardcoded Content-Length values drift
+// whenever the body literal changes; a mismatch causes fasthttp to block
+// waiting for the missing byte, hanging every request.
+func buildDDBReq(target, body string) string {
+	return "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/dynamodb/aws4_request\r\nX-Amz-Target: " + target + "\r\nContent-Type: application/x-amz-json-1.0\r\nContent-Length: " + strconv.Itoa(len(body)) + "\r\nConnection: keep-alive\r\n\r\n" + body
+}
 
-var putItemReq = "POST / HTTP/1.1\r\nHost: localhost\r\nAuthorization: AWS4-HMAC-SHA256 Credential=test/20260408/us-east-1/dynamodb/aws4_request\r\nX-Amz-Target: DynamoDB_20120810.PutItem\r\nContent-Type: application/x-amz-json-1.0\r\nContent-Length: 64\r\nConnection: keep-alive\r\n\r\n" +
-	`{"TableName":"gun","Item":{"pk":{"S":"k"},"d":{"S":"v"}}}`
+var getItemReq = buildDDBReq("DynamoDB_20120810.GetItem", `{"TableName":"gun","Key":{"pk":{"S":"key-50"}}}`)
+
+var putItemReq = buildDDBReq("DynamoDB_20120810.PutItem", `{"TableName":"gun","Item":{"pk":{"S":"k"},"d":{"S":"v"}}}`)
 
 func sqsSendReq(addr string) string {
 	body := "Action=SendMessage&QueueUrl=http://" + addr + "/123456789012/gun-queue&MessageBody=hello"

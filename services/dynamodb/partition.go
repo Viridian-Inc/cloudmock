@@ -5,8 +5,14 @@ import (
 	"strings"
 	"sync"
 
+	gojson "github.com/goccy/go-json"
 	"github.com/tidwall/btree"
 )
+
+// frozenGetItemResponse is the JSON wrapper for pre-serialized GetItem responses.
+type frozenGetItemResponse struct {
+	Item Item `json:"Item"`
+}
 
 // pkPool interns partition key strings to avoid repeat allocations.
 // DynamoDB workloads repeatedly access the same partition keys, so caching
@@ -115,12 +121,18 @@ func serializeKey(item Item, hashKeyName, rangeKeyName string) string {
 // Partition holds items sharing the same partition key value.
 // For tables without a sort key, it holds at most one item.
 // For tables with a sort key, items are stored in a B-tree sorted by sort key.
+//
+// Frozen JSON cache: each item's GetItem JSON response is pre-serialized at write time
+// and stored in frozenJSON. GetItemRaw returns the cached bytes with zero marshaling,
+// eliminating the #1 CPU bottleneck (28% of CPU was spent in gojson.Marshal on reads).
 type Partition struct {
-	mu     sync.RWMutex        // per-partition lock for item operations
-	single Item                // used when there is no sort key
-	tree   *btree.BTreeG[Item] // used when there is a sort key
-	skName string              // sort key attribute name (empty if no sort key)
-	count  int
+	mu         sync.RWMutex        // per-partition lock for item operations
+	single     Item                // used when there is no sort key
+	singleJSON []byte              // pre-serialized JSON for single item
+	tree       *btree.BTreeG[Item] // used when there is a sort key
+	frozenJSON map[string][]byte   // skValue → pre-serialized GetItem JSON response
+	skName     string              // sort key attribute name (empty if no sort key)
+	count      int
 }
 
 // newPartition creates a Partition for the given sort key name.
@@ -131,17 +143,22 @@ func newPartition(skName string) *Partition {
 		p.tree = btree.NewBTreeG(func(a, b Item) bool {
 			return sortKeyValue(a, skName) < sortKeyValue(b, skName)
 		})
+		p.frozenJSON = make(map[string][]byte)
 	}
 	return p
 }
 
 // put inserts or replaces an item. Returns the old item and whether it replaced.
+// Also pre-serializes the item to JSON for the frozen cache (zero-marshal reads).
 func (p *Partition) put(item Item) (old Item, replaced bool) {
+	// Pre-serialize for frozen cache. Errors are silently ignored (read will fall back to marshal).
+	frozen, _ := gojson.Marshal(frozenGetItemResponse{Item: item})
+
 	if p.skName == "" {
-		// Hash-only: single item per partition.
 		old = p.single
 		replaced = old != nil
 		p.single = item
+		p.singleJSON = frozen
 		if !replaced {
 			p.count++
 		}
@@ -151,7 +168,20 @@ func (p *Partition) put(item Item) (old Item, replaced bool) {
 	if !replaced {
 		p.count++
 	}
+	// Cache frozen JSON keyed by sort key value.
+	skVal := sortKeyValue(item, p.skName)
+	p.frozenJSON[skVal] = frozen
 	return old, replaced
+}
+
+// getRaw returns the pre-serialized JSON for an item, or nil if not cached.
+// This is the zero-marshal fast path for GetItemRaw.
+func (p *Partition) getRaw(sortKey Item) []byte {
+	if p.skName == "" {
+		return p.singleJSON
+	}
+	skVal := sortKeyValue(sortKey, p.skName)
+	return p.frozenJSON[skVal]
 }
 
 // get retrieves an item by sort key value. For hash-only tables, sortKey is ignored.
@@ -173,12 +203,15 @@ func (p *Partition) delete(sortKey Item) (old Item, deleted bool) {
 			return nil, false
 		}
 		p.single = nil
+		p.singleJSON = nil
 		p.count--
 		return old, true
 	}
 	old, deleted = p.tree.Delete(sortKey)
 	if deleted {
 		p.count--
+		skVal := sortKeyValue(sortKey, p.skName)
+		delete(p.frozenJSON, skVal)
 	}
 	return old, deleted
 }

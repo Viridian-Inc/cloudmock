@@ -328,12 +328,19 @@ func (s *TableStore) GetItemRaw(tableName string, key Item) ([]byte, *service.AW
 	}
 
 	part.mu.RLock()
+
+	// Fast path: return pre-serialized JSON from frozen cache (zero marshal).
+	if frozen := part.getRaw(key); frozen != nil {
+		part.mu.RUnlock()
+		return frozen, nil
+	}
+
+	// Fallback: item exists but no frozen cache (shouldn't happen, but safe).
 	item, ok := part.get(key)
 	if !ok {
 		part.mu.RUnlock()
 		return nil, nil
 	}
-	// Marshal while holding the lock — avoids copyItem allocation.
 	raw, _ := gojson.Marshal(getItemResponseRaw{Item: item})
 	part.mu.RUnlock()
 

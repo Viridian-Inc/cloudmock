@@ -2065,6 +2065,17 @@ func main() {
 			}
 		}()
 
+		// Unix domain socket for maximum throughput (bypasses TCP overhead).
+		if sockPath := os.Getenv("CLOUDMOCK_SOCK"); sockPath != "" {
+			os.Remove(sockPath) // clean up stale socket
+			go func() {
+				slog.Info("cloudmock unix socket listening", "path", sockPath)
+				if err := fastServer.ListenAndServeUNIX(sockPath, 0666); err != nil {
+					slog.Error("unix socket listener failed", "error", err)
+				}
+			}()
+		}
+
 		// Startup banner
 		fmt.Printf("\nCloudMock %s\n", version)
 		fmt.Printf("  Mode:       TEST (fasthttp, zero observability)\n")

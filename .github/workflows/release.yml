@@ -45,8 +45,12 @@ jobs:
           name: devtools-dist
           path: pkg/dashboard/dist/
       - name: Build binary
+        env:
+          TAG_NAME: ${{ github.ref_name }}
         run: |
-          CGO_ENABLED=1 go build -ldflags="-s -w" \
+          VERSION="${TAG_NAME#v}"
+          CGO_ENABLED=1 go build \
+            -ldflags="-s -w -X main.version=${VERSION}" \
             -o cloudmock-${{ matrix.goos }}-${{ matrix.goarch }} \
             ./cmd/gateway
       - uses: actions/upload-artifact@v4
@@ -132,24 +136,59 @@ jobs:
           git push
 
   publish-npm:
-    needs: release
+    # Runs after update-homebrew so commit-back to main is serialized
+    # with the homebrew bump (avoids concurrent `git push` races).
+    needs: update-homebrew
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      - name: Publish npm package
+      - name: Bump cloudmock npm package to release version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          cd npm/cloudmock
+          npm version "$VERSION" --no-git-tag-version --allow-same-version
+      - name: Publish cloudmock to npm
         run: cd npm/cloudmock && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Commit version bump back to main
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add npm/cloudmock/package.json
+          git diff --cached --quiet || git commit -m "chore: bump cloudmock npm package to v${VERSION}"
+          git push
 
   publish-snap:
-    needs: release
+    # Runs after publish-npm so commit-back to main is serialized with
+    # the homebrew + npm bumps (avoids concurrent `git push` races).
+    needs: publish-npm
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Bump snapcraft.yaml to release version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          sed -i "s/^version: .*/version: '${VERSION}'/" snap/snapcraft.yaml
       - uses: snapcore/action-build@v1
         id: build
       - uses: snapcore/action-publish@v1
@@ -158,6 +197,16 @@ jobs:
         with:
           snap: ${{ steps.build.outputs.snap }}
           release: stable
+      - name: Commit version bump back to main
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          VERSION="${TAG_NAME#v}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add snap/snapcraft.yaml
+          git diff --cached --quiet || git commit -m "chore: bump snap version to v${VERSION}"
+          git push
 
   publish-docker:
     needs: build-binary

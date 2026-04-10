@@ -313,7 +313,10 @@ func buildIaCTopology(result *iac.IaCImportResult) ([]admin.TopologyNodeV2, []ad
 	return nodes, edges
 }
 
-const version = "1.5.3"
+// version is the release version embedded in the binary. It defaults to
+// "dev" for local builds and is overridden at release time by
+// `-ldflags="-X main.version=${VERSION}"` in .github/workflows/release.yml.
+var version = "dev"
 
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.

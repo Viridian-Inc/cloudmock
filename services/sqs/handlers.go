@@ -629,6 +629,120 @@ func handleDeleteMessageBatch(ctx *service.RequestContext, store *QueueStore) (*
 	return xmlOK(resp)
 }
 
+// ---- ListQueueTags ----
+
+type xmlListQueueTagsResponse struct {
+	XMLName xml.Name               `xml:"ListQueueTagsResponse"`
+	Result  xmlListQueueTagsResult `xml:"ListQueueTagsResult"`
+	Meta    xmlResponseMetadata    `xml:"ResponseMetadata"`
+}
+
+type xmlListQueueTagsResult struct {
+	Tags []xmlTag `xml:"Tag"`
+}
+
+type xmlTag struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
+}
+
+func handleListQueueTags(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	form := parseForm(ctx)
+	queueURL := resolveQueueURL(ctx, form, store)
+	if queueURL == "" {
+		return xmlErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(queueURL); !ok {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+
+	tags := store.GetTags(queueURL)
+	tagEntries := make([]xmlTag, 0, len(tags))
+	for k, v := range tags {
+		tagEntries = append(tagEntries, xmlTag{Key: k, Value: v})
+	}
+
+	resp := &xmlListQueueTagsResponse{
+		Result: xmlListQueueTagsResult{Tags: tagEntries},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	}
+	return xmlOK(resp)
+}
+
+// ---- TagQueue ----
+
+type xmlTagQueueResponse struct {
+	XMLName xml.Name            `xml:"TagQueueResponse"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleTagQueue(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	form := parseForm(ctx)
+	queueURL := resolveQueueURL(ctx, form, store)
+	if queueURL == "" {
+		return xmlErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(queueURL); !ok {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+
+	// AWS query protocol encodes tag maps as Tags.1.Key, Tags.1.Value,
+	// Tags.2.Key, Tags.2.Value, ... The tag count is not bounded by a
+	// header, so we walk the form looking for the highest Tags.N.Key.
+	tags := make(map[string]string)
+	for i := 1; ; i++ {
+		prefix := fmt.Sprintf("Tags.%d.", i)
+		key := form.Get(prefix + "Key")
+		if key == "" {
+			break
+		}
+		tags[key] = form.Get(prefix + "Value")
+	}
+	store.SetTags(queueURL, tags)
+
+	resp := &xmlTagQueueResponse{
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
+	}
+	return xmlOK(resp)
+}
+
+// ---- UntagQueue ----
+
+type xmlUntagQueueResponse struct {
+	XMLName xml.Name            `xml:"UntagQueueResponse"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+func handleUntagQueue(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	form := parseForm(ctx)
+	queueURL := resolveQueueURL(ctx, form, store)
+	if queueURL == "" {
+		return xmlErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(queueURL); !ok {
+		return xmlErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+
+	// AWS query protocol encodes tag-key lists as TagKeys.1, TagKeys.2, ...
+	var keys []string
+	for i := 1; ; i++ {
+		key := form.Get(fmt.Sprintf("TagKeys.%d", i))
+		if key == "" {
+			break
+		}
+		keys = append(keys, key)
+	}
+	store.RemoveTags(queueURL, keys)
+
+	resp := &xmlUntagQueueResponse{
+		Meta: xmlResponseMetadata{RequestID: newUUID()},
+	}
+	return xmlOK(resp)
+}
+
 // ---- helper functions ----
 
 // parseForm merges the query-string params and the form-encoded body into a

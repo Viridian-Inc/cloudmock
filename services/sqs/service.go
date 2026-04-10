@@ -39,6 +39,9 @@ func (s *SQSService) Actions() []service.Action {
 		{Name: "ChangeMessageVisibility", Method: http.MethodPost, IAMAction: "sqs:ChangeMessageVisibility"},
 		{Name: "SendMessageBatch", Method: http.MethodPost, IAMAction: "sqs:SendMessageBatch"},
 		{Name: "DeleteMessageBatch", Method: http.MethodPost, IAMAction: "sqs:DeleteMessageBatch"},
+		{Name: "ListQueueTags", Method: http.MethodPost, IAMAction: "sqs:ListQueueTags"},
+		{Name: "TagQueue", Method: http.MethodPost, IAMAction: "sqs:TagQueue"},
+		{Name: "UntagQueue", Method: http.MethodPost, IAMAction: "sqs:UntagQueue"},
 	}
 }
 
@@ -169,6 +172,12 @@ func (s *SQSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleSendMessageBatch(ctx, s.store)
 	case "DeleteMessageBatch":
 		return handleDeleteMessageBatch(ctx, s.store)
+	case "ListQueueTags":
+		return handleListQueueTags(ctx, s.store)
+	case "TagQueue":
+		return handleTagQueue(ctx, s.store)
+	case "UntagQueue":
+		return handleUntagQueue(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

@@ -14,6 +14,7 @@ type QueueStore struct {
 	byURL     map[string]Queue
 	byName    map[string]Queue
 	byARN     map[string]Queue
+	tags      map[string]map[string]string // queueURL -> tag key/value map
 	accountID string
 	region    string
 	port      int
@@ -32,9 +33,63 @@ func NewStore(accountID, region string) *QueueStore {
 		byURL:     make(map[string]Queue),
 		byName:    make(map[string]Queue),
 		byARN:     make(map[string]Queue),
+		tags:      make(map[string]map[string]string),
 		accountID: accountID,
 		region:    region,
 		port:      port,
+	}
+}
+
+// GetTags returns a copy of the tag map for the given queue URL. Returns
+// an empty (non-nil) map if the queue has no tags or if the queue does
+// not exist.
+func (s *QueueStore) GetTags(queueURL string) map[string]string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	src := s.tags[queueURL]
+	out := make(map[string]string, len(src))
+	for k, v := range src {
+		out[k] = v
+	}
+	return out
+}
+
+// SetTags merges the given tag map into the queue's existing tags.
+// Existing keys are overwritten. No effect if the queue does not exist
+// in byURL. This mirrors AWS SQS TagQueue semantics.
+func (s *QueueStore) SetTags(queueURL string, tags map[string]string) {
+	if len(tags) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if _, ok := s.byURL[queueURL]; !ok {
+		return
+	}
+	existing := s.tags[queueURL]
+	if existing == nil {
+		existing = make(map[string]string, len(tags))
+		s.tags[queueURL] = existing
+	}
+	for k, v := range tags {
+		existing[k] = v
+	}
+}
+
+// RemoveTags deletes the named tag keys from the queue.
+// No-op for unknown queues or unknown keys.
+func (s *QueueStore) RemoveTags(queueURL string, keys []string) {
+	if len(keys) == 0 {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	existing, ok := s.tags[queueURL]
+	if !ok {
+		return
+	}
+	for _, k := range keys {
+		delete(existing, k)
 	}
 }
 
@@ -121,6 +176,7 @@ func (s *QueueStore) DeleteQueue(url string) bool {
 	delete(s.byURL, url)
 	delete(s.byName, name)
 	delete(s.byARN, arn)
+	delete(s.tags, url)
 	return true
 }
 

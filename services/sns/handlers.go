@@ -613,6 +613,49 @@ func jsonEscape(s string) string {
 	return b.String()
 }
 
+// ---- ListTagsForResource ----
+
+type xmlListTagsForResourceResponse struct {
+	XMLName xml.Name                    `xml:"ListTagsForResourceResponse"`
+	Xmlns   string                      `xml:"xmlns,attr"`
+	Result  xmlListTagsForResourceResult `xml:"ListTagsForResourceResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+type xmlListTagsForResourceResult struct {
+	Tags []xmlTagEntry `xml:"Tags>member"`
+}
+
+type xmlTagEntry struct {
+	Key   string `xml:"Key"`
+	Value string `xml:"Value"`
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	form := parseForm(ctx)
+	resourceArn := form.Get("ResourceArn")
+	if resourceArn == "" {
+		return xmlErr(service.ErrValidation("ResourceArn is required."))
+	}
+
+	tags, ok := store.ListTagsForResource(resourceArn)
+	if !ok {
+		return xmlErr(service.NewAWSError("NotFound",
+			"Resource does not exist.", http.StatusNotFound))
+	}
+
+	entries := make([]xmlTagEntry, 0, len(tags))
+	for k, v := range tags {
+		entries = append(entries, xmlTagEntry{Key: k, Value: v})
+	}
+
+	return xmlOK(&xmlListTagsForResourceResponse{
+		Xmlns:  snsXmlns,
+		Result: xmlListTagsForResourceResult{Tags: entries},
+		Meta:   xmlResponseMetadata{RequestID: newUUID()},
+	})
+}
+
 // ---- TagResource ----
 
 type xmlTagResourceResponse struct {

@@ -39,6 +39,8 @@ func (s *SNSService) handleJSON(ctx *service.RequestContext) (*service.Response,
 		return jsonTagResource(ctx, s.store)
 	case "UntagResource":
 		return jsonUntagResource(ctx, s.store)
+	case "ListTagsForResource":
+		return jsonListTagsForResource(ctx, s.store)
 	default:
 		return snsJSONErr(service.NewAWSError("InvalidAction",
 			"The action "+action+" is not valid for this web service.",
@@ -445,4 +447,43 @@ func jsonUntagResource(ctx *service.RequestContext, store *Store) (*service.Resp
 	}
 
 	return snsJSONOK(map[string]any{})
+}
+
+// ---- ListTagsForResource ----
+
+type jsonListTagsForResourceInput struct {
+	ResourceArn string `json:"ResourceArn"`
+}
+
+type jsonListTagsForResourceTag struct {
+	Key   string `json:"Key"`
+	Value string `json:"Value"`
+}
+
+type jsonListTagsForResourceOutput struct {
+	Tags []jsonListTagsForResourceTag `json:"Tags"`
+}
+
+func jsonListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var input jsonListTagsForResourceInput
+	if err := snsParseJSONBody(ctx, &input); err != nil {
+		return snsJSONErr(service.ErrValidation("Invalid JSON: " + err.Error()))
+	}
+	if input.ResourceArn == "" {
+		return snsJSONErr(service.ErrValidation("ResourceArn is required."))
+	}
+
+	tags, ok := store.ListTagsForResource(input.ResourceArn)
+	if !ok {
+		return snsJSONErr(service.NewAWSError("NotFound",
+			"Resource does not exist.", http.StatusNotFound))
+	}
+
+	out := &jsonListTagsForResourceOutput{
+		Tags: make([]jsonListTagsForResourceTag, 0, len(tags)),
+	}
+	for k, v := range tags {
+		out.Tags = append(out.Tags, jsonListTagsForResourceTag{Key: k, Value: v})
+	}
+	return snsJSONOK(out)
 }

@@ -59,6 +59,7 @@ func (s *SNSService) Actions() []service.Action {
 		{Name: "Publish", Method: http.MethodPost, IAMAction: "sns:Publish"},
 		{Name: "TagResource", Method: http.MethodPost, IAMAction: "sns:TagResource"},
 		{Name: "UntagResource", Method: http.MethodPost, IAMAction: "sns:UntagResource"},
+		{Name: "ListTagsForResource", Method: http.MethodPost, IAMAction: "sns:ListTagsForResource"},
 	}
 }
 
@@ -196,6 +197,8 @@ func (s *SNSService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleTagResource(ctx, s.store)
 	case "UntagResource":
 		return handleUntagResource(ctx, s.store)
+	case "ListTagsForResource":
+		return handleListTagsForResource(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatXML},
 			service.NewAWSError("InvalidAction",

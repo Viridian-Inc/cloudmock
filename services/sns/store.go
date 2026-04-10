@@ -302,6 +302,22 @@ func (s *Store) Publish(topicArn, message, subject string, msgAttrs map[string]s
 	return msgID, true
 }
 
+// ListTagsForResource returns a copy of the tag map for a topic.
+// Returns false if the topic does not exist.
+func (s *Store) ListTagsForResource(topicArn string) (map[string]string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	t, ok := s.topics[topicArn]
+	if !ok {
+		return nil, false
+	}
+	out := make(map[string]string, len(t.Tags))
+	for k, v := range t.Tags {
+		out[k] = v
+	}
+	return out, true
+}
+
 // TagResource sets tags on a topic.
 func (s *Store) TagResource(topicArn string, tags map[string]string) bool {
 	s.mu.Lock()

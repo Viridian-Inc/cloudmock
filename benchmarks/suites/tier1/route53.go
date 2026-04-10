@@ -59,8 +59,14 @@ func (s *route53Suite) Operations() []harness.Operation {
 				if err != nil {
 					return nil, err
 				}
-				// clean up
-				client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: out.HostedZone.Id})
+				// Defensive cleanup: if the mock returns a malformed
+				// response where HostedZone is nil, skip cleanup rather
+				// than crash the whole harness with a nil deref. The
+				// Validate hook still reports this as a correctness
+				// failure for the operation.
+				if out != nil && out.HostedZone != nil && out.HostedZone.Id != nil {
+					client.DeleteHostedZone(ctx, &route53.DeleteHostedZoneInput{Id: out.HostedZone.Id})
+				}
 				return out, nil
 			},
 			Validate: func(resp any) []harness.Finding {

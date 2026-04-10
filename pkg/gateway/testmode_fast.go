@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"encoding/xml"
 	"net/http"
 	"net/url"
 	"sync"
@@ -190,8 +191,22 @@ func FastTestModeServer(identity *service.CallerIdentity, region, accountID stri
 			return
 		}
 
-		data, err := gojson.Marshal(resp.Body)
-		if err != nil {
+		// Marshal using the format the handler declared. Using
+		// gojson unconditionally here would ship JSON bytes with an
+		// "text/xml" Content-Type for every XML-protocol service
+		// (Route53, EC2, SNS, CloudFormation, S3, ...), which
+		// AWS SDKs silently parse into nil fields.
+		var (
+			data       []byte
+			marshalErr error
+		)
+		switch resp.Format {
+		case service.FormatXML:
+			data, marshalErr = xml.Marshal(resp.Body)
+		default:
+			data, marshalErr = gojson.Marshal(resp.Body)
+		}
+		if marshalErr != nil {
 			ctx.SetStatusCode(500)
 			return
 		}

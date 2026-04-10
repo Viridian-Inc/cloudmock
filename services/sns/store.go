@@ -2,6 +2,7 @@ package sns
 
 import (
 	"fmt"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -119,6 +120,71 @@ func (s *Store) GetTopic(arn string) (*Topic, bool) {
 	defer s.mu.RUnlock()
 	t, ok := s.topics[arn]
 	return t, ok
+}
+
+// GetTopicAttributes returns the full set of attributes AWS reports for
+// a topic: the explicit attributes stored on the topic plus synthesized
+// defaults (Policy, Owner, EffectiveDeliveryPolicy, subscription
+// counters). Callers should use this rather than reading t.Attributes
+// directly, because SDK clients (notably Terraform's aws provider)
+// unconditionally parse Policy as JSON and crash on an empty string.
+func (s *Store) GetTopicAttributes(arn string) (map[string]string, bool) {
+	s.mu.RLock()
+	t, ok := s.topics[arn]
+	if !ok {
+		s.mu.RUnlock()
+		return nil, false
+	}
+	// Count subscriptions by state for the SubscriptionsPending /
+	// SubscriptionsConfirmed counters. We only track confirmation state,
+	// so deleted is always reported as 0.
+	var confirmed, pending int
+	for _, sub := range t.Subscriptions {
+		if sub.ConfirmationWasAuthenticated {
+			confirmed++
+		} else {
+			pending++
+		}
+	}
+	name := t.Name
+	region := s.region
+	accountID := s.accountID
+	existing := make(map[string]string, len(t.Attributes))
+	for k, v := range t.Attributes {
+		existing[k] = v
+	}
+	s.mu.RUnlock()
+
+	out := make(map[string]string, len(existing)+8)
+	out["TopicArn"] = arn
+	out["Owner"] = accountID
+	out["SubscriptionsConfirmed"] = strconv.Itoa(confirmed)
+	out["SubscriptionsPending"] = strconv.Itoa(pending)
+	out["SubscriptionsDeleted"] = "0"
+	out["Policy"] = defaultTopicPolicy(region, accountID, name)
+	out["EffectiveDeliveryPolicy"] = defaultDeliveryPolicy()
+	if _, has := existing["DisplayName"]; !has {
+		out["DisplayName"] = name
+	}
+	// Explicit attributes (set via CreateTopic or SetTopicAttributes)
+	// override the synthesized defaults.
+	for k, v := range existing {
+		out[k] = v
+	}
+	return out, true
+}
+
+// defaultTopicPolicy returns the default resource-based policy AWS
+// attaches to a newly created SNS topic. It is a well-formed JSON
+// document so Terraform's aws provider can parse it successfully.
+func defaultTopicPolicy(region, accountID, topicName string) string {
+	return fmt.Sprintf(`{"Version":"2008-10-17","Id":"__default_policy_ID","Statement":[{"Sid":"__default_statement_ID","Effect":"Allow","Principal":{"AWS":"*"},"Action":["SNS:GetTopicAttributes","SNS:SetTopicAttributes","SNS:AddPermission","SNS:RemovePermission","SNS:DeleteTopic","SNS:Subscribe","SNS:ListSubscriptionsByTopic","SNS:Publish"],"Resource":"arn:aws:sns:%s:%s:%s","Condition":{"StringEquals":{"AWS:SourceOwner":"%s"}}}]}`,
+		region, accountID, topicName, accountID)
+}
+
+// defaultDeliveryPolicy returns the default SNS delivery policy JSON.
+func defaultDeliveryPolicy() string {
+	return `{"http":{"defaultHealthyRetryPolicy":{"minDelayTarget":20,"maxDelayTarget":20,"numRetries":3,"numMaxDelayRetries":0,"numNoDelayRetries":0,"numMinDelayRetries":0,"backoffFunction":"linear"},"disableSubscriptionOverrides":false}}`
 }
 
 // ListTopics returns all topic ARNs.

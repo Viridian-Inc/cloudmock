@@ -43,6 +43,12 @@ func (s *SQSService) handleJSON(ctx *service.RequestContext) (*service.Response,
 		return jsonSendMessageBatch(ctx, s.store)
 	case "DeleteMessageBatch":
 		return jsonDeleteMessageBatch(ctx, s.store)
+	case "ListQueueTags":
+		return jsonListQueueTags(ctx, s.store)
+	case "TagQueue":
+		return jsonTagQueue(ctx, s.store)
+	case "UntagQueue":
+		return jsonUntagQueue(ctx, s.store)
 	default:
 		return jsonErr(service.NewAWSError("InvalidAction",
 			"The action "+action+" is not valid for this web service.",
@@ -623,4 +629,80 @@ func jsonDeleteMessageBatch(ctx *service.RequestContext, store *QueueStore) (*se
 	}
 
 	return jsonOK(&jsonDeleteMessageBatchOutput{Successful: successful, Failed: failed})
+}
+
+// ---- ListQueueTags (JSON protocol) ----
+
+type jsonListQueueTagsInput struct {
+	QueueUrl string `json:"QueueUrl"`
+}
+
+type jsonListQueueTagsOutput struct {
+	Tags map[string]string `json:"Tags"`
+}
+
+func jsonListQueueTags(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	var input jsonListQueueTagsInput
+	if err := parseJSONBody(ctx, &input); err != nil {
+		return jsonErr(service.ErrValidation("Invalid JSON: " + err.Error()))
+	}
+	if input.QueueUrl == "" {
+		return jsonErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(input.QueueUrl); !ok {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+
+	tags := store.GetTags(input.QueueUrl)
+	if tags == nil {
+		tags = map[string]string{}
+	}
+	return jsonOK(&jsonListQueueTagsOutput{Tags: tags})
+}
+
+// ---- TagQueue (JSON protocol) ----
+
+type jsonTagQueueInput struct {
+	QueueUrl string            `json:"QueueUrl"`
+	Tags     map[string]string `json:"Tags"`
+}
+
+func jsonTagQueue(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	var input jsonTagQueueInput
+	if err := parseJSONBody(ctx, &input); err != nil {
+		return jsonErr(service.ErrValidation("Invalid JSON: " + err.Error()))
+	}
+	if input.QueueUrl == "" {
+		return jsonErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(input.QueueUrl); !ok {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+	store.SetTags(input.QueueUrl, input.Tags)
+	return jsonOK(map[string]any{})
+}
+
+// ---- UntagQueue (JSON protocol) ----
+
+type jsonUntagQueueInput struct {
+	QueueUrl string   `json:"QueueUrl"`
+	TagKeys  []string `json:"TagKeys"`
+}
+
+func jsonUntagQueue(ctx *service.RequestContext, store *QueueStore) (*service.Response, error) {
+	var input jsonUntagQueueInput
+	if err := parseJSONBody(ctx, &input); err != nil {
+		return jsonErr(service.ErrValidation("Invalid JSON: " + err.Error()))
+	}
+	if input.QueueUrl == "" {
+		return jsonErr(service.ErrValidation("QueueUrl is required."))
+	}
+	if _, ok := store.GetByURL(input.QueueUrl); !ok {
+		return jsonErr(service.NewAWSError("AWS.SimpleQueueService.NonExistentQueue",
+			"The specified queue does not exist.", http.StatusBadRequest))
+	}
+	store.RemoveTags(input.QueueUrl, input.TagKeys)
+	return jsonOK(map[string]any{})
 }

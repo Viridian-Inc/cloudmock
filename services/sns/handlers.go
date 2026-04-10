@@ -135,19 +135,14 @@ func handleGetTopicAttributes(ctx *service.RequestContext, store *Store) (*servi
 		return xmlErr(service.ErrValidation("TopicArn is required."))
 	}
 
-	t, ok := store.GetTopic(topicArn)
+	attrs, ok := store.GetTopicAttributes(topicArn)
 	if !ok {
 		return xmlErr(service.NewAWSError("NotFound",
 			"Topic does not exist.", http.StatusNotFound))
 	}
 
-	entries := make([]xmlAttributeEntry, 0, len(t.Attributes)+2)
-	// Always include TopicArn and DisplayName as standard attributes.
-	entries = append(entries, xmlAttributeEntry{Key: "TopicArn", Value: t.ARN})
-	if _, hasDisplay := t.Attributes["DisplayName"]; !hasDisplay {
-		entries = append(entries, xmlAttributeEntry{Key: "DisplayName", Value: t.Name})
-	}
-	for k, v := range t.Attributes {
+	entries := make([]xmlAttributeEntry, 0, len(attrs))
+	for k, v := range attrs {
 		entries = append(entries, xmlAttributeEntry{Key: k, Value: v})
 	}
 

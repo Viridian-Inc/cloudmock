@@ -179,19 +179,10 @@ func jsonGetTopicAttributes(ctx *service.RequestContext, store *Store) (*service
 		return snsJSONErr(service.ErrValidation("TopicArn is required."))
 	}
 
-	t, ok := store.GetTopic(input.TopicArn)
+	attrs, ok := store.GetTopicAttributes(input.TopicArn)
 	if !ok {
 		return snsJSONErr(service.NewAWSError("NotFound",
 			"Topic does not exist.", http.StatusNotFound))
-	}
-
-	attrs := make(map[string]string)
-	attrs["TopicArn"] = t.ARN
-	if _, hasDisplay := t.Attributes["DisplayName"]; !hasDisplay {
-		attrs["DisplayName"] = t.Name
-	}
-	for k, v := range t.Attributes {
-		attrs[k] = v
 	}
 
 	return snsJSONOK(&jsonGetTopicAttributesOutput{Attributes: attrs})

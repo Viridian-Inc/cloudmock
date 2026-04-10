@@ -1,6 +1,6 @@
 name: cloudmock
 base: core24
-version: '1.7.1'
+version: '1.7.2'
 summary: Local AWS emulation — 98 services, one binary, built-in devtools
 description: |
   CloudMock emulates 98 AWS services on your local machine. Point your AWS SDK

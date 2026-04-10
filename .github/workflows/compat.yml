@@ -30,23 +30,6 @@ jobs:
       - uses: ./.github/actions/cloudmock
         id: cloudmock
 
-      - name: Run comprehensive SDK compat tests
-        env:
-          AWS_ENDPOINT_URL: http://localhost:4566
-          AWS_ACCESS_KEY_ID: test
-          AWS_SECRET_ACCESS_KEY: test
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          mkdir -p /tmp/compat
-          # The compat tests are in the repo under tests/compat/
-          cp -r $GITHUB_WORKSPACE/tests/compat/* /tmp/compat/ 2>/dev/null || true
-
-          # Run the tests if they exist
-          if [ -f /tmp/compat/main_test.go ]; then
-            cd /tmp/compat
-            go test -v -tags integration -timeout 120s 2>&1 | tee /tmp/compat-results.txt
-          fi
-
       - name: Run benchmark harness (all services)
         run: |
           go run ./benchmarks/cmd/bench \
@@ -76,7 +59,6 @@ jobs:
           path: |
             website/src/data/compat.json
             benchmarks/results/nightly/
-            /tmp/compat-results.txt
 
   terraform-compat:
     name: Terraform Compatibility

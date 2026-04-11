@@ -124,10 +124,16 @@ jobs:
           SHA_LINUX_AMD64=$(shasum -a 256 dist/cloudmock-linux-amd64 | cut -d' ' -f1)
 
           sed -i "s/version \".*\"/version \"${VERSION}\"/" homebrew/cloudmock.rb
-          sed -i "s/RELEASE_SHA256_DARWIN_ARM64/${SHA_DARWIN_ARM64}/" homebrew/cloudmock.rb
-          sed -i "s/RELEASE_SHA256_DARWIN_AMD64/${SHA_DARWIN_AMD64}/" homebrew/cloudmock.rb
-          sed -i "s/RELEASE_SHA256_LINUX_ARM64/${SHA_LINUX_ARM64}/" homebrew/cloudmock.rb
-          sed -i "s/RELEASE_SHA256_LINUX_AMD64/${SHA_LINUX_AMD64}/" homebrew/cloudmock.rb
+          # Replace SHA on the line after each platform's URL. The old
+          # placeholder-based sed ("s/RELEASE_SHA256_.../...") silently
+          # did nothing because the formula has real hex SHAs from the
+          # previous release, not placeholder strings. Context-aware
+          # sed matches the URL line and substitutes the sha256 on the
+          # next line, regardless of what the current value is.
+          sed -i "/cloudmock-darwin-arm64/{n;s/sha256 \".*\"/sha256 \"${SHA_DARWIN_ARM64}\"/;}" homebrew/cloudmock.rb
+          sed -i "/cloudmock-darwin-amd64/{n;s/sha256 \".*\"/sha256 \"${SHA_DARWIN_AMD64}\"/;}" homebrew/cloudmock.rb
+          sed -i "/cloudmock-linux-arm64/{n;s/sha256 \".*\"/sha256 \"${SHA_LINUX_ARM64}\"/;}" homebrew/cloudmock.rb
+          sed -i "/cloudmock-linux-amd64/{n;s/sha256 \".*\"/sha256 \"${SHA_LINUX_AMD64}\"/;}" homebrew/cloudmock.rb
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

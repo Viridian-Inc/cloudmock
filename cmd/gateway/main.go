@@ -346,6 +346,23 @@ func main() {
 		}
 	}
 
+	// Auto-detect state/seed file from .cloudmock/ in the working
+	// directory. Teams can commit this directory to git so every
+	// developer starts with the same baseline. Prefers state.json
+	// (full snapshot) over seed-tables.json (seed data).
+	if *stateFile == "" {
+		for _, candidate := range []string{
+			".cloudmock/state.json",
+			".cloudmock/seed-tables.json",
+		} {
+			if _, err := os.Stat(candidate); err == nil {
+				*stateFile = candidate
+				slog.Info("auto-detected state file", "path", candidate)
+				break
+			}
+		}
+	}
+
 	var cfg *config.Config
 	var err error
 

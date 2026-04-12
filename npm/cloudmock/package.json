@@ -16,11 +16,20 @@
   "keywords": [
     "aws",
     "mock",
+    "localstack",
+    "moto",
     "local",
     "development",
     "testing",
+    "emulator",
     "s3",
     "dynamodb",
-    "lambda"
+    "lambda",
+    "sqs",
+    "sns",
+    "ecs",
+    "devtools",
+    "observability",
+    "cloud"
   ]
 }

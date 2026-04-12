@@ -383,21 +383,30 @@ func tfTypeToNodeType(tfType string) string {
 
 // --- Auto-detection ---
 
-// DetectIaCType returns "terraform", "pulumi", or "" based on the files
-// present in the given directory.
+// DetectIaCType returns "terraform", "pulumi", "sam", "cdk", or "" based
+// on the files present in the given directory.
 func DetectIaCType(dir string) string {
-	// Check for Terraform
+	// Check for Terraform (.tf files)
 	if matches, _ := filepath.Glob(filepath.Join(dir, "*.tf")); len(matches) > 0 {
 		return "terraform"
 	}
-	// Check for Pulumi
+	// Check for SAM (template.yaml)
+	if FindSAMTemplate(dir) != "" {
+		return "sam"
+	}
+	// Check for Pulumi (Pulumi.yaml)
 	if _, err := os.Stat(filepath.Join(dir, "Pulumi.yaml")); err == nil {
 		return "pulumi"
 	}
 	if _, err := os.Stat(filepath.Join(dir, "Pulumi.yml")); err == nil {
 		return "pulumi"
 	}
-	// Check for .ts files with aws imports (Pulumi TypeScript)
+	// Check for CDK (cdk.json or .ts files importing aws-cdk-lib)
+	if _, err := os.Stat(filepath.Join(dir, "cdk.json")); err == nil {
+		return "cdk"
+	}
+	// Fallback: .ts files with aws imports → could be Pulumi or CDK.
+	// Prefer Pulumi since CDK detection is via cdk.json above.
 	if matches, _ := filepath.Glob(filepath.Join(dir, "*.ts")); len(matches) > 0 {
 		return "pulumi"
 	}
@@ -411,10 +420,17 @@ func ImportDir(dir string, environment string, logger *slog.Logger) (*IaCImportR
 	case "terraform":
 		logger.Info("detected Terraform project", "dir", dir)
 		return ImportTerraformDir(dir, environment, logger)
+	case "sam":
+		tplPath := FindSAMTemplate(dir)
+		logger.Info("detected SAM project", "dir", dir, "template", tplPath)
+		return ImportSAMTemplate(tplPath, environment, logger)
+	case "cdk":
+		logger.Info("detected CDK project", "dir", dir)
+		return ImportCDKDir(dir, environment, logger)
 	case "pulumi":
 		logger.Info("detected Pulumi project", "dir", dir)
 		result, err := ImportPulumiDir(dir, environment, logger)
-		return result, nil, err // Pulumi parser doesn't build DependencyGraph yet
+		return result, nil, err
 	default:
 		logger.Warn("no IaC project detected", "dir", dir)
 		return &IaCImportResult{}, NewDependencyGraph(), nil

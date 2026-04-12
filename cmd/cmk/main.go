@@ -36,6 +36,8 @@ func main() {
 		cmdLogs(os.Args[2:])
 	case "config":
 		cmdConfig()
+	case "bench":
+		cmdBench(os.Args[2:])
 	case "version":
 		fmt.Printf("cmk version %s (%s/%s)\n", version, runtime.GOOS, runtime.GOARCH)
 	case "help", "--help", "-h":
@@ -56,6 +58,7 @@ Commands:
   status     Show running status, port info, service count
   logs       Tail CloudMock logs
   config     Show current configuration
+  bench      Run benchmarks against CloudMock (+ LocalStack/Moto if installed)
   version    Print version information
   help       Show this help message
 

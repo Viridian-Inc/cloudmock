@@ -9,7 +9,7 @@ description: |
   metrics, and chaos engineering.
 
   Install methods: snap, npm, Homebrew, apt, Docker.
-  More info: https://cloudmock.dev
+  More info: https://cloudmock.io
 
 grade: stable
 confinement: strict
@@ -18,7 +18,7 @@ title: CloudMock
 contact: eng@viri.app
 issues: https://github.com/Viridian-Inc/cloudmock/issues
 source-code: https://github.com/Viridian-Inc/cloudmock
-website: https://cloudmock.dev
+website: https://cloudmock.io
 
 platforms:
   amd64:

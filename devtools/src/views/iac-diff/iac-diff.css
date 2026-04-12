@@ -1,0 +1,103 @@
+.iac-diff {
+  padding: 1.5rem;
+  max-width: 900px;
+}
+
+.iac-diff h2 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.diff-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.diff-stat {
+  padding: 0.75rem 1.25rem;
+  border-radius: 8px;
+  background: var(--surface-secondary, #1e1e2e);
+  text-align: center;
+  min-width: 80px;
+}
+
+.diff-stat .count {
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.diff-stat .label {
+  font-size: 0.75rem;
+  color: var(--text-secondary, #888);
+  margin-top: 0.25rem;
+}
+
+.diff-stat.synced .count { color: #4caf50; }
+.diff-stat.missing .count { color: #ff9800; }
+.diff-stat.orphaned .count { color: #2196f3; }
+.diff-stat.drift .count { color: #f44336; }
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.diff-table th {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border, #333);
+  color: var(--text-secondary, #888);
+  font-weight: 500;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.diff-table td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle, #222);
+}
+
+.diff-table tr:hover {
+  background: var(--surface-hover, #ffffff08);
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.status-badge.synced   { background: #4caf5022; color: #4caf50; }
+.status-badge.missing  { background: #ff980022; color: #ff9800; }
+.status-badge.orphaned { background: #2196f322; color: #2196f3; }
+.status-badge.drift    { background: #f4433622; color: #f44336; }
+
+.service-icon {
+  display: inline-block;
+  width: 20px;
+  text-align: center;
+  margin-right: 0.25rem;
+}
+
+.no-iac-message {
+  padding: 2rem;
+  text-align: center;
+  color: var(--text-secondary, #888);
+}
+
+.no-iac-message code {
+  background: var(--surface-secondary, #1e1e2e);
+  padding: 0.15rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.85em;
+}

@@ -30,6 +30,7 @@ import { S3BrowserView } from './views/s3-browser';
 import { DynamoDBView } from './views/dynamodb';
 import { SQSBrowserView } from './views/sqs-browser';
 import { CognitoView } from './views/cognito';
+import IaCDiffView from './views/iac-diff';
 import { LambdaView } from './views/lambda';
 import { IAMView } from './views/iam';
 import { MailView } from './views/mail';
@@ -68,7 +69,8 @@ export type ViewId =
   | 'platform-keys'
   | 'platform-usage'
   | 'platform-audit'
-  | 'platform-settings';
+  | 'platform-settings'
+  | 'iac-diff';
 
 const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   activity: ActivityView,
@@ -94,6 +96,7 @@ const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   routing: RoutingView,
   traffic: TrafficView,
   rum: RUMView,
+  'iac-diff': IaCDiffView,
   settings: SettingsView,
   'platform-apps': PlatformAppsView,
   'platform-keys': PlatformKeysView,

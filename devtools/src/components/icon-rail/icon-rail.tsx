@@ -29,6 +29,7 @@ import {
   UsageIcon,
   AuditIcon,
   PlatformSettingsIcon,
+  DiffIcon,
 } from '../icons';
 import './icon-rail.css';
 
@@ -87,6 +88,7 @@ const NAV_GROUPS: NavGroup[] = [
     label: 'Tools',
     items: [
       { id: 'ai-debug', icon: CpuIcon, i18nKey: 'nav.ai_debug' },
+      { id: 'iac-diff', icon: DiffIcon, i18nKey: 'nav.iac_diff' },
       { id: 'routing', icon: RoutingIcon, i18nKey: 'nav.routing' },
       { id: 'traffic', icon: TrafficIcon, i18nKey: 'nav.traffic' },
       { id: 'rum', icon: RUMIcon, i18nKey: 'nav.rum' },

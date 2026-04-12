@@ -461,6 +461,12 @@ export function GridIcon(p: IconProps) {
   </Icon>;
 }
 
+export function DiffIcon(p: IconProps) {
+  return <Icon {...p}>
+    <path d="M12 3v18M8 7l-4 4 4 4M16 7l4 4-4 4" stroke="currentColor" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+  </Icon>;
+}
+
 export const iconMap: Record<string, (p: IconProps) => JSX.Element> = {
   home: HomeIcon,
   cloud: CloudIcon,

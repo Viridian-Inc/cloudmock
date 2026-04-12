@@ -111,6 +111,8 @@ type API struct {
 	iacTopologyMu    sync.RWMutex
 	iacMicroservices []iac.MicroserviceDef
 	depGraph         *iac.DependencyGraph
+	iacResult        *iac.IaCImportResult
+	iacResultMu      sync.RWMutex
 	deploys        []DeployEvent
 	deploysMu      sync.RWMutex
 	sloEngine      *gateway.SLOEngine
@@ -252,6 +254,7 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
 	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
 	a.mux.HandleFunc("/api/topology/tree", a.handleTopologyTree)
+	a.mux.HandleFunc("/api/iac/diff", a.handleIaCDiff)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/", a.handleTraceByID)
@@ -397,6 +400,7 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/topology", a.handleTopology)
 	a.mux.HandleFunc("/api/topology/config", a.handleTopologyConfig)
 	a.mux.HandleFunc("/api/topology/tree", a.handleTopologyTree)
+	a.mux.HandleFunc("/api/iac/diff", a.handleIaCDiff)
 	a.mux.HandleFunc("/api/resources/", a.handleResources)
 	a.mux.HandleFunc("/api/traces", a.handleTraces)
 	a.mux.HandleFunc("/api/traces/compare", a.handleTraceCompare)

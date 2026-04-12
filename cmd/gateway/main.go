@@ -1163,6 +1163,11 @@ func main() {
 		}
 	}
 
+	// Store IaC result for the /api/iac/diff endpoint.
+	if iacResult != nil {
+		adminAPI.SetIaCResult(iacResult)
+	}
+
 	// Start IaC file watcher for hot-reload (re-scans on .ts/.tf file changes).
 	if *iacDir != "" {
 		reconciler := iac.NewReconciler(registry, slog.Default())

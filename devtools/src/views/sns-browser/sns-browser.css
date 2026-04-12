@@ -1,0 +1,11 @@
+.sns-view { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.sns-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border-subtle); }
+.sns-header h2 { font-size: 15px; font-weight: 700; }
+.sns-list { flex: 1; overflow-y: auto; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.sns-card { background: var(--bg-secondary); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); padding: 12px; }
+.sns-card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.sns-card-name { font-weight: 600; font-size: 13px; font-family: var(--font-mono); }
+.sns-badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; background: var(--bg-tertiary); color: var(--text-secondary); }
+.sns-messages { margin-top: 8px; border-top: 1px solid var(--border-subtle); padding-top: 8px; }
+.sns-msg { font-size: 12px; color: var(--text-secondary); padding: 4px 0; font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sns-empty { display: flex; align-items: center; justify-content: center; height: 100%; color: var(--text-tertiary); font-size: 14px; }

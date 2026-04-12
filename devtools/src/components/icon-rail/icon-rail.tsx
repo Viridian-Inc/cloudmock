@@ -30,6 +30,12 @@ import {
   AuditIcon,
   PlatformSettingsIcon,
   DiffIcon,
+  SNSIcon,
+  LogIcon,
+  AnomalyIcon,
+  EventBridgeIcon,
+  APIIcon,
+  DNSIcon,
 } from '../icons';
 import './icon-rail.css';
 
@@ -60,6 +66,8 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'traces', icon: TracesIcon, i18nKey: 'nav.traces' },
       { id: 'metrics', icon: ChartIcon, i18nKey: 'nav.metrics' },
       { id: 'dashboards', icon: DashboardIcon, i18nKey: 'nav.dashboards' },
+      { id: 'logs', icon: LogIcon, i18nKey: 'nav.logs' },
+      { id: 'anomalies', icon: AnomalyIcon, i18nKey: 'nav.anomalies' },
     ],
   },
   {
@@ -72,6 +80,10 @@ const NAV_GROUPS: NavGroup[] = [
       { id: 'lambda', icon: LambdaIcon, i18nKey: 'nav.lambda' },
       { id: 'iam', icon: ShieldIcon, i18nKey: 'nav.iam' },
       { id: 'mail', icon: MailIcon, i18nKey: 'nav.mail' },
+      { id: 'sns-browser', icon: SNSIcon, i18nKey: 'nav.sns' },
+      { id: 'eventbridge', icon: EventBridgeIcon, i18nKey: 'nav.eventbridge' },
+      { id: 'apigateway', icon: APIIcon, i18nKey: 'nav.apigateway' },
+      { id: 'route53', icon: DNSIcon, i18nKey: 'nav.route53' },
     ],
   },
   {

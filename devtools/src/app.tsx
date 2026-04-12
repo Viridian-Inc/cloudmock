@@ -34,6 +34,12 @@ import IaCDiffView from './views/iac-diff';
 import { LambdaView } from './views/lambda';
 import { IAMView } from './views/iam';
 import { MailView } from './views/mail';
+import { SNSBrowserView } from './views/sns-browser';
+import { LogsView } from './views/logs';
+import { AnomaliesView } from './views/anomalies';
+import { EventBridgeView } from './views/eventbridge';
+import { ApiGatewayView } from './views/apigateway';
+import { Route53View } from './views/route53';
 import { RegressionsView } from './views/regressions';
 import { PlatformAppsView } from './views/platform-apps';
 import { PlatformKeysView } from './views/platform-keys';
@@ -70,7 +76,13 @@ export type ViewId =
   | 'platform-usage'
   | 'platform-audit'
   | 'platform-settings'
-  | 'iac-diff';
+  | 'iac-diff'
+  | 'sns-browser'
+  | 'logs'
+  | 'anomalies'
+  | 'eventbridge'
+  | 'apigateway'
+  | 'route53';
 
 const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   activity: ActivityView,
@@ -103,6 +115,12 @@ const VIEW_COMPONENTS: Record<ViewId, () => preact.JSX.Element> = {
   'platform-usage': PlatformUsageView,
   'platform-audit': PlatformAuditView,
   'platform-settings': PlatformSettingsView,
+  'sns-browser': SNSBrowserView,
+  logs: LogsView,
+  anomalies: AnomaliesView,
+  eventbridge: EventBridgeView,
+  apigateway: ApiGatewayView,
+  route53: Route53View,
 };
 
 /** View IDs reachable via Cmd+number shortcuts */

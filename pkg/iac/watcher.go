@@ -132,9 +132,10 @@ func (w *Watcher) loop() {
 }
 
 // rescan re-imports the IaC directory and calls the onChange callback.
+// Auto-detects Terraform vs Pulumi based on file presence.
 func (w *Watcher) rescan() {
 	w.logger.Info("iac files changed, re-scanning", "dir", w.dir)
-	result, err := ImportPulumiDir(w.dir, w.env, w.logger)
+	result, _, err := ImportDir(w.dir, w.env, w.logger)
 	if err != nil {
 		w.logger.Error("iac re-scan failed", "error", err)
 		return

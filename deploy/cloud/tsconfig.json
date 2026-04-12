@@ -1,0 +1,14 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "outDir": "bin",
+    "target": "es2020",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "sourceMap": true,
+    "experimentalDecorators": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": ["index.ts"]
+}

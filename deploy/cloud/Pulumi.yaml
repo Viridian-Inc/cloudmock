@@ -1,0 +1,3 @@
+name: cloudmock-cloud
+runtime: nodejs
+description: CloudMock Cloud ingest service — ECS Fargate + RDS TimescaleDB

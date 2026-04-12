@@ -1,0 +1,8 @@
+config:
+  cloudmock-cloud:domain: cloud.cloudmock.io
+  cloudmock-cloud:containerImage: ghcr.io/viridian-inc/cloudmock-cloud:latest
+  cloudmock-cloud:dbInstanceClass: db.t4g.micro
+  cloudmock-cloud:dbAllocatedStorage: "20"
+  cloudmock-cloud:cpu: "256"
+  cloudmock-cloud:memory: "512"
+  cloudmock-cloud:desiredCount: "1"

@@ -1,0 +1,15 @@
+{
+  "name": "cloudmock-cloud-deploy",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@pulumi/pulumi": "^3",
+    "@pulumi/aws": "^6"
+  },
+  "devDependencies": {
+    "typescript": "^5"
+  }
+}

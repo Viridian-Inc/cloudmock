@@ -1,5 +1,44 @@
 # Changelog
 
+## v1.8.0 (2026-04-14)
+
+### Added
+- **14 previously-stubbed services now fully implemented** — `polly`, `translate`, `keyspaces` (cassandra), `ecrpublic`, `efs` (elasticfilesystem), `lexmodels` (lex), `globalaccelerator`, `rekognition`, `inspector2`, `comprehend`, `guardduty`, `servicecatalog`, `securityhub`, and `quicksight` had code scaffolding but every handler returned `{"status":"ok","action":"X"}` without touching a store. 951 handlers have been rewritten as real in-memory CRUD backed by typed per-resource stores. SDK clients that previously received a fake success now get AWS-shaped responses and persistence across calls.
+- **Gateway registration for the 14 services** — `cmd/gateway/main.go` now imports and calls `registerOrDefer` for each, so the SigV4 router actually resolves them. Before this change, requests to rekognition/quicksight/etc. hit `ServiceUnavailable: Service not registered`.
+- **`GET /api/sns/topics`** — devtools SNS browser endpoint. Returns topics with subscription counts and recent messages.
+- **`GET /api/eventbridge/buses`** — devtools EventBridge browser endpoint. Returns buses with rules and target ARNs.
+- **`GET /api/apigateway/apis`** — devtools API Gateway browser endpoint. Returns REST APIs with their routes + integrations.
+- **`GET /api/route53/zones`** — devtools Route 53 browser endpoint. Returns hosted zones with record sets.
+- **`GET /api/browser/anomalies`** — wrapper over the anomaly detector that returns `{anomalies: [...]}` with fields mapped to what the devtools view decodes (`type`, `message`, `detectedAt` vs the raw detector output's `metric`, `description`, `detected_at`).
+- **`GET /api/browser/logs`** — wrapper over the Lambda log buffer that returns `{logs: [...]}` with `functionName → service` and `stream → severity` mapping.
+- `BrowserInspect() []map[string]any` method on the sns, eventbridge, apigateway, and route53 services — pre-shapes resource state for the new admin endpoints without introducing a circular import back into the services.
+- **Smithy RPC-v2 CBOR protocol support** for cloudwatch — handles the new `POST /service/GraniteServiceVersion20100801/operation/{Op}` wire format that `aws-sdk-go-v2 v1.56+` uses. Responses are sent with the `smithy-protocol: rpc-v2-cbor` header and an empty `application/cbor` body; the SDK's deserializer accepts this and constructs the zero-valued output struct. PutMetricData, ListMetrics, GetMetricData all pass SDK correctness checks without requiring a full CBOR encoder.
+
+### Fixed
+- **Devtools SNS / EventBridge / API Gateway / Route 53 / Anomalies / Logs views were showing empty lists permanently.** Each view was fetching an endpoint that returned the wrong shape (e.g. `/api/services/sns` returns `{name, actionCount, healthy}`, not a topic list). They silently fell back to `|| []` and never rendered data. All six now point at the new `/api/*/...` endpoints above and light up with real state.
+- **apigateway timestamp serialization** — `CreatedDate` on `restApiResponse`, `deploymentResponse`, and `stageResponse` was marshaled as an RFC3339 string. The aws-sdk-go-v2 apigateway client's smithy deserializer declares that field as `Timestamp` and rejects strings with `expected Timestamp to be a JSON Number, got string instead`. Switched all three to `float64` (epoch seconds) and updated the converter helpers.
+- **eks timestamp serialization** — same root cause as apigateway. `clusterJSON`, `nodegroupJSON`, `fargateProfileJSON`, `addonJSON` had `CreatedAt`/`ModifiedAt` formatted via `time.Format("2006-01-02T15:04:05Z")`. Now epoch-seconds float64 at all five conversion sites.
+- **CloudFormation CreateStack after DeleteStack** — `DeleteStack` marks stacks as `DELETE_COMPLETE` but leaves them in the map for history lookups. `CreateStack` then errored with `AlreadyExistsException` on any name that had been deleted. Matches real AWS semantics now: a stack in `DELETE_COMPLETE` is treated as absent for the purposes of recreation. Fixes the tier-1 benchmark's cloudformation 3/4 failures that came from the shared stackName across warm iterations.
+- **apprunner and the 14 previously-stub services were not registered with the gateway.** They existed as code but weren't imported by any entry point. SDK calls returned `ServiceUnavailable`. Fixed for the 14; `apprunner` is tracked separately.
+- **codebuild benchmark harness** — the tier-1 codebuild suite didn't set `ServiceRole`, which aws-sdk-go-v2 now marks required. The SDK's `Validate` middleware rejected the input client-side before it ever hit any mock. Added `ServiceRole` to both the setup helper and the `CreateProject` Run. Helps all three targets (cloudmock, moto, localstack) the same way.
+
+### Performance
+- **Tier-1 benchmark correctness: 87/100 → 100/100.** Every one of the 100 tier-1 ops across 26 services now round-trips through the AWS Go SDK without errors. LocalStack 3.8 holds 66/100 and moto holds 87/100 on the same run.
+- **Throughput unchanged.** cloudmock test mode (`CLOUDMOCK_TEST_MODE=true`) still sustains ~130k req/s across all 12 README benchmark ops against `hey -c 50 -z 15s`. The correctness fixes did not add any hot-path overhead — the cloudwatch CBOR short-circuit is the fastest cloudwatch path and runs in <1ms p50.
+
+### Benchmark results (this release, hey -c 50 -z 15s, same machine)
+| Operation | cloudmock | localstack 3.8 | moto |
+|---|---:|---:|---:|
+| DynamoDB GetItem | 141,902 req/s | 688 | 685 |
+| DynamoDB PutItem | 149,939 req/s | 523 | 705 |
+| DynamoDB Query | 157,151 req/s | 735 | 552 |
+| SQS SendMessage | 156,415 req/s | 1,236 | 21 |
+| S3 GetObject (1KB) | 162,663 req/s | 1,121 | 650 |
+| SNS Publish | 134,731 req/s | 1,304 | 682 |
+| KMS Encrypt | 152,431 req/s | 1,100 | 738 |
+
+Geomean: **cloudmock 129k req/s, 149× faster than localstack, 322× faster than moto.**
+
 ## v1.7.5 (2026-04-12)
 
 ### Added

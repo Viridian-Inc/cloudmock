@@ -16,7 +16,16 @@ jobs:
         id: cloudmock
 
       - name: Verify CloudMock is running
-        run: curl -sf http://localhost:4599/api/health
+        # The composite action defaults to test-mode=true which disables the
+        # admin API on :4599. Probe the gateway instead — an unauthenticated
+        # GET returns an AWS error envelope with a 4xx status, which is
+        # enough to confirm the process is up.
+        env:
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+        run: |
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$CM_ENDPOINT/")
+          echo "gateway http code: $code"
+          [ "$code" != "000" ] || { echo "gateway unreachable"; exit 1; }
 
       - name: Test S3
         run: |

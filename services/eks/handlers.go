@@ -31,7 +31,7 @@ type clusterJSON struct {
 	PlatformVersion        string            `json:"platformVersion,omitempty"`
 	ResourcesVpcConfig     *vpcConfigJSON    `json:"resourcesVpcConfig,omitempty"`
 	KubernetesNetworkConfig *kubeNetJSON     `json:"kubernetesNetworkConfig,omitempty"`
-	CreatedAt              string            `json:"createdAt,omitempty"`
+	CreatedAt              float64           `json:"createdAt,omitempty"`
 	Tags                   map[string]string `json:"tags,omitempty"`
 }
 
@@ -72,7 +72,7 @@ type nodegroupJSON struct {
 	Labels        map[string]string         `json:"labels,omitempty"`
 	Taints        []taintJSON               `json:"taints,omitempty"`
 	CapacityType  string                    `json:"capacityType,omitempty"`
-	CreatedAt     string                    `json:"createdAt,omitempty"`
+	CreatedAt     float64                   `json:"createdAt,omitempty"`
 	Tags          map[string]string         `json:"tags,omitempty"`
 }
 
@@ -96,7 +96,7 @@ type fargateProfileJSON struct {
 	Status              string                `json:"status"`
 	Subnets             []string              `json:"subnets,omitempty"`
 	Selectors           []fargateSelectorJSON `json:"selectors,omitempty"`
-	CreatedAt           string                `json:"createdAt,omitempty"`
+	CreatedAt           float64               `json:"createdAt,omitempty"`
 	Tags                map[string]string     `json:"tags,omitempty"`
 }
 
@@ -112,8 +112,8 @@ type addonJSON struct {
 	AddonVersion          string            `json:"addonVersion,omitempty"`
 	Status                string            `json:"status"`
 	ServiceAccountRoleArn string            `json:"serviceAccountRoleArn,omitempty"`
-	CreatedAt             string            `json:"createdAt,omitempty"`
-	ModifiedAt            string            `json:"modifiedAt,omitempty"`
+	CreatedAt             float64           `json:"createdAt,omitempty"`
+	ModifiedAt            float64           `json:"modifiedAt,omitempty"`
 	Tags                  map[string]string `json:"tags,omitempty"`
 }
 
@@ -128,7 +128,7 @@ func clusterToJSON(c *Cluster) clusterJSON {
 		Status:          c.Status,
 		Endpoint:        c.Endpoint,
 		PlatformVersion: c.PlatformVersion,
-		CreatedAt:       c.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:       float64(c.CreatedAt.Unix()),
 		Tags:            c.Tags,
 	}
 	if c.CertificateAuthority != "" {
@@ -162,7 +162,7 @@ func nodegroupToJSON(ng *Nodegroup) nodegroupJSON {
 		Subnets:       ng.SubnetIDs,
 		Labels:        ng.Labels,
 		CapacityType:  ng.CapacityType,
-		CreatedAt:     ng.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:     float64(ng.CreatedAt.Unix()),
 		Tags:          ng.Tags,
 	}
 	if ng.ScalingConfig != nil {
@@ -195,7 +195,7 @@ func fargateProfileToJSON(fp *FargateProfile) fargateProfileJSON {
 		Status:              fp.Status,
 		Subnets:             fp.SubnetIDs,
 		Selectors:           selectors,
-		CreatedAt:           fp.CreatedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:           float64(fp.CreatedAt.Unix()),
 		Tags:                fp.Tags,
 	}
 }
@@ -208,8 +208,8 @@ func addonToJSON(a *Addon) addonJSON {
 		AddonVersion:          a.AddonVersion,
 		Status:                a.Status,
 		ServiceAccountRoleArn: a.ServiceAccountRoleARN,
-		CreatedAt:             a.CreatedAt.Format("2006-01-02T15:04:05Z"),
-		ModifiedAt:            a.ModifiedAt.Format("2006-01-02T15:04:05Z"),
+		CreatedAt:             float64(a.CreatedAt.Unix()),
+		ModifiedAt:            float64(a.ModifiedAt.Unix()),
 		Tags:                  a.Tags,
 	}
 }

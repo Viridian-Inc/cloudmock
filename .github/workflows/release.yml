@@ -138,8 +138,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add homebrew/cloudmock.rb
-          git commit -m "chore: update Homebrew formula for v${VERSION}" || echo "No changes"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "chore: update Homebrew formula for v${VERSION}"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $i failed, retrying..."
+            sleep $((i * 2))
+          done
+          exit 1
 
   publish-npm:
     # Runs after update-homebrew so commit-back to main is serialized
@@ -184,8 +193,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add npm/cloudmock/package.json npm/cloudmock-rum/package.json
-          git diff --cached --quiet || git commit -m "chore: bump npm packages to v${VERSION}"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "chore: bump npm packages to v${VERSION}"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $i failed, retrying..."
+            sleep $((i * 2))
+          done
+          exit 1
 
   publish-snap:
     # Runs after publish-npm so commit-back to main is serialized with
@@ -220,8 +238,17 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add snap/snapcraft.yaml
-          git diff --cached --quiet || git commit -m "chore: bump snap version to v${VERSION}"
-          git push
+          if git diff --cached --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "chore: bump snap version to v${VERSION}"
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $i failed, retrying..."
+            sleep $((i * 2))
+          done
+          exit 1
 
   publish-docker:
     needs: build-binary

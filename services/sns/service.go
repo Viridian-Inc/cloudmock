@@ -116,6 +116,32 @@ func (s *SNSService) GetAllTopics() []string {
 	return s.store.ListTopics()
 }
 
+// BrowserInspect returns topics in the shape the devtools SNS browser view wants.
+func (s *SNSService) BrowserInspect() []map[string]any {
+	arns := s.store.ListTopics()
+	counts := map[string]int{}
+	for _, sub := range s.store.ListSubscriptions() {
+		counts[sub.TopicArn]++
+	}
+	out := make([]map[string]any, 0, len(arns))
+	for _, arn := range arns {
+		name := arn
+		for i := len(arn) - 1; i >= 0; i-- {
+			if arn[i] == ':' {
+				name = arn[i+1:]
+				break
+			}
+		}
+		out = append(out, map[string]any{
+			"topicArn":          arn,
+			"name":              name,
+			"subscriptionCount": counts[arn],
+			"recentMessages":    []string{},
+		})
+	}
+	return out
+}
+
 // GetSubscriptionsSummary returns parallel slices of subscription data for topology building.
 func (s *SNSService) GetSubscriptionsSummary() (topicArns, protocols, endpoints []string) {
 	subs := s.store.ListSubscriptions()

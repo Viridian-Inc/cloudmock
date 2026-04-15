@@ -20,7 +20,7 @@ export function AnomaliesView() {
   async function loadAnomalies() {
     setLoading(true);
     try {
-      const data = await api<{ anomalies: Anomaly[] }>('/api/anomalies');
+      const data = await api<{ anomalies: Anomaly[] }>('/api/browser/anomalies');
       setAnomalies(data.anomalies || []);
     } catch {
       setAnomalies([]);

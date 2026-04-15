@@ -21,7 +21,7 @@ export function LogsView() {
   async function fetchLogs() {
     setLoading(true);
     try {
-      const data = await api<{ logs: LogEntry[] }>('/api/lambda/logs');
+      const data = await api<{ logs: LogEntry[] }>('/api/browser/logs');
       setLogs(data.logs || []);
     } catch {
       setLogs([]);

@@ -24,7 +24,7 @@ export function EventBridgeView() {
   async function loadBuses() {
     setLoading(true);
     try {
-      const data = await api<{ buses: EventBus[] }>('/api/services/events');
+      const data = await api<{ buses: EventBus[] }>('/api/eventbridge/buses');
       setBuses(data.buses || []);
     } catch {
       setBuses([]);

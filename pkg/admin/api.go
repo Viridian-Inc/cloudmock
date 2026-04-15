@@ -295,6 +295,9 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
 	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
 
+	// Devtools "browser" endpoints (per-service resource views)
+	a.registerBrowserRoutes()
+
 	// SaaS hosted-tier endpoints
 	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)
 	a.mux.HandleFunc("/api/saas/config", a.handleSaaSConfig)
@@ -452,6 +455,9 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/store/", a.handlePluginStoreAction)
 	a.mux.HandleFunc("/api/source/events", a.handleSourceEvents)
 	a.mux.HandleFunc("/api/source/status", a.handleSourceStatus)
+
+	// Devtools "browser" endpoints (per-service resource views)
+	a.registerBrowserRoutes()
 
 	// SaaS hosted-tier endpoints
 	a.mux.HandleFunc("/api/saas/tenants", a.handleTenantsSaaS)

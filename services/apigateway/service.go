@@ -23,6 +23,38 @@ func New(accountID, region string) *APIGatewayService {
 // Name returns the AWS service name used for routing.
 func (s *APIGatewayService) Name() string { return "apigateway" }
 
+// BrowserInspect returns API Gateway REST APIs in the shape the devtools
+// browser view expects: list of {id, name, routes[]}.
+func (s *APIGatewayService) BrowserInspect() []map[string]any {
+	apis := s.store.ListRestApis()
+	out := make([]map[string]any, 0, len(apis))
+	for _, api := range apis {
+		routes := make([]map[string]any, 0)
+		for _, res := range api.Resources {
+			for method, m := range res.Methods {
+				integration := ""
+				if m.Integration != nil {
+					integration = m.Integration.Type
+					if m.Integration.Uri != "" {
+						integration = integration + " " + m.Integration.Uri
+					}
+				}
+				routes = append(routes, map[string]any{
+					"method":      method,
+					"path":        res.Path,
+					"integration": integration,
+				})
+			}
+		}
+		out = append(out, map[string]any{
+			"id":    api.Id,
+			"name":  api.Name,
+			"routes": routes,
+		})
+	}
+	return out
+}
+
 // Actions returns the list of API Gateway actions supported by this service.
 // API Gateway uses path-based REST routing, so these are descriptive only.
 func (s *APIGatewayService) Actions() []service.Action {

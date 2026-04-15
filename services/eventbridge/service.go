@@ -150,6 +150,40 @@ func (s *EventBridgeService) GetAllEventBuses() []string {
 	return names
 }
 
+// BrowserInspect returns buses shaped for the devtools EventBridge view.
+func (s *EventBridgeService) BrowserInspect() []map[string]any {
+	buses := s.store.ListEventBuses()
+	out := make([]map[string]any, 0, len(buses))
+	for _, bus := range buses {
+		ruleMaps := make([]map[string]any, 0)
+		rules, ok := s.store.ListRules(bus.Name, "")
+		if ok {
+			for _, rule := range rules {
+				targetList := make([]string, 0)
+				targets, _ := s.store.ListTargetsByRule(bus.Name, rule.Name)
+				for _, t := range targets {
+					targetList = append(targetList, t.Arn)
+				}
+				state := rule.State
+				if state == "" {
+					state = "ENABLED"
+				}
+				ruleMaps = append(ruleMaps, map[string]any{
+					"name":    rule.Name,
+					"state":   state,
+					"targets": targetList,
+				})
+			}
+		}
+		out = append(out, map[string]any{
+			"name":  bus.Name,
+			"arn":   bus.ARN,
+			"rules": ruleMaps,
+		})
+	}
+	return out
+}
+
 // GetRuleTargetsSummary returns parallel slices of rule names and target ARNs for topology.
 func (s *EventBridgeService) GetRuleTargetsSummary() (ruleNames, targetArns []string) {
 	rwts := s.GetAllRulesWithTargets()

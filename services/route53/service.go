@@ -25,6 +25,34 @@ func New(accountID, region string) *Route53Service {
 // Name returns the AWS service name used for routing.
 func (s *Route53Service) Name() string { return "route53" }
 
+// BrowserInspect returns hosted zones in the shape the devtools Route 53
+// browser view expects: list of {id, name, recordSets[]}.
+func (s *Route53Service) BrowserInspect() []map[string]any {
+	zones := s.store.ListZones()
+	out := make([]map[string]any, 0, len(zones))
+	for _, z := range zones {
+		records := make([]map[string]any, 0, len(z.RecordSets))
+		for _, rs := range z.RecordSets {
+			values := make([]string, 0, len(rs.ResourceRecords))
+			for _, r := range rs.ResourceRecords {
+				values = append(values, r.Value)
+			}
+			records = append(records, map[string]any{
+				"name":   rs.Name,
+				"type":   rs.Type,
+				"ttl":    rs.TTL,
+				"values": values,
+			})
+		}
+		out = append(out, map[string]any{
+			"id":         z.Id,
+			"name":       z.Name,
+			"recordSets": records,
+		})
+	}
+	return out
+}
+
 // Actions returns the list of Route 53 API actions.
 // Route 53 uses path-based routing rather than Action params or X-Amz-Target,
 // so we describe actions without relying on those mechanisms.

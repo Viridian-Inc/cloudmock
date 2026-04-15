@@ -20,7 +20,7 @@ export function SNSBrowserView() {
   async function loadTopics() {
     setLoading(true);
     try {
-      const data = await api<{ topics: SNSTopic[] }>('/api/services/sns');
+      const data = await api<{ topics: SNSTopic[] }>('/api/sns/topics');
       setTopics(data.topics || []);
     } catch {
       setTopics([]);

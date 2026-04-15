@@ -24,7 +24,7 @@ export function Route53View() {
   async function loadZones() {
     setLoading(true);
     try {
-      const data = await api<{ zones: HostedZone[] }>('/api/services/route53');
+      const data = await api<{ zones: HostedZone[] }>('/api/route53/zones');
       setZones(data.zones || []);
     } catch {
       setZones([]);

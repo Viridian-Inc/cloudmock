@@ -23,7 +23,7 @@ export function ApiGatewayView() {
   async function loadApis() {
     setLoading(true);
     try {
-      const data = await api<{ apis: RestApi[] }>('/api/services/apigateway');
+      const data = await api<{ apis: RestApi[] }>('/api/apigateway/apis');
       setApis(data.apis || []);
     } catch {
       setApis([]);

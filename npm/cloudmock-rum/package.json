@@ -1,6 +1,6 @@
 {
   "name": "@cloudmock/rum",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "description": "Real User Monitoring SDK for CloudMock — web vitals, error tracking, session replay",
   "type": "module",
   "main": "./dist/index.cjs",

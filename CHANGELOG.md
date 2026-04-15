@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.8.1 (2026-04-14)
+
+### Fixed
+- **Test CloudMock Action workflow** was failing on every tag push since v1.7.2 with `Process completed with exit code 7` on `curl -sf http://localhost:4599/api/health`. The composite action at `.github/actions/cloudmock/action.yml` defaults `test-mode: 'true'` which disables the admin API; probing `:4599` always returns connection refused. Fixed the workflow step to probe the gateway endpoint (from the action's own `endpoint` output) instead — a 4xx on an unauthenticated GET is proof-of-life.
+
 ## v1.8.0 (2026-04-14)
 
 ### Added

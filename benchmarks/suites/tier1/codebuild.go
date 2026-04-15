@@ -46,10 +46,11 @@ func (s *codeBuildSuite) Operations() []harness.Operation {
 				Type: codebuildtypes.ArtifactsTypeNoArtifacts,
 			},
 			Environment: &codebuildtypes.ProjectEnvironment{
-				Type:           codebuildtypes.EnvironmentTypeLinuxContainer,
-				Image:          aws.String("aws/codebuild/standard:7.0"),
-				ComputeType:    codebuildtypes.ComputeTypeBuildGeneral1Small,
+				Type:        codebuildtypes.EnvironmentTypeLinuxContainer,
+				Image:       aws.String("aws/codebuild/standard:7.0"),
+				ComputeType: codebuildtypes.ComputeTypeBuildGeneral1Small,
 			},
+			ServiceRole: aws.String("arn:aws:iam::000000000000:role/bench-codebuild"),
 		})
 		return err
 	}
@@ -87,6 +88,7 @@ func (s *codeBuildSuite) Operations() []harness.Operation {
 						Image:       aws.String("aws/codebuild/standard:7.0"),
 						ComputeType: codebuildtypes.ComputeTypeBuildGeneral1Small,
 					},
+					ServiceRole: aws.String("arn:aws:iam::000000000000:role/bench-codebuild"),
 				})
 				if err != nil {
 					return nil, err

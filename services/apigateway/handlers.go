@@ -1,9 +1,9 @@
 package apigateway
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
-	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
@@ -16,10 +16,10 @@ type createRestApiRequest struct {
 }
 
 type restApiResponse struct {
-	Id          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	CreatedDate time.Time `json:"createdDate"`
+	Id          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	CreatedDate float64 `json:"createdDate"`
 }
 
 type restApisListResponse struct {
@@ -65,9 +65,9 @@ type createDeploymentRequest struct {
 }
 
 type deploymentResponse struct {
-	Id          string    `json:"id"`
-	CreatedDate time.Time `json:"createdDate"`
-	Description string    `json:"description"`
+	Id          string  `json:"id"`
+	CreatedDate float64 `json:"createdDate"`
+	Description string  `json:"description"`
 }
 
 type deploymentsListResponse struct {
@@ -81,10 +81,10 @@ type createStageRequest struct {
 }
 
 type stageResponse struct {
-	StageName    string    `json:"stageName"`
-	DeploymentId string    `json:"deploymentId"`
-	Description  string    `json:"description"`
-	CreatedDate  time.Time `json:"createdDate"`
+	StageName    string  `json:"stageName"`
+	DeploymentId string  `json:"deploymentId"`
+	Description  string  `json:"description"`
+	CreatedDate  float64 `json:"createdDate"`
 }
 
 type stagesListResponse struct {
@@ -136,7 +136,7 @@ func apiToResponse(api *RestApi) *restApiResponse {
 		Id:          api.Id,
 		Name:        api.Name,
 		Description: api.Description,
-		CreatedDate: api.CreatedDate,
+		CreatedDate: float64(api.CreatedDate.Unix()),
 	}
 }
 
@@ -152,7 +152,7 @@ func resourceToResponse(r *Resource) *resourceResponse {
 func deploymentToResponse(d *Deployment) *deploymentResponse {
 	return &deploymentResponse{
 		Id:          d.Id,
-		CreatedDate: d.CreatedDate,
+		CreatedDate: float64(d.CreatedDate.Unix()),
 		Description: d.Description,
 	}
 }
@@ -162,7 +162,7 @@ func stageToResponse(st *Stage) *stageResponse {
 		StageName:    st.StageName,
 		DeploymentId: st.DeploymentId,
 		Description:  st.Description,
-		CreatedDate:  st.CreatedDate,
+		CreatedDate:  float64(st.CreatedDate.Unix()),
 	}
 }
 

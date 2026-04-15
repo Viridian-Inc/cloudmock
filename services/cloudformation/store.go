@@ -146,7 +146,7 @@ func (s *StackStore) CreateStack(name, templateBody string, params []Parameter, 
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if _, exists := s.stacks[name]; exists {
+	if existing, exists := s.stacks[name]; exists && existing.StackStatus != "DELETE_COMPLETE" {
 		return nil, fmt.Errorf("AlreadyExistsException: Stack [%s] already exists", name)
 	}
 

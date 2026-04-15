@@ -105,7 +105,14 @@ func (s *CloudWatchService) ResourceSchemas() []schema.ResourceSchema {
 
 // HandleRequest routes an incoming CloudWatch request to the appropriate handler.
 // CloudWatch uses form-encoded POST bodies; the Action is found in the form body.
+// Newer AWS SDKs use Smithy RPC-v2 CBOR over the /service/.../operation/{name} path.
 func (s *CloudWatchService) HandleRequest(ctx *service.RequestContext) (*service.Response, error) {
+	// Detect the Smithy RPC-v2 CBOR protocol. The SDK sets smithy-protocol and
+	// dispatches under /service/GraniteServiceVersion20100801/operation/{Op}.
+	if ctx.RawRequest != nil && ctx.RawRequest.Header.Get("smithy-protocol") == "rpc-v2-cbor" {
+		return s.handleCBORRequest(ctx)
+	}
+
 	action := ctx.Action
 	if action == "" {
 		form := parseForm(ctx)

@@ -1,368 +1,16 @@
 package translate
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
+	"strings"
 	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
-// ── Generated request/response types ─────────────────────────────────────────
-
-type AppliedTerminology struct {
-	Name *string `json:"Name,omitempty"`
-	Terms []Term `json:"Terms,omitempty"`
-}
-
-type CreateParallelDataRequest struct {
-	ClientToken string `json:"ClientToken,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	EncryptionKey *EncryptionKey `json:"EncryptionKey,omitempty"`
-	Name string `json:"Name,omitempty"`
-	ParallelDataConfig ParallelDataConfig `json:"ParallelDataConfig,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateParallelDataResponse struct {
-	Name *string `json:"Name,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type DeleteParallelDataRequest struct {
-	Name string `json:"Name,omitempty"`
-}
-
-type DeleteParallelDataResponse struct {
-	Name *string `json:"Name,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type DeleteTerminologyRequest struct {
-	Name string `json:"Name,omitempty"`
-}
-
-type DescribeTextTranslationJobRequest struct {
-	JobId string `json:"JobId,omitempty"`
-}
-
-type DescribeTextTranslationJobResponse struct {
-	TextTranslationJobProperties *TextTranslationJobProperties `json:"TextTranslationJobProperties,omitempty"`
-}
-
-type Document struct {
-	Content []byte `json:"Content,omitempty"`
-	ContentType string `json:"ContentType,omitempty"`
-}
-
-type EncryptionKey struct {
-	Id string `json:"Id,omitempty"`
-	Type string `json:"Type,omitempty"`
-}
-
-type GetParallelDataRequest struct {
-	Name string `json:"Name,omitempty"`
-}
-
-type GetParallelDataResponse struct {
-	AuxiliaryDataLocation *ParallelDataDataLocation `json:"AuxiliaryDataLocation,omitempty"`
-	DataLocation *ParallelDataDataLocation `json:"DataLocation,omitempty"`
-	LatestUpdateAttemptAuxiliaryDataLocation *ParallelDataDataLocation `json:"LatestUpdateAttemptAuxiliaryDataLocation,omitempty"`
-	ParallelDataProperties *ParallelDataProperties `json:"ParallelDataProperties,omitempty"`
-}
-
-type GetTerminologyRequest struct {
-	Name string `json:"Name,omitempty"`
-	TerminologyDataFormat *string `json:"TerminologyDataFormat,omitempty"`
-}
-
-type GetTerminologyResponse struct {
-	AuxiliaryDataLocation *TerminologyDataLocation `json:"AuxiliaryDataLocation,omitempty"`
-	TerminologyDataLocation *TerminologyDataLocation `json:"TerminologyDataLocation,omitempty"`
-	TerminologyProperties *TerminologyProperties `json:"TerminologyProperties,omitempty"`
-}
-
-type ImportTerminologyRequest struct {
-	Description *string `json:"Description,omitempty"`
-	EncryptionKey *EncryptionKey `json:"EncryptionKey,omitempty"`
-	MergeStrategy string `json:"MergeStrategy,omitempty"`
-	Name string `json:"Name,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-	TerminologyData TerminologyData `json:"TerminologyData,omitempty"`
-}
-
-type ImportTerminologyResponse struct {
-	AuxiliaryDataLocation *TerminologyDataLocation `json:"AuxiliaryDataLocation,omitempty"`
-	TerminologyProperties *TerminologyProperties `json:"TerminologyProperties,omitempty"`
-}
-
-type InputDataConfig struct {
-	ContentType string `json:"ContentType,omitempty"`
-	S3Uri string `json:"S3Uri,omitempty"`
-}
-
-type JobDetails struct {
-	DocumentsWithErrorsCount int `json:"DocumentsWithErrorsCount,omitempty"`
-	InputDocumentsCount int `json:"InputDocumentsCount,omitempty"`
-	TranslatedDocumentsCount int `json:"TranslatedDocumentsCount,omitempty"`
-}
-
-type Language struct {
-	LanguageCode string `json:"LanguageCode,omitempty"`
-	LanguageName string `json:"LanguageName,omitempty"`
-}
-
-type ListLanguagesRequest struct {
-	DisplayLanguageCode *string `json:"DisplayLanguageCode,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListLanguagesResponse struct {
-	DisplayLanguageCode *string `json:"DisplayLanguageCode,omitempty"`
-	Languages []Language `json:"Languages,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListParallelDataRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListParallelDataResponse struct {
-	NextToken *string `json:"NextToken,omitempty"`
-	ParallelDataPropertiesList []ParallelDataProperties `json:"ParallelDataPropertiesList,omitempty"`
-}
-
-type ListTagsForResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-}
-
-type ListTagsForResourceResponse struct {
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type ListTerminologiesRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListTerminologiesResponse struct {
-	NextToken *string `json:"NextToken,omitempty"`
-	TerminologyPropertiesList []TerminologyProperties `json:"TerminologyPropertiesList,omitempty"`
-}
-
-type ListTextTranslationJobsRequest struct {
-	Filter *TextTranslationJobFilter `json:"Filter,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListTextTranslationJobsResponse struct {
-	NextToken *string `json:"NextToken,omitempty"`
-	TextTranslationJobPropertiesList []TextTranslationJobProperties `json:"TextTranslationJobPropertiesList,omitempty"`
-}
-
-type OutputDataConfig struct {
-	EncryptionKey *EncryptionKey `json:"EncryptionKey,omitempty"`
-	S3Uri string `json:"S3Uri,omitempty"`
-}
-
-type ParallelDataConfig struct {
-	Format *string `json:"Format,omitempty"`
-	S3Uri *string `json:"S3Uri,omitempty"`
-}
-
-type ParallelDataDataLocation struct {
-	Location string `json:"Location,omitempty"`
-	RepositoryType string `json:"RepositoryType,omitempty"`
-}
-
-type ParallelDataProperties struct {
-	Arn *string `json:"Arn,omitempty"`
-	CreatedAt *time.Time `json:"CreatedAt,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	EncryptionKey *EncryptionKey `json:"EncryptionKey,omitempty"`
-	FailedRecordCount int64 `json:"FailedRecordCount,omitempty"`
-	ImportedDataSize int64 `json:"ImportedDataSize,omitempty"`
-	ImportedRecordCount int64 `json:"ImportedRecordCount,omitempty"`
-	LastUpdatedAt *time.Time `json:"LastUpdatedAt,omitempty"`
-	LatestUpdateAttemptAt *time.Time `json:"LatestUpdateAttemptAt,omitempty"`
-	LatestUpdateAttemptStatus *string `json:"LatestUpdateAttemptStatus,omitempty"`
-	Message *string `json:"Message,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	ParallelDataConfig *ParallelDataConfig `json:"ParallelDataConfig,omitempty"`
-	SkippedRecordCount int64 `json:"SkippedRecordCount,omitempty"`
-	SourceLanguageCode *string `json:"SourceLanguageCode,omitempty"`
-	Status *string `json:"Status,omitempty"`
-	TargetLanguageCodes []string `json:"TargetLanguageCodes,omitempty"`
-}
-
-type StartTextTranslationJobRequest struct {
-	ClientToken string `json:"ClientToken,omitempty"`
-	DataAccessRoleArn string `json:"DataAccessRoleArn,omitempty"`
-	InputDataConfig InputDataConfig `json:"InputDataConfig,omitempty"`
-	JobName *string `json:"JobName,omitempty"`
-	OutputDataConfig OutputDataConfig `json:"OutputDataConfig,omitempty"`
-	ParallelDataNames []string `json:"ParallelDataNames,omitempty"`
-	Settings *TranslationSettings `json:"Settings,omitempty"`
-	SourceLanguageCode string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCodes []string `json:"TargetLanguageCodes,omitempty"`
-	TerminologyNames []string `json:"TerminologyNames,omitempty"`
-}
-
-type StartTextTranslationJobResponse struct {
-	JobId *string `json:"JobId,omitempty"`
-	JobStatus *string `json:"JobStatus,omitempty"`
-}
-
-type StopTextTranslationJobRequest struct {
-	JobId string `json:"JobId,omitempty"`
-}
-
-type StopTextTranslationJobResponse struct {
-	JobId *string `json:"JobId,omitempty"`
-	JobStatus *string `json:"JobStatus,omitempty"`
-}
-
-type Tag struct {
-	Key string `json:"Key,omitempty"`
-	Value string `json:"Value,omitempty"`
-}
-
-type TagResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type TagResourceResponse struct {
-}
-
-type Term struct {
-	SourceText *string `json:"SourceText,omitempty"`
-	TargetText *string `json:"TargetText,omitempty"`
-}
-
-type TerminologyData struct {
-	Directionality *string `json:"Directionality,omitempty"`
-	File []byte `json:"File,omitempty"`
-	Format string `json:"Format,omitempty"`
-}
-
-type TerminologyDataLocation struct {
-	Location string `json:"Location,omitempty"`
-	RepositoryType string `json:"RepositoryType,omitempty"`
-}
-
-type TerminologyProperties struct {
-	Arn *string `json:"Arn,omitempty"`
-	CreatedAt *time.Time `json:"CreatedAt,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Directionality *string `json:"Directionality,omitempty"`
-	EncryptionKey *EncryptionKey `json:"EncryptionKey,omitempty"`
-	Format *string `json:"Format,omitempty"`
-	LastUpdatedAt *time.Time `json:"LastUpdatedAt,omitempty"`
-	Message *string `json:"Message,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	SizeBytes int `json:"SizeBytes,omitempty"`
-	SkippedTermCount int `json:"SkippedTermCount,omitempty"`
-	SourceLanguageCode *string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCodes []string `json:"TargetLanguageCodes,omitempty"`
-	TermCount int `json:"TermCount,omitempty"`
-}
-
-type TextTranslationJobFilter struct {
-	JobName *string `json:"JobName,omitempty"`
-	JobStatus *string `json:"JobStatus,omitempty"`
-	SubmittedAfterTime *time.Time `json:"SubmittedAfterTime,omitempty"`
-	SubmittedBeforeTime *time.Time `json:"SubmittedBeforeTime,omitempty"`
-}
-
-type TextTranslationJobProperties struct {
-	DataAccessRoleArn *string `json:"DataAccessRoleArn,omitempty"`
-	EndTime *time.Time `json:"EndTime,omitempty"`
-	InputDataConfig *InputDataConfig `json:"InputDataConfig,omitempty"`
-	JobDetails *JobDetails `json:"JobDetails,omitempty"`
-	JobId *string `json:"JobId,omitempty"`
-	JobName *string `json:"JobName,omitempty"`
-	JobStatus *string `json:"JobStatus,omitempty"`
-	Message *string `json:"Message,omitempty"`
-	OutputDataConfig *OutputDataConfig `json:"OutputDataConfig,omitempty"`
-	ParallelDataNames []string `json:"ParallelDataNames,omitempty"`
-	Settings *TranslationSettings `json:"Settings,omitempty"`
-	SourceLanguageCode *string `json:"SourceLanguageCode,omitempty"`
-	SubmittedTime *time.Time `json:"SubmittedTime,omitempty"`
-	TargetLanguageCodes []string `json:"TargetLanguageCodes,omitempty"`
-	TerminologyNames []string `json:"TerminologyNames,omitempty"`
-}
-
-type TranslateDocumentRequest struct {
-	Document Document `json:"Document,omitempty"`
-	Settings *TranslationSettings `json:"Settings,omitempty"`
-	SourceLanguageCode string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCode string `json:"TargetLanguageCode,omitempty"`
-	TerminologyNames []string `json:"TerminologyNames,omitempty"`
-}
-
-type TranslateDocumentResponse struct {
-	AppliedSettings *TranslationSettings `json:"AppliedSettings,omitempty"`
-	AppliedTerminologies []AppliedTerminology `json:"AppliedTerminologies,omitempty"`
-	SourceLanguageCode string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCode string `json:"TargetLanguageCode,omitempty"`
-	TranslatedDocument TranslatedDocument `json:"TranslatedDocument,omitempty"`
-}
-
-type TranslateTextRequest struct {
-	Settings *TranslationSettings `json:"Settings,omitempty"`
-	SourceLanguageCode string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCode string `json:"TargetLanguageCode,omitempty"`
-	TerminologyNames []string `json:"TerminologyNames,omitempty"`
-	Text string `json:"Text,omitempty"`
-}
-
-type TranslateTextResponse struct {
-	AppliedSettings *TranslationSettings `json:"AppliedSettings,omitempty"`
-	AppliedTerminologies []AppliedTerminology `json:"AppliedTerminologies,omitempty"`
-	SourceLanguageCode string `json:"SourceLanguageCode,omitempty"`
-	TargetLanguageCode string `json:"TargetLanguageCode,omitempty"`
-	TranslatedText string `json:"TranslatedText,omitempty"`
-}
-
-type TranslatedDocument struct {
-	Content []byte `json:"Content,omitempty"`
-}
-
-type TranslationSettings struct {
-	Brevity *string `json:"Brevity,omitempty"`
-	Formality *string `json:"Formality,omitempty"`
-	Profanity *string `json:"Profanity,omitempty"`
-}
-
-type UntagResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-	TagKeys []string `json:"TagKeys,omitempty"`
-}
-
-type UntagResourceResponse struct {
-}
-
-type UpdateParallelDataRequest struct {
-	ClientToken string `json:"ClientToken,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Name string `json:"Name,omitempty"`
-	ParallelDataConfig ParallelDataConfig `json:"ParallelDataConfig,omitempty"`
-}
-
-type UpdateParallelDataResponse struct {
-	LatestUpdateAttemptAt *time.Time `json:"LatestUpdateAttemptAt,omitempty"`
-	LatestUpdateAttemptStatus *string `json:"LatestUpdateAttemptStatus,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-
-
-// ── Handler helpers ──────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -377,182 +25,581 @@ func parseJSON(body []byte, v any) *service.AWSError {
 		return nil
 	}
 	if err := gojson.Unmarshal(body, v); err != nil {
-		return service.NewAWSError("InvalidParameterException",
+		return service.NewAWSError("InvalidParameterValueException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}
 	return nil
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
-
-func handleCreateParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateParallelDataRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
 	}
-	// TODO: implement CreateParallelData business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateParallelData"})
+	return ""
 }
 
-func handleDeleteParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteParallelDataRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStrList(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
 	}
-	// TODO: implement DeleteParallelData business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteParallelData"})
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, x := range arr {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
-func handleDeleteTerminology(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteTerminologyRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getMap(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if mm, ok := v.(map[string]any); ok {
+			return mm
+		}
 	}
-	// TODO: implement DeleteTerminology business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteTerminology"})
+	return nil
 }
 
-func handleDescribeTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeTextTranslationJobRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getBytes(m map[string]any, key string) []byte {
+	v, ok := m[key]
+	if !ok {
+		return nil
 	}
-	// TODO: implement DescribeTextTranslationJob business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeTextTranslationJob"})
+	switch x := v.(type) {
+	case string:
+		return []byte(x)
+	case []byte:
+		return x
+	case []any:
+		out := make([]byte, 0, len(x))
+		for _, b := range x {
+			if n, ok := b.(float64); ok {
+				out = append(out, byte(int(n)))
+			}
+		}
+		return out
+	}
+	return nil
 }
 
-func handleGetParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetParallelDataRequest
+func getStringTags(m map[string]any, key string) map[string]string {
+	out := make(map[string]string)
+	arr, ok := m[key].([]any)
+	if !ok {
+		return out
+	}
+	for _, t := range arr {
+		tm, ok := t.(map[string]any)
+		if !ok {
+			continue
+		}
+		k := getStr(tm, "Key")
+		v := getStr(tm, "Value")
+		if k != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func rfc3339(t time.Time) string {
+	return t.Format(time.RFC3339)
+}
+
+// ── Terminology handlers ─────────────────────────────────────────────────────
+
+func handleImportTerminology(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetParallelData business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetParallelData"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	data := getMap(req, "TerminologyData")
+	if data == nil {
+		return jsonErr(service.ErrValidation("TerminologyData is required."))
+	}
+	format := getStr(data, "Format")
+	if format == "" {
+		return jsonErr(service.ErrValidation("TerminologyData.Format is required."))
+	}
+	directionality := getStr(data, "Directionality")
+	if directionality == "" {
+		directionality = "UNI"
+	}
+	sourceLang := getStr(data, "SourceLanguageCode")
+	targetLangs := getStrList(data, "TargetLanguageCodes")
+	description := getStr(req, "Description")
+	var fileBytes []byte
+	if f := getMap(req, "TerminologyData"); f != nil {
+		fileBytes = getBytes(f, "File")
+	}
+
+	term := store.ImportTerminology(name, description, sourceLang, targetLangs, format, directionality, fileBytes, getStringTags(req, "Tags"))
+	return jsonOK(map[string]any{
+		"TerminologyProperties": terminologyProps(term),
+	})
 }
 
 func handleGetTerminology(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetTerminologyRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetTerminology business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetTerminology"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	t, err := store.GetTerminology(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"TerminologyProperties": terminologyProps(t),
+		"TerminologyDataLocation": map[string]any{
+			"Location":      "s3://cloudmock-mock/terminology/" + t.Name,
+			"RepositoryType": "S3",
+		},
+	})
 }
 
-func handleImportTerminology(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ImportTerminologyRequest
+func handleDeleteTerminology(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement ImportTerminology business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ImportTerminology"})
-}
-
-func handleListLanguages(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListLanguagesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
 	}
-	// TODO: implement ListLanguages business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListLanguages"})
-}
-
-func handleListParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListParallelDataRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if err := store.DeleteTerminology(name); err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement ListParallelData business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListParallelData"})
-}
-
-func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTagsForResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTagsForResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTagsForResource"})
+	return jsonOK(map[string]any{})
 }
 
 func handleListTerminologies(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTerminologiesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	terms := store.ListTerminologies()
+	out := make([]map[string]any, 0, len(terms))
+	for _, t := range terms {
+		out = append(out, terminologyProps(t))
 	}
-	// TODO: implement ListTerminologies business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTerminologies"})
+	return jsonOK(map[string]any{"TerminologyPropertiesList": out})
 }
 
-func handleListTextTranslationJobs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTextTranslationJobsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func terminologyProps(t *StoredTerminology) map[string]any {
+	return map[string]any{
+		"Name":                 t.Name,
+		"Arn":                  t.Arn,
+		"Description":          t.Description,
+		"SourceLanguageCode":   t.SourceLanguage,
+		"TargetLanguageCodes":  t.TargetLanguages,
+		"TermCount":            t.TermCount,
+		"Format":               t.Format,
+		"Directionality":       t.Directionality,
+		"CreatedAt":            rfc3339(t.CreatedAt),
+		"LastUpdatedAt":        rfc3339(t.LastUpdatedAt),
 	}
-	// TODO: implement ListTextTranslationJobs business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTextTranslationJobs"})
 }
 
-func handleStartTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req StartTextTranslationJobRequest
+// ── Parallel data handlers ──────────────────────────────────────────────────
+
+func handleCreateParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement StartTextTranslationJob business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "StartTextTranslationJob"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	config := getMap(req, "ParallelDataConfig")
+	if config == nil {
+		return jsonErr(service.ErrValidation("ParallelDataConfig is required."))
+	}
+	encKey := ""
+	if ek := getMap(req, "EncryptionKey"); ek != nil {
+		encKey = getStr(ek, "Id")
+	}
+	pd, err := store.CreateParallelData(name, getStr(req, "Description"), "", nil, config, encKey, getStringTags(req, "Tags"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"Name":   pd.Name,
+		"Status": pd.Status,
+	})
 }
 
-func handleStopTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req StopTextTranslationJobRequest
+func handleGetParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement StopTextTranslationJob business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "StopTextTranslationJob"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	pd, err := store.GetParallelData(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ParallelDataProperties": parallelDataProps(pd),
+		"DataLocation": map[string]any{
+			"Location":       "s3://cloudmock-mock/parallel-data/" + pd.Name,
+			"RepositoryType": "S3",
+		},
+	})
 }
 
-func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TagResourceRequest
+func handleDeleteParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement TagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TagResource"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	if err := store.DeleteParallelData(name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"Name":   name,
+		"Status": "DELETING",
+	})
 }
 
-func handleTranslateDocument(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TranslateDocumentRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func handleListParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	pds := store.ListParallelData()
+	out := make([]map[string]any, 0, len(pds))
+	for _, pd := range pds {
+		out = append(out, parallelDataProps(pd))
 	}
-	// TODO: implement TranslateDocument business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TranslateDocument"})
-}
-
-func handleTranslateText(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TranslateTextRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement TranslateText business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TranslateText"})
-}
-
-func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UntagResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement UntagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UntagResource"})
+	return jsonOK(map[string]any{"ParallelDataPropertiesList": out})
 }
 
 func handleUpdateParallelData(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateParallelDataRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateParallelData business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateParallelData"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	pd, err := store.UpdateParallelData(name, getStr(req, "Description"), getMap(req, "ParallelDataConfig"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"Name":          pd.Name,
+		"Status":        pd.Status,
+		"LatestUpdateAttemptStatus": "ACTIVE",
+		"LatestUpdateAttemptAt":     rfc3339(pd.LastUpdatedAt),
+	})
 }
 
+func parallelDataProps(pd *StoredParallelData) map[string]any {
+	return map[string]any{
+		"Name":                pd.Name,
+		"Arn":                 pd.Arn,
+		"Description":         pd.Description,
+		"Status":              pd.Status,
+		"SourceLanguageCode":  pd.SourceLanguageCode,
+		"TargetLanguageCodes": pd.TargetLanguageCodes,
+		"ParallelDataConfig":  pd.ParallelDataConfig,
+		"CreatedAt":           rfc3339(pd.CreatedAt),
+		"LastUpdatedAt":       rfc3339(pd.LastUpdatedAt),
+	}
+}
+
+// ── Jobs ─────────────────────────────────────────────────────────────────────
+
+func handleStartTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	jobName := getStr(req, "JobName")
+	if jobName == "" {
+		return jsonErr(service.ErrValidation("JobName is required."))
+	}
+	sourceLang := getStr(req, "SourceLanguageCode")
+	if sourceLang == "" {
+		return jsonErr(service.ErrValidation("SourceLanguageCode is required."))
+	}
+	targetLangs := getStrList(req, "TargetLanguageCodes")
+	if len(targetLangs) == 0 {
+		return jsonErr(service.ErrValidation("TargetLanguageCodes is required."))
+	}
+	inputCfg := getMap(req, "InputDataConfig")
+	if inputCfg == nil {
+		return jsonErr(service.ErrValidation("InputDataConfig is required."))
+	}
+	outputCfg := getMap(req, "OutputDataConfig")
+	if outputCfg == nil {
+		return jsonErr(service.ErrValidation("OutputDataConfig is required."))
+	}
+	dataAccessRole := getStr(req, "DataAccessRoleArn")
+	if dataAccessRole == "" {
+		return jsonErr(service.ErrValidation("DataAccessRoleArn is required."))
+	}
+
+	job := store.StartJob(&StoredJob{
+		JobName:             jobName,
+		SourceLanguageCode:  sourceLang,
+		TargetLanguageCodes: targetLangs,
+		TerminologyNames:    getStrList(req, "TerminologyNames"),
+		ParallelDataNames:   getStrList(req, "ParallelDataNames"),
+		InputDataConfig:     inputCfg,
+		OutputDataConfig:    outputCfg,
+		DataAccessRoleArn:   dataAccessRole,
+		Settings:            getMap(req, "Settings"),
+	})
+	return jsonOK(map[string]any{
+		"JobId":     job.JobID,
+		"JobStatus": job.JobStatus,
+	})
+}
+
+func handleStopTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "JobId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("JobId is required."))
+	}
+	job, err := store.StopJob(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"JobId":     job.JobID,
+		"JobStatus": job.JobStatus,
+	})
+}
+
+func handleDescribeTextTranslationJob(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "JobId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("JobId is required."))
+	}
+	job, err := store.GetJob(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"TextTranslationJobProperties": jobProps(job),
+	})
+}
+
+func handleListTextTranslationJobs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	jobs := store.ListJobs()
+	out := make([]map[string]any, 0, len(jobs))
+	for _, j := range jobs {
+		out = append(out, jobProps(j))
+	}
+	return jsonOK(map[string]any{"TextTranslationJobPropertiesList": out})
+}
+
+func jobProps(j *StoredJob) map[string]any {
+	return map[string]any{
+		"JobId":               j.JobID,
+		"JobName":             j.JobName,
+		"JobStatus":           j.JobStatus,
+		"SubmittedTime":       rfc3339(j.SubmittedTime),
+		"EndTime":             rfc3339(j.EndTime),
+		"SourceLanguageCode":  j.SourceLanguageCode,
+		"TargetLanguageCodes": j.TargetLanguageCodes,
+		"TerminologyNames":    j.TerminologyNames,
+		"ParallelDataNames":   j.ParallelDataNames,
+		"InputDataConfig":     j.InputDataConfig,
+		"OutputDataConfig":    j.OutputDataConfig,
+		"DataAccessRoleArn":   j.DataAccessRoleArn,
+		"Settings":            j.Settings,
+		"Message":             j.Message,
+		"JobDetails": map[string]any{
+			"TranslatedDocumentsCount": 0,
+			"DocumentsWithErrorsCount": 0,
+			"InputDocumentsCount":      0,
+		},
+	}
+}
+
+// ── Tagging ──────────────────────────────────────────────────────────────────
+
+func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	store.TagResource(arn, getStringTags(req, "Tags"))
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	store.UntagResource(arn, getStrList(req, "TagKeys"))
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	tags := store.ListTags(arn)
+	tagList := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		tagList = append(tagList, map[string]any{"Key": k, "Value": v})
+	}
+	return jsonOK(map[string]any{"Tags": tagList})
+}
+
+// ── Direct translation ──────────────────────────────────────────────────────
+
+// Cloudmock doesn't actually translate. It returns the input text unchanged
+// with the requested target language code — enough for SDK smoke tests.
+
+func handleTranslateText(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	text := getStr(req, "Text")
+	if text == "" {
+		return jsonErr(service.ErrValidation("Text is required."))
+	}
+	sourceLang := getStr(req, "SourceLanguageCode")
+	if sourceLang == "" {
+		return jsonErr(service.ErrValidation("SourceLanguageCode is required."))
+	}
+	targetLang := getStr(req, "TargetLanguageCode")
+	if targetLang == "" {
+		return jsonErr(service.ErrValidation("TargetLanguageCode is required."))
+	}
+
+	detected := sourceLang
+	if sourceLang == "auto" {
+		detected = "en"
+	}
+	return jsonOK(map[string]any{
+		"TranslatedText":     text,
+		"SourceLanguageCode": detected,
+		"TargetLanguageCode": targetLang,
+		"AppliedTerminologies": []any{},
+	})
+}
+
+func handleTranslateDocument(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	doc := getMap(req, "Document")
+	if doc == nil {
+		return jsonErr(service.ErrValidation("Document is required."))
+	}
+	content := getBytes(doc, "Content")
+	if len(content) == 0 {
+		return jsonErr(service.ErrValidation("Document.Content is required."))
+	}
+	sourceLang := getStr(req, "SourceLanguageCode")
+	if sourceLang == "" {
+		return jsonErr(service.ErrValidation("SourceLanguageCode is required."))
+	}
+	targetLang := getStr(req, "TargetLanguageCode")
+	if targetLang == "" {
+		return jsonErr(service.ErrValidation("TargetLanguageCode is required."))
+	}
+
+	return jsonOK(map[string]any{
+		"TranslatedDocument": map[string]any{
+			"Content": content,
+		},
+		"SourceLanguageCode": sourceLang,
+		"TargetLanguageCode": targetLang,
+	})
+}
+
+// ── Static catalogue ─────────────────────────────────────────────────────────
+
+var supportedLanguages = []map[string]any{
+	{"LanguageName": "Afrikaans", "LanguageCode": "af"},
+	{"LanguageName": "Arabic", "LanguageCode": "ar"},
+	{"LanguageName": "Bengali", "LanguageCode": "bn"},
+	{"LanguageName": "Chinese (Simplified)", "LanguageCode": "zh"},
+	{"LanguageName": "Chinese (Traditional)", "LanguageCode": "zh-TW"},
+	{"LanguageName": "Czech", "LanguageCode": "cs"},
+	{"LanguageName": "Danish", "LanguageCode": "da"},
+	{"LanguageName": "Dutch", "LanguageCode": "nl"},
+	{"LanguageName": "English", "LanguageCode": "en"},
+	{"LanguageName": "Finnish", "LanguageCode": "fi"},
+	{"LanguageName": "French", "LanguageCode": "fr"},
+	{"LanguageName": "German", "LanguageCode": "de"},
+	{"LanguageName": "Greek", "LanguageCode": "el"},
+	{"LanguageName": "Hebrew", "LanguageCode": "he"},
+	{"LanguageName": "Hindi", "LanguageCode": "hi"},
+	{"LanguageName": "Italian", "LanguageCode": "it"},
+	{"LanguageName": "Japanese", "LanguageCode": "ja"},
+	{"LanguageName": "Korean", "LanguageCode": "ko"},
+	{"LanguageName": "Norwegian", "LanguageCode": "no"},
+	{"LanguageName": "Polish", "LanguageCode": "pl"},
+	{"LanguageName": "Portuguese", "LanguageCode": "pt"},
+	{"LanguageName": "Russian", "LanguageCode": "ru"},
+	{"LanguageName": "Spanish", "LanguageCode": "es"},
+	{"LanguageName": "Swedish", "LanguageCode": "sv"},
+	{"LanguageName": "Thai", "LanguageCode": "th"},
+	{"LanguageName": "Turkish", "LanguageCode": "tr"},
+	{"LanguageName": "Ukrainian", "LanguageCode": "uk"},
+	{"LanguageName": "Urdu", "LanguageCode": "ur"},
+	{"LanguageName": "Vietnamese", "LanguageCode": "vi"},
+}
+
+func handleListLanguages(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	_ = parseJSON(ctx.Body, &req)
+	display := getStr(req, "DisplayLanguageCode")
+	if display == "" {
+		display = "en"
+	}
+	return jsonOK(map[string]any{
+		"Languages":           supportedLanguages,
+		"DisplayLanguageCode": display,
+	})
+}
+
+// Ensure imports are used even when some sections get trimmed.
+var _ = strings.TrimSpace

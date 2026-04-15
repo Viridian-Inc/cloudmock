@@ -1,731 +1,15 @@
 package globalaccelerator
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
 	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
-// ── Generated request/response types ─────────────────────────────────────────
-
-type Accelerator struct {
-	AcceleratorArn *string `json:"AcceleratorArn,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	DnsName *string `json:"DnsName,omitempty"`
-	DualStackDnsName *string `json:"DualStackDnsName,omitempty"`
-	Enabled bool `json:"Enabled,omitempty"`
-	Events []AcceleratorEvent `json:"Events,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpSets []IpSet `json:"IpSets,omitempty"`
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type AcceleratorAttributes struct {
-	FlowLogsEnabled bool `json:"FlowLogsEnabled,omitempty"`
-	FlowLogsS3Bucket *string `json:"FlowLogsS3Bucket,omitempty"`
-	FlowLogsS3Prefix *string `json:"FlowLogsS3Prefix,omitempty"`
-}
-
-type AcceleratorEvent struct {
-	Message *string `json:"Message,omitempty"`
-	Timestamp *time.Time `json:"Timestamp,omitempty"`
-}
-
-type AddCustomRoutingEndpointsRequest struct {
-	EndpointConfigurations []CustomRoutingEndpointConfiguration `json:"EndpointConfigurations,omitempty"`
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type AddCustomRoutingEndpointsResponse struct {
-	EndpointDescriptions []CustomRoutingEndpointDescription `json:"EndpointDescriptions,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-}
-
-type AddEndpointsRequest struct {
-	EndpointConfigurations []EndpointConfiguration `json:"EndpointConfigurations,omitempty"`
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type AddEndpointsResponse struct {
-	EndpointDescriptions []EndpointDescription `json:"EndpointDescriptions,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-}
-
-type AdvertiseByoipCidrRequest struct {
-	Cidr string `json:"Cidr,omitempty"`
-}
-
-type AdvertiseByoipCidrResponse struct {
-	ByoipCidr *ByoipCidr `json:"ByoipCidr,omitempty"`
-}
-
-type AllowCustomRoutingTrafficRequest struct {
-	AllowAllTrafficToEndpoint bool `json:"AllowAllTrafficToEndpoint,omitempty"`
-	DestinationAddresses []string `json:"DestinationAddresses,omitempty"`
-	DestinationPorts []int `json:"DestinationPorts,omitempty"`
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-	EndpointId string `json:"EndpointId,omitempty"`
-}
-
-type Attachment struct {
-	AttachmentArn *string `json:"AttachmentArn,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Principals []string `json:"Principals,omitempty"`
-	Resources []Resource `json:"Resources,omitempty"`
-}
-
-type ByoipCidr struct {
-	Cidr *string `json:"Cidr,omitempty"`
-	Events []ByoipCidrEvent `json:"Events,omitempty"`
-	State *string `json:"State,omitempty"`
-}
-
-type ByoipCidrEvent struct {
-	Message *string `json:"Message,omitempty"`
-	Timestamp *time.Time `json:"Timestamp,omitempty"`
-}
-
-type CidrAuthorizationContext struct {
-	Message string `json:"Message,omitempty"`
-	Signature string `json:"Signature,omitempty"`
-}
-
-type CreateAcceleratorRequest struct {
-	Enabled bool `json:"Enabled,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpAddresses []string `json:"IpAddresses,omitempty"`
-	Name string `json:"Name,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateAcceleratorResponse struct {
-	Accelerator *Accelerator `json:"Accelerator,omitempty"`
-}
-
-type CreateCrossAccountAttachmentRequest struct {
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Name string `json:"Name,omitempty"`
-	Principals []string `json:"Principals,omitempty"`
-	Resources []Resource `json:"Resources,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateCrossAccountAttachmentResponse struct {
-	CrossAccountAttachment *Attachment `json:"CrossAccountAttachment,omitempty"`
-}
-
-type CreateCustomRoutingAcceleratorRequest struct {
-	Enabled bool `json:"Enabled,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpAddresses []string `json:"IpAddresses,omitempty"`
-	Name string `json:"Name,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateCustomRoutingAcceleratorResponse struct {
-	Accelerator *CustomRoutingAccelerator `json:"Accelerator,omitempty"`
-}
-
-type CreateCustomRoutingEndpointGroupRequest struct {
-	DestinationConfigurations []CustomRoutingDestinationConfiguration `json:"DestinationConfigurations,omitempty"`
-	EndpointGroupRegion string `json:"EndpointGroupRegion,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	ListenerArn string `json:"ListenerArn,omitempty"`
-}
-
-type CreateCustomRoutingEndpointGroupResponse struct {
-	EndpointGroup *CustomRoutingEndpointGroup `json:"EndpointGroup,omitempty"`
-}
-
-type CreateCustomRoutingListenerRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-}
-
-type CreateCustomRoutingListenerResponse struct {
-	Listener *CustomRoutingListener `json:"Listener,omitempty"`
-}
-
-type CreateEndpointGroupRequest struct {
-	EndpointConfigurations []EndpointConfiguration `json:"EndpointConfigurations,omitempty"`
-	EndpointGroupRegion string `json:"EndpointGroupRegion,omitempty"`
-	HealthCheckIntervalSeconds int `json:"HealthCheckIntervalSeconds,omitempty"`
-	HealthCheckPath *string `json:"HealthCheckPath,omitempty"`
-	HealthCheckPort int `json:"HealthCheckPort,omitempty"`
-	HealthCheckProtocol *string `json:"HealthCheckProtocol,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	ListenerArn string `json:"ListenerArn,omitempty"`
-	PortOverrides []PortOverride `json:"PortOverrides,omitempty"`
-	ThresholdCount int `json:"ThresholdCount,omitempty"`
-	TrafficDialPercentage float64 `json:"TrafficDialPercentage,omitempty"`
-}
-
-type CreateEndpointGroupResponse struct {
-	EndpointGroup *EndpointGroup `json:"EndpointGroup,omitempty"`
-}
-
-type CreateListenerRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	ClientAffinity *string `json:"ClientAffinity,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-	Protocol string `json:"Protocol,omitempty"`
-}
-
-type CreateListenerResponse struct {
-	Listener *Listener `json:"Listener,omitempty"`
-}
-
-type CrossAccountResource struct {
-	AttachmentArn *string `json:"AttachmentArn,omitempty"`
-	Cidr *string `json:"Cidr,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-}
-
-type CustomRoutingAccelerator struct {
-	AcceleratorArn *string `json:"AcceleratorArn,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	DnsName *string `json:"DnsName,omitempty"`
-	Enabled bool `json:"Enabled,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpSets []IpSet `json:"IpSets,omitempty"`
-	LastModifiedTime *time.Time `json:"LastModifiedTime,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type CustomRoutingAcceleratorAttributes struct {
-	FlowLogsEnabled bool `json:"FlowLogsEnabled,omitempty"`
-	FlowLogsS3Bucket *string `json:"FlowLogsS3Bucket,omitempty"`
-	FlowLogsS3Prefix *string `json:"FlowLogsS3Prefix,omitempty"`
-}
-
-type CustomRoutingDestinationConfiguration struct {
-	FromPort int `json:"FromPort,omitempty"`
-	Protocols []string `json:"Protocols,omitempty"`
-	ToPort int `json:"ToPort,omitempty"`
-}
-
-type CustomRoutingDestinationDescription struct {
-	FromPort int `json:"FromPort,omitempty"`
-	Protocols []string `json:"Protocols,omitempty"`
-	ToPort int `json:"ToPort,omitempty"`
-}
-
-type CustomRoutingEndpointConfiguration struct {
-	AttachmentArn *string `json:"AttachmentArn,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-}
-
-type CustomRoutingEndpointDescription struct {
-	EndpointId *string `json:"EndpointId,omitempty"`
-}
-
-type CustomRoutingEndpointGroup struct {
-	DestinationDescriptions []CustomRoutingDestinationDescription `json:"DestinationDescriptions,omitempty"`
-	EndpointDescriptions []CustomRoutingEndpointDescription `json:"EndpointDescriptions,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-	EndpointGroupRegion *string `json:"EndpointGroupRegion,omitempty"`
-}
-
-type CustomRoutingListener struct {
-	ListenerArn *string `json:"ListenerArn,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-}
-
-type DeleteAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DeleteCrossAccountAttachmentRequest struct {
-	AttachmentArn string `json:"AttachmentArn,omitempty"`
-}
-
-type DeleteCustomRoutingAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DeleteCustomRoutingEndpointGroupRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type DeleteCustomRoutingListenerRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-}
-
-type DeleteEndpointGroupRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type DeleteListenerRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-}
-
-type DenyCustomRoutingTrafficRequest struct {
-	DenyAllTrafficToEndpoint bool `json:"DenyAllTrafficToEndpoint,omitempty"`
-	DestinationAddresses []string `json:"DestinationAddresses,omitempty"`
-	DestinationPorts []int `json:"DestinationPorts,omitempty"`
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-	EndpointId string `json:"EndpointId,omitempty"`
-}
-
-type DeprovisionByoipCidrRequest struct {
-	Cidr string `json:"Cidr,omitempty"`
-}
-
-type DeprovisionByoipCidrResponse struct {
-	ByoipCidr *ByoipCidr `json:"ByoipCidr,omitempty"`
-}
-
-type DescribeAcceleratorAttributesRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DescribeAcceleratorAttributesResponse struct {
-	AcceleratorAttributes *AcceleratorAttributes `json:"AcceleratorAttributes,omitempty"`
-}
-
-type DescribeAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DescribeAcceleratorResponse struct {
-	Accelerator *Accelerator `json:"Accelerator,omitempty"`
-}
-
-type DescribeCrossAccountAttachmentRequest struct {
-	AttachmentArn string `json:"AttachmentArn,omitempty"`
-}
-
-type DescribeCrossAccountAttachmentResponse struct {
-	CrossAccountAttachment *Attachment `json:"CrossAccountAttachment,omitempty"`
-}
-
-type DescribeCustomRoutingAcceleratorAttributesRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DescribeCustomRoutingAcceleratorAttributesResponse struct {
-	AcceleratorAttributes *CustomRoutingAcceleratorAttributes `json:"AcceleratorAttributes,omitempty"`
-}
-
-type DescribeCustomRoutingAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-}
-
-type DescribeCustomRoutingAcceleratorResponse struct {
-	Accelerator *CustomRoutingAccelerator `json:"Accelerator,omitempty"`
-}
-
-type DescribeCustomRoutingEndpointGroupRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type DescribeCustomRoutingEndpointGroupResponse struct {
-	EndpointGroup *CustomRoutingEndpointGroup `json:"EndpointGroup,omitempty"`
-}
-
-type DescribeCustomRoutingListenerRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-}
-
-type DescribeCustomRoutingListenerResponse struct {
-	Listener *CustomRoutingListener `json:"Listener,omitempty"`
-}
-
-type DescribeEndpointGroupRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-}
-
-type DescribeEndpointGroupResponse struct {
-	EndpointGroup *EndpointGroup `json:"EndpointGroup,omitempty"`
-}
-
-type DescribeListenerRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-}
-
-type DescribeListenerResponse struct {
-	Listener *Listener `json:"Listener,omitempty"`
-}
-
-type DestinationPortMapping struct {
-	AcceleratorArn *string `json:"AcceleratorArn,omitempty"`
-	AcceleratorSocketAddresses []SocketAddress `json:"AcceleratorSocketAddresses,omitempty"`
-	DestinationSocketAddress *SocketAddress `json:"DestinationSocketAddress,omitempty"`
-	DestinationTrafficState *string `json:"DestinationTrafficState,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-	EndpointGroupRegion *string `json:"EndpointGroupRegion,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-}
-
-type EndpointConfiguration struct {
-	AttachmentArn *string `json:"AttachmentArn,omitempty"`
-	ClientIPPreservationEnabled bool `json:"ClientIPPreservationEnabled,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-	Weight int `json:"Weight,omitempty"`
-}
-
-type EndpointDescription struct {
-	ClientIPPreservationEnabled bool `json:"ClientIPPreservationEnabled,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-	HealthReason *string `json:"HealthReason,omitempty"`
-	HealthState *string `json:"HealthState,omitempty"`
-	Weight int `json:"Weight,omitempty"`
-}
-
-type EndpointGroup struct {
-	EndpointDescriptions []EndpointDescription `json:"EndpointDescriptions,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-	EndpointGroupRegion *string `json:"EndpointGroupRegion,omitempty"`
-	HealthCheckIntervalSeconds int `json:"HealthCheckIntervalSeconds,omitempty"`
-	HealthCheckPath *string `json:"HealthCheckPath,omitempty"`
-	HealthCheckPort int `json:"HealthCheckPort,omitempty"`
-	HealthCheckProtocol *string `json:"HealthCheckProtocol,omitempty"`
-	PortOverrides []PortOverride `json:"PortOverrides,omitempty"`
-	ThresholdCount int `json:"ThresholdCount,omitempty"`
-	TrafficDialPercentage float64 `json:"TrafficDialPercentage,omitempty"`
-}
-
-type EndpointIdentifier struct {
-	ClientIPPreservationEnabled bool `json:"ClientIPPreservationEnabled,omitempty"`
-	EndpointId string `json:"EndpointId,omitempty"`
-}
-
-type IpSet struct {
-	IpAddressFamily *string `json:"IpAddressFamily,omitempty"`
-	IpAddresses []string `json:"IpAddresses,omitempty"`
-	IpFamily *string `json:"IpFamily,omitempty"`
-}
-
-type ListAcceleratorsRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListAcceleratorsResponse struct {
-	Accelerators []Accelerator `json:"Accelerators,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListByoipCidrsRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListByoipCidrsResponse struct {
-	ByoipCidrs []ByoipCidr `json:"ByoipCidrs,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCrossAccountAttachmentsRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCrossAccountAttachmentsResponse struct {
-	CrossAccountAttachments []Attachment `json:"CrossAccountAttachments,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCrossAccountResourceAccountsRequest struct {
-}
-
-type ListCrossAccountResourceAccountsResponse struct {
-	ResourceOwnerAwsAccountIds []string `json:"ResourceOwnerAwsAccountIds,omitempty"`
-}
-
-type ListCrossAccountResourcesRequest struct {
-	AcceleratorArn *string `json:"AcceleratorArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-	ResourceOwnerAwsAccountId string `json:"ResourceOwnerAwsAccountId,omitempty"`
-}
-
-type ListCrossAccountResourcesResponse struct {
-	CrossAccountResources []CrossAccountResource `json:"CrossAccountResources,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingAcceleratorsRequest struct {
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingAcceleratorsResponse struct {
-	Accelerators []CustomRoutingAccelerator `json:"Accelerators,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingEndpointGroupsRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingEndpointGroupsResponse struct {
-	EndpointGroups []CustomRoutingEndpointGroup `json:"EndpointGroups,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingListenersRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingListenersResponse struct {
-	Listeners []CustomRoutingListener `json:"Listeners,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingPortMappingsByDestinationRequest struct {
-	DestinationAddress string `json:"DestinationAddress,omitempty"`
-	EndpointId string `json:"EndpointId,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingPortMappingsByDestinationResponse struct {
-	DestinationPortMappings []DestinationPortMapping `json:"DestinationPortMappings,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingPortMappingsRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListCustomRoutingPortMappingsResponse struct {
-	NextToken *string `json:"NextToken,omitempty"`
-	PortMappings []PortMapping `json:"PortMappings,omitempty"`
-}
-
-type ListEndpointGroupsRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListEndpointGroupsResponse struct {
-	EndpointGroups []EndpointGroup `json:"EndpointGroups,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListListenersRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	MaxResults int `json:"MaxResults,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListListenersResponse struct {
-	Listeners []Listener `json:"Listeners,omitempty"`
-	NextToken *string `json:"NextToken,omitempty"`
-}
-
-type ListTagsForResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-}
-
-type ListTagsForResourceResponse struct {
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type Listener struct {
-	ClientAffinity *string `json:"ClientAffinity,omitempty"`
-	ListenerArn *string `json:"ListenerArn,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-	Protocol *string `json:"Protocol,omitempty"`
-}
-
-type PortMapping struct {
-	AcceleratorPort int `json:"AcceleratorPort,omitempty"`
-	DestinationSocketAddress *SocketAddress `json:"DestinationSocketAddress,omitempty"`
-	DestinationTrafficState *string `json:"DestinationTrafficState,omitempty"`
-	EndpointGroupArn *string `json:"EndpointGroupArn,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-	Protocols []string `json:"Protocols,omitempty"`
-}
-
-type PortOverride struct {
-	EndpointPort int `json:"EndpointPort,omitempty"`
-	ListenerPort int `json:"ListenerPort,omitempty"`
-}
-
-type PortRange struct {
-	FromPort int `json:"FromPort,omitempty"`
-	ToPort int `json:"ToPort,omitempty"`
-}
-
-type ProvisionByoipCidrRequest struct {
-	Cidr string `json:"Cidr,omitempty"`
-	CidrAuthorizationContext CidrAuthorizationContext `json:"CidrAuthorizationContext,omitempty"`
-}
-
-type ProvisionByoipCidrResponse struct {
-	ByoipCidr *ByoipCidr `json:"ByoipCidr,omitempty"`
-}
-
-type RemoveCustomRoutingEndpointsRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-	EndpointIds []string `json:"EndpointIds,omitempty"`
-}
-
-type RemoveEndpointsRequest struct {
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-	EndpointIdentifiers []EndpointIdentifier `json:"EndpointIdentifiers,omitempty"`
-}
-
-type Resource struct {
-	Cidr *string `json:"Cidr,omitempty"`
-	EndpointId *string `json:"EndpointId,omitempty"`
-	Region *string `json:"Region,omitempty"`
-}
-
-type SocketAddress struct {
-	IpAddress *string `json:"IpAddress,omitempty"`
-	Port int `json:"Port,omitempty"`
-}
-
-type Tag struct {
-	Key string `json:"Key,omitempty"`
-	Value string `json:"Value,omitempty"`
-}
-
-type TagResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type TagResourceResponse struct {
-}
-
-type UntagResourceRequest struct {
-	ResourceArn string `json:"ResourceArn,omitempty"`
-	TagKeys []string `json:"TagKeys,omitempty"`
-}
-
-type UntagResourceResponse struct {
-}
-
-type UpdateAcceleratorAttributesRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	FlowLogsEnabled bool `json:"FlowLogsEnabled,omitempty"`
-	FlowLogsS3Bucket *string `json:"FlowLogsS3Bucket,omitempty"`
-	FlowLogsS3Prefix *string `json:"FlowLogsS3Prefix,omitempty"`
-}
-
-type UpdateAcceleratorAttributesResponse struct {
-	AcceleratorAttributes *AcceleratorAttributes `json:"AcceleratorAttributes,omitempty"`
-}
-
-type UpdateAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	Enabled bool `json:"Enabled,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpAddresses []string `json:"IpAddresses,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type UpdateAcceleratorResponse struct {
-	Accelerator *Accelerator `json:"Accelerator,omitempty"`
-}
-
-type UpdateCrossAccountAttachmentRequest struct {
-	AddPrincipals []string `json:"AddPrincipals,omitempty"`
-	AddResources []Resource `json:"AddResources,omitempty"`
-	AttachmentArn string `json:"AttachmentArn,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	RemovePrincipals []string `json:"RemovePrincipals,omitempty"`
-	RemoveResources []Resource `json:"RemoveResources,omitempty"`
-}
-
-type UpdateCrossAccountAttachmentResponse struct {
-	CrossAccountAttachment *Attachment `json:"CrossAccountAttachment,omitempty"`
-}
-
-type UpdateCustomRoutingAcceleratorAttributesRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	FlowLogsEnabled bool `json:"FlowLogsEnabled,omitempty"`
-	FlowLogsS3Bucket *string `json:"FlowLogsS3Bucket,omitempty"`
-	FlowLogsS3Prefix *string `json:"FlowLogsS3Prefix,omitempty"`
-}
-
-type UpdateCustomRoutingAcceleratorAttributesResponse struct {
-	AcceleratorAttributes *CustomRoutingAcceleratorAttributes `json:"AcceleratorAttributes,omitempty"`
-}
-
-type UpdateCustomRoutingAcceleratorRequest struct {
-	AcceleratorArn string `json:"AcceleratorArn,omitempty"`
-	Enabled bool `json:"Enabled,omitempty"`
-	IpAddressType *string `json:"IpAddressType,omitempty"`
-	IpAddresses []string `json:"IpAddresses,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type UpdateCustomRoutingAcceleratorResponse struct {
-	Accelerator *CustomRoutingAccelerator `json:"Accelerator,omitempty"`
-}
-
-type UpdateCustomRoutingListenerRequest struct {
-	ListenerArn string `json:"ListenerArn,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-}
-
-type UpdateCustomRoutingListenerResponse struct {
-	Listener *CustomRoutingListener `json:"Listener,omitempty"`
-}
-
-type UpdateEndpointGroupRequest struct {
-	EndpointConfigurations []EndpointConfiguration `json:"EndpointConfigurations,omitempty"`
-	EndpointGroupArn string `json:"EndpointGroupArn,omitempty"`
-	HealthCheckIntervalSeconds int `json:"HealthCheckIntervalSeconds,omitempty"`
-	HealthCheckPath *string `json:"HealthCheckPath,omitempty"`
-	HealthCheckPort int `json:"HealthCheckPort,omitempty"`
-	HealthCheckProtocol *string `json:"HealthCheckProtocol,omitempty"`
-	PortOverrides []PortOverride `json:"PortOverrides,omitempty"`
-	ThresholdCount int `json:"ThresholdCount,omitempty"`
-	TrafficDialPercentage float64 `json:"TrafficDialPercentage,omitempty"`
-}
-
-type UpdateEndpointGroupResponse struct {
-	EndpointGroup *EndpointGroup `json:"EndpointGroup,omitempty"`
-}
-
-type UpdateListenerRequest struct {
-	ClientAffinity *string `json:"ClientAffinity,omitempty"`
-	ListenerArn string `json:"ListenerArn,omitempty"`
-	PortRanges []PortRange `json:"PortRanges,omitempty"`
-	Protocol *string `json:"Protocol,omitempty"`
-}
-
-type UpdateListenerResponse struct {
-	Listener *Listener `json:"Listener,omitempty"`
-}
-
-type WithdrawByoipCidrRequest struct {
-	Cidr string `json:"Cidr,omitempty"`
-}
-
-type WithdrawByoipCidrResponse struct {
-	ByoipCidr *ByoipCidr `json:"ByoipCidr,omitempty"`
-}
-
-
-
-// ── Handler helpers ──────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -746,509 +30,1216 @@ func parseJSON(body []byte, v any) *service.AWSError {
 	return nil
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
-
-func handleAddCustomRoutingEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AddCustomRoutingEndpointsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
 	}
-	// TODO: implement AddCustomRoutingEndpoints business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AddCustomRoutingEndpoints"})
+	return ""
 }
 
-func handleAddEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AddEndpointsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStrPtr(m map[string]any, key string) *string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return &s
+		}
 	}
-	// TODO: implement AddEndpoints business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AddEndpoints"})
+	return nil
 }
 
-func handleAdvertiseByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AdvertiseByoipCidrRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getBool(m map[string]any, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
 	}
-	// TODO: implement AdvertiseByoipCidr business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AdvertiseByoipCidr"})
+	return false
 }
 
-func handleAllowCustomRoutingTraffic(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AllowCustomRoutingTrafficRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getBoolPtr(m map[string]any, key string) *bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return &b
+		}
 	}
-	// TODO: implement AllowCustomRoutingTraffic business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AllowCustomRoutingTraffic"})
+	return nil
 }
+
+func getInt(m map[string]any, key string) int {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		}
+	}
+	return 0
+}
+
+func getIntPtr(m map[string]any, key string) *int {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			i := int(n)
+			return &i
+		case int:
+			return &n
+		}
+	}
+	return nil
+}
+
+func getFloat(m map[string]any, key string) float64 {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int:
+			return float64(n)
+		}
+	}
+	return 0
+}
+
+func getFloatPtr(m map[string]any, key string) *float64 {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return &n
+		case int:
+			f := float64(n)
+			return &f
+		}
+	}
+	return nil
+}
+
+func getMap(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if mm, ok := v.(map[string]any); ok {
+			return mm
+		}
+	}
+	return nil
+}
+
+func getMapList(m map[string]any, key string) []map[string]any {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(arr))
+	for _, x := range arr {
+		if xm, ok := x.(map[string]any); ok {
+			out = append(out, xm)
+		}
+	}
+	return out
+}
+
+func getStrList(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, x := range arr {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func parseTagList(m map[string]any, key string) map[string]string {
+	out := make(map[string]string)
+	for _, t := range getMapList(m, key) {
+		k := getStr(t, "Key")
+		if k == "" {
+			k = getStr(t, "key")
+		}
+		v := getStr(t, "Value")
+		if v == "" {
+			v = getStr(t, "value")
+		}
+		if k != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func rfc3339(t time.Time) string { return t.Format(time.RFC3339) }
+
+// ── Response shapers ─────────────────────────────────────────────────────────
+
+func acceleratorToMap(a *StoredAccelerator) map[string]any {
+	return map[string]any{
+		"AcceleratorArn":   a.Arn,
+		"Name":             a.Name,
+		"IpAddressType":    a.IpAddressType,
+		"Enabled":          a.Enabled,
+		"DnsName":          a.DnsName,
+		"DualStackDnsName": a.DualStackDnsName,
+		"Status":           a.Status,
+		"IpSets":           a.IpSets,
+		"Events":           a.Events,
+		"CreatedTime":      rfc3339(a.CreatedTime),
+		"LastModifiedTime": rfc3339(a.LastModifiedTime),
+	}
+}
+
+func customAcceleratorToMap(a *StoredCustomRoutingAccelerator) map[string]any {
+	return map[string]any{
+		"AcceleratorArn":   a.Arn,
+		"Name":             a.Name,
+		"IpAddressType":    a.IpAddressType,
+		"Enabled":          a.Enabled,
+		"DnsName":          a.DnsName,
+		"Status":           a.Status,
+		"IpSets":           a.IpSets,
+		"CreatedTime":      rfc3339(a.CreatedTime),
+		"LastModifiedTime": rfc3339(a.LastModifiedTime),
+	}
+}
+
+func acceleratorAttributesToMap(a *StoredAcceleratorAttributes) map[string]any {
+	return map[string]any{
+		"FlowLogsEnabled":  a.FlowLogsEnabled,
+		"FlowLogsS3Bucket": a.FlowLogsS3Bucket,
+		"FlowLogsS3Prefix": a.FlowLogsS3Prefix,
+	}
+}
+
+func customAcceleratorAttributesToMap(a *StoredCustomRoutingAcceleratorAttributes) map[string]any {
+	return map[string]any{
+		"FlowLogsEnabled":  a.FlowLogsEnabled,
+		"FlowLogsS3Bucket": a.FlowLogsS3Bucket,
+		"FlowLogsS3Prefix": a.FlowLogsS3Prefix,
+	}
+}
+
+func listenerToMap(l *StoredListener) map[string]any {
+	return map[string]any{
+		"ListenerArn":    l.Arn,
+		"Protocol":       l.Protocol,
+		"ClientAffinity": l.ClientAffinity,
+		"PortRanges":     l.PortRanges,
+	}
+}
+
+func customListenerToMap(l *StoredCustomRoutingListener) map[string]any {
+	return map[string]any{
+		"ListenerArn": l.Arn,
+		"PortRanges":  l.PortRanges,
+	}
+}
+
+func endpointGroupToMap(g *StoredEndpointGroup) map[string]any {
+	return map[string]any{
+		"EndpointGroupArn":           g.Arn,
+		"EndpointGroupRegion":        g.EndpointGroupRegion,
+		"HealthCheckPort":            g.HealthCheckPort,
+		"HealthCheckProtocol":        g.HealthCheckProtocol,
+		"HealthCheckPath":            g.HealthCheckPath,
+		"HealthCheckIntervalSeconds": g.HealthCheckIntervalSeconds,
+		"ThresholdCount":             g.ThresholdCount,
+		"TrafficDialPercentage":      g.TrafficDialPercentage,
+		"PortOverrides":              g.PortOverrides,
+		"EndpointDescriptions":       g.EndpointDescriptions,
+	}
+}
+
+func customEndpointGroupToMap(g *StoredCustomRoutingEndpointGroup) map[string]any {
+	return map[string]any{
+		"EndpointGroupArn":        g.Arn,
+		"EndpointGroupRegion":     g.EndpointGroupRegion,
+		"DestinationDescriptions": g.DestinationDescriptions,
+		"EndpointDescriptions":    g.EndpointDescriptions,
+	}
+}
+
+func byoipCidrToMap(c *StoredByoipCidr) map[string]any {
+	return map[string]any{
+		"Cidr":   c.Cidr,
+		"State":  c.State,
+		"Events": c.Events,
+	}
+}
+
+func attachmentToMap(a *StoredCrossAccountAttachment) map[string]any {
+	return map[string]any{
+		"AttachmentArn":    a.Arn,
+		"Name":             a.Name,
+		"Principals":       a.Principals,
+		"Resources":        a.Resources,
+		"CreatedTime":      rfc3339(a.CreatedTime),
+		"LastModifiedTime": rfc3339(a.LastModifiedTime),
+	}
+}
+
+// ── Accelerator handlers ─────────────────────────────────────────────────────
 
 func handleCreateAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateAcceleratorRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement CreateAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateAccelerator"})
-}
-
-func handleCreateCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateCrossAccountAttachmentRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
 	}
-	// TODO: implement CreateCrossAccountAttachment business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateCrossAccountAttachment"})
-}
-
-func handleCreateCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateCustomRoutingAcceleratorRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	enabled := true
+	if v := getBoolPtr(req, "Enabled"); v != nil {
+		enabled = *v
 	}
-	// TODO: implement CreateCustomRoutingAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateCustomRoutingAccelerator"})
-}
-
-func handleCreateCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateCustomRoutingEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	a := store.CreateAccelerator(name, getStr(req, "IpAddressType"), getStrList(req, "IpAddresses"), enabled)
+	tags := parseTagList(req, "Tags")
+	if len(tags) > 0 {
+		store.TagResource(a.Arn, tags)
 	}
-	// TODO: implement CreateCustomRoutingEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateCustomRoutingEndpointGroup"})
-}
-
-func handleCreateCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateCustomRoutingListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateCustomRoutingListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateCustomRoutingListener"})
-}
-
-func handleCreateEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateEndpointGroup"})
-}
-
-func handleCreateListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateListener"})
-}
-
-func handleDeleteAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteAcceleratorRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteAccelerator"})
-}
-
-func handleDeleteCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteCrossAccountAttachmentRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteCrossAccountAttachment business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteCrossAccountAttachment"})
-}
-
-func handleDeleteCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteCustomRoutingAcceleratorRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteCustomRoutingAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteCustomRoutingAccelerator"})
-}
-
-func handleDeleteCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteCustomRoutingEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteCustomRoutingEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteCustomRoutingEndpointGroup"})
-}
-
-func handleDeleteCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteCustomRoutingListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteCustomRoutingListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteCustomRoutingListener"})
-}
-
-func handleDeleteEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteEndpointGroup"})
-}
-
-func handleDeleteListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteListener"})
-}
-
-func handleDenyCustomRoutingTraffic(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DenyCustomRoutingTrafficRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DenyCustomRoutingTraffic business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DenyCustomRoutingTraffic"})
-}
-
-func handleDeprovisionByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeprovisionByoipCidrRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeprovisionByoipCidr business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeprovisionByoipCidr"})
+	return jsonOK(map[string]any{"Accelerator": acceleratorToMap(a)})
 }
 
 func handleDescribeAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeAcceleratorRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement DescribeAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeAccelerator"})
-}
-
-func handleDescribeAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeAcceleratorAttributesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
 	}
-	// TODO: implement DescribeAcceleratorAttributes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeAcceleratorAttributes"})
-}
-
-func handleDescribeCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCrossAccountAttachmentRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	a, err := store.GetAccelerator(arn)
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement DescribeCrossAccountAttachment business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCrossAccountAttachment"})
-}
-
-func handleDescribeCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCustomRoutingAcceleratorRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeCustomRoutingAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCustomRoutingAccelerator"})
-}
-
-func handleDescribeCustomRoutingAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCustomRoutingAcceleratorAttributesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeCustomRoutingAcceleratorAttributes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCustomRoutingAcceleratorAttributes"})
-}
-
-func handleDescribeCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCustomRoutingEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeCustomRoutingEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCustomRoutingEndpointGroup"})
-}
-
-func handleDescribeCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCustomRoutingListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeCustomRoutingListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCustomRoutingListener"})
-}
-
-func handleDescribeEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeEndpointGroupRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeEndpointGroup"})
-}
-
-func handleDescribeListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeListenerRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeListener"})
-}
-
-func handleListAccelerators(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListAcceleratorsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListAccelerators business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListAccelerators"})
-}
-
-func handleListByoipCidrs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListByoipCidrsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListByoipCidrs business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListByoipCidrs"})
-}
-
-func handleListCrossAccountAttachments(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCrossAccountAttachmentsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCrossAccountAttachments business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCrossAccountAttachments"})
-}
-
-func handleListCrossAccountResourceAccounts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCrossAccountResourceAccountsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCrossAccountResourceAccounts business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCrossAccountResourceAccounts"})
-}
-
-func handleListCrossAccountResources(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCrossAccountResourcesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCrossAccountResources business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCrossAccountResources"})
-}
-
-func handleListCustomRoutingAccelerators(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCustomRoutingAcceleratorsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCustomRoutingAccelerators business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCustomRoutingAccelerators"})
-}
-
-func handleListCustomRoutingEndpointGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCustomRoutingEndpointGroupsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCustomRoutingEndpointGroups business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCustomRoutingEndpointGroups"})
-}
-
-func handleListCustomRoutingListeners(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCustomRoutingListenersRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCustomRoutingListeners business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCustomRoutingListeners"})
-}
-
-func handleListCustomRoutingPortMappings(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCustomRoutingPortMappingsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCustomRoutingPortMappings business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCustomRoutingPortMappings"})
-}
-
-func handleListCustomRoutingPortMappingsByDestination(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListCustomRoutingPortMappingsByDestinationRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListCustomRoutingPortMappingsByDestination business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListCustomRoutingPortMappingsByDestination"})
-}
-
-func handleListEndpointGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListEndpointGroupsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListEndpointGroups business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListEndpointGroups"})
-}
-
-func handleListListeners(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListListenersRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListListeners business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListListeners"})
-}
-
-func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTagsForResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTagsForResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTagsForResource"})
-}
-
-func handleProvisionByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ProvisionByoipCidrRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ProvisionByoipCidr business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ProvisionByoipCidr"})
-}
-
-func handleRemoveCustomRoutingEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req RemoveCustomRoutingEndpointsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement RemoveCustomRoutingEndpoints business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "RemoveCustomRoutingEndpoints"})
-}
-
-func handleRemoveEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req RemoveEndpointsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement RemoveEndpoints business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "RemoveEndpoints"})
-}
-
-func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TagResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement TagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TagResource"})
-}
-
-func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UntagResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement UntagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UntagResource"})
+	return jsonOK(map[string]any{"Accelerator": acceleratorToMap(a)})
 }
 
 func handleUpdateAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateAcceleratorRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateAccelerator"})
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	a, err := store.UpdateAccelerator(arn,
+		getStrPtr(req, "Name"),
+		getStrPtr(req, "IpAddressType"),
+		getStrList(req, "IpAddresses"),
+		getBoolPtr(req, "Enabled"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Accelerator": acceleratorToMap(a)})
+}
+
+func handleDeleteAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	if err := store.DeleteAccelerator(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListAccelerators(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListAccelerators()
+	out := make([]map[string]any, 0, len(list))
+	for _, a := range list {
+		out = append(out, acceleratorToMap(a))
+	}
+	return jsonOK(map[string]any{"Accelerators": out})
+}
+
+func handleDescribeAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	attrs, err := store.GetAcceleratorAttributes(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"AcceleratorAttributes": acceleratorAttributesToMap(attrs)})
 }
 
 func handleUpdateAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateAcceleratorAttributesRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateAcceleratorAttributes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateAcceleratorAttributes"})
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	attrs, err := store.UpdateAcceleratorAttributes(arn,
+		getBoolPtr(req, "FlowLogsEnabled"),
+		getStrPtr(req, "FlowLogsS3Bucket"),
+		getStrPtr(req, "FlowLogsS3Prefix"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"AcceleratorAttributes": acceleratorAttributesToMap(attrs)})
 }
 
-func handleUpdateCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateCrossAccountAttachmentRequest
+// ── Custom Routing Accelerator handlers ──────────────────────────────────────
+
+func handleCreateCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateCrossAccountAttachment business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateCrossAccountAttachment"})
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	enabled := true
+	if v := getBoolPtr(req, "Enabled"); v != nil {
+		enabled = *v
+	}
+	a := store.CreateCustomRoutingAccelerator(name, getStr(req, "IpAddressType"), getStrList(req, "IpAddresses"), enabled)
+	tags := parseTagList(req, "Tags")
+	if len(tags) > 0 {
+		store.TagResource(a.Arn, tags)
+	}
+	return jsonOK(map[string]any{"Accelerator": customAcceleratorToMap(a)})
+}
+
+func handleDescribeCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	a, err := store.GetCustomRoutingAccelerator(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Accelerator": customAcceleratorToMap(a)})
 }
 
 func handleUpdateCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateCustomRoutingAcceleratorRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateCustomRoutingAccelerator business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateCustomRoutingAccelerator"})
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	a, err := store.UpdateCustomRoutingAccelerator(arn,
+		getStrPtr(req, "Name"),
+		getStrPtr(req, "IpAddressType"),
+		getStrList(req, "IpAddresses"),
+		getBoolPtr(req, "Enabled"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Accelerator": customAcceleratorToMap(a)})
+}
+
+func handleDeleteCustomRoutingAccelerator(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	if err := store.DeleteCustomRoutingAccelerator(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListCustomRoutingAccelerators(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListCustomRoutingAccelerators()
+	out := make([]map[string]any, 0, len(list))
+	for _, a := range list {
+		out = append(out, customAcceleratorToMap(a))
+	}
+	return jsonOK(map[string]any{"Accelerators": out})
+}
+
+func handleDescribeCustomRoutingAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	attrs, err := store.GetCustomRoutingAcceleratorAttributes(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"AcceleratorAttributes": customAcceleratorAttributesToMap(attrs)})
 }
 
 func handleUpdateCustomRoutingAcceleratorAttributes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateCustomRoutingAcceleratorAttributesRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateCustomRoutingAcceleratorAttributes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateCustomRoutingAcceleratorAttributes"})
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	attrs, err := store.UpdateCustomRoutingAcceleratorAttributes(arn,
+		getBoolPtr(req, "FlowLogsEnabled"),
+		getStrPtr(req, "FlowLogsS3Bucket"),
+		getStrPtr(req, "FlowLogsS3Prefix"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"AcceleratorAttributes": customAcceleratorAttributesToMap(attrs)})
 }
 
-func handleUpdateCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateCustomRoutingListenerRequest
+// ── Listener handlers ────────────────────────────────────────────────────────
+
+func handleCreateListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateCustomRoutingListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateCustomRoutingListener"})
+	acceleratorArn := getStr(req, "AcceleratorArn")
+	if acceleratorArn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	protocol := getStr(req, "Protocol")
+	if protocol == "" {
+		return jsonErr(service.ErrValidation("Protocol is required."))
+	}
+	portRanges := getMapList(req, "PortRanges")
+	if len(portRanges) == 0 {
+		return jsonErr(service.ErrValidation("PortRanges is required."))
+	}
+	l, err := store.CreateListener(acceleratorArn, protocol, getStr(req, "ClientAffinity"), portRanges)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": listenerToMap(l)})
 }
 
-func handleUpdateEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateEndpointGroupRequest
+func handleDescribeListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateEndpointGroup business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateEndpointGroup"})
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	l, err := store.GetListener(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": listenerToMap(l)})
 }
 
 func handleUpdateListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateListenerRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateListener business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateListener"})
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	l, err := store.UpdateListener(arn,
+		getStrPtr(req, "Protocol"),
+		getStrPtr(req, "ClientAffinity"),
+		getMapList(req, "PortRanges"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": listenerToMap(l)})
+}
+
+func handleDeleteListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	if err := store.DeleteListener(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListListeners(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	list := store.ListListeners(arn)
+	out := make([]map[string]any, 0, len(list))
+	for _, l := range list {
+		out = append(out, listenerToMap(l))
+	}
+	return jsonOK(map[string]any{"Listeners": out})
+}
+
+// ── Custom Routing Listener handlers ─────────────────────────────────────────
+
+func handleCreateCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	acceleratorArn := getStr(req, "AcceleratorArn")
+	if acceleratorArn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	portRanges := getMapList(req, "PortRanges")
+	if len(portRanges) == 0 {
+		return jsonErr(service.ErrValidation("PortRanges is required."))
+	}
+	l, err := store.CreateCustomRoutingListener(acceleratorArn, portRanges)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": customListenerToMap(l)})
+}
+
+func handleDescribeCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	l, err := store.GetCustomRoutingListener(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": customListenerToMap(l)})
+}
+
+func handleUpdateCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	l, err := store.UpdateCustomRoutingListener(arn, getMapList(req, "PortRanges"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"Listener": customListenerToMap(l)})
+}
+
+func handleDeleteCustomRoutingListener(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	if err := store.DeleteCustomRoutingListener(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListCustomRoutingListeners(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	list := store.ListCustomRoutingListeners(arn)
+	out := make([]map[string]any, 0, len(list))
+	for _, l := range list {
+		out = append(out, customListenerToMap(l))
+	}
+	return jsonOK(map[string]any{"Listeners": out})
+}
+
+// ── Endpoint Group handlers ──────────────────────────────────────────────────
+
+func handleCreateEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	listenerArn := getStr(req, "ListenerArn")
+	if listenerArn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	region := getStr(req, "EndpointGroupRegion")
+	if region == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupRegion is required."))
+	}
+	g, err := store.CreateEndpointGroup(
+		listenerArn,
+		region,
+		getInt(req, "HealthCheckPort"),
+		getStr(req, "HealthCheckProtocol"),
+		getStr(req, "HealthCheckPath"),
+		getInt(req, "HealthCheckIntervalSeconds"),
+		getInt(req, "ThresholdCount"),
+		getFloat(req, "TrafficDialPercentage"),
+		getMapList(req, "PortOverrides"),
+		getMapList(req, "EndpointConfigurations"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"EndpointGroup": endpointGroupToMap(g)})
+}
+
+func handleDescribeEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	g, err := store.GetEndpointGroup(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"EndpointGroup": endpointGroupToMap(g)})
+}
+
+func handleUpdateEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	g, err := store.UpdateEndpointGroup(arn,
+		getIntPtr(req, "HealthCheckPort"),
+		getStrPtr(req, "HealthCheckProtocol"),
+		getStrPtr(req, "HealthCheckPath"),
+		getIntPtr(req, "HealthCheckIntervalSeconds"),
+		getIntPtr(req, "ThresholdCount"),
+		getFloatPtr(req, "TrafficDialPercentage"),
+		getMapList(req, "PortOverrides"),
+		getMapList(req, "EndpointConfigurations"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"EndpointGroup": endpointGroupToMap(g)})
+}
+
+func handleDeleteEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if err := store.DeleteEndpointGroup(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListEndpointGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	list := store.ListEndpointGroups(arn)
+	out := make([]map[string]any, 0, len(list))
+	for _, g := range list {
+		out = append(out, endpointGroupToMap(g))
+	}
+	return jsonOK(map[string]any{"EndpointGroups": out})
+}
+
+func handleAddEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	g, err := store.AddEndpoints(arn, getMapList(req, "EndpointConfigurations"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"EndpointGroupArn":     arn,
+		"EndpointDescriptions": g.EndpointDescriptions,
+	})
+}
+
+func handleRemoveEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if err := store.RemoveEndpoints(arn, getMapList(req, "EndpointIdentifiers")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Custom Routing Endpoint Group handlers ───────────────────────────────────
+
+func handleCreateCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	listenerArn := getStr(req, "ListenerArn")
+	if listenerArn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	region := getStr(req, "EndpointGroupRegion")
+	if region == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupRegion is required."))
+	}
+	destinations := getMapList(req, "DestinationConfigurations")
+	if len(destinations) == 0 {
+		return jsonErr(service.ErrValidation("DestinationConfigurations is required."))
+	}
+	g, err := store.CreateCustomRoutingEndpointGroup(listenerArn, region, destinations)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"EndpointGroup": customEndpointGroupToMap(g)})
+}
+
+func handleDescribeCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	g, err := store.GetCustomRoutingEndpointGroup(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"EndpointGroup": customEndpointGroupToMap(g)})
+}
+
+func handleDeleteCustomRoutingEndpointGroup(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if err := store.DeleteCustomRoutingEndpointGroup(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListCustomRoutingEndpointGroups(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ListenerArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ListenerArn is required."))
+	}
+	list := store.ListCustomRoutingEndpointGroups(arn)
+	out := make([]map[string]any, 0, len(list))
+	for _, g := range list {
+		out = append(out, customEndpointGroupToMap(g))
+	}
+	return jsonOK(map[string]any{"EndpointGroups": out})
+}
+
+func handleAddCustomRoutingEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	g, err := store.AddCustomRoutingEndpoints(arn, getMapList(req, "EndpointConfigurations"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"EndpointGroupArn":     arn,
+		"EndpointDescriptions": g.EndpointDescriptions,
+	})
+}
+
+func handleRemoveCustomRoutingEndpoints(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if err := store.RemoveCustomRoutingEndpoints(arn, getStrList(req, "EndpointIds")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Custom Routing Port Mappings ─────────────────────────────────────────────
+
+func handleListCustomRoutingPortMappings(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AcceleratorArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AcceleratorArn is required."))
+	}
+	if _, err := store.GetCustomRoutingAccelerator(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"PortMappings": []map[string]any{}})
+}
+
+func handleListCustomRoutingPortMappingsByDestination(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if getStr(req, "EndpointId") == "" {
+		return jsonErr(service.ErrValidation("EndpointId is required."))
+	}
+	if getStr(req, "DestinationAddress") == "" {
+		return jsonErr(service.ErrValidation("DestinationAddress is required."))
+	}
+	return jsonOK(map[string]any{"DestinationPortMappings": []map[string]any{}})
+}
+
+// ── Allow / Deny Custom Routing Traffic ──────────────────────────────────────
+
+func handleAllowCustomRoutingTraffic(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if getStr(req, "EndpointId") == "" {
+		return jsonErr(service.ErrValidation("EndpointId is required."))
+	}
+	if _, err := store.GetCustomRoutingEndpointGroup(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDenyCustomRoutingTraffic(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "EndpointGroupArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("EndpointGroupArn is required."))
+	}
+	if getStr(req, "EndpointId") == "" {
+		return jsonErr(service.ErrValidation("EndpointId is required."))
+	}
+	if _, err := store.GetCustomRoutingEndpointGroup(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── BYOIP CIDR handlers ──────────────────────────────────────────────────────
+
+func handleProvisionByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	cidr := getStr(req, "Cidr")
+	if cidr == "" {
+		return jsonErr(service.ErrValidation("Cidr is required."))
+	}
+	c, err := store.ProvisionByoipCidr(cidr)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ByoipCidr": byoipCidrToMap(c)})
+}
+
+func handleAdvertiseByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	cidr := getStr(req, "Cidr")
+	if cidr == "" {
+		return jsonErr(service.ErrValidation("Cidr is required."))
+	}
+	c, err := store.SetByoipCidrState(cidr, "ADVERTISING")
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ByoipCidr": byoipCidrToMap(c)})
 }
 
 func handleWithdrawByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req WithdrawByoipCidrRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement WithdrawByoipCidr business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "WithdrawByoipCidr"})
+	cidr := getStr(req, "Cidr")
+	if cidr == "" {
+		return jsonErr(service.ErrValidation("Cidr is required."))
+	}
+	c, err := store.SetByoipCidrState(cidr, "READY")
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ByoipCidr": byoipCidrToMap(c)})
 }
 
+func handleDeprovisionByoipCidr(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	cidr := getStr(req, "Cidr")
+	if cidr == "" {
+		return jsonErr(service.ErrValidation("Cidr is required."))
+	}
+	c, err := store.DeleteByoipCidr(cidr)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ByoipCidr": byoipCidrToMap(c)})
+}
+
+func handleListByoipCidrs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListByoipCidrs()
+	out := make([]map[string]any, 0, len(list))
+	for _, c := range list {
+		out = append(out, byoipCidrToMap(c))
+	}
+	return jsonOK(map[string]any{"ByoipCidrs": out})
+}
+
+// ── Cross Account Attachment handlers ────────────────────────────────────────
+
+func handleCreateCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "Name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("Name is required."))
+	}
+	a := store.CreateCrossAccountAttachment(name, getStrList(req, "Principals"), getMapList(req, "Resources"))
+	tags := parseTagList(req, "Tags")
+	if len(tags) > 0 {
+		store.TagResource(a.Arn, tags)
+	}
+	return jsonOK(map[string]any{"CrossAccountAttachment": attachmentToMap(a)})
+}
+
+func handleDescribeCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AttachmentArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AttachmentArn is required."))
+	}
+	a, err := store.GetCrossAccountAttachment(arn)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"CrossAccountAttachment": attachmentToMap(a)})
+}
+
+func handleUpdateCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AttachmentArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AttachmentArn is required."))
+	}
+	a, err := store.UpdateCrossAccountAttachment(arn,
+		getStrPtr(req, "Name"),
+		getStrList(req, "AddPrincipals"),
+		getStrList(req, "RemovePrincipals"),
+		getMapList(req, "AddResources"),
+		getMapList(req, "RemoveResources"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"CrossAccountAttachment": attachmentToMap(a)})
+}
+
+func handleDeleteCrossAccountAttachment(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "AttachmentArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("AttachmentArn is required."))
+	}
+	if err := store.DeleteCrossAccountAttachment(arn); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListCrossAccountAttachments(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListCrossAccountAttachments()
+	out := make([]map[string]any, 0, len(list))
+	for _, a := range list {
+		out = append(out, attachmentToMap(a))
+	}
+	return jsonOK(map[string]any{"CrossAccountAttachments": out})
+}
+
+func handleListCrossAccountResourceAccounts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	accounts := store.ListCrossAccountResourceAccounts()
+	return jsonOK(map[string]any{"ResourceOwnerAwsAccountIds": accounts})
+}
+
+func handleListCrossAccountResources(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	owner := getStr(req, "ResourceOwnerAwsAccountId")
+	if owner == "" {
+		return jsonErr(service.ErrValidation("ResourceOwnerAwsAccountId is required."))
+	}
+	list := store.ListCrossAccountResources(owner)
+	return jsonOK(map[string]any{"CrossAccountResources": list})
+}
+
+// ── Tag handlers ─────────────────────────────────────────────────────────────
+
+func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	store.TagResource(arn, parseTagList(req, "Tags"))
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	store.UntagResource(arn, getStrList(req, "TagKeys"))
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "ResourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("ResourceArn is required."))
+	}
+	tags := store.ListTags(arn)
+	out := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		out = append(out, map[string]any{"Key": k, "Value": v})
+	}
+	return jsonOK(map[string]any{"Tags": out})
+}

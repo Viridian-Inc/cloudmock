@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/config"
@@ -12,6 +13,8 @@ import (
 	"github.com/Viridian-Inc/cloudmock/pkg/routing"
 	svc "github.com/Viridian-Inc/cloudmock/services/comprehend"
 )
+
+// ── Test plumbing ───────────────────────────────────────────────────────────
 
 func newGateway(t *testing.T) http.Handler {
 	t.Helper()
@@ -42,769 +45,751 @@ func svcReq(t *testing.T, action string, body any) *http.Request {
 	return req
 }
 
-
-func TestBatchDetectDominantLanguage(t *testing.T) {
-	handler := newGateway(t)
+func doCall(t *testing.T, h http.Handler, action string, body any) (*httptest.ResponseRecorder, map[string]any) {
+	t.Helper()
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectDominantLanguage", nil))
+	h.ServeHTTP(w, svcReq(t, action, body))
 	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectDominantLanguage: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("%s: want 200, got %d\nbody: %s", action, w.Code, w.Body.String())
+	}
+	var out map[string]any
+	if w.Body.Len() > 0 {
+		if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+			t.Fatalf("%s: decode: %v\nbody: %s", action, err, w.Body.String())
+		}
+	}
+	return w, out
+}
+
+func doCallExpectStatus(t *testing.T, h http.Handler, action string, body any, want int) *httptest.ResponseRecorder {
+	t.Helper()
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, svcReq(t, action, body))
+	if w.Code != want {
+		t.Fatalf("%s: want %d, got %d\nbody: %s", action, want, w.Code, w.Body.String())
+	}
+	return w
+}
+
+func mustStr(t *testing.T, m map[string]any, key string) string {
+	t.Helper()
+	v, ok := m[key]
+	if !ok {
+		t.Fatalf("missing key %q in %+v", key, m)
+	}
+	s, ok := v.(string)
+	if !ok {
+		t.Fatalf("key %q not a string: %T", key, v)
+	}
+	return s
+}
+
+func sampleInputDataConfig() map[string]any {
+	return map[string]any{
+		"S3Uri":      "s3://bucket/input/",
+		"DataFormat": "COMPREHEND_CSV",
 	}
 }
 
-func TestBatchDetectEntities(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectEntities", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectEntities: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func sampleOutputDataConfig() map[string]any {
+	return map[string]any{
+		"S3Uri": "s3://bucket/output/",
 	}
 }
 
-func TestBatchDetectKeyPhrases(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectKeyPhrases", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectKeyPhrases: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+// ── Sync detection handlers ─────────────────────────────────────────────────
 
-func TestBatchDetectSentiment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectSentiment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectSentiment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+func TestDetectSyncOps(t *testing.T) {
+	h := newGateway(t)
 
-func TestBatchDetectSyntax(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectSyntax", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectSyntax: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	cases := []struct {
+		action   string
+		req      map[string]any
+		key      string
+		expectMap bool
+	}{
+		{"DetectDominantLanguage", map[string]any{"Text": "Hello world"}, "Languages", false},
+		{"DetectEntities", map[string]any{"Text": "John Smith lives in Seattle.", "LanguageCode": "en"}, "Entities", false},
+		{"DetectKeyPhrases", map[string]any{"Text": "the quick brown fox", "LanguageCode": "en"}, "KeyPhrases", false},
+		{"DetectPiiEntities", map[string]any{"Text": "alice@example.com", "LanguageCode": "en"}, "Entities", false},
+		{"DetectSentiment", map[string]any{"Text": "i love it", "LanguageCode": "en"}, "Sentiment", false},
+		{"DetectSyntax", map[string]any{"Text": "Hello world", "LanguageCode": "en"}, "SyntaxTokens", false},
+		{"DetectTargetedSentiment", map[string]any{"Text": "the service was great", "LanguageCode": "en"}, "Entities", false},
 	}
-}
-
-func TestBatchDetectTargetedSentiment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDetectTargetedSentiment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDetectTargetedSentiment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestClassifyDocument(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ClassifyDocument", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ClassifyDocument: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestContainsPiiEntities(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ContainsPiiEntities", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ContainsPiiEntities: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateDataset(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateDataset", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateDataset: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateDocumentClassifier(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateDocumentClassifier", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateDocumentClassifier: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateEndpoint(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateEndpoint", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateEndpoint: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateEntityRecognizer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateEntityRecognizer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateEntityRecognizer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateFlywheel(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateFlywheel", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateFlywheel: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDocumentClassifier(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDocumentClassifier", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDocumentClassifier: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteEndpoint(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteEndpoint", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteEndpoint: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteEntityRecognizer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteEntityRecognizer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteEntityRecognizer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteFlywheel(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteFlywheel", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteFlywheel: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteResourcePolicy(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteResourcePolicy", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteResourcePolicy: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataset(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataset", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataset: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDocumentClassificationJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDocumentClassificationJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDocumentClassificationJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDocumentClassifier(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDocumentClassifier", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDocumentClassifier: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDominantLanguageDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDominantLanguageDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDominantLanguageDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeEndpoint(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeEndpoint", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeEndpoint: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeEntityRecognizer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeEntityRecognizer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeEntityRecognizer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeEventsDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeEventsDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeEventsDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeFlywheel(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeFlywheel", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeFlywheel: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeFlywheelIteration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeFlywheelIteration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeFlywheelIteration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeKeyPhrasesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeKeyPhrasesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeKeyPhrasesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribePiiEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribePiiEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribePiiEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeResourcePolicy(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeResourcePolicy", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeResourcePolicy: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTargetedSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTargetedSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTargetedSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTopicsDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTopicsDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTopicsDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectDominantLanguage(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectDominantLanguage", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectDominantLanguage: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectEntities(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectEntities", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectEntities: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectKeyPhrases(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectKeyPhrases", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectKeyPhrases: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectPiiEntities(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectPiiEntities", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectPiiEntities: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectSentiment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectSentiment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectSentiment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectSyntax(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectSyntax", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectSyntax: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDetectTargetedSentiment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectTargetedSentiment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectTargetedSentiment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	for _, c := range cases {
+		t.Run(c.action, func(t *testing.T) {
+			_, out := doCall(t, h, c.action, c.req)
+			if _, ok := out[c.key]; !ok {
+				t.Fatalf("%s: missing %s in response: %+v", c.action, c.key, out)
+			}
+		})
 	}
 }
 
 func TestDetectToxicContent(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DetectToxicContent", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DetectToxicContent: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	h := newGateway(t)
+	_, out := doCall(t, h, "DetectToxicContent", map[string]any{
+		"LanguageCode": "en",
+		"TextSegments": []map[string]any{{"Text": "hello world"}},
+	})
+	if _, ok := out["ResultList"]; !ok {
+		t.Fatalf("missing ResultList: %+v", out)
 	}
 }
 
-func TestImportModel(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ImportModel", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ImportModel: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestContainsPiiEntities(t *testing.T) {
+	h := newGateway(t)
+	_, out := doCall(t, h, "ContainsPiiEntities", map[string]any{
+		"Text":         "alice@example.com",
+		"LanguageCode": "en",
+	})
+	if _, ok := out["Labels"]; !ok {
+		t.Fatalf("missing Labels: %+v", out)
 	}
 }
 
-func TestListDatasets(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDatasets", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDatasets: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestDetectMissingArgs(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "DetectSentiment", map[string]any{"LanguageCode": "en"}, http.StatusBadRequest)
+}
+
+// ── Batch detection handlers ────────────────────────────────────────────────
+
+func TestBatchDetectAll(t *testing.T) {
+	h := newGateway(t)
+	texts := []string{"first text", "second text", "third text"}
+	cases := []string{
+		"BatchDetectDominantLanguage",
+		"BatchDetectEntities",
+		"BatchDetectKeyPhrases",
+		"BatchDetectSentiment",
+		"BatchDetectSyntax",
+		"BatchDetectTargetedSentiment",
+	}
+	for _, action := range cases {
+		t.Run(action, func(t *testing.T) {
+			_, out := doCall(t, h, action, map[string]any{
+				"TextList":     texts,
+				"LanguageCode": "en",
+			})
+			rl, ok := out["ResultList"].([]any)
+			if !ok {
+				t.Fatalf("%s: missing/invalid ResultList: %+v", action, out)
+			}
+			if len(rl) != len(texts) {
+				t.Fatalf("%s: want %d results, got %d", action, len(texts), len(rl))
+			}
+		})
 	}
 }
 
-func TestListDocumentClassificationJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDocumentClassificationJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDocumentClassificationJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestBatchDetectMissingTexts(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "BatchDetectEntities", map[string]any{"LanguageCode": "en"}, http.StatusBadRequest)
+}
+
+// ── Document classifier lifecycle ───────────────────────────────────────────
+
+func TestDocumentClassifierLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	_, out := doCall(t, h, "CreateDocumentClassifier", map[string]any{
+		"DocumentClassifierName": "my-classifier",
+		"DataAccessRoleArn":      "arn:aws:iam::123456789012:role/comprehend",
+		"LanguageCode":           "en",
+		"InputDataConfig":        sampleInputDataConfig(),
+		"OutputDataConfig":       sampleOutputDataConfig(),
+		"Tags": []map[string]any{
+			{"Key": "team", "Value": "ml"},
+		},
+	})
+	arn := mustStr(t, out, "DocumentClassifierArn")
+	if !strings.Contains(arn, "document-classifier/my-classifier") {
+		t.Fatalf("unexpected arn: %s", arn)
+	}
+
+	_, out = doCall(t, h, "DescribeDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": arn,
+	})
+	props, ok := out["DocumentClassifierProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing DocumentClassifierProperties: %+v", out)
+	}
+	if mustStr(t, props, "Status") != "TRAINED" {
+		t.Fatalf("unexpected status: %v", props["Status"])
+	}
+
+	_, out = doCall(t, h, "ListDocumentClassifiers", nil)
+	if list, ok := out["DocumentClassifierPropertiesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected list: %+v", out)
+	}
+
+	_, out = doCall(t, h, "ListDocumentClassifierSummaries", nil)
+	if list, ok := out["DocumentClassifierSummariesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected summaries: %+v", out)
+	}
+
+	doCall(t, h, "StopTrainingDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": arn,
+	})
+
+	doCall(t, h, "DeleteDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": arn,
+	})
+
+	doCallExpectStatus(t, h, "DescribeDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": arn,
+	}, http.StatusNotFound)
+}
+
+func TestCreateDocumentClassifierValidation(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "CreateDocumentClassifier", map[string]any{}, http.StatusBadRequest)
+}
+
+// ── Entity recognizer lifecycle ─────────────────────────────────────────────
+
+func TestEntityRecognizerLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	_, out := doCall(t, h, "CreateEntityRecognizer", map[string]any{
+		"RecognizerName":    "my-recognizer",
+		"DataAccessRoleArn": "arn:aws:iam::123456789012:role/comprehend",
+		"LanguageCode":      "en",
+		"InputDataConfig":   sampleInputDataConfig(),
+	})
+	arn := mustStr(t, out, "EntityRecognizerArn")
+
+	_, out = doCall(t, h, "DescribeEntityRecognizer", map[string]any{
+		"EntityRecognizerArn": arn,
+	})
+	if _, ok := out["EntityRecognizerProperties"]; !ok {
+		t.Fatalf("missing EntityRecognizerProperties")
+	}
+
+	_, out = doCall(t, h, "ListEntityRecognizers", nil)
+	if list, ok := out["EntityRecognizerPropertiesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected list: %+v", out)
+	}
+
+	_, out = doCall(t, h, "ListEntityRecognizerSummaries", nil)
+	if list, ok := out["EntityRecognizerSummariesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected summaries: %+v", out)
+	}
+
+	doCall(t, h, "StopTrainingEntityRecognizer", map[string]any{
+		"EntityRecognizerArn": arn,
+	})
+
+	doCall(t, h, "DeleteEntityRecognizer", map[string]any{
+		"EntityRecognizerArn": arn,
+	})
+
+	doCallExpectStatus(t, h, "DescribeEntityRecognizer", map[string]any{
+		"EntityRecognizerArn": arn,
+	}, http.StatusNotFound)
+}
+
+// ── Endpoint lifecycle ──────────────────────────────────────────────────────
+
+func TestEndpointLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// First create a model the endpoint can reference.
+	_, out := doCall(t, h, "CreateDocumentClassifier", map[string]any{
+		"DocumentClassifierName": "ep-classifier",
+		"DataAccessRoleArn":      "arn:aws:iam::123456789012:role/comprehend",
+		"LanguageCode":           "en",
+		"InputDataConfig":        sampleInputDataConfig(),
+	})
+	modelArn := mustStr(t, out, "DocumentClassifierArn")
+
+	_, out = doCall(t, h, "CreateEndpoint", map[string]any{
+		"EndpointName":          "my-endpoint",
+		"ModelArn":              modelArn,
+		"DesiredInferenceUnits": 2,
+		"DataAccessRoleArn":     "arn:aws:iam::123456789012:role/comprehend",
+	})
+	endpointArn := mustStr(t, out, "EndpointArn")
+
+	_, out = doCall(t, h, "DescribeEndpoint", map[string]any{
+		"EndpointArn": endpointArn,
+	})
+	props, ok := out["EndpointProperties"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing EndpointProperties: %+v", out)
+	}
+	if mustStr(t, props, "Status") != "IN_SERVICE" {
+		t.Fatalf("unexpected status: %v", props["Status"])
+	}
+
+	_, out = doCall(t, h, "ListEndpoints", nil)
+	if list, ok := out["EndpointPropertiesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected list: %+v", out)
+	}
+
+	doCall(t, h, "UpdateEndpoint", map[string]any{
+		"EndpointArn":           endpointArn,
+		"DesiredInferenceUnits": 4,
+	})
+
+	// Endpoint guards classifier deletion.
+	doCallExpectStatus(t, h, "DeleteDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": modelArn,
+	}, http.StatusBadRequest)
+
+	doCall(t, h, "DeleteEndpoint", map[string]any{
+		"EndpointArn": endpointArn,
+	})
+
+	doCallExpectStatus(t, h, "DescribeEndpoint", map[string]any{
+		"EndpointArn": endpointArn,
+	}, http.StatusNotFound)
+
+	doCall(t, h, "DeleteDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": modelArn,
+	})
+}
+
+func TestCreateEndpointRequiresModel(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "CreateEndpoint", map[string]any{
+		"EndpointName":          "x",
+		"DesiredInferenceUnits": 1,
+	}, http.StatusBadRequest)
+}
+
+// ── Flywheel lifecycle ──────────────────────────────────────────────────────
+
+func TestFlywheelLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	_, out := doCall(t, h, "CreateFlywheel", map[string]any{
+		"FlywheelName":      "my-flywheel",
+		"DataAccessRoleArn": "arn:aws:iam::123456789012:role/comprehend",
+		"DataLakeS3Uri":     "s3://bucket/lake",
+		"ModelType":         "DOCUMENT_CLASSIFIER",
+	})
+	flywheelArn := mustStr(t, out, "FlywheelArn")
+
+	_, out = doCall(t, h, "DescribeFlywheel", map[string]any{
+		"FlywheelArn": flywheelArn,
+	})
+	if _, ok := out["FlywheelProperties"]; !ok {
+		t.Fatalf("missing FlywheelProperties")
+	}
+
+	_, out = doCall(t, h, "ListFlywheels", nil)
+	if list, ok := out["FlywheelSummaryList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected list: %+v", out)
+	}
+
+	doCall(t, h, "UpdateFlywheel", map[string]any{
+		"FlywheelArn":       flywheelArn,
+		"DataAccessRoleArn": "arn:aws:iam::123456789012:role/new",
+	})
+
+	// Iteration
+	_, out = doCall(t, h, "StartFlywheelIteration", map[string]any{
+		"FlywheelArn": flywheelArn,
+	})
+	iterationID := mustStr(t, out, "FlywheelIterationId")
+
+	_, out = doCall(t, h, "DescribeFlywheelIteration", map[string]any{
+		"FlywheelArn":         flywheelArn,
+		"FlywheelIterationId": iterationID,
+	})
+	if _, ok := out["FlywheelIterationProperties"]; !ok {
+		t.Fatalf("missing FlywheelIterationProperties")
+	}
+
+	_, out = doCall(t, h, "ListFlywheelIterationHistory", map[string]any{
+		"FlywheelArn": flywheelArn,
+	})
+	if list, ok := out["FlywheelIterationPropertiesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected iteration list: %+v", out)
+	}
+
+	// Dataset
+	_, out = doCall(t, h, "CreateDataset", map[string]any{
+		"DatasetName":     "ds1",
+		"FlywheelArn":     flywheelArn,
+		"DatasetType":     "TRAIN",
+		"InputDataConfig": sampleInputDataConfig(),
+	})
+	dsArn := mustStr(t, out, "DatasetArn")
+
+	_, out = doCall(t, h, "DescribeDataset", map[string]any{
+		"DatasetArn": dsArn,
+	})
+	if _, ok := out["DatasetProperties"]; !ok {
+		t.Fatalf("missing DatasetProperties")
+	}
+
+	_, out = doCall(t, h, "ListDatasets", map[string]any{
+		"FlywheelArn": flywheelArn,
+	})
+	if list, ok := out["DatasetPropertiesList"].([]any); !ok || len(list) != 1 {
+		t.Fatalf("unexpected dataset list: %+v", out)
+	}
+
+	doCall(t, h, "DeleteFlywheel", map[string]any{
+		"FlywheelArn": flywheelArn,
+	})
+
+	doCallExpectStatus(t, h, "DescribeFlywheel", map[string]any{
+		"FlywheelArn": flywheelArn,
+	}, http.StatusNotFound)
+}
+
+// ── Async job lifecycles ────────────────────────────────────────────────────
+
+func TestJobLifecycles(t *testing.T) {
+	h := newGateway(t)
+
+	jobs := []struct {
+		family       string // base name e.g. "DominantLanguage"
+		startAction  string
+		describeKey  string
+		describeProp string
+		listAction   string
+		listKey      string
+		stopAction   string
+	}{
+		{
+			family:       "DocumentClassification",
+			startAction:  "StartDocumentClassificationJob",
+			describeKey:  "DescribeDocumentClassificationJob",
+			describeProp: "DocumentClassificationJobProperties",
+			listAction:   "ListDocumentClassificationJobs",
+			listKey:      "DocumentClassificationJobPropertiesList",
+		},
+		{
+			family:       "DominantLanguage",
+			startAction:  "StartDominantLanguageDetectionJob",
+			describeKey:  "DescribeDominantLanguageDetectionJob",
+			describeProp: "DominantLanguageDetectionJobProperties",
+			listAction:   "ListDominantLanguageDetectionJobs",
+			listKey:      "DominantLanguageDetectionJobPropertiesList",
+			stopAction:   "StopDominantLanguageDetectionJob",
+		},
+		{
+			family:       "Entities",
+			startAction:  "StartEntitiesDetectionJob",
+			describeKey:  "DescribeEntitiesDetectionJob",
+			describeProp: "EntitiesDetectionJobProperties",
+			listAction:   "ListEntitiesDetectionJobs",
+			listKey:      "EntitiesDetectionJobPropertiesList",
+			stopAction:   "StopEntitiesDetectionJob",
+		},
+		{
+			family:       "Events",
+			startAction:  "StartEventsDetectionJob",
+			describeKey:  "DescribeEventsDetectionJob",
+			describeProp: "EventsDetectionJobProperties",
+			listAction:   "ListEventsDetectionJobs",
+			listKey:      "EventsDetectionJobPropertiesList",
+			stopAction:   "StopEventsDetectionJob",
+		},
+		{
+			family:       "KeyPhrases",
+			startAction:  "StartKeyPhrasesDetectionJob",
+			describeKey:  "DescribeKeyPhrasesDetectionJob",
+			describeProp: "KeyPhrasesDetectionJobProperties",
+			listAction:   "ListKeyPhrasesDetectionJobs",
+			listKey:      "KeyPhrasesDetectionJobPropertiesList",
+			stopAction:   "StopKeyPhrasesDetectionJob",
+		},
+		{
+			family:       "PiiEntities",
+			startAction:  "StartPiiEntitiesDetectionJob",
+			describeKey:  "DescribePiiEntitiesDetectionJob",
+			describeProp: "PiiEntitiesDetectionJobProperties",
+			listAction:   "ListPiiEntitiesDetectionJobs",
+			listKey:      "PiiEntitiesDetectionJobPropertiesList",
+			stopAction:   "StopPiiEntitiesDetectionJob",
+		},
+		{
+			family:       "Sentiment",
+			startAction:  "StartSentimentDetectionJob",
+			describeKey:  "DescribeSentimentDetectionJob",
+			describeProp: "SentimentDetectionJobProperties",
+			listAction:   "ListSentimentDetectionJobs",
+			listKey:      "SentimentDetectionJobPropertiesList",
+			stopAction:   "StopSentimentDetectionJob",
+		},
+		{
+			family:       "TargetedSentiment",
+			startAction:  "StartTargetedSentimentDetectionJob",
+			describeKey:  "DescribeTargetedSentimentDetectionJob",
+			describeProp: "TargetedSentimentDetectionJobProperties",
+			listAction:   "ListTargetedSentimentDetectionJobs",
+			listKey:      "TargetedSentimentDetectionJobPropertiesList",
+			stopAction:   "StopTargetedSentimentDetectionJob",
+		},
+		{
+			family:       "Topics",
+			startAction:  "StartTopicsDetectionJob",
+			describeKey:  "DescribeTopicsDetectionJob",
+			describeProp: "TopicsDetectionJobProperties",
+			listAction:   "ListTopicsDetectionJobs",
+			listKey:      "TopicsDetectionJobPropertiesList",
+		},
+	}
+
+	for _, j := range jobs {
+		j := j
+		t.Run(j.family, func(t *testing.T) {
+			_, out := doCall(t, h, j.startAction, map[string]any{
+				"JobName":           "job-" + j.family,
+				"InputDataConfig":   sampleInputDataConfig(),
+				"OutputDataConfig":  sampleOutputDataConfig(),
+				"DataAccessRoleArn": "arn:aws:iam::123456789012:role/comprehend",
+				"LanguageCode":      "en",
+			})
+			jobID := mustStr(t, out, "JobId")
+			if mustStr(t, out, "JobStatus") != "COMPLETED" {
+				t.Fatalf("%s: unexpected status %v", j.startAction, out["JobStatus"])
+			}
+
+			_, out = doCall(t, h, j.describeKey, map[string]any{"JobId": jobID})
+			if _, ok := out[j.describeProp]; !ok {
+				t.Fatalf("%s: missing %s", j.describeKey, j.describeProp)
+			}
+
+			_, out = doCall(t, h, j.listAction, nil)
+			if list, ok := out[j.listKey].([]any); !ok || len(list) != 1 {
+				t.Fatalf("%s: want 1 job, got %+v", j.listAction, out)
+			}
+
+			if j.stopAction != "" {
+				_, out = doCall(t, h, j.stopAction, map[string]any{"JobId": jobID})
+				if mustStr(t, out, "JobStatus") != "STOP_REQUESTED" {
+					t.Fatalf("%s: unexpected stopped status %v", j.stopAction, out["JobStatus"])
+				}
+			}
+		})
 	}
 }
 
-func TestListDocumentClassifierSummaries(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDocumentClassifierSummaries", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDocumentClassifierSummaries: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestStartJobValidation(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "StartSentimentDetectionJob", map[string]any{}, http.StatusBadRequest)
+}
+
+func TestDescribeJobNotFound(t *testing.T) {
+	h := newGateway(t)
+	doCallExpectStatus(t, h, "DescribeSentimentDetectionJob", map[string]any{
+		"JobId": "missing",
+	}, http.StatusNotFound)
+}
+
+// ── ImportModel ─────────────────────────────────────────────────────────────
+
+func TestImportModelClassifier(t *testing.T) {
+	h := newGateway(t)
+	_, out := doCall(t, h, "ImportModel", map[string]any{
+		"SourceModelArn":    "arn:aws:comprehend:us-east-1:123456789012:document-classifier/source",
+		"ModelName":         "imported",
+		"DataAccessRoleArn": "arn:aws:iam::123456789012:role/comprehend",
+	})
+	arn := mustStr(t, out, "ModelArn")
+	if !strings.Contains(arn, "document-classifier/imported") {
+		t.Fatalf("unexpected imported arn: %s", arn)
+	}
+	doCall(t, h, "DescribeDocumentClassifier", map[string]any{
+		"DocumentClassifierArn": arn,
+	})
+}
+
+func TestImportModelRecognizer(t *testing.T) {
+	h := newGateway(t)
+	_, out := doCall(t, h, "ImportModel", map[string]any{
+		"SourceModelArn": "arn:aws:comprehend:us-east-1:123456789012:entity-recognizer/source",
+		"ModelName":      "imported-er",
+	})
+	arn := mustStr(t, out, "ModelArn")
+	if !strings.Contains(arn, "entity-recognizer/imported-er") {
+		t.Fatalf("unexpected imported arn: %s", arn)
+	}
+	doCall(t, h, "DescribeEntityRecognizer", map[string]any{
+		"EntityRecognizerArn": arn,
+	})
+}
+
+// ── Resource policy lifecycle ───────────────────────────────────────────────
+
+func TestResourcePolicyLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// Need an endpoint to attach a policy to.
+	_, out := doCall(t, h, "CreateDocumentClassifier", map[string]any{
+		"DocumentClassifierName": "rp-classifier",
+		"DataAccessRoleArn":      "arn:aws:iam::123456789012:role/comprehend",
+		"LanguageCode":           "en",
+		"InputDataConfig":        sampleInputDataConfig(),
+	})
+	modelArn := mustStr(t, out, "DocumentClassifierArn")
+
+	_, out = doCall(t, h, "CreateEndpoint", map[string]any{
+		"EndpointName":          "rp-endpoint",
+		"ModelArn":              modelArn,
+		"DesiredInferenceUnits": 1,
+	})
+	endpointArn := mustStr(t, out, "EndpointArn")
+
+	_, out = doCall(t, h, "PutResourcePolicy", map[string]any{
+		"ResourceArn":    endpointArn,
+		"ResourcePolicy": `{"Version":"2012-10-17","Statement":[]}`,
+	})
+	revID := mustStr(t, out, "PolicyRevisionId")
+	if revID == "" {
+		t.Fatalf("missing PolicyRevisionId")
+	}
+
+	_, out = doCall(t, h, "DescribeResourcePolicy", map[string]any{
+		"ResourceArn": endpointArn,
+	})
+	if mustStr(t, out, "ResourcePolicy") == "" {
+		t.Fatalf("missing ResourcePolicy text")
+	}
+
+	doCall(t, h, "DeleteResourcePolicy", map[string]any{
+		"ResourceArn": endpointArn,
+	})
+
+	doCallExpectStatus(t, h, "DescribeResourcePolicy", map[string]any{
+		"ResourceArn": endpointArn,
+	}, http.StatusNotFound)
+}
+
+// ── Tagging ─────────────────────────────────────────────────────────────────
+
+func TestTaggingLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	_, out := doCall(t, h, "CreateDocumentClassifier", map[string]any{
+		"DocumentClassifierName": "tag-classifier",
+		"DataAccessRoleArn":      "arn:aws:iam::123456789012:role/comprehend",
+		"LanguageCode":           "en",
+		"InputDataConfig":        sampleInputDataConfig(),
+	})
+	arn := mustStr(t, out, "DocumentClassifierArn")
+
+	doCall(t, h, "TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags": []map[string]any{
+			{"Key": "team", "Value": "ml"},
+			{"Key": "env", "Value": "prod"},
+		},
+	})
+
+	_, out = doCall(t, h, "ListTagsForResource", map[string]any{
+		"ResourceArn": arn,
+	})
+	tags, ok := out["Tags"].([]any)
+	if !ok || len(tags) != 2 {
+		t.Fatalf("want 2 tags, got %+v", out)
+	}
+
+	doCall(t, h, "UntagResource", map[string]any{
+		"ResourceArn": arn,
+		"TagKeys":     []string{"env"},
+	})
+
+	_, out = doCall(t, h, "ListTagsForResource", map[string]any{
+		"ResourceArn": arn,
+	})
+	tags, _ = out["Tags"].([]any)
+	if len(tags) != 1 {
+		t.Fatalf("want 1 tag after untag, got %+v", out)
 	}
 }
 
-func TestListDocumentClassifiers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDocumentClassifiers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDocumentClassifiers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Reset ───────────────────────────────────────────────────────────────────
+
+func TestStoreReset(t *testing.T) {
+	store := svc.NewStore("123456789012", "us-east-1")
+	if _, err := store.CreateDocumentClassifier(&svc.StoredDocumentClassifier{
+		Name:              "c1",
+		DataAccessRoleArn: "role",
+		LanguageCode:      "en",
+		InputDataConfig:   sampleInputDataConfig(),
+	}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if got := store.ListDocumentClassifiers(); len(got) != 1 {
+		t.Fatalf("want 1 classifier, got %d", len(got))
+	}
+	store.Reset()
+	if got := store.ListDocumentClassifiers(); len(got) != 0 {
+		t.Fatalf("want 0 classifiers after reset, got %d", len(got))
 	}
 }
 
-func TestListDominantLanguageDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDominantLanguageDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDominantLanguageDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Smoke check that all 85 actions are wired and reachable ────────────────
+
+func TestAllActionsRouted(t *testing.T) {
+	h := newGateway(t)
+	// We just need to verify the action dispatch table covers each action
+	// without returning InvalidAction. Sending an empty body should yield
+	// either 200 (for actions with no required fields) or a 4xx
+	// ValidationError — but never InvalidAction.
+	actions := []string{
+		"BatchDetectDominantLanguage", "BatchDetectEntities", "BatchDetectKeyPhrases",
+		"BatchDetectSentiment", "BatchDetectSyntax", "BatchDetectTargetedSentiment",
+		"ClassifyDocument", "ContainsPiiEntities", "CreateDataset",
+		"CreateDocumentClassifier", "CreateEndpoint", "CreateEntityRecognizer",
+		"CreateFlywheel", "DeleteDocumentClassifier", "DeleteEndpoint",
+		"DeleteEntityRecognizer", "DeleteFlywheel", "DeleteResourcePolicy",
+		"DescribeDataset", "DescribeDocumentClassificationJob",
+		"DescribeDocumentClassifier", "DescribeDominantLanguageDetectionJob",
+		"DescribeEndpoint", "DescribeEntitiesDetectionJob",
+		"DescribeEntityRecognizer", "DescribeEventsDetectionJob",
+		"DescribeFlywheel", "DescribeFlywheelIteration",
+		"DescribeKeyPhrasesDetectionJob", "DescribePiiEntitiesDetectionJob",
+		"DescribeResourcePolicy", "DescribeSentimentDetectionJob",
+		"DescribeTargetedSentimentDetectionJob", "DescribeTopicsDetectionJob",
+		"DetectDominantLanguage", "DetectEntities", "DetectKeyPhrases",
+		"DetectPiiEntities", "DetectSentiment", "DetectSyntax",
+		"DetectTargetedSentiment", "DetectToxicContent", "ImportModel",
+		"ListDatasets", "ListDocumentClassificationJobs",
+		"ListDocumentClassifierSummaries", "ListDocumentClassifiers",
+		"ListDominantLanguageDetectionJobs", "ListEndpoints",
+		"ListEntitiesDetectionJobs", "ListEntityRecognizerSummaries",
+		"ListEntityRecognizers", "ListEventsDetectionJobs",
+		"ListFlywheelIterationHistory", "ListFlywheels",
+		"ListKeyPhrasesDetectionJobs", "ListPiiEntitiesDetectionJobs",
+		"ListSentimentDetectionJobs", "ListTagsForResource",
+		"ListTargetedSentimentDetectionJobs", "ListTopicsDetectionJobs",
+		"PutResourcePolicy", "StartDocumentClassificationJob",
+		"StartDominantLanguageDetectionJob", "StartEntitiesDetectionJob",
+		"StartEventsDetectionJob", "StartFlywheelIteration",
+		"StartKeyPhrasesDetectionJob", "StartPiiEntitiesDetectionJob",
+		"StartSentimentDetectionJob", "StartTargetedSentimentDetectionJob",
+		"StartTopicsDetectionJob", "StopDominantLanguageDetectionJob",
+		"StopEntitiesDetectionJob", "StopEventsDetectionJob",
+		"StopKeyPhrasesDetectionJob", "StopPiiEntitiesDetectionJob",
+		"StopSentimentDetectionJob", "StopTargetedSentimentDetectionJob",
+		"StopTrainingDocumentClassifier", "StopTrainingEntityRecognizer",
+		"TagResource", "UntagResource", "UpdateEndpoint", "UpdateFlywheel",
+	}
+	if len(actions) != 85 {
+		t.Fatalf("expected 85 actions, got %d", len(actions))
+	}
+	for _, a := range actions {
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, svcReq(t, a, map[string]any{}))
+		if w.Code == http.StatusOK {
+			continue
+		}
+		var body map[string]any
+		_ = json.Unmarshal(w.Body.Bytes(), &body)
+		// Tolerate validation/not-found errors for actions that need real
+		// arguments. What we won't tolerate is "InvalidAction" which means
+		// the action is unrouted.
+		if code, ok := body["__type"].(string); ok && code == "InvalidAction" {
+			t.Errorf("action %s returned InvalidAction", a)
+		}
 	}
 }
-
-func TestListEndpoints(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEndpoints", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEndpoints: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListEntitiesDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEntitiesDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEntitiesDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListEntityRecognizerSummaries(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEntityRecognizerSummaries", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEntityRecognizerSummaries: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListEntityRecognizers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEntityRecognizers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEntityRecognizers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListEventsDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEventsDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEventsDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFlywheelIterationHistory(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFlywheelIterationHistory", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFlywheelIterationHistory: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFlywheels(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFlywheels", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFlywheels: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListKeyPhrasesDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListKeyPhrasesDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListKeyPhrasesDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListPiiEntitiesDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListPiiEntitiesDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListPiiEntitiesDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListSentimentDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListSentimentDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListSentimentDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTagsForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTagsForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTargetedSentimentDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTargetedSentimentDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTargetedSentimentDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTopicsDetectionJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTopicsDetectionJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTopicsDetectionJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPutResourcePolicy(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "PutResourcePolicy", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("PutResourcePolicy: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartDocumentClassificationJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartDocumentClassificationJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartDocumentClassificationJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartDominantLanguageDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartDominantLanguageDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartDominantLanguageDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartEventsDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartEventsDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartEventsDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartFlywheelIteration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartFlywheelIteration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartFlywheelIteration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartKeyPhrasesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartKeyPhrasesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartKeyPhrasesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartPiiEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartPiiEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartPiiEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartTargetedSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartTargetedSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartTargetedSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartTopicsDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartTopicsDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartTopicsDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopDominantLanguageDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopDominantLanguageDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopDominantLanguageDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopEventsDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopEventsDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopEventsDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopKeyPhrasesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopKeyPhrasesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopKeyPhrasesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopPiiEntitiesDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopPiiEntitiesDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopPiiEntitiesDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopTargetedSentimentDetectionJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopTargetedSentimentDetectionJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopTargetedSentimentDetectionJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopTrainingDocumentClassifier(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopTrainingDocumentClassifier", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopTrainingDocumentClassifier: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStopTrainingEntityRecognizer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopTrainingEntityRecognizer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopTrainingEntityRecognizer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "TagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("TagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUntagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UntagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateEndpoint(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateEndpoint", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateEndpoint: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateFlywheel(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateFlywheel", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateFlywheel: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-

@@ -22,14 +22,16 @@ func newGateway(t *testing.T) http.Handler {
 	return gateway.New(cfg, reg)
 }
 
-func svcReq(t *testing.T, action string, body any) *http.Request {
+// call invokes a quicksight action, asserting the expected status code, and
+// returns the decoded response body.
+func call(t *testing.T, h http.Handler, action string, body any, wantStatus int) map[string]any {
 	t.Helper()
 	var bodyBytes []byte
 	if body != nil {
 		var err error
 		bodyBytes, err = json.Marshal(body)
 		if err != nil {
-			t.Fatalf("marshal: %v", err)
+			t.Fatalf("marshal %s: %v", action, err)
 		}
 	} else {
 		bodyBytes = []byte("{}")
@@ -39,2095 +41,991 @@ func svcReq(t *testing.T, action string, body any) *http.Request {
 	req.Header.Set("X-Amz-Target", "quicksight."+action)
 	req.Header.Set("Authorization",
 		"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/quicksight/aws4_request, SignedHeaders=host, Signature=abc123")
-	return req
-}
-
-
-func TestBatchCreateTopicReviewedAnswer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchCreateTopicReviewedAnswer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchCreateTopicReviewedAnswer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestBatchDeleteTopicReviewedAnswer(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDeleteTopicReviewedAnswer", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDeleteTopicReviewedAnswer: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCancelIngestion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CancelIngestion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CancelIngestion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateAccountCustomization(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateAccountCustomization", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateAccountCustomization: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateAccountSubscription(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateAccountSubscription", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateAccountSubscription: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateActionConnector(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateActionConnector", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateActionConnector: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateAnalysis(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateAnalysis", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateAnalysis: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateBrand(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateBrand", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateBrand: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateCustomPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCustomPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCustomPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateDashboard(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateDashboard", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateDashboard: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateDataSet(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateDataSet", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateDataSet: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateDataSource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateDataSource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateDataSource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateFolder(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateFolder", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateFolder: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateFolderMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateFolderMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateFolderMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateGroupMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateGroupMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateGroupMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateIAMPolicyAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateIAMPolicyAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateIAMPolicyAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateIngestion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateIngestion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateIngestion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateNamespace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateNamespace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateNamespace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateRoleMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateRoleMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateRoleMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateTemplate(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTemplate", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTemplate: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateTemplateAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTemplateAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTemplateAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateTheme(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTheme", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTheme: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateThemeAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateThemeAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateThemeAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateTopic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTopic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTopic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateTopicRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTopicRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTopicRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestCreateVPCConnection(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateVPCConnection", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateVPCConnection: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteAccountCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteAccountCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteAccountCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteAccountCustomization(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteAccountCustomization", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteAccountCustomization: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteAccountSubscription(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteAccountSubscription", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteAccountSubscription: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteActionConnector(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteActionConnector", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteActionConnector: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteAnalysis(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteAnalysis", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteAnalysis: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteBrand(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteBrand", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteBrand: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteBrandAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteBrandAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteBrandAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteCustomPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCustomPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCustomPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDashboard(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDashboard", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDashboard: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDataSet(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDataSet", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDataSet: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDataSetRefreshProperties(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDataSetRefreshProperties", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDataSetRefreshProperties: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDataSource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDataSource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDataSource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteDefaultQBusinessApplication(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteDefaultQBusinessApplication", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteDefaultQBusinessApplication: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteFolder(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteFolder", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteFolder: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteFolderMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteFolderMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteFolderMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteGroupMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteGroupMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteGroupMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteIAMPolicyAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteIAMPolicyAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteIAMPolicyAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteIdentityPropagationConfig(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteIdentityPropagationConfig", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteIdentityPropagationConfig: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteNamespace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteNamespace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteNamespace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteRoleCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteRoleCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteRoleCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteRoleMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteRoleMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteRoleMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteTemplate(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTemplate", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTemplate: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteTemplateAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTemplateAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTemplateAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteTheme(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTheme", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTheme: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteThemeAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteThemeAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteThemeAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteTopic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTopic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTopic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteTopicRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTopicRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTopicRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteUserByPrincipalId(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteUserByPrincipalId", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteUserByPrincipalId: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteUserCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteUserCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteUserCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteVPCConnection(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteVPCConnection", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteVPCConnection: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAccountCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAccountCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAccountCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAccountCustomization(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAccountCustomization", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAccountCustomization: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAccountSettings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAccountSettings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAccountSettings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAccountSubscription(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAccountSubscription", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAccountSubscription: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeActionConnector(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeActionConnector", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeActionConnector: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeActionConnectorPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeActionConnectorPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeActionConnectorPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAnalysis(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAnalysis", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAnalysis: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAnalysisDefinition(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAnalysisDefinition", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAnalysisDefinition: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAnalysisPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAnalysisPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAnalysisPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAssetBundleExportJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAssetBundleExportJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAssetBundleExportJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAssetBundleImportJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAssetBundleImportJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAssetBundleImportJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAutomationJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAutomationJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAutomationJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeBrand(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeBrand", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeBrand: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeBrandAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeBrandAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeBrandAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeBrandPublishedVersion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeBrandPublishedVersion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeBrandPublishedVersion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCustomPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCustomPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCustomPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboard(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboard", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboard: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboardDefinition(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboardDefinition", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboardDefinition: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboardPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboardPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboardPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboardSnapshotJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboardSnapshotJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboardSnapshotJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboardSnapshotJobResult(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboardSnapshotJobResult", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboardSnapshotJobResult: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDashboardsQAConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDashboardsQAConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDashboardsQAConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataSet(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataSet", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataSet: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataSetPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataSetPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataSetPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataSetRefreshProperties(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataSetRefreshProperties", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataSetRefreshProperties: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataSource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataSource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataSource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDataSourcePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDataSourcePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDataSourcePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeDefaultQBusinessApplication(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeDefaultQBusinessApplication", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeDefaultQBusinessApplication: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeFolder(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeFolder", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeFolder: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeFolderPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeFolderPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeFolderPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeFolderResolvedPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeFolderResolvedPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeFolderResolvedPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeGroupMembership(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeGroupMembership", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeGroupMembership: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeIAMPolicyAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeIAMPolicyAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeIAMPolicyAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeIngestion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeIngestion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeIngestion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeIpRestriction(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeIpRestriction", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeIpRestriction: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeKeyRegistration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeKeyRegistration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeKeyRegistration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeNamespace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeNamespace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeNamespace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeQPersonalizationConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeQPersonalizationConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeQPersonalizationConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeQuickSightQSearchConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeQuickSightQSearchConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeQuickSightQSearchConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeRoleCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeRoleCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeRoleCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeSelfUpgradeConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeSelfUpgradeConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeSelfUpgradeConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTemplate(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTemplate", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTemplate: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTemplateAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTemplateAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTemplateAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTemplateDefinition(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTemplateDefinition", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTemplateDefinition: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTemplatePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTemplatePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTemplatePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTheme(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTheme", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTheme: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeThemeAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeThemeAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeThemeAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeThemePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeThemePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeThemePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTopic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTopic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTopic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTopicPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTopicPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTopicPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTopicRefresh(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTopicRefresh", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTopicRefresh: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeTopicRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeTopicRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeTopicRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeVPCConnection(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeVPCConnection", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeVPCConnection: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGenerateEmbedUrlForAnonymousUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GenerateEmbedUrlForAnonymousUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GenerateEmbedUrlForAnonymousUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGenerateEmbedUrlForRegisteredUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GenerateEmbedUrlForRegisteredUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GenerateEmbedUrlForRegisteredUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGenerateEmbedUrlForRegisteredUserWithIdentity(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GenerateEmbedUrlForRegisteredUserWithIdentity", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GenerateEmbedUrlForRegisteredUserWithIdentity: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetDashboardEmbedUrl(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetDashboardEmbedUrl", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetDashboardEmbedUrl: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetFlowMetadata(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetFlowMetadata", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetFlowMetadata: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetFlowPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetFlowPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetFlowPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetIdentityContext(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetIdentityContext", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetIdentityContext: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetSessionEmbedUrl(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetSessionEmbedUrl", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetSessionEmbedUrl: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListActionConnectors(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListActionConnectors", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListActionConnectors: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListAnalyses(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListAnalyses", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListAnalyses: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListAssetBundleExportJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListAssetBundleExportJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListAssetBundleExportJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListAssetBundleImportJobs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListAssetBundleImportJobs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListAssetBundleImportJobs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListBrands(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListBrands", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListBrands: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListDashboardVersions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDashboardVersions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDashboardVersions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListDashboards(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDashboards", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDashboards: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListDataSets(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDataSets", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDataSets: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListDataSources(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDataSources", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDataSources: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFlows(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFlows", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFlows: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFolderMembers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFolderMembers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFolderMembers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFolders(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFolders", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFolders: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFoldersForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFoldersForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFoldersForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListGroupMemberships(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListGroupMemberships", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListGroupMemberships: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListGroups(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListGroups", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListGroups: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListIAMPolicyAssignments(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListIAMPolicyAssignments", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListIAMPolicyAssignments: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListIAMPolicyAssignmentsForUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListIAMPolicyAssignmentsForUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListIAMPolicyAssignmentsForUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListIdentityPropagationConfigs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListIdentityPropagationConfigs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListIdentityPropagationConfigs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListIngestions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListIngestions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListIngestions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListNamespaces(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListNamespaces", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListNamespaces: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListRefreshSchedules(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListRefreshSchedules", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListRefreshSchedules: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListRoleMemberships(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListRoleMemberships", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListRoleMemberships: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListSelfUpgrades(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListSelfUpgrades", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListSelfUpgrades: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTagsForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTagsForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTemplateAliases(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTemplateAliases", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTemplateAliases: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTemplateVersions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTemplateVersions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTemplateVersions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTemplates(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTemplates", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTemplates: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListThemeAliases(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListThemeAliases", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListThemeAliases: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListThemeVersions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListThemeVersions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListThemeVersions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListThemes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListThemes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListThemes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTopicRefreshSchedules(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTopicRefreshSchedules", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTopicRefreshSchedules: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTopicReviewedAnswers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTopicReviewedAnswers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTopicReviewedAnswers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTopics(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTopics", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTopics: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListUserGroups(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListUserGroups", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListUserGroups: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListUsers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListUsers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListUsers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListVPCConnections(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListVPCConnections", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListVPCConnections: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPredictQAResults(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "PredictQAResults", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("PredictQAResults: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestPutDataSetRefreshProperties(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "PutDataSetRefreshProperties", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("PutDataSetRefreshProperties: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestRegisterUser(t *testing.T) {
-	handler := newGateway(t)
 	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "RegisterUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("RegisterUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	h.ServeHTTP(w, req)
+	if w.Code != wantStatus {
+		t.Fatalf("%s: want status %d, got %d\nbody: %s", action, wantStatus, w.Code, w.Body.String())
 	}
-}
-
-func TestRestoreAnalysis(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "RestoreAnalysis", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("RestoreAnalysis: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchActionConnectors(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchActionConnectors", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchActionConnectors: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchAnalyses(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchAnalyses", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchAnalyses: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchDashboards(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchDashboards", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchDashboards: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchDataSets(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchDataSets", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchDataSets: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchDataSources(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchDataSources", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchDataSources: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchFlows(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchFlows", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchFlows: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchFolders(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchFolders", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchFolders: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchGroups(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchGroups", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchGroups: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestSearchTopics(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchTopics", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchTopics: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartAssetBundleExportJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartAssetBundleExportJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartAssetBundleExportJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartAssetBundleImportJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartAssetBundleImportJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartAssetBundleImportJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartAutomationJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartAutomationJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartAutomationJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartDashboardSnapshotJob(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartDashboardSnapshotJob", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartDashboardSnapshotJob: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestStartDashboardSnapshotJobSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartDashboardSnapshotJobSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartDashboardSnapshotJobSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "TagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("TagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUntagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UntagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAccountCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAccountCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAccountCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAccountCustomization(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAccountCustomization", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAccountCustomization: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAccountSettings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAccountSettings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAccountSettings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateActionConnector(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateActionConnector", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateActionConnector: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateActionConnectorPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateActionConnectorPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateActionConnectorPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAnalysis(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAnalysis", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAnalysis: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAnalysisPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAnalysisPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAnalysisPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateApplicationWithTokenExchangeGrant(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateApplicationWithTokenExchangeGrant", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateApplicationWithTokenExchangeGrant: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateBrand(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateBrand", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateBrand: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateBrandAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateBrandAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateBrandAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateBrandPublishedVersion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateBrandPublishedVersion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateBrandPublishedVersion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCustomPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCustomPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCustomPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDashboard(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDashboard", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDashboard: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDashboardLinks(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDashboardLinks", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDashboardLinks: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDashboardPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDashboardPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDashboardPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDashboardPublishedVersion(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDashboardPublishedVersion", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDashboardPublishedVersion: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDashboardsQAConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDashboardsQAConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDashboardsQAConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDataSet(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDataSet", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDataSet: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDataSetPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDataSetPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDataSetPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDataSource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDataSource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDataSource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDataSourcePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDataSourcePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDataSourcePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateDefaultQBusinessApplication(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateDefaultQBusinessApplication", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateDefaultQBusinessApplication: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateFlowPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateFlowPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateFlowPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateFolder(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateFolder", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateFolder: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateFolderPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateFolderPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateFolderPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateIAMPolicyAssignment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateIAMPolicyAssignment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateIAMPolicyAssignment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateIdentityPropagationConfig(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateIdentityPropagationConfig", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateIdentityPropagationConfig: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateIpRestriction(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateIpRestriction", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateIpRestriction: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateKeyRegistration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateKeyRegistration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateKeyRegistration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdatePublicSharingSettings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdatePublicSharingSettings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdatePublicSharingSettings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateQPersonalizationConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateQPersonalizationConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateQPersonalizationConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateQuickSightQSearchConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateQuickSightQSearchConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateQuickSightQSearchConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateRoleCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateRoleCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateRoleCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateSPICECapacityConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateSPICECapacityConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateSPICECapacityConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateSelfUpgrade(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateSelfUpgrade", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateSelfUpgrade: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateSelfUpgradeConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateSelfUpgradeConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateSelfUpgradeConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateTemplate(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTemplate", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTemplate: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateTemplateAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTemplateAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTemplateAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateTemplatePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTemplatePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTemplatePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateTheme(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTheme", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTheme: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	if w.Body.Len() == 0 {
+		return nil
 	}
-}
-
-func TestUpdateThemeAlias(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateThemeAlias", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateThemeAlias: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	var out map[string]any
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("%s: failed to decode body: %v\nbody: %s", action, err, w.Body.String())
 	}
-}
+	return out
+}
 
-func TestUpdateThemePermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateThemePermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateThemePermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+// callOK is a shortcut for asserting 200 OK.
+func callOK(t *testing.T, h http.Handler, action string, body any) map[string]any {
+	t.Helper()
+	return call(t, h, action, body, http.StatusOK)
+}
+
+// callCreated is a shortcut for asserting 201 Created.
+func callCreated(t *testing.T, h http.Handler, action string, body any) map[string]any {
+	t.Helper()
+	return call(t, h, action, body, http.StatusCreated)
+}
+
+// ── User lifecycle ───────────────────────────────────────────────────────────
+
+func TestUserLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// Register a user.
+	resp := callCreated(t, h, "RegisterUser", map[string]any{
+		"AwsAccountId": "000000000000",
+		"Namespace":    "default",
+		"UserName":     "alice",
+		"Email":        "alice@example.com",
+		"UserRole":     "AUTHOR",
+		"IdentityType": "QUICKSIGHT",
+	})
+	user, _ := resp["User"].(map[string]any)
+	if user["UserName"] != "alice" {
+		t.Fatalf("RegisterUser: expected UserName alice, got %v", user["UserName"])
+	}
+
+	// Describe.
+	resp = callOK(t, h, "DescribeUser", map[string]any{
+		"Namespace": "default",
+		"UserName":  "alice",
+	})
+	user, _ = resp["User"].(map[string]any)
+	if user["Email"] != "alice@example.com" {
+		t.Fatalf("DescribeUser: unexpected email %v", user["Email"])
+	}
+
+	// Update.
+	resp = callOK(t, h, "UpdateUser", map[string]any{
+		"Namespace": "default",
+		"UserName":  "alice",
+		"Email":     "alice2@example.com",
+		"Role":      "ADMIN",
+	})
+	user, _ = resp["User"].(map[string]any)
+	if user["Email"] != "alice2@example.com" || user["Role"] != "ADMIN" {
+		t.Fatalf("UpdateUser: unexpected user %v", user)
+	}
+
+	// List.
+	resp = callOK(t, h, "ListUsers", map[string]any{"Namespace": "default"})
+	if list, _ := resp["UserList"].([]any); len(list) != 1 {
+		t.Fatalf("ListUsers: expected 1 user, got %d", len(list))
+	}
+
+	// Delete.
+	callOK(t, h, "DeleteUser", map[string]any{"Namespace": "default", "UserName": "alice"})
+
+	// Describe should now 404.
+	call(t, h, "DescribeUser", map[string]any{"Namespace": "default", "UserName": "alice"}, http.StatusNotFound)
+}
+
+// ── Group lifecycle ──────────────────────────────────────────────────────────
+
+func TestGroupLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// Set up a user to add to the group.
+	callCreated(t, h, "RegisterUser", map[string]any{
+		"AwsAccountId": "000000000000",
+		"Namespace":    "default",
+		"UserName":     "bob",
+		"Email":        "bob@example.com",
+		"UserRole":     "READER",
+		"IdentityType": "QUICKSIGHT",
+	})
+
+	// Create group.
+	resp := callCreated(t, h, "CreateGroup", map[string]any{
+		"Namespace":   "default",
+		"GroupName":   "engineering",
+		"Description": "engineering team",
+	})
+	group, _ := resp["Group"].(map[string]any)
+	if group["GroupName"] != "engineering" {
+		t.Fatalf("CreateGroup: unexpected group %v", group)
+	}
 
-func TestUpdateTopic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTopic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTopic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	// Update.
+	callOK(t, h, "UpdateGroup", map[string]any{
+		"Namespace":   "default",
+		"GroupName":   "engineering",
+		"Description": "engineering & platform",
+	})
+
+	// Describe.
+	resp = callOK(t, h, "DescribeGroup", map[string]any{
+		"Namespace": "default",
+		"GroupName": "engineering",
+	})
+	group, _ = resp["Group"].(map[string]any)
+	if group["Description"] != "engineering & platform" {
+		t.Fatalf("DescribeGroup: unexpected description %v", group["Description"])
+	}
+
+	// Add member.
+	callOK(t, h, "CreateGroupMembership", map[string]any{
+		"Namespace":  "default",
+		"GroupName":  "engineering",
+		"MemberName": "bob",
+	})
+
+	// Describe membership.
+	callOK(t, h, "DescribeGroupMembership", map[string]any{
+		"Namespace":  "default",
+		"GroupName":  "engineering",
+		"MemberName": "bob",
+	})
+
+	// List members.
+	resp = callOK(t, h, "ListGroupMemberships", map[string]any{
+		"Namespace": "default",
+		"GroupName": "engineering",
+	})
+	if list, _ := resp["GroupMemberList"].([]any); len(list) != 1 {
+		t.Fatalf("ListGroupMemberships: expected 1 member, got %d", len(list))
+	}
+
+	// List user groups.
+	resp = callOK(t, h, "ListUserGroups", map[string]any{
+		"Namespace": "default",
+		"UserName":  "bob",
+	})
+	if list, _ := resp["GroupList"].([]any); len(list) != 1 {
+		t.Fatalf("ListUserGroups: expected 1 group, got %d", len(list))
 	}
-}
 
-func TestUpdateTopicPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTopicPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTopicPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+	// Remove member.
+	callOK(t, h, "DeleteGroupMembership", map[string]any{
+		"Namespace":  "default",
+		"GroupName":  "engineering",
+		"MemberName": "bob",
+	})
+
+	// Delete group.
+	callOK(t, h, "DeleteGroup", map[string]any{
+		"Namespace": "default",
+		"GroupName": "engineering",
+	})
+
+	// Should be gone.
+	call(t, h, "DescribeGroup", map[string]any{"Namespace": "default", "GroupName": "engineering"}, http.StatusNotFound)
+}
+
+// ── Namespace lifecycle ──────────────────────────────────────────────────────
+
+func TestNamespaceLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateNamespace", map[string]any{
+		"Namespace":     "tenant-1",
+		"IdentityStore": "QUICKSIGHT",
+	})
+	if resp["Name"] != "tenant-1" {
+		t.Fatalf("CreateNamespace: expected name tenant-1, got %v", resp["Name"])
+	}
+
+	resp = callOK(t, h, "DescribeNamespace", map[string]any{"Namespace": "tenant-1"})
+	ns, _ := resp["Namespace"].(map[string]any)
+	if ns["Name"] != "tenant-1" {
+		t.Fatalf("DescribeNamespace: unexpected namespace %v", ns)
+	}
+
+	resp = callOK(t, h, "ListNamespaces", nil)
+	if list, _ := resp["Namespaces"].([]any); len(list) != 1 {
+		t.Fatalf("ListNamespaces: expected 1 namespace, got %d", len(list))
+	}
+
+	callOK(t, h, "DeleteNamespace", map[string]any{"Namespace": "tenant-1"})
+	call(t, h, "DescribeNamespace", map[string]any{"Namespace": "tenant-1"}, http.StatusNotFound)
+}
+
+// ── DataSource lifecycle ─────────────────────────────────────────────────────
+
+func TestDataSourceLifecycle(t *testing.T) {
+	h := newGateway(t)
 
-func TestUpdateTopicRefreshSchedule(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTopicRefreshSchedule", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTopicRefreshSchedule: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	resp := callCreated(t, h, "CreateDataSource", map[string]any{
+		"AwsAccountId": "000000000000",
+		"DataSourceId": "ds-1",
+		"Name":         "MyAthena",
+		"Type":         "ATHENA",
+		"DataSourceParameters": map[string]any{
+			"AthenaParameters": map[string]any{"WorkGroup": "primary"},
+		},
+	})
+	if resp["DataSourceId"] != "ds-1" {
+		t.Fatalf("CreateDataSource: unexpected id %v", resp["DataSourceId"])
+	}
+
+	resp = callOK(t, h, "DescribeDataSource", map[string]any{"DataSourceId": "ds-1"})
+	d, _ := resp["DataSource"].(map[string]any)
+	if d["Name"] != "MyAthena" {
+		t.Fatalf("DescribeDataSource: unexpected datasource %v", d)
+	}
+
+	callOK(t, h, "UpdateDataSource", map[string]any{
+		"DataSourceId": "ds-1",
+		"Name":         "MyAthenaV2",
+	})
+
+	resp = callOK(t, h, "ListDataSources", nil)
+	if list, _ := resp["DataSources"].([]any); len(list) != 1 {
+		t.Fatalf("ListDataSources: expected 1 data source, got %d", len(list))
+	}
+
+	// Permissions.
+	callOK(t, h, "UpdateDataSourcePermissions", map[string]any{
+		"DataSourceId": "ds-1",
+		"GrantPermissions": []map[string]any{
+			{"Principal": "arn:aws:quicksight:us-east-1:000000000000:user/default/alice", "Actions": []string{"quicksight:DescribeDataSource"}},
+		},
+	})
+	resp = callOK(t, h, "DescribeDataSourcePermissions", map[string]any{"DataSourceId": "ds-1"})
+	if perms, _ := resp["Permissions"].([]any); len(perms) != 1 {
+		t.Fatalf("DescribeDataSourcePermissions: expected 1 permission, got %d", len(perms))
+	}
+
+	callOK(t, h, "DeleteDataSource", map[string]any{"DataSourceId": "ds-1"})
+	call(t, h, "DescribeDataSource", map[string]any{"DataSourceId": "ds-1"}, http.StatusNotFound)
+}
+
+// ── DataSet lifecycle ────────────────────────────────────────────────────────
+
+func TestDataSetLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateDataSet", map[string]any{
+		"AwsAccountId": "000000000000",
+		"DataSetId":    "ds-1",
+		"Name":         "Sales",
+		"PhysicalTableMap": map[string]any{
+			"table1": map[string]any{"S3Source": map[string]any{"DataSourceArn": "arn:..."}},
+		},
+		"ImportMode": "SPICE",
+	})
+	if resp["DataSetId"] != "ds-1" {
+		t.Fatalf("CreateDataSet: unexpected id %v", resp["DataSetId"])
+	}
+
+	resp = callOK(t, h, "DescribeDataSet", map[string]any{"DataSetId": "ds-1"})
+	d, _ := resp["DataSet"].(map[string]any)
+	if d["Name"] != "Sales" || d["ImportMode"] != "SPICE" {
+		t.Fatalf("DescribeDataSet: unexpected dataset %v", d)
+	}
+
+	callOK(t, h, "UpdateDataSet", map[string]any{
+		"DataSetId":  "ds-1",
+		"Name":       "SalesV2",
+		"ImportMode": "DIRECT_QUERY",
+	})
+
+	// PutDataSetRefreshProperties
+	callOK(t, h, "PutDataSetRefreshProperties", map[string]any{
+		"DataSetId": "ds-1",
+		"DataSetRefreshProperties": map[string]any{
+			"RefreshConfiguration": map[string]any{"IncrementalRefresh": map[string]any{}},
+		},
+	})
+	resp = callOK(t, h, "DescribeDataSetRefreshProperties", map[string]any{"DataSetId": "ds-1"})
+	if props, _ := resp["DataSetRefreshProperties"].(map[string]any); props == nil {
+		t.Fatalf("DescribeDataSetRefreshProperties: expected non-nil props")
 	}
-}
+	callOK(t, h, "DeleteDataSetRefreshProperties", map[string]any{"DataSetId": "ds-1"})
 
-func TestUpdateUser(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateUser", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateUser: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	resp = callOK(t, h, "ListDataSets", nil)
+	if list, _ := resp["DataSetSummaries"].([]any); len(list) != 1 {
+		t.Fatalf("ListDataSets: expected 1, got %d", len(list))
 	}
-}
 
-func TestUpdateUserCustomPermission(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateUserCustomPermission", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateUserCustomPermission: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+	callOK(t, h, "DeleteDataSet", map[string]any{"DataSetId": "ds-1"})
+	call(t, h, "DescribeDataSet", map[string]any{"DataSetId": "ds-1"}, http.StatusNotFound)
+}
+
+// ── Dashboard lifecycle ──────────────────────────────────────────────────────
+
+func TestDashboardLifecycle(t *testing.T) {
+	h := newGateway(t)
 
-func TestUpdateVPCConnection(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateVPCConnection", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateVPCConnection: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
+	resp := callCreated(t, h, "CreateDashboard", map[string]any{
+		"AwsAccountId": "000000000000",
+		"DashboardId":  "dash-1",
+		"Name":         "Sales Dashboard",
+		"SourceEntity": map[string]any{
+			"SourceTemplate": map[string]any{
+				"Arn": "arn:aws:quicksight:us-east-1:000000000000:template/t1",
+			},
+		},
+	})
+	if resp["DashboardId"] != "dash-1" {
+		t.Fatalf("CreateDashboard: unexpected id %v", resp["DashboardId"])
+	}
+
+	resp = callOK(t, h, "DescribeDashboard", map[string]any{"DashboardId": "dash-1"})
+	d, _ := resp["Dashboard"].(map[string]any)
+	if d["Name"] != "Sales Dashboard" {
+		t.Fatalf("DescribeDashboard: unexpected name %v", d["Name"])
+	}
+
+	callOK(t, h, "UpdateDashboard", map[string]any{
+		"DashboardId": "dash-1",
+		"Name":        "Sales Dashboard V2",
+	})
+	callOK(t, h, "UpdateDashboardPublishedVersion", map[string]any{
+		"DashboardId":   "dash-1",
+		"VersionNumber": 2,
+	})
+	resp = callOK(t, h, "ListDashboardVersions", map[string]any{"DashboardId": "dash-1"})
+	if vers, _ := resp["DashboardVersionSummaryList"].([]any); len(vers) != 2 {
+		t.Fatalf("ListDashboardVersions: expected 2 versions, got %d", len(vers))
+	}
+
+	callOK(t, h, "UpdateDashboardPermissions", map[string]any{
+		"DashboardId": "dash-1",
+		"GrantPermissions": []map[string]any{
+			{"Principal": "arn:aws:quicksight:us-east-1:000000000000:user/default/alice", "Actions": []string{"quicksight:DescribeDashboard"}},
+		},
+	})
+	resp = callOK(t, h, "DescribeDashboardPermissions", map[string]any{"DashboardId": "dash-1"})
+	if perms, _ := resp["Permissions"].([]any); len(perms) != 1 {
+		t.Fatalf("DescribeDashboardPermissions: expected 1 permission, got %d", len(perms))
+	}
+
+	callOK(t, h, "DeleteDashboard", map[string]any{"DashboardId": "dash-1"})
+	call(t, h, "DescribeDashboard", map[string]any{"DashboardId": "dash-1"}, http.StatusNotFound)
+}
+
+// ── Analysis lifecycle ───────────────────────────────────────────────────────
+
+func TestAnalysisLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateAnalysis", map[string]any{
+		"AnalysisId": "ana-1",
+		"Name":       "Sales Analysis",
+		"SourceEntity": map[string]any{
+			"SourceTemplate": map[string]any{"Arn": "arn:..."},
+		},
+	})
+	if resp["AnalysisId"] != "ana-1" {
+		t.Fatalf("CreateAnalysis: unexpected id %v", resp["AnalysisId"])
+	}
+
+	resp = callOK(t, h, "DescribeAnalysis", map[string]any{"AnalysisId": "ana-1"})
+	a, _ := resp["Analysis"].(map[string]any)
+	if a["Name"] != "Sales Analysis" {
+		t.Fatalf("DescribeAnalysis: unexpected name %v", a["Name"])
+	}
+
+	callOK(t, h, "UpdateAnalysis", map[string]any{
+		"AnalysisId": "ana-1",
+		"Name":       "Sales Analysis V2",
+	})
+
+	// Soft-delete.
+	callOK(t, h, "DeleteAnalysis", map[string]any{"AnalysisId": "ana-1"})
+
+	// Restore.
+	callOK(t, h, "RestoreAnalysis", map[string]any{"AnalysisId": "ana-1"})
+}
+
+// ── Template lifecycle ───────────────────────────────────────────────────────
+
+func TestTemplateLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateTemplate", map[string]any{
+		"TemplateId": "tmpl-1",
+		"Name":       "MyTemplate",
+		"SourceEntity": map[string]any{
+			"SourceAnalysis": map[string]any{"Arn": "arn:..."},
+		},
+	})
+	if resp["TemplateId"] != "tmpl-1" {
+		t.Fatalf("CreateTemplate: unexpected id %v", resp["TemplateId"])
+	}
+
+	callOK(t, h, "DescribeTemplate", map[string]any{"TemplateId": "tmpl-1"})
+
+	callOK(t, h, "UpdateTemplate", map[string]any{
+		"TemplateId": "tmpl-1",
+		"Name":       "MyTemplateV2",
+	})
+
+	// Template aliases.
+	callCreated(t, h, "CreateTemplateAlias", map[string]any{
+		"TemplateId":            "tmpl-1",
+		"AliasName":             "PROD",
+		"TemplateVersionNumber": 1,
+	})
+	callOK(t, h, "DescribeTemplateAlias", map[string]any{
+		"TemplateId": "tmpl-1",
+		"AliasName":  "PROD",
+	})
+	callOK(t, h, "UpdateTemplateAlias", map[string]any{
+		"TemplateId":            "tmpl-1",
+		"AliasName":             "PROD",
+		"TemplateVersionNumber": 2,
+	})
+	resp = callOK(t, h, "ListTemplateAliases", map[string]any{"TemplateId": "tmpl-1"})
+	if al, _ := resp["TemplateAliasList"].([]any); len(al) != 1 {
+		t.Fatalf("ListTemplateAliases: expected 1, got %d", len(al))
+	}
+	callOK(t, h, "DeleteTemplateAlias", map[string]any{
+		"TemplateId": "tmpl-1",
+		"AliasName":  "PROD",
+	})
+
+	resp = callOK(t, h, "ListTemplateVersions", map[string]any{"TemplateId": "tmpl-1"})
+	if vers, _ := resp["TemplateVersionSummaryList"].([]any); len(vers) != 2 {
+		t.Fatalf("ListTemplateVersions: expected 2, got %d", len(vers))
+	}
+
+	callOK(t, h, "DeleteTemplate", map[string]any{"TemplateId": "tmpl-1"})
+	call(t, h, "DescribeTemplate", map[string]any{"TemplateId": "tmpl-1"}, http.StatusNotFound)
+}
+
+// ── Theme lifecycle ──────────────────────────────────────────────────────────
+
+func TestThemeLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateTheme", map[string]any{
+		"ThemeId":     "theme-1",
+		"Name":        "Dark Theme",
+		"BaseThemeId": "MIDNIGHT",
+		"Configuration": map[string]any{
+			"DataColorPalette": map[string]any{},
+		},
+	})
+	if resp["ThemeId"] != "theme-1" {
+		t.Fatalf("CreateTheme: unexpected id %v", resp["ThemeId"])
+	}
+
+	callOK(t, h, "DescribeTheme", map[string]any{"ThemeId": "theme-1"})
+
+	callOK(t, h, "UpdateTheme", map[string]any{
+		"ThemeId": "theme-1",
+		"Name":    "Dark Theme V2",
+	})
+
+	callCreated(t, h, "CreateThemeAlias", map[string]any{
+		"ThemeId":            "theme-1",
+		"AliasName":          "PROD",
+		"ThemeVersionNumber": 1,
+	})
+	callOK(t, h, "DescribeThemeAlias", map[string]any{
+		"ThemeId":   "theme-1",
+		"AliasName": "PROD",
+	})
+	callOK(t, h, "UpdateThemeAlias", map[string]any{
+		"ThemeId":            "theme-1",
+		"AliasName":          "PROD",
+		"ThemeVersionNumber": 2,
+	})
+	resp = callOK(t, h, "ListThemeAliases", map[string]any{"ThemeId": "theme-1"})
+	if al, _ := resp["ThemeAliasList"].([]any); len(al) != 1 {
+		t.Fatalf("ListThemeAliases: expected 1, got %d", len(al))
+	}
+	callOK(t, h, "DeleteThemeAlias", map[string]any{
+		"ThemeId":   "theme-1",
+		"AliasName": "PROD",
+	})
+
+	callOK(t, h, "DeleteTheme", map[string]any{"ThemeId": "theme-1"})
+	call(t, h, "DescribeTheme", map[string]any{"ThemeId": "theme-1"}, http.StatusNotFound)
+}
+
+// ── Folder lifecycle ─────────────────────────────────────────────────────────
+
+func TestFolderLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateFolder", map[string]any{
+		"FolderId":   "folder-1",
+		"Name":       "MyFolder",
+		"FolderType": "SHARED",
+	})
+	if resp["FolderId"] != "folder-1" {
+		t.Fatalf("CreateFolder: unexpected id %v", resp["FolderId"])
+	}
+
+	callOK(t, h, "DescribeFolder", map[string]any{"FolderId": "folder-1"})
+
+	callOK(t, h, "UpdateFolder", map[string]any{
+		"FolderId": "folder-1",
+		"Name":     "MyFolderV2",
+	})
+
+	// Add membership.
+	callCreated(t, h, "CreateFolderMembership", map[string]any{
+		"FolderId":   "folder-1",
+		"MemberId":   "dash-x",
+		"MemberType": "DASHBOARD",
+	})
+	resp = callOK(t, h, "ListFolderMembers", map[string]any{"FolderId": "folder-1"})
+	if list, _ := resp["FolderMemberList"].([]any); len(list) != 1 {
+		t.Fatalf("ListFolderMembers: expected 1 member, got %d", len(list))
+	}
+	callOK(t, h, "DeleteFolderMembership", map[string]any{
+		"FolderId": "folder-1",
+		"MemberId": "dash-x",
+	})
+
+	// Folder permissions.
+	callOK(t, h, "UpdateFolderPermissions", map[string]any{
+		"FolderId": "folder-1",
+		"GrantPermissions": []map[string]any{
+			{"Principal": "arn:...:user/default/alice", "Actions": []string{"quicksight:DescribeFolder"}},
+		},
+	})
+	resp = callOK(t, h, "DescribeFolderPermissions", map[string]any{"FolderId": "folder-1"})
+	if perms, _ := resp["Permissions"].([]any); len(perms) != 1 {
+		t.Fatalf("DescribeFolderPermissions: expected 1 permission, got %d", len(perms))
+	}
+
+	callOK(t, h, "DeleteFolder", map[string]any{"FolderId": "folder-1"})
+	call(t, h, "DescribeFolder", map[string]any{"FolderId": "folder-1"}, http.StatusNotFound)
+}
+
+// ── RefreshSchedule + Ingestion lifecycle ────────────────────────────────────
+
+func TestRefreshScheduleAndIngestion(t *testing.T) {
+	h := newGateway(t)
+
+	// First need a dataset.
+	callCreated(t, h, "CreateDataSet", map[string]any{
+		"DataSetId":  "ds-1",
+		"Name":       "Sales",
+		"ImportMode": "SPICE",
+	})
+
+	// Create refresh schedule.
+	callCreated(t, h, "CreateRefreshSchedule", map[string]any{
+		"DataSetId": "ds-1",
+		"Schedule": map[string]any{
+			"ScheduleId": "sched-1",
+			"ScheduleFrequency": map[string]any{
+				"Interval": "DAILY",
+				"TimeOfTheDay": "00:00",
+			},
+			"RefreshType": "FULL_REFRESH",
+		},
+	})
+	callOK(t, h, "DescribeRefreshSchedule", map[string]any{
+		"DataSetId":  "ds-1",
+		"ScheduleId": "sched-1",
+	})
+	callOK(t, h, "UpdateRefreshSchedule", map[string]any{
+		"DataSetId": "ds-1",
+		"Schedule": map[string]any{
+			"ScheduleId":  "sched-1",
+			"RefreshType": "INCREMENTAL_REFRESH",
+		},
+	})
+	resp := callOK(t, h, "ListRefreshSchedules", map[string]any{"DataSetId": "ds-1"})
+	if list, _ := resp["RefreshSchedules"].([]any); len(list) != 1 {
+		t.Fatalf("ListRefreshSchedules: expected 1, got %d", len(list))
+	}
+
+	// Create ingestion.
+	callCreated(t, h, "CreateIngestion", map[string]any{
+		"DataSetId":   "ds-1",
+		"IngestionId": "ing-1",
+	})
+	resp = callOK(t, h, "DescribeIngestion", map[string]any{
+		"DataSetId":   "ds-1",
+		"IngestionId": "ing-1",
+	})
+	ing, _ := resp["Ingestion"].(map[string]any)
+	if ing["IngestionStatus"] == "" {
+		t.Fatalf("DescribeIngestion: empty status")
+	}
+	resp = callOK(t, h, "ListIngestions", map[string]any{"DataSetId": "ds-1"})
+	if list, _ := resp["Ingestions"].([]any); len(list) != 1 {
+		t.Fatalf("ListIngestions: expected 1, got %d", len(list))
+	}
+	callOK(t, h, "CancelIngestion", map[string]any{
+		"DataSetId":   "ds-1",
+		"IngestionId": "ing-1",
+	})
+
+	// Cleanup.
+	callOK(t, h, "DeleteRefreshSchedule", map[string]any{
+		"DataSetId":  "ds-1",
+		"ScheduleId": "sched-1",
+	})
+}
+
+// ── VPC Connection lifecycle ─────────────────────────────────────────────────
+
+func TestVPCConnectionLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callCreated(t, h, "CreateVPCConnection", map[string]any{
+		"VPCConnectionId":  "vpc-1",
+		"Name":             "MyVPC",
+		"VpcId":            "vpc-12345",
+		"SecurityGroupIds": []string{"sg-1"},
+		"DnsResolvers":     []string{"10.0.0.2"},
+		"RoleArn":          "arn:aws:iam::000000000000:role/QuickSightVPC",
+	})
+	if resp["VPCConnectionId"] != "vpc-1" {
+		t.Fatalf("CreateVPCConnection: unexpected id %v", resp["VPCConnectionId"])
+	}
+
+	resp = callOK(t, h, "DescribeVPCConnection", map[string]any{"VPCConnectionId": "vpc-1"})
+	v, _ := resp["VPCConnection"].(map[string]any)
+	if v["Name"] != "MyVPC" {
+		t.Fatalf("DescribeVPCConnection: unexpected name %v", v["Name"])
+	}
+
+	callOK(t, h, "UpdateVPCConnection", map[string]any{
+		"VPCConnectionId": "vpc-1",
+		"Name":            "MyVPCv2",
+	})
+
+	resp = callOK(t, h, "ListVPCConnections", nil)
+	if list, _ := resp["VPCConnectionSummaries"].([]any); len(list) != 1 {
+		t.Fatalf("ListVPCConnections: expected 1, got %d", len(list))
+	}
+
+	callOK(t, h, "DeleteVPCConnection", map[string]any{"VPCConnectionId": "vpc-1"})
+	call(t, h, "DescribeVPCConnection", map[string]any{"VPCConnectionId": "vpc-1"}, http.StatusNotFound)
+}
+
+// ── IAM Policy Assignment ────────────────────────────────────────────────────
+
+func TestIAMPolicyAssignmentLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	callCreated(t, h, "CreateIAMPolicyAssignment", map[string]any{
+		"AwsAccountId":     "000000000000",
+		"Namespace":        "default",
+		"AssignmentName":   "myassign",
+		"AssignmentStatus": "ENABLED",
+		"PolicyArn":        "arn:aws:iam::aws:policy/AdministratorAccess",
+		"Identities": map[string]any{
+			"User": []string{"alice"},
+		},
+	})
+
+	resp := callOK(t, h, "DescribeIAMPolicyAssignment", map[string]any{
+		"Namespace":      "default",
+		"AssignmentName": "myassign",
+	})
+	a, _ := resp["IAMPolicyAssignment"].(map[string]any)
+	if a["AssignmentName"] != "myassign" {
+		t.Fatalf("DescribeIAMPolicyAssignment: unexpected name %v", a["AssignmentName"])
+	}
+
+	callOK(t, h, "UpdateIAMPolicyAssignment", map[string]any{
+		"Namespace":        "default",
+		"AssignmentName":   "myassign",
+		"AssignmentStatus": "DISABLED",
+	})
+
+	resp = callOK(t, h, "ListIAMPolicyAssignments", map[string]any{"Namespace": "default"})
+	if list, _ := resp["IAMPolicyAssignments"].([]any); len(list) != 1 {
+		t.Fatalf("ListIAMPolicyAssignments: expected 1, got %d", len(list))
+	}
+
+	callOK(t, h, "DeleteIAMPolicyAssignment", map[string]any{
+		"Namespace":      "default",
+		"AssignmentName": "myassign",
+	})
+}
+
+// ── Topic lifecycle ──────────────────────────────────────────────────────────
+
+func TestTopicLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	callCreated(t, h, "CreateTopic", map[string]any{
+		"TopicId": "topic-1",
+		"Topic": map[string]any{
+			"Name":                  "Sales Topic",
+			"Description":           "Q topic for sales data",
+			"UserExperienceVersion": "NEW_READER_EXPERIENCE",
+		},
+	})
+
+	resp := callOK(t, h, "DescribeTopic", map[string]any{"TopicId": "topic-1"})
+	topic, _ := resp["Topic"].(map[string]any)
+	if topic["Name"] != "Sales Topic" {
+		t.Fatalf("DescribeTopic: unexpected name %v", topic["Name"])
+	}
+
+	callOK(t, h, "UpdateTopic", map[string]any{
+		"TopicId": "topic-1",
+		"Topic": map[string]any{
+			"Name": "Sales Topic V2",
+		},
+	})
+
+	// Topic refresh schedule.
+	callCreated(t, h, "CreateTopicRefreshSchedule", map[string]any{
+		"TopicId": "topic-1",
+		"RefreshSchedule": map[string]any{
+			"IsEnabled":       true,
+			"BasedOnSpiceSchedule": true,
+		},
+	})
+	callOK(t, h, "DescribeTopicRefreshSchedule", map[string]any{
+		"TopicId":    "topic-1",
+		"DatasetArn": "arn:aws:quicksight:us-east-1:000000000000:dataset/ds-1",
+	})
+	callOK(t, h, "UpdateTopicRefreshSchedule", map[string]any{
+		"TopicId": "topic-1",
+		"RefreshSchedule": map[string]any{
+			"IsEnabled": false,
+		},
+	})
+	callOK(t, h, "DeleteTopicRefreshSchedule", map[string]any{"TopicId": "topic-1"})
+
+	// Topic permissions.
+	callOK(t, h, "UpdateTopicPermissions", map[string]any{
+		"TopicId": "topic-1",
+		"GrantPermissions": []map[string]any{
+			{"Principal": "arn:...:user/default/alice", "Actions": []string{"quicksight:DescribeTopic"}},
+		},
+	})
+
+	callOK(t, h, "DeleteTopic", map[string]any{"TopicId": "topic-1"})
+}
+
+// ── Custom permissions lifecycle ─────────────────────────────────────────────
+
+func TestCustomPermissionsLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	callCreated(t, h, "CreateCustomPermissions", map[string]any{
+		"CustomPermissionsName": "RestrictedReader",
+		"Capabilities": map[string]any{
+			"ExportToCsv": "DENY",
+		},
+	})
+
+	resp := callOK(t, h, "DescribeCustomPermissions", map[string]any{
+		"CustomPermissionsName": "RestrictedReader",
+	})
+	cp, _ := resp["CustomPermissions"].(map[string]any)
+	if cp["CustomPermissionsName"] != "RestrictedReader" {
+		t.Fatalf("DescribeCustomPermissions: unexpected %v", cp)
+	}
+
+	callOK(t, h, "UpdateCustomPermissions", map[string]any{
+		"CustomPermissionsName": "RestrictedReader",
+		"Capabilities": map[string]any{
+			"ExportToCsv": "ALLOW",
+		},
+	})
+
+	resp = callOK(t, h, "ListCustomPermissions", nil)
+	if list, _ := resp["CustomPermissionsList"].([]any); len(list) != 1 {
+		t.Fatalf("ListCustomPermissions: expected 1, got %d", len(list))
+	}
+
+	callOK(t, h, "DeleteCustomPermissions", map[string]any{"CustomPermissionsName": "RestrictedReader"})
+}
+
+// ── AssetBundleExportJob lifecycle ───────────────────────────────────────────
+
+func TestAssetBundleExportJobLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	callOK(t, h, "StartAssetBundleExportJob", map[string]any{
+		"AssetBundleExportJobId": "exp-1",
+		"ResourceArns":           []string{"arn:aws:quicksight:us-east-1:000000000000:dashboard/d1"},
+		"ExportFormat":           "QUICKSIGHT_JSON",
+		"IncludePermissions":     true,
+	})
+
+	// First describe should return a status.
+	resp := callOK(t, h, "DescribeAssetBundleExportJob", map[string]any{
+		"AssetBundleExportJobId": "exp-1",
+	})
+	if status, _ := resp["JobStatus"].(string); status != "SUCCESSFUL" {
+		t.Fatalf("DescribeAssetBundleExportJob: expected SUCCESSFUL on first describe, got %v", status)
+	}
+	if dl, _ := resp["DownloadUrl"].(string); dl == "" {
+		t.Fatalf("DescribeAssetBundleExportJob: expected DownloadUrl, got empty")
+	}
+
+	resp = callOK(t, h, "ListAssetBundleExportJobs", nil)
+	if list, _ := resp["AssetBundleExportJobSummaryList"].([]any); len(list) != 1 {
+		t.Fatalf("ListAssetBundleExportJobs: expected 1, got %d", len(list))
+	}
+}
+
+// ── AssetBundleImportJob lifecycle ───────────────────────────────────────────
+
+func TestAssetBundleImportJobLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	callOK(t, h, "StartAssetBundleImportJob", map[string]any{
+		"AssetBundleImportJobId": "imp-1",
+		"AssetBundleImportSource": map[string]any{
+			"S3Uri": "s3://my-bucket/asset.qs",
+		},
+		"FailureAction": "DO_NOTHING",
+	})
+
+	resp := callOK(t, h, "DescribeAssetBundleImportJob", map[string]any{
+		"AssetBundleImportJobId": "imp-1",
+	})
+	if status, _ := resp["JobStatus"].(string); status != "SUCCESSFUL" {
+		t.Fatalf("DescribeAssetBundleImportJob: expected SUCCESSFUL on first describe, got %v", status)
+	}
+
+	resp = callOK(t, h, "ListAssetBundleImportJobs", nil)
+	if list, _ := resp["AssetBundleImportJobSummaryList"].([]any); len(list) != 1 {
+		t.Fatalf("ListAssetBundleImportJobs: expected 1, got %d", len(list))
+	}
+}
+
+// ── Embed URL handlers ───────────────────────────────────────────────────────
+
+func TestEmbedUrlHandlers(t *testing.T) {
+	h := newGateway(t)
+
+	for _, action := range []string{
+		"GetSessionEmbedUrl",
+		"GetDashboardEmbedUrl",
+		"GenerateEmbedUrlForRegisteredUser",
+		"GenerateEmbedUrlForRegisteredUserWithIdentity",
+		"GenerateEmbedUrlForAnonymousUser",
+	} {
+		resp := callOK(t, h, action, map[string]any{"AwsAccountId": "000000000000"})
+		if url, _ := resp["EmbedUrl"].(string); url == "" {
+			t.Fatalf("%s: expected non-empty EmbedUrl", action)
+		}
+	}
+}
+
+// ── Tag handlers ─────────────────────────────────────────────────────────────
+
+func TestTagHandlers(t *testing.T) {
+	h := newGateway(t)
+
+	arn := "arn:aws:quicksight:us-east-1:000000000000:dataset/ds-tag"
+	callOK(t, h, "TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags": []map[string]any{
+			{"Key": "env", "Value": "prod"},
+			{"Key": "owner", "Value": "team-a"},
+		},
+	})
+
+	resp := callOK(t, h, "ListTagsForResource", map[string]any{"ResourceArn": arn})
+	tags, _ := resp["Tags"].([]any)
+	if len(tags) != 2 {
+		t.Fatalf("ListTagsForResource: expected 2 tags, got %d", len(tags))
+	}
+
+	callOK(t, h, "UntagResource", map[string]any{
+		"ResourceArn": arn,
+		"TagKeys":     []string{"env"},
+	})
+	resp = callOK(t, h, "ListTagsForResource", map[string]any{"ResourceArn": arn})
+	if tags, _ := resp["Tags"].([]any); len(tags) != 1 {
+		t.Fatalf("ListTagsForResource after untag: expected 1, got %d", len(tags))
+	}
+}
+
+// ── Account settings handlers ────────────────────────────────────────────────
+
+func TestAccountSettingsHandlers(t *testing.T) {
+	h := newGateway(t)
+
+	resp := callOK(t, h, "DescribeAccountSettings", nil)
+	if as, _ := resp["AccountSettings"].(map[string]any); as == nil {
+		t.Fatalf("DescribeAccountSettings: expected AccountSettings")
+	}
+
+	callOK(t, h, "UpdateAccountSettings", map[string]any{
+		"DefaultNamespace":             "default",
+		"NotificationEmail":            "ops@example.com",
+		"TerminationProtectionEnabled": false,
+	})
+
+	resp = callOK(t, h, "DescribeAccountSettings", nil)
+	as, _ := resp["AccountSettings"].(map[string]any)
+	if as["NotificationEmail"] != "ops@example.com" {
+		t.Fatalf("UpdateAccountSettings: expected ops@example.com, got %v", as["NotificationEmail"])
+	}
+
+	resp = callOK(t, h, "DescribeAccountSubscription", nil)
+	if ai, _ := resp["AccountInfo"].(map[string]any); ai == nil {
+		t.Fatalf("DescribeAccountSubscription: expected AccountInfo")
+	}
+}
+
+// ── Smoke test: every action returns a non-error status ──────────────────────
+
+// TestAllActionsRespondNonServerError calls every registered action with a minimal
+// payload and asserts the status code is < 500. This catches handlers that crash
+// on empty input rather than returning a clean validation error.
+func TestAllActionsRespondNonServerError(t *testing.T) {
+	h := newGateway(t)
+
+	// Per-action minimum payloads to satisfy required-field validation.
+	// Anything not listed here will be invoked with an empty body.
+	payloads := map[string]map[string]any{
+		"RegisterUser":                {"UserName": "u", "UserRole": "READER", "IdentityType": "QUICKSIGHT"},
+		"CreateGroup":                 {"GroupName": "g"},
+		"CreateNamespace":             {"Namespace": "n"},
+		"CreateDataSource":            {"DataSourceId": "ds-x", "Name": "x", "Type": "ATHENA"},
+		"CreateDataSet":               {"DataSetId": "set-x", "Name": "x"},
+		"CreateTemplate":              {"TemplateId": "t-x", "Name": "x"},
+		"CreateDashboard":             {"DashboardId": "d-x", "Name": "x"},
+		"CreateAnalysis":              {"AnalysisId": "a-x", "Name": "x"},
+		"CreateTheme":                 {"ThemeId": "th-x", "Name": "x"},
+		"CreateFolder":                {"FolderId": "f-x", "Name": "x"},
+		"CreateTopic":                 {"TopicId": "tp-x", "Topic": map[string]any{"Name": "x"}},
+		"CreateVPCConnection":         {"VPCConnectionId": "vp-x", "Name": "x", "VpcId": "vpc-x"},
+		"CreateCustomPermissions":     {"CustomPermissionsName": "cp-x"},
+		"CreateBrand":                 {"BrandId": "b-x"},
+		"CreateIAMPolicyAssignment":   {"AssignmentName": "an-x"},
+		"CreateActionConnector":       {"ActionConnectorId": "ac-x", "Name": "x", "Type": "GENERIC"},
+		"UpdateIdentityPropagationConfig": {"Service": "redshift"},
+	}
+
+	for _, action := range allQuickSightActions(t) {
+		body := payloads[action]
+		req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(mustJSON(t, body)))
+		req.Header.Set("Content-Type", "application/x-amz-json-1.1")
+		req.Header.Set("X-Amz-Target", "quicksight."+action)
+		req.Header.Set("Authorization",
+			"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/quicksight/aws4_request, SignedHeaders=host, Signature=abc123")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, req)
+		if w.Code >= 500 {
+			t.Errorf("%s: unexpected server error %d, body: %s", action, w.Code, w.Body.String())
+		}
+	}
+}
+
+func mustJSON(t *testing.T, v any) []byte {
+	t.Helper()
+	if v == nil {
+		return []byte("{}")
+	}
+	b, err := json.Marshal(v)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	return b
+}
+
+func allQuickSightActions(t *testing.T) []string {
+	t.Helper()
+	s := svc.New("000000000000", "us-east-1")
+	out := make([]string, 0, len(s.Actions()))
+	for _, a := range s.Actions() {
+		out = append(out, a.Name)
+	}
+	return out
 }
-

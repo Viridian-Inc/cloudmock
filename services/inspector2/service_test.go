@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/config"
@@ -12,6 +13,8 @@ import (
 	"github.com/Viridian-Inc/cloudmock/pkg/routing"
 	svc "github.com/Viridian-Inc/cloudmock/services/inspector2"
 )
+
+// ── Test helpers ─────────────────────────────────────────────────────────────
 
 func newGateway(t *testing.T) http.Handler {
 	t.Helper()
@@ -22,699 +25,823 @@ func newGateway(t *testing.T) http.Handler {
 	return gateway.New(cfg, reg)
 }
 
-func svcReq(t *testing.T, action string, body any) *http.Request {
+func doCall(t *testing.T, h http.Handler, action string, body any) *httptest.ResponseRecorder {
 	t.Helper()
-	var bodyBytes []byte
-	if body != nil {
+	var data []byte
+	if body == nil {
+		data = []byte("{}")
+	} else {
 		var err error
-		bodyBytes, err = json.Marshal(body)
+		data, err = json.Marshal(body)
 		if err != nil {
 			t.Fatalf("marshal: %v", err)
 		}
-	} else {
-		bodyBytes = []byte("{}")
 	}
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(data))
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
-	req.Header.Set("X-Amz-Target", "inspector2."+action)
+	req.Header.Set("X-Amz-Target", "Inspector2."+action)
 	req.Header.Set("Authorization",
 		"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/inspector2/aws4_request, SignedHeaders=host, Signature=abc123")
-	return req
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
 }
 
-
-func TestAssociateMember(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "AssociateMember", nil))
+func mustOK(t *testing.T, w *httptest.ResponseRecorder, action string) map[string]any {
+	t.Helper()
 	if w.Code != http.StatusOK {
-		t.Fatalf("AssociateMember: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("%s: expected 200, got %d body=%s", action, w.Code, w.Body.String())
+	}
+	out := map[string]any{}
+	if w.Body.Len() == 0 {
+		return out
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("%s: decode: %v body=%s", action, err, w.Body.String())
+	}
+	return out
+}
+
+func mustErr(t *testing.T, w *httptest.ResponseRecorder, action string, code int) {
+	t.Helper()
+	if w.Code != code {
+		t.Fatalf("%s: expected %d, got %d body=%s", action, code, w.Code, w.Body.String())
 	}
 }
 
-func TestBatchAssociateCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchAssociateCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchAssociateCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Lifecycle tests ──────────────────────────────────────────────────────────
+
+func TestEnableDisableLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	out := mustOK(t, doCall(t, h, "Enable", map[string]any{
+		"accountIds":    []string{"111122223333"},
+		"resourceTypes": []string{"EC2", "ECR"},
+	}), "Enable")
+	accounts, _ := out["accounts"].([]any)
+	if len(accounts) != 1 {
+		t.Fatalf("expected 1 account, got %v", out)
+	}
+	first, _ := accounts[0].(map[string]any)
+	rs, _ := first["resourceStatus"].(map[string]any)
+	if rs["ec2"] != "ENABLED" || rs["ecr"] != "ENABLED" {
+		t.Fatalf("EC2/ECR not enabled: %v", rs)
+	}
+	if rs["lambda"] != "DISABLED" {
+		t.Fatalf("Lambda should still be DISABLED: %v", rs)
+	}
+
+	out = mustOK(t, doCall(t, h, "BatchGetAccountStatus", map[string]any{
+		"accountIds": []string{"111122223333"},
+	}), "BatchGetAccountStatus")
+	accs, _ := out["accounts"].([]any)
+	if len(accs) != 1 {
+		t.Fatalf("BatchGetAccountStatus: expected 1, got %v", out)
+	}
+
+	mustOK(t, doCall(t, h, "Disable", map[string]any{
+		"accountIds":    []string{"111122223333"},
+		"resourceTypes": []string{"EC2"},
+	}), "Disable")
+
+	out = mustOK(t, doCall(t, h, "BatchGetAccountStatus", map[string]any{
+		"accountIds": []string{"111122223333"},
+	}), "BatchGetAccountStatus")
+	accs, _ = out["accounts"].([]any)
+	first, _ = accs[0].(map[string]any)
+	state, _ := first["resourceState"].(map[string]any)
+	ec2, _ := state["ec2"].(map[string]any)
+	if ec2["status"] != "DISABLED" {
+		t.Fatalf("expected EC2 DISABLED after disable, got %v", state)
 	}
 }
 
-func TestBatchDisassociateCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchDisassociateCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchDisassociateCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestFilterLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateFilter", map[string]any{
+		"name":        "myfilter",
+		"description": "test filter",
+		"action":      "SUPPRESS",
+		"reason":      "false-positive",
+		"filterCriteria": map[string]any{
+			"severity": []map[string]any{
+				{"comparison": "EQUALS", "value": "HIGH"},
+			},
+		},
+		"tags": map[string]string{"env": "dev"},
+	}), "CreateFilter")
+
+	arn, _ := create["arn"].(string)
+	if arn == "" {
+		t.Fatalf("CreateFilter: missing arn: %v", create)
+	}
+
+	dup := doCall(t, h, "CreateFilter", map[string]any{
+		"name":   "myfilter",
+		"action": "SUPPRESS",
+	})
+	if dup.Code != http.StatusConflict {
+		t.Fatalf("CreateFilter duplicate: expected 409, got %d body=%s", dup.Code, dup.Body.String())
+	}
+
+	list := mustOK(t, doCall(t, h, "ListFilters", nil), "ListFilters")
+	filters, _ := list["filters"].([]any)
+	if len(filters) != 1 {
+		t.Fatalf("ListFilters: expected 1 filter, got %d body=%v", len(filters), list)
+	}
+
+	updated := mustOK(t, doCall(t, h, "UpdateFilter", map[string]any{
+		"filterArn":   arn,
+		"description": "updated desc",
+	}), "UpdateFilter")
+	if updated["arn"] != arn {
+		t.Fatalf("UpdateFilter: arn mismatch: %v", updated)
+	}
+
+	delResp := mustOK(t, doCall(t, h, "DeleteFilter", map[string]any{"arn": arn}), "DeleteFilter")
+	if delResp["arn"] != arn {
+		t.Fatalf("DeleteFilter: arn mismatch: %v", delResp)
+	}
+
+	notFound := doCall(t, h, "DeleteFilter", map[string]any{"arn": arn})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("DeleteFilter after delete: expected 404, got %d body=%s", notFound.Code, notFound.Body.String())
+	}
+
+	list = mustOK(t, doCall(t, h, "ListFilters", nil), "ListFilters")
+	filters, _ = list["filters"].([]any)
+	if len(filters) != 0 {
+		t.Fatalf("ListFilters after delete: expected 0, got %d", len(filters))
 	}
 }
 
-func TestBatchGetAccountStatus(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchGetAccountStatus", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchGetAccountStatus: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestFilterValidation(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateFilter", map[string]any{"action": "NONE"})
+	mustErr(t, w, "CreateFilter missing name", http.StatusBadRequest)
+
+	w = doCall(t, h, "CreateFilter", map[string]any{"name": "x"})
+	mustErr(t, w, "CreateFilter missing action", http.StatusBadRequest)
+}
+
+func TestCisScanConfigurationLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateCisScanConfiguration", map[string]any{
+		"scanName":      "weekly-scan",
+		"securityLevel": "LEVEL_1",
+		"schedule": map[string]any{
+			"daily": map[string]any{
+				"startTime": map[string]any{"timeOfDay": "04:00", "timezone": "UTC"},
+			},
+		},
+		"targets": map[string]any{
+			"accountIds": []string{"111122223333"},
+		},
+		"tags": map[string]string{"team": "secops"},
+	}), "CreateCisScanConfiguration")
+	arn, _ := create["scanConfigurationArn"].(string)
+	if arn == "" {
+		t.Fatalf("CreateCisScanConfiguration: missing arn: %v", create)
+	}
+
+	list := mustOK(t, doCall(t, h, "ListCisScanConfigurations", nil), "ListCisScanConfigurations")
+	configs, _ := list["scanConfigurations"].([]any)
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 config, got %d", len(configs))
+	}
+
+	mustOK(t, doCall(t, h, "UpdateCisScanConfiguration", map[string]any{
+		"scanConfigurationArn": arn,
+		"scanName":             "renamed",
+	}), "UpdateCisScanConfiguration")
+
+	mustOK(t, doCall(t, h, "DeleteCisScanConfiguration", map[string]any{
+		"scanConfigurationArn": arn,
+	}), "DeleteCisScanConfiguration")
+
+	notFound := doCall(t, h, "DeleteCisScanConfiguration", map[string]any{"scanConfigurationArn": arn})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("DeleteCisScanConfiguration after delete: expected 404, got %d", notFound.Code)
 	}
 }
 
-func TestBatchGetCodeSnippet(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchGetCodeSnippet", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchGetCodeSnippet: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCisSessionLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	mustOK(t, doCall(t, h, "StartCisSession", map[string]any{
+		"scanJobId": "job-1",
+		"message": map[string]any{
+			"sessionToken": "tok-1",
+		},
+	}), "StartCisSession")
+
+	mustOK(t, doCall(t, h, "SendCisSessionHealth", map[string]any{
+		"sessionToken": "tok-1",
+		"scanJobId":    "job-1",
+	}), "SendCisSessionHealth")
+
+	mustOK(t, doCall(t, h, "SendCisSessionTelemetry", map[string]any{
+		"sessionToken": "tok-1",
+		"scanJobId":    "job-1",
+		"messages":     []map[string]any{},
+	}), "SendCisSessionTelemetry")
+
+	mustOK(t, doCall(t, h, "StopCisSession", map[string]any{
+		"sessionToken": "tok-1",
+		"scanJobId":    "job-1",
+	}), "StopCisSession")
+
+	notFound := doCall(t, h, "SendCisSessionHealth", map[string]any{
+		"sessionToken": "tok-1",
+		"scanJobId":    "job-1",
+	})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("SendCisSessionHealth after stop: expected 404, got %d", notFound.Code)
 	}
 }
 
-func TestBatchGetFindingDetails(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchGetFindingDetails", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchGetFindingDetails: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCodeSecurityIntegrationLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateCodeSecurityIntegration", map[string]any{
+		"name": "main-gitlab",
+		"type": "GITLAB_SELF_MANAGED",
+		"tags": map[string]string{"team": "secops"},
+	}), "CreateCodeSecurityIntegration")
+	arn, _ := create["integrationArn"].(string)
+	if arn == "" {
+		t.Fatalf("CreateCodeSecurityIntegration: missing arn: %v", create)
+	}
+	if create["status"] != "PENDING" {
+		t.Fatalf("CreateCodeSecurityIntegration: expected PENDING, got %v", create)
+	}
+
+	got := mustOK(t, doCall(t, h, "GetCodeSecurityIntegration", map[string]any{
+		"integrationArn": arn,
+	}), "GetCodeSecurityIntegration")
+	if got["integrationArn"] != arn {
+		t.Fatalf("GetCodeSecurityIntegration: arn mismatch: %v", got)
+	}
+
+	updated := mustOK(t, doCall(t, h, "UpdateCodeSecurityIntegration", map[string]any{
+		"integrationArn": arn,
+	}), "UpdateCodeSecurityIntegration")
+	if updated["status"] != "ACTIVE" {
+		t.Fatalf("UpdateCodeSecurityIntegration: expected ACTIVE, got %v", updated)
+	}
+
+	list := mustOK(t, doCall(t, h, "ListCodeSecurityIntegrations", nil), "ListCodeSecurityIntegrations")
+	if items, _ := list["integrations"].([]any); len(items) != 1 {
+		t.Fatalf("ListCodeSecurityIntegrations: expected 1, got %d", len(items))
+	}
+
+	mustOK(t, doCall(t, h, "DeleteCodeSecurityIntegration", map[string]any{
+		"integrationArn": arn,
+	}), "DeleteCodeSecurityIntegration")
+
+	notFound := doCall(t, h, "GetCodeSecurityIntegration", map[string]any{"integrationArn": arn})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("GetCodeSecurityIntegration after delete: expected 404, got %d", notFound.Code)
 	}
 }
 
-func TestBatchGetFreeTrialInfo(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchGetFreeTrialInfo", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchGetFreeTrialInfo: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCodeSecurityScanConfigurationLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateCodeSecurityScanConfiguration", map[string]any{
+		"name":  "scan-everything",
+		"level": "ACCOUNT",
+		"configuration": map[string]any{
+			"ruleSetCategories": []string{"OWASP"},
+		},
+	}), "CreateCodeSecurityScanConfiguration")
+	arn, _ := create["scanConfigurationArn"].(string)
+	if arn == "" {
+		t.Fatalf("CreateCodeSecurityScanConfiguration: missing arn: %v", create)
+	}
+
+	got := mustOK(t, doCall(t, h, "GetCodeSecurityScanConfiguration", map[string]any{
+		"scanConfigurationArn": arn,
+	}), "GetCodeSecurityScanConfiguration")
+	if got["scanConfigurationArn"] != arn {
+		t.Fatalf("GetCodeSecurityScanConfiguration: mismatch: %v", got)
+	}
+
+	mustOK(t, doCall(t, h, "UpdateCodeSecurityScanConfiguration", map[string]any{
+		"scanConfigurationArn": arn,
+		"configuration": map[string]any{
+			"ruleSetCategories": []string{"CWE", "OWASP"},
+		},
+	}), "UpdateCodeSecurityScanConfiguration")
+
+	// Associate / disassociate
+	assoc := mustOK(t, doCall(t, h, "BatchAssociateCodeSecurityScanConfiguration", map[string]any{
+		"associateConfigurationRequests": []map[string]any{
+			{
+				"scanConfigurationArn": arn,
+				"resource": map[string]any{
+					"projectId": "project-A",
+				},
+			},
+		},
+	}), "BatchAssociateCodeSecurityScanConfiguration")
+	if successful, _ := assoc["successfulAssociations"].([]any); len(successful) != 1 {
+		t.Fatalf("BatchAssociateCodeSecurityScanConfiguration: expected 1 successful, got %v", assoc)
+	}
+
+	listAssoc := mustOK(t, doCall(t, h, "ListCodeSecurityScanConfigurationAssociations", map[string]any{
+		"scanConfigurationArn": arn,
+	}), "ListCodeSecurityScanConfigurationAssociations")
+	if associations, _ := listAssoc["associations"].([]any); len(associations) != 1 {
+		t.Fatalf("ListCodeSecurityScanConfigurationAssociations: expected 1, got %v", listAssoc)
+	}
+
+	disassoc := mustOK(t, doCall(t, h, "BatchDisassociateCodeSecurityScanConfiguration", map[string]any{
+		"disassociateConfigurationRequests": []map[string]any{
+			{
+				"scanConfigurationArn": arn,
+				"resource": map[string]any{
+					"projectId": "project-A",
+				},
+			},
+		},
+	}), "BatchDisassociateCodeSecurityScanConfiguration")
+	if successful, _ := disassoc["successfulAssociations"].([]any); len(successful) != 1 {
+		t.Fatalf("BatchDisassociateCodeSecurityScanConfiguration: expected 1 successful, got %v", disassoc)
+	}
+
+	mustOK(t, doCall(t, h, "DeleteCodeSecurityScanConfiguration", map[string]any{
+		"scanConfigurationArn": arn,
+	}), "DeleteCodeSecurityScanConfiguration")
+}
+
+func TestCodeSecurityScanLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	start := mustOK(t, doCall(t, h, "StartCodeSecurityScan", map[string]any{
+		"resource": map[string]any{
+			"projectId": "project-1",
+		},
+	}), "StartCodeSecurityScan")
+	scanId, _ := start["scanId"].(string)
+	if scanId == "" {
+		t.Fatalf("StartCodeSecurityScan: missing scanId: %v", start)
+	}
+
+	got := mustOK(t, doCall(t, h, "GetCodeSecurityScan", map[string]any{
+		"scanId": scanId,
+	}), "GetCodeSecurityScan")
+	if got["scanId"] != scanId {
+		t.Fatalf("GetCodeSecurityScan: mismatch: %v", got)
 	}
 }
 
-func TestBatchGetMemberEc2DeepInspectionStatus(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchGetMemberEc2DeepInspectionStatus", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchGetMemberEc2DeepInspectionStatus: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestMemberLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	mustOK(t, doCall(t, h, "AssociateMember", map[string]any{
+		"accountId": "111122223333",
+	}), "AssociateMember")
+
+	got := mustOK(t, doCall(t, h, "GetMember", map[string]any{
+		"accountId": "111122223333",
+	}), "GetMember")
+	member, _ := got["member"].(map[string]any)
+	if member["accountId"] != "111122223333" {
+		t.Fatalf("GetMember: mismatch: %v", got)
+	}
+	if member["relationshipStatus"] != "INVITED" {
+		t.Fatalf("GetMember: expected INVITED, got %v", member)
+	}
+
+	list := mustOK(t, doCall(t, h, "ListMembers", nil), "ListMembers")
+	if members, _ := list["members"].([]any); len(members) != 1 {
+		t.Fatalf("ListMembers: expected 1, got %d", len(members))
+	}
+
+	mustOK(t, doCall(t, h, "DisassociateMember", map[string]any{
+		"accountId": "111122223333",
+	}), "DisassociateMember")
+
+	listAssoc := mustOK(t, doCall(t, h, "ListMembers", map[string]any{
+		"onlyAssociated": true,
+	}), "ListMembers (onlyAssociated)")
+	if members, _ := listAssoc["members"].([]any); len(members) != 0 {
+		t.Fatalf("ListMembers onlyAssociated after disassociate: expected 0, got %d", len(members))
 	}
 }
 
-func TestBatchUpdateMemberEc2DeepInspectionStatus(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "BatchUpdateMemberEc2DeepInspectionStatus", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("BatchUpdateMemberEc2DeepInspectionStatus: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestDelegatedAdminLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	mustOK(t, doCall(t, h, "EnableDelegatedAdminAccount", map[string]any{
+		"delegatedAdminAccountId": "111122223333",
+	}), "EnableDelegatedAdminAccount")
+
+	got := mustOK(t, doCall(t, h, "GetDelegatedAdminAccount", nil), "GetDelegatedAdminAccount")
+	admin, _ := got["delegatedAdmin"].(map[string]any)
+	if admin["accountId"] != "111122223333" {
+		t.Fatalf("GetDelegatedAdminAccount: mismatch: %v", got)
+	}
+
+	list := mustOK(t, doCall(t, h, "ListDelegatedAdminAccounts", nil), "ListDelegatedAdminAccounts")
+	if items, _ := list["delegatedAdminAccounts"].([]any); len(items) != 1 {
+		t.Fatalf("ListDelegatedAdminAccounts: expected 1, got %d", len(items))
+	}
+
+	mustOK(t, doCall(t, h, "DisableDelegatedAdminAccount", map[string]any{
+		"delegatedAdminAccountId": "111122223333",
+	}), "DisableDelegatedAdminAccount")
+
+	notFound := doCall(t, h, "DisableDelegatedAdminAccount", map[string]any{
+		"delegatedAdminAccountId": "111122223333",
+	})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("DisableDelegatedAdminAccount after delete: expected 404, got %d", notFound.Code)
 	}
 }
 
-func TestCancelFindingsReport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CancelFindingsReport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CancelFindingsReport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestFindingsReportLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateFindingsReport", map[string]any{
+		"reportFormat": "CSV",
+		"s3Destination": map[string]any{
+			"bucketName": "my-bucket",
+			"keyPrefix":  "reports/",
+			"kmsKeyArn":  "arn:aws:kms:us-east-1:111122223333:key/abc",
+		},
+	}), "CreateFindingsReport")
+	id, _ := create["reportId"].(string)
+	if id == "" {
+		t.Fatalf("CreateFindingsReport: missing reportId: %v", create)
+	}
+
+	status := mustOK(t, doCall(t, h, "GetFindingsReportStatus", map[string]any{
+		"reportId": id,
+	}), "GetFindingsReportStatus")
+	if status["status"] != "IN_PROGRESS" {
+		t.Fatalf("GetFindingsReportStatus: expected IN_PROGRESS, got %v", status)
+	}
+
+	mustOK(t, doCall(t, h, "CancelFindingsReport", map[string]any{
+		"reportId": id,
+	}), "CancelFindingsReport")
+
+	status = mustOK(t, doCall(t, h, "GetFindingsReportStatus", map[string]any{
+		"reportId": id,
+	}), "GetFindingsReportStatus after cancel")
+	if status["status"] != "CANCELLED" {
+		t.Fatalf("GetFindingsReportStatus: expected CANCELLED, got %v", status)
 	}
 }
 
-func TestCancelSbomExport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CancelSbomExport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CancelSbomExport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestSbomExportLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	create := mustOK(t, doCall(t, h, "CreateSbomExport", map[string]any{
+		"reportFormat": "CYCLONEDX_1_4",
+		"s3Destination": map[string]any{
+			"bucketName": "my-bucket",
+			"kmsKeyArn":  "arn:aws:kms:us-east-1:111122223333:key/abc",
+		},
+	}), "CreateSbomExport")
+	id, _ := create["reportId"].(string)
+	if id == "" {
+		t.Fatalf("CreateSbomExport: missing reportId: %v", create)
+	}
+
+	got := mustOK(t, doCall(t, h, "GetSbomExport", map[string]any{
+		"reportId": id,
+	}), "GetSbomExport")
+	if got["status"] != "IN_PROGRESS" {
+		t.Fatalf("GetSbomExport: expected IN_PROGRESS, got %v", got)
+	}
+
+	mustOK(t, doCall(t, h, "CancelSbomExport", map[string]any{
+		"reportId": id,
+	}), "CancelSbomExport")
+
+	got = mustOK(t, doCall(t, h, "GetSbomExport", map[string]any{
+		"reportId": id,
+	}), "GetSbomExport after cancel")
+	if got["status"] != "CANCELLED" {
+		t.Fatalf("GetSbomExport: expected CANCELLED, got %v", got)
 	}
 }
 
-func TestCreateCisScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCisScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCisScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestEncryptionKeyLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	notFound := doCall(t, h, "GetEncryptionKey", map[string]any{
+		"scanType":     "CODE",
+		"resourceType": "AWS_LAMBDA_FUNCTION",
+	})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("GetEncryptionKey before set: expected 404, got %d", notFound.Code)
+	}
+
+	mustOK(t, doCall(t, h, "UpdateEncryptionKey", map[string]any{
+		"scanType":     "CODE",
+		"resourceType": "AWS_LAMBDA_FUNCTION",
+		"kmsKeyId":     "arn:aws:kms:us-east-1:111122223333:key/test-key",
+	}), "UpdateEncryptionKey")
+
+	got := mustOK(t, doCall(t, h, "GetEncryptionKey", map[string]any{
+		"scanType":     "CODE",
+		"resourceType": "AWS_LAMBDA_FUNCTION",
+	}), "GetEncryptionKey")
+	if got["kmsKeyId"] != "arn:aws:kms:us-east-1:111122223333:key/test-key" {
+		t.Fatalf("GetEncryptionKey: mismatch: %v", got)
+	}
+
+	mustOK(t, doCall(t, h, "ResetEncryptionKey", map[string]any{
+		"scanType":     "CODE",
+		"resourceType": "AWS_LAMBDA_FUNCTION",
+	}), "ResetEncryptionKey")
+
+	notFound = doCall(t, h, "GetEncryptionKey", map[string]any{
+		"scanType":     "CODE",
+		"resourceType": "AWS_LAMBDA_FUNCTION",
+	})
+	if notFound.Code != http.StatusNotFound {
+		t.Fatalf("GetEncryptionKey after reset: expected 404, got %d", notFound.Code)
 	}
 }
 
-func TestCreateCodeSecurityIntegration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCodeSecurityIntegration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCodeSecurityIntegration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestOrganizationConfiguration(t *testing.T) {
+	h := newGateway(t)
+
+	got := mustOK(t, doCall(t, h, "DescribeOrganizationConfiguration", nil), "DescribeOrganizationConfiguration")
+	auto, _ := got["autoEnable"].(map[string]any)
+	if auto == nil {
+		t.Fatalf("DescribeOrganizationConfiguration: missing autoEnable: %v", got)
+	}
+
+	mustOK(t, doCall(t, h, "UpdateOrganizationConfiguration", map[string]any{
+		"autoEnable": map[string]any{
+			"ec2":            true,
+			"ecr":            true,
+			"lambda":         false,
+			"lambdaCode":     false,
+			"codeRepository": false,
+		},
+	}), "UpdateOrganizationConfiguration")
+
+	got = mustOK(t, doCall(t, h, "DescribeOrganizationConfiguration", nil), "DescribeOrganizationConfiguration")
+	auto, _ = got["autoEnable"].(map[string]any)
+	if auto["ec2"] != true || auto["ecr"] != true || auto["lambda"] != false {
+		t.Fatalf("DescribeOrganizationConfiguration: %v", auto)
 	}
 }
 
-func TestCreateCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestEc2DeepInspectionLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	got := mustOK(t, doCall(t, h, "GetEc2DeepInspectionConfiguration", nil), "GetEc2DeepInspectionConfiguration")
+	if got["status"] != "DEACTIVATED" {
+		t.Fatalf("GetEc2DeepInspectionConfiguration: expected DEACTIVATED, got %v", got)
+	}
+
+	updated := mustOK(t, doCall(t, h, "UpdateEc2DeepInspectionConfiguration", map[string]any{
+		"activateDeepInspection": true,
+		"packagePaths":           []string{"/usr/local/bin"},
+	}), "UpdateEc2DeepInspectionConfiguration")
+	if updated["status"] != "ACTIVATED" {
+		t.Fatalf("UpdateEc2DeepInspectionConfiguration: expected ACTIVATED, got %v", updated)
+	}
+
+	mustOK(t, doCall(t, h, "UpdateOrgEc2DeepInspectionConfiguration", map[string]any{
+		"orgPackagePaths": []string{"/opt"},
+	}), "UpdateOrgEc2DeepInspectionConfiguration")
+
+	got = mustOK(t, doCall(t, h, "GetEc2DeepInspectionConfiguration", nil), "GetEc2DeepInspectionConfiguration")
+	orgPaths, _ := got["orgPackagePaths"].([]any)
+	if len(orgPaths) != 1 || orgPaths[0] != "/opt" {
+		t.Fatalf("GetEc2DeepInspectionConfiguration: orgPackagePaths mismatch: %v", got)
 	}
 }
 
-func TestCreateFilter(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateFilter", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateFilter: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestConfigurationLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	mustOK(t, doCall(t, h, "UpdateConfiguration", map[string]any{
+		"ec2Configuration": map[string]any{"scanMode": "EC2_HYBRID"},
+		"ecrConfiguration": map[string]any{"rescanDuration": "DAYS_30"},
+	}), "UpdateConfiguration")
+
+	got := mustOK(t, doCall(t, h, "GetConfiguration", nil), "GetConfiguration")
+	ec2cfg, _ := got["ec2Configuration"].(map[string]any)
+	scanMode, _ := ec2cfg["scanModeState"].(map[string]any)
+	if scanMode["scanMode"] != "EC2_HYBRID" {
+		t.Fatalf("GetConfiguration: ec2 scanMode mismatch: %v", got)
 	}
 }
 
-func TestCreateFindingsReport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateFindingsReport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateFindingsReport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+func TestTagsLifecycle(t *testing.T) {
+	h := newGateway(t)
 
-func TestCreateSbomExport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateSbomExport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateSbomExport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+	create := mustOK(t, doCall(t, h, "CreateFilter", map[string]any{
+		"name":   "tagged",
+		"action": "NONE",
+	}), "CreateFilter")
+	arn, _ := create["arn"].(string)
 
-func TestDeleteCisScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCisScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCisScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
+	mustOK(t, doCall(t, h, "TagResource", map[string]any{
+		"resourceArn": arn,
+		"tags":        map[string]string{"team": "secops", "env": "prod"},
+	}), "TagResource")
 
-func TestDeleteCodeSecurityIntegration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCodeSecurityIntegration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCodeSecurityIntegration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	got := mustOK(t, doCall(t, h, "ListTagsForResource", map[string]any{
+		"resourceArn": arn,
+	}), "ListTagsForResource")
+	tags, _ := got["tags"].(map[string]any)
+	if tags["team"] != "secops" || tags["env"] != "prod" {
+		t.Fatalf("ListTagsForResource: mismatch: %v", got)
 	}
-}
 
-func TestDeleteCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	mustOK(t, doCall(t, h, "UntagResource", map[string]any{
+		"resourceArn": arn,
+		"tagKeys":     []string{"env"},
+	}), "UntagResource")
+
+	got = mustOK(t, doCall(t, h, "ListTagsForResource", map[string]any{
+		"resourceArn": arn,
+	}), "ListTagsForResource")
+	tags, _ = got["tags"].(map[string]any)
+	if _, ok := tags["env"]; ok {
+		t.Fatalf("UntagResource: env tag still present: %v", tags)
 	}
-}
-
-func TestDeleteFilter(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteFilter", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteFilter: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeOrganizationConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeOrganizationConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeOrganizationConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDisable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "Disable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("Disable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDisableDelegatedAdminAccount(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DisableDelegatedAdminAccount", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DisableDelegatedAdminAccount: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDisassociateMember(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DisassociateMember", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DisassociateMember: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestEnable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "Enable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("Enable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestEnableDelegatedAdminAccount(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "EnableDelegatedAdminAccount", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("EnableDelegatedAdminAccount: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetCisScanReport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetCisScanReport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetCisScanReport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetCisScanResultDetails(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetCisScanResultDetails", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetCisScanResultDetails: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetClustersForImage(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetClustersForImage", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetClustersForImage: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetCodeSecurityIntegration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetCodeSecurityIntegration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetCodeSecurityIntegration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetCodeSecurityScan(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetCodeSecurityScan", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetCodeSecurityScan: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetDelegatedAdminAccount(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetDelegatedAdminAccount", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetDelegatedAdminAccount: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetEc2DeepInspectionConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetEc2DeepInspectionConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetEc2DeepInspectionConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetEncryptionKey(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetEncryptionKey", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetEncryptionKey: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetFindingsReportStatus(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetFindingsReportStatus", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetFindingsReportStatus: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetMember(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetMember", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetMember: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetSbomExport(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetSbomExport", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetSbomExport: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListAccountPermissions(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListAccountPermissions", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListAccountPermissions: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCisScanConfigurations(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCisScanConfigurations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCisScanConfigurations: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCisScanResultsAggregatedByChecks(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCisScanResultsAggregatedByChecks", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCisScanResultsAggregatedByChecks: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCisScanResultsAggregatedByTargetResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCisScanResultsAggregatedByTargetResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCisScanResultsAggregatedByTargetResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCisScans(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCisScans", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCisScans: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCodeSecurityIntegrations(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCodeSecurityIntegrations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCodeSecurityIntegrations: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCodeSecurityScanConfigurationAssociations(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCodeSecurityScanConfigurationAssociations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCodeSecurityScanConfigurationAssociations: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCodeSecurityScanConfigurations(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCodeSecurityScanConfigurations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCodeSecurityScanConfigurations: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCoverage(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCoverage", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCoverage: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCoverageStatistics(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCoverageStatistics", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCoverageStatistics: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListDelegatedAdminAccounts(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListDelegatedAdminAccounts", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListDelegatedAdminAccounts: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFilters(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFilters", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFilters: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFindingAggregations(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFindingAggregations", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFindingAggregations: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListFindings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListFindings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListFindings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListMembers(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListMembers", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListMembers: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTagsForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTagsForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListUsageTotals(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListUsageTotals", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListUsageTotals: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestResetEncryptionKey(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ResetEncryptionKey", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ResetEncryptionKey: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	if tags["team"] != "secops" {
+		t.Fatalf("UntagResource: team tag removed: %v", tags)
 	}
 }
 
 func TestSearchVulnerabilities(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SearchVulnerabilities", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SearchVulnerabilities: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+	h := newGateway(t)
+
+	got := mustOK(t, doCall(t, h, "SearchVulnerabilities", map[string]any{
+		"filterCriteria": map[string]any{
+			"vulnerabilityIds": []string{"CVE-2024-12345"},
+		},
+	}), "SearchVulnerabilities")
+	vulns, _ := got["vulnerabilities"].([]any)
+	if len(vulns) != 1 {
+		t.Fatalf("SearchVulnerabilities: expected 1, got %v", got)
+	}
+	first, _ := vulns[0].(map[string]any)
+	if first["id"] != "CVE-2024-12345" {
+		t.Fatalf("SearchVulnerabilities: id mismatch: %v", first)
 	}
 }
 
-func TestSendCisSessionHealth(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SendCisSessionHealth", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SendCisSessionHealth: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestEmptyListsReturnEmpty(t *testing.T) {
+	h := newGateway(t)
+
+	out := mustOK(t, doCall(t, h, "ListCoverage", nil), "ListCoverage")
+	if cov, _ := out["coveredResources"].([]any); len(cov) != 0 {
+		t.Fatalf("ListCoverage: expected empty, got %v", out)
+	}
+
+	out = mustOK(t, doCall(t, h, "ListCoverageStatistics", nil), "ListCoverageStatistics")
+	if c, _ := out["countsByGroup"].([]any); len(c) != 0 {
+		t.Fatalf("ListCoverageStatistics: expected empty, got %v", out)
+	}
+
+	out = mustOK(t, doCall(t, h, "ListFindings", nil), "ListFindings")
+	if f, _ := out["findings"].([]any); len(f) != 0 {
+		t.Fatalf("ListFindings: expected empty, got %v", out)
+	}
+
+	out = mustOK(t, doCall(t, h, "ListCisScans", nil), "ListCisScans")
+	if s, _ := out["scans"].([]any); len(s) != 0 {
+		t.Fatalf("ListCisScans: expected empty, got %v", out)
+	}
+
+	out = mustOK(t, doCall(t, h, "ListFindingAggregations", map[string]any{
+		"aggregationType": "TITLE",
+	}), "ListFindingAggregations")
+	if r, _ := out["responses"].([]any); len(r) != 0 {
+		t.Fatalf("ListFindingAggregations: expected empty, got %v", out)
 	}
 }
 
-func TestSendCisSessionTelemetry(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "SendCisSessionTelemetry", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("SendCisSessionTelemetry: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestUsageTotalsAndPermissions(t *testing.T) {
+	h := newGateway(t)
+
+	out := mustOK(t, doCall(t, h, "ListUsageTotals", map[string]any{
+		"accountIds": []string{"111122223333", "444455556666"},
+	}), "ListUsageTotals")
+	totals, _ := out["totals"].([]any)
+	if len(totals) != 2 {
+		t.Fatalf("ListUsageTotals: expected 2, got %d", len(totals))
+	}
+
+	out = mustOK(t, doCall(t, h, "ListAccountPermissions", nil), "ListAccountPermissions")
+	if perms, _ := out["permissions"].([]any); len(perms) == 0 {
+		t.Fatalf("ListAccountPermissions: expected at least one permission, got 0")
+	}
+
+	out = mustOK(t, doCall(t, h, "ListAccountPermissions", map[string]any{
+		"service": "EC2",
+	}), "ListAccountPermissions filtered")
+	perms, _ := out["permissions"].([]any)
+	if len(perms) != 1 {
+		t.Fatalf("ListAccountPermissions filtered: expected 1, got %d", len(perms))
 	}
 }
 
-func TestStartCisSession(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartCisSession", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartCisSession: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestBatchGetCodeSnippetAndFreeTrial(t *testing.T) {
+	h := newGateway(t)
+
+	out := mustOK(t, doCall(t, h, "BatchGetCodeSnippet", map[string]any{
+		"findingArns": []string{
+			"arn:aws:inspector2:us-east-1:111122223333:finding/abc",
+		},
+	}), "BatchGetCodeSnippet")
+	if results, _ := out["codeSnippetResults"].([]any); len(results) != 1 {
+		t.Fatalf("BatchGetCodeSnippet: expected 1 result, got %v", out)
+	}
+
+	out = mustOK(t, doCall(t, h, "BatchGetFreeTrialInfo", map[string]any{
+		"accountIds": []string{"111122223333"},
+	}), "BatchGetFreeTrialInfo")
+	if accs, _ := out["accounts"].([]any); len(accs) != 1 {
+		t.Fatalf("BatchGetFreeTrialInfo: expected 1 account, got %v", out)
 	}
 }
 
-func TestStartCodeSecurityScan(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StartCodeSecurityScan", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StartCodeSecurityScan: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestBatchGetMemberEc2DeepInspectionStatus(t *testing.T) {
+	h := newGateway(t)
+
+	mustOK(t, doCall(t, h, "BatchUpdateMemberEc2DeepInspectionStatus", map[string]any{
+		"accountIds": []map[string]any{
+			{"accountId": "111122223333", "activateDeepInspection": true},
+			{"accountId": "444455556666", "activateDeepInspection": false},
+		},
+	}), "BatchUpdateMemberEc2DeepInspectionStatus")
+
+	out := mustOK(t, doCall(t, h, "BatchGetMemberEc2DeepInspectionStatus", map[string]any{
+		"accountIds": []string{"111122223333", "444455556666"},
+	}), "BatchGetMemberEc2DeepInspectionStatus")
+	statuses, _ := out["accountIds"].([]any)
+	if len(statuses) != 2 {
+		t.Fatalf("BatchGetMemberEc2DeepInspectionStatus: expected 2, got %d", len(statuses))
+	}
+	first, _ := statuses[0].(map[string]any)
+	second, _ := statuses[1].(map[string]any)
+	if first["status"] == second["status"] {
+		t.Fatalf("expected differing statuses, got %v / %v", first, second)
 	}
 }
 
-func TestStopCisSession(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "StopCisSession", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("StopCisSession: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestGetClustersForImage(t *testing.T) {
+	h := newGateway(t)
+
+	out := mustOK(t, doCall(t, h, "GetClustersForImage", map[string]any{
+		"filter": map[string]any{
+			"resourceId": "sha256:abc",
+		},
+	}), "GetClustersForImage")
+	if c, _ := out["cluster"].([]any); len(c) != 0 {
+		t.Fatalf("GetClustersForImage: expected empty cluster slice, got %v", out)
+	}
+
+	missing := doCall(t, h, "GetClustersForImage", map[string]any{"filter": map[string]any{}})
+	if missing.Code != http.StatusBadRequest {
+		t.Fatalf("GetClustersForImage missing resourceId: expected 400, got %d", missing.Code)
 	}
 }
 
-func TestTagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "TagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("TagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCisScanReportRequiresArn(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "GetCisScanReport", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("GetCisScanReport without arn: expected 400, got %d", w.Code)
 	}
+
+	mustOK(t, doCall(t, h, "GetCisScanReport", map[string]any{
+		"scanArn": "arn:aws:inspector2:us-east-1:111122223333:cis-scan/abc",
+	}), "GetCisScanReport")
+
+	mustOK(t, doCall(t, h, "GetCisScanResultDetails", map[string]any{
+		"scanArn": "arn:aws:inspector2:us-east-1:111122223333:cis-scan/abc",
+	}), "GetCisScanResultDetails")
 }
 
-func TestUntagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UntagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Smoke test for unknown action ────────────────────────────────────────────
+
+func TestUnknownAction(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "BogusAction", nil)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("BogusAction: expected 400, got %d", w.Code)
+	}
+	if !strings.Contains(w.Body.String(), "InvalidAction") {
+		t.Fatalf("BogusAction: expected InvalidAction error, got %s", w.Body.String())
 	}
 }
-
-func TestUpdateCisScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCisScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCisScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCodeSecurityIntegration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCodeSecurityIntegration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCodeSecurityIntegration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCodeSecurityScanConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCodeSecurityScanConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCodeSecurityScanConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateEc2DeepInspectionConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateEc2DeepInspectionConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateEc2DeepInspectionConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateEncryptionKey(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateEncryptionKey", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateEncryptionKey: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateFilter(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateFilter", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateFilter: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateOrgEc2DeepInspectionConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateOrgEc2DeepInspectionConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateOrgEc2DeepInspectionConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateOrganizationConfiguration(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateOrganizationConfiguration", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateOrganizationConfiguration: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-

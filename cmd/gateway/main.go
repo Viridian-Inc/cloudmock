@@ -199,6 +199,20 @@ import (
 	timestreamwritesvc "github.com/Viridian-Inc/cloudmock/services/timestreamwrite"
 	transcribesvc "github.com/Viridian-Inc/cloudmock/services/transcribe"
 	transfersvc "github.com/Viridian-Inc/cloudmock/services/transfer"
+	comprehendsvc "github.com/Viridian-Inc/cloudmock/services/comprehend"
+	ecrpublicsvc "github.com/Viridian-Inc/cloudmock/services/ecrpublic"
+	efssvc "github.com/Viridian-Inc/cloudmock/services/efs"
+	globalacceleratorsvc "github.com/Viridian-Inc/cloudmock/services/globalaccelerator"
+	guarddutysvc "github.com/Viridian-Inc/cloudmock/services/guardduty"
+	inspector2svc "github.com/Viridian-Inc/cloudmock/services/inspector2"
+	keyspacessvc "github.com/Viridian-Inc/cloudmock/services/keyspaces"
+	lexmodelssvc "github.com/Viridian-Inc/cloudmock/services/lexmodels"
+	pollysvc "github.com/Viridian-Inc/cloudmock/services/polly"
+	quicksightsvc "github.com/Viridian-Inc/cloudmock/services/quicksight"
+	rekognitionsvc "github.com/Viridian-Inc/cloudmock/services/rekognition"
+	securityhubsvc "github.com/Viridian-Inc/cloudmock/services/securityhub"
+	servicecatalogsvc "github.com/Viridian-Inc/cloudmock/services/servicecatalog"
+	translatesvc "github.com/Viridian-Inc/cloudmock/services/translate"
 	verifiedpermissionssvc "github.com/Viridian-Inc/cloudmock/services/verifiedpermissions"
 	wafregionalsvc "github.com/Viridian-Inc/cloudmock/services/wafregional"
 	wafv2svc "github.com/Viridian-Inc/cloudmock/services/wafv2"
@@ -838,6 +852,20 @@ func main() {
 	_ = registerOrDefer("elasticbeanstalk", func() service.Service { return ebsvc2.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("batch", func() service.Service { return batchsvc.New(cfg.AccountID, cfg.Region) })
 	_ = registerOrDefer("xray", func() service.Service { return xraysvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("polly", func() service.Service { return pollysvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("translate", func() service.Service { return translatesvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("cassandra", func() service.Service { return keyspacessvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("ecr-public", func() service.Service { return ecrpublicsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("elasticfilesystem", func() service.Service { return efssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("lex", func() service.Service { return lexmodelssvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("globalaccelerator", func() service.Service { return globalacceleratorsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("rekognition", func() service.Service { return rekognitionsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("inspector2", func() service.Service { return inspector2svc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("comprehend", func() service.Service { return comprehendsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("guardduty", func() service.Service { return guarddutysvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("servicecatalog", func() service.Service { return servicecatalogsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("securityhub", func() service.Service { return securityhubsvc.New(cfg.AccountID, cfg.Region) })
+	_ = registerOrDefer("quicksight", func() service.Service { return quicksightsvc.New(cfg.AccountID, cfg.Region) })
 
 	// Auto-provision resources from IaC source (Pulumi/Terraform).
 	// This reads DynamoDB table definitions, API Gateway routes, etc. from the

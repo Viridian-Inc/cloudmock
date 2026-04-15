@@ -1,422 +1,15 @@
 package keyspaces
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
 	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
-// ── Generated request/response types ─────────────────────────────────────────
-
-type AutoScalingPolicy struct {
-	TargetTrackingScalingPolicyConfiguration *TargetTrackingScalingPolicyConfiguration `json:"targetTrackingScalingPolicyConfiguration,omitempty"`
-}
-
-type AutoScalingSettings struct {
-	AutoScalingDisabled bool `json:"autoScalingDisabled,omitempty"`
-	MaximumUnits int64 `json:"maximumUnits,omitempty"`
-	MinimumUnits int64 `json:"minimumUnits,omitempty"`
-	ScalingPolicy *AutoScalingPolicy `json:"scalingPolicy,omitempty"`
-}
-
-type AutoScalingSpecification struct {
-	ReadCapacityAutoScaling *AutoScalingSettings `json:"readCapacityAutoScaling,omitempty"`
-	WriteCapacityAutoScaling *AutoScalingSettings `json:"writeCapacityAutoScaling,omitempty"`
-}
-
-type CapacitySpecification struct {
-	ReadCapacityUnits int64 `json:"readCapacityUnits,omitempty"`
-	ThroughputMode string `json:"throughputMode,omitempty"`
-	WriteCapacityUnits int64 `json:"writeCapacityUnits,omitempty"`
-}
-
-type CapacitySpecificationSummary struct {
-	LastUpdateToPayPerRequestTimestamp *time.Time `json:"lastUpdateToPayPerRequestTimestamp,omitempty"`
-	ReadCapacityUnits int64 `json:"readCapacityUnits,omitempty"`
-	ThroughputMode string `json:"throughputMode,omitempty"`
-	WriteCapacityUnits int64 `json:"writeCapacityUnits,omitempty"`
-}
-
-type CdcSpecification struct {
-	PropagateTags *string `json:"propagateTags,omitempty"`
-	Status string `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-	ViewType *string `json:"viewType,omitempty"`
-}
-
-type CdcSpecificationSummary struct {
-	Status string `json:"status,omitempty"`
-	ViewType *string `json:"viewType,omitempty"`
-}
-
-type ClientSideTimestamps struct {
-	Status string `json:"status,omitempty"`
-}
-
-type ClusteringKey struct {
-	Name string `json:"name,omitempty"`
-	OrderBy string `json:"orderBy,omitempty"`
-}
-
-type ColumnDefinition struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-type Comment struct {
-	Message string `json:"message,omitempty"`
-}
-
-type CreateKeyspaceRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ReplicationSpecification *ReplicationSpecification `json:"replicationSpecification,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type CreateKeyspaceResponse struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type CreateTableRequest struct {
-	AutoScalingSpecification *AutoScalingSpecification `json:"autoScalingSpecification,omitempty"`
-	CapacitySpecification *CapacitySpecification `json:"capacitySpecification,omitempty"`
-	CdcSpecification *CdcSpecification `json:"cdcSpecification,omitempty"`
-	ClientSideTimestamps *ClientSideTimestamps `json:"clientSideTimestamps,omitempty"`
-	Comment *Comment `json:"comment,omitempty"`
-	DefaultTimeToLive int `json:"defaultTimeToLive,omitempty"`
-	EncryptionSpecification *EncryptionSpecification `json:"encryptionSpecification,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	PointInTimeRecovery *PointInTimeRecovery `json:"pointInTimeRecovery,omitempty"`
-	ReplicaSpecifications []ReplicaSpecification `json:"replicaSpecifications,omitempty"`
-	SchemaDefinition SchemaDefinition `json:"schemaDefinition,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-	Ttl *TimeToLive `json:"ttl,omitempty"`
-	WarmThroughputSpecification *WarmThroughputSpecification `json:"warmThroughputSpecification,omitempty"`
-}
-
-type CreateTableResponse struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type CreateTypeRequest struct {
-	FieldDefinitions []FieldDefinition `json:"fieldDefinitions,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type CreateTypeResponse struct {
-	KeyspaceArn string `json:"keyspaceArn,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type DeleteKeyspaceRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-}
-
-type DeleteKeyspaceResponse struct {
-}
-
-type DeleteTableRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-}
-
-type DeleteTableResponse struct {
-}
-
-type DeleteTypeRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type DeleteTypeResponse struct {
-	KeyspaceArn string `json:"keyspaceArn,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type EncryptionSpecification struct {
-	KmsKeyIdentifier *string `json:"kmsKeyIdentifier,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-type FieldDefinition struct {
-	Name string `json:"name,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-type GetKeyspaceRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-}
-
-type GetKeyspaceResponse struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ReplicationGroupStatuses []ReplicationGroupStatus `json:"replicationGroupStatuses,omitempty"`
-	ReplicationRegions []string `json:"replicationRegions,omitempty"`
-	ReplicationStrategy string `json:"replicationStrategy,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type GetTableAutoScalingSettingsRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-}
-
-type GetTableAutoScalingSettingsResponse struct {
-	AutoScalingSpecification *AutoScalingSpecification `json:"autoScalingSpecification,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ReplicaSpecifications []ReplicaAutoScalingSpecification `json:"replicaSpecifications,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-}
-
-type GetTableRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-}
-
-type GetTableResponse struct {
-	CapacitySpecification *CapacitySpecificationSummary `json:"capacitySpecification,omitempty"`
-	CdcSpecification *CdcSpecificationSummary `json:"cdcSpecification,omitempty"`
-	ClientSideTimestamps *ClientSideTimestamps `json:"clientSideTimestamps,omitempty"`
-	Comment *Comment `json:"comment,omitempty"`
-	CreationTimestamp *time.Time `json:"creationTimestamp,omitempty"`
-	DefaultTimeToLive int `json:"defaultTimeToLive,omitempty"`
-	EncryptionSpecification *EncryptionSpecification `json:"encryptionSpecification,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	LatestStreamArn *string `json:"latestStreamArn,omitempty"`
-	PointInTimeRecovery *PointInTimeRecoverySummary `json:"pointInTimeRecovery,omitempty"`
-	ReplicaSpecifications []ReplicaSpecificationSummary `json:"replicaSpecifications,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-	SchemaDefinition *SchemaDefinition `json:"schemaDefinition,omitempty"`
-	Status *string `json:"status,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-	Ttl *TimeToLive `json:"ttl,omitempty"`
-	WarmThroughputSpecification *WarmThroughputSpecificationSummary `json:"warmThroughputSpecification,omitempty"`
-}
-
-type GetTypeRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type GetTypeResponse struct {
-	DirectParentTypes []string `json:"directParentTypes,omitempty"`
-	DirectReferringTables []string `json:"directReferringTables,omitempty"`
-	FieldDefinitions []FieldDefinition `json:"fieldDefinitions,omitempty"`
-	KeyspaceArn string `json:"keyspaceArn,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	LastModifiedTimestamp *time.Time `json:"lastModifiedTimestamp,omitempty"`
-	MaxNestingDepth int `json:"maxNestingDepth,omitempty"`
-	Status *string `json:"status,omitempty"`
-	TypeName string `json:"typeName,omitempty"`
-}
-
-type KeyspaceSummary struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ReplicationRegions []string `json:"replicationRegions,omitempty"`
-	ReplicationStrategy string `json:"replicationStrategy,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type ListKeyspacesRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type ListKeyspacesResponse struct {
-	Keyspaces []KeyspaceSummary `json:"keyspaces,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type ListTablesRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type ListTablesResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	Tables []TableSummary `json:"tables,omitempty"`
-}
-
-type ListTagsForResourceRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type ListTagsForResourceResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type ListTypesRequest struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type ListTypesResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	Types []string `json:"types,omitempty"`
-}
-
-type PartitionKey struct {
-	Name string `json:"name,omitempty"`
-}
-
-type PointInTimeRecovery struct {
-	Status string `json:"status,omitempty"`
-}
-
-type PointInTimeRecoverySummary struct {
-	EarliestRestorableTimestamp *time.Time `json:"earliestRestorableTimestamp,omitempty"`
-	Status string `json:"status,omitempty"`
-}
-
-type ReplicaAutoScalingSpecification struct {
-	AutoScalingSpecification *AutoScalingSpecification `json:"autoScalingSpecification,omitempty"`
-	Region *string `json:"region,omitempty"`
-}
-
-type ReplicaSpecification struct {
-	ReadCapacityAutoScaling *AutoScalingSettings `json:"readCapacityAutoScaling,omitempty"`
-	ReadCapacityUnits int64 `json:"readCapacityUnits,omitempty"`
-	Region string `json:"region,omitempty"`
-}
-
-type ReplicaSpecificationSummary struct {
-	CapacitySpecification *CapacitySpecificationSummary `json:"capacitySpecification,omitempty"`
-	Region *string `json:"region,omitempty"`
-	Status *string `json:"status,omitempty"`
-	WarmThroughputSpecification *WarmThroughputSpecificationSummary `json:"warmThroughputSpecification,omitempty"`
-}
-
-type ReplicationGroupStatus struct {
-	KeyspaceStatus string `json:"keyspaceStatus,omitempty"`
-	Region string `json:"region,omitempty"`
-	TablesReplicationProgress *string `json:"tablesReplicationProgress,omitempty"`
-}
-
-type ReplicationSpecification struct {
-	RegionList []string `json:"regionList,omitempty"`
-	ReplicationStrategy string `json:"replicationStrategy,omitempty"`
-}
-
-type RestoreTableRequest struct {
-	AutoScalingSpecification *AutoScalingSpecification `json:"autoScalingSpecification,omitempty"`
-	CapacitySpecificationOverride *CapacitySpecification `json:"capacitySpecificationOverride,omitempty"`
-	EncryptionSpecificationOverride *EncryptionSpecification `json:"encryptionSpecificationOverride,omitempty"`
-	PointInTimeRecoveryOverride *PointInTimeRecovery `json:"pointInTimeRecoveryOverride,omitempty"`
-	ReplicaSpecifications []ReplicaSpecification `json:"replicaSpecifications,omitempty"`
-	RestoreTimestamp *time.Time `json:"restoreTimestamp,omitempty"`
-	SourceKeyspaceName string `json:"sourceKeyspaceName,omitempty"`
-	SourceTableName string `json:"sourceTableName,omitempty"`
-	TagsOverride []Tag `json:"tagsOverride,omitempty"`
-	TargetKeyspaceName string `json:"targetKeyspaceName,omitempty"`
-	TargetTableName string `json:"targetTableName,omitempty"`
-}
-
-type RestoreTableResponse struct {
-	RestoredTableARN string `json:"restoredTableARN,omitempty"`
-}
-
-type SchemaDefinition struct {
-	AllColumns []ColumnDefinition `json:"allColumns,omitempty"`
-	ClusteringKeys []ClusteringKey `json:"clusteringKeys,omitempty"`
-	PartitionKeys []PartitionKey `json:"partitionKeys,omitempty"`
-	StaticColumns []StaticColumn `json:"staticColumns,omitempty"`
-}
-
-type StaticColumn struct {
-	Name string `json:"name,omitempty"`
-}
-
-type TableSummary struct {
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-}
-
-type Tag struct {
-	Key string `json:"key,omitempty"`
-	Value string `json:"value,omitempty"`
-}
-
-type TagResourceRequest struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type TagResourceResponse struct {
-}
-
-type TargetTrackingScalingPolicyConfiguration struct {
-	DisableScaleIn bool `json:"disableScaleIn,omitempty"`
-	ScaleInCooldown int `json:"scaleInCooldown,omitempty"`
-	ScaleOutCooldown int `json:"scaleOutCooldown,omitempty"`
-	TargetValue float64 `json:"targetValue,omitempty"`
-}
-
-type TimeToLive struct {
-	Status string `json:"status,omitempty"`
-}
-
-type UntagResourceRequest struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type UntagResourceResponse struct {
-}
-
-type UpdateKeyspaceRequest struct {
-	ClientSideTimestamps *ClientSideTimestamps `json:"clientSideTimestamps,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	ReplicationSpecification ReplicationSpecification `json:"replicationSpecification,omitempty"`
-}
-
-type UpdateKeyspaceResponse struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type UpdateTableRequest struct {
-	AddColumns []ColumnDefinition `json:"addColumns,omitempty"`
-	AutoScalingSpecification *AutoScalingSpecification `json:"autoScalingSpecification,omitempty"`
-	CapacitySpecification *CapacitySpecification `json:"capacitySpecification,omitempty"`
-	CdcSpecification *CdcSpecification `json:"cdcSpecification,omitempty"`
-	ClientSideTimestamps *ClientSideTimestamps `json:"clientSideTimestamps,omitempty"`
-	DefaultTimeToLive int `json:"defaultTimeToLive,omitempty"`
-	EncryptionSpecification *EncryptionSpecification `json:"encryptionSpecification,omitempty"`
-	KeyspaceName string `json:"keyspaceName,omitempty"`
-	PointInTimeRecovery *PointInTimeRecovery `json:"pointInTimeRecovery,omitempty"`
-	ReplicaSpecifications []ReplicaSpecification `json:"replicaSpecifications,omitempty"`
-	TableName string `json:"tableName,omitempty"`
-	Ttl *TimeToLive `json:"ttl,omitempty"`
-	WarmThroughputSpecification *WarmThroughputSpecification `json:"warmThroughputSpecification,omitempty"`
-}
-
-type UpdateTableResponse struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type WarmThroughputSpecification struct {
-	ReadUnitsPerSecond int64 `json:"readUnitsPerSecond,omitempty"`
-	WriteUnitsPerSecond int64 `json:"writeUnitsPerSecond,omitempty"`
-}
-
-type WarmThroughputSpecificationSummary struct {
-	ReadUnitsPerSecond int64 `json:"readUnitsPerSecond,omitempty"`
-	Status string `json:"status,omitempty"`
-	WriteUnitsPerSecond int64 `json:"writeUnitsPerSecond,omitempty"`
-}
-
-
-
-// ── Handler helpers ──────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -431,182 +24,476 @@ func parseJSON(body []byte, v any) *service.AWSError {
 		return nil
 	}
 	if err := gojson.Unmarshal(body, v); err != nil {
-		return service.NewAWSError("InvalidParameterException",
+		return service.NewAWSError("ValidationException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}
 	return nil
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getInt(m map[string]any, key string) int {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		}
+	}
+	return 0
+}
+
+func getMap(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if mm, ok := v.(map[string]any); ok {
+			return mm
+		}
+	}
+	return nil
+}
+
+func getMapList(m map[string]any, key string) []map[string]any {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(arr))
+	for _, x := range arr {
+		if xm, ok := x.(map[string]any); ok {
+			out = append(out, xm)
+		}
+	}
+	return out
+}
+
+func getStrList(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, x := range arr {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func parseTagList(m map[string]any, key string) map[string]string {
+	out := make(map[string]string)
+	for _, t := range getMapList(m, key) {
+		k := getStr(t, "key")
+		if k == "" {
+			k = getStr(t, "Key")
+		}
+		v := getStr(t, "value")
+		if v == "" {
+			v = getStr(t, "Value")
+		}
+		if k != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func rfc3339(t time.Time) string { return t.Format(time.RFC3339) }
+
+// ── Keyspace handlers ───────────────────────────────────────────────────────
 
 func handleCreateKeyspace(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateKeyspaceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement CreateKeyspace business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateKeyspace"})
-}
+	name := getStr(req, "keyspaceName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("keyspaceName is required."))
+	}
+	replicationType := "SINGLE_REGION"
+	var regions []string
+	if rs := getMap(req, "replicationSpecification"); rs != nil {
+		replicationType = getStr(rs, "replicationStrategy")
+		if replicationType == "" {
+			replicationType = "SINGLE_REGION"
+		}
+		regions = getStrList(rs, "regionList")
+	}
 
-func handleCreateTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateTableRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	ks, err := store.CreateKeyspace(name, replicationType, regions, parseTagList(req, "tags"))
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement CreateTable business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateTable"})
-}
-
-func handleCreateType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateTypeRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateType"})
+	return jsonOK(map[string]any{"resourceArn": ks.Arn})
 }
 
 func handleDeleteKeyspace(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteKeyspaceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement DeleteKeyspace business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteKeyspace"})
-}
-
-func handleDeleteTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteTableRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "keyspaceName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("keyspaceName is required."))
 	}
-	// TODO: implement DeleteTable business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteTable"})
-}
-
-func handleDeleteType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteTypeRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if err := store.DeleteKeyspace(name); err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement DeleteType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteType"})
+	return jsonOK(map[string]any{})
 }
 
 func handleGetKeyspace(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetKeyspaceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetKeyspace business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetKeyspace"})
-}
-
-func handleGetTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetTableRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "keyspaceName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("keyspaceName is required."))
 	}
-	// TODO: implement GetTable business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetTable"})
-}
-
-func handleGetTableAutoScalingSettings(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetTableAutoScalingSettingsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	ks, err := store.GetKeyspace(name)
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement GetTableAutoScalingSettings business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetTableAutoScalingSettings"})
-}
-
-func handleGetType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetTypeRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement GetType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetType"})
+	return jsonOK(keyspaceSummary(ks))
 }
 
 func handleListKeyspaces(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListKeyspacesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	list := store.ListKeyspaces()
+	out := make([]map[string]any, 0, len(list))
+	for _, ks := range list {
+		out = append(out, keyspaceSummary(ks))
 	}
-	// TODO: implement ListKeyspaces business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListKeyspaces"})
-}
-
-func handleListTables(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTablesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTables business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTables"})
-}
-
-func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTagsForResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTagsForResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTagsForResource"})
-}
-
-func handleListTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTypesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTypes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTypes"})
-}
-
-func handleRestoreTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req RestoreTableRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement RestoreTable business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "RestoreTable"})
-}
-
-func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TagResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement TagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TagResource"})
-}
-
-func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UntagResourceRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement UntagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UntagResource"})
+	return jsonOK(map[string]any{"keyspaces": out})
 }
 
 func handleUpdateKeyspace(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateKeyspaceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateKeyspace business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateKeyspace"})
+	name := getStr(req, "keyspaceName")
+	if name == "" {
+		return jsonErr(service.ErrValidation("keyspaceName is required."))
+	}
+	var regions []string
+	if rs := getMap(req, "replicationSpecification"); rs != nil {
+		regions = getStrList(rs, "regionList")
+	}
+	ks, err := store.UpdateKeyspace(name, regions)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"resourceArn": ks.Arn})
+}
+
+func keyspaceSummary(ks *StoredKeyspace) map[string]any {
+	return map[string]any{
+		"keyspaceName":       ks.Name,
+		"resourceArn":        ks.Arn,
+		"replicationStrategy": ks.ReplicationType,
+		"replicationRegions":  ks.ReplicationRegions,
+	}
+}
+
+// ── Table handlers ──────────────────────────────────────────────────────────
+
+func handleCreateTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	ksName := getStr(req, "keyspaceName")
+	tableName := getStr(req, "tableName")
+	if ksName == "" {
+		return jsonErr(service.ErrValidation("keyspaceName is required."))
+	}
+	if tableName == "" {
+		return jsonErr(service.ErrValidation("tableName is required."))
+	}
+	schema := getMap(req, "schemaDefinition")
+	if schema == nil {
+		return jsonErr(service.ErrValidation("schemaDefinition is required."))
+	}
+
+	t, err := store.CreateTable(
+		ksName, tableName,
+		schema,
+		getMap(req, "capacitySpecification"),
+		getMap(req, "encryptionSpecification"),
+		getMap(req, "pointInTimeRecovery"),
+		getMap(req, "ttl"),
+		getInt(req, "defaultTimeToLive"),
+		getMap(req, "comment"),
+		parseTagList(req, "tags"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"resourceArn": t.Arn})
+}
+
+func handleDeleteTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteTable(getStr(req, "keyspaceName"), getStr(req, "tableName")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleGetTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.GetTable(getStr(req, "keyspaceName"), getStr(req, "tableName"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(tableSummary(t))
+}
+
+func handleGetTableAutoScalingSettings(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.GetTable(getStr(req, "keyspaceName"), getStr(req, "tableName"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"keyspaceName": t.KeyspaceName,
+		"tableName":    t.TableName,
+		"resourceArn":  t.Arn,
+		"autoScalingSpecification": map[string]any{
+			"readCapacityAutoScaling": map[string]any{
+				"autoScalingDisabled": true,
+			},
+			"writeCapacityAutoScaling": map[string]any{
+				"autoScalingDisabled": true,
+			},
+		},
+	})
+}
+
+func handleListTables(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListTables(getStr(req, "keyspaceName"))
+	out := make([]map[string]any, 0, len(list))
+	for _, t := range list {
+		out = append(out, map[string]any{
+			"keyspaceName": t.KeyspaceName,
+			"tableName":    t.TableName,
+			"resourceArn":  t.Arn,
+		})
+	}
+	return jsonOK(map[string]any{"tables": out})
 }
 
 func handleUpdateTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateTableRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateTable business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateTable"})
+	var ttl *int
+	if _, ok := req["defaultTimeToLive"]; ok {
+		v := getInt(req, "defaultTimeToLive")
+		ttl = &v
+	}
+	t, err := store.UpdateTable(
+		getStr(req, "keyspaceName"),
+		getStr(req, "tableName"),
+		getMap(req, "addColumns"),
+		getMap(req, "capacitySpecification"),
+		getMap(req, "pointInTimeRecovery"),
+		ttl,
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"resourceArn": t.Arn})
 }
 
+func handleRestoreTable(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.RestoreTable(
+		getStr(req, "sourceKeyspaceName"),
+		getStr(req, "sourceTableName"),
+		getStr(req, "targetKeyspaceName"),
+		getStr(req, "targetTableName"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"restoredTableARN": t.Arn})
+}
+
+func tableSummary(t *StoredTable) map[string]any {
+	return map[string]any{
+		"keyspaceName":       t.KeyspaceName,
+		"tableName":          t.TableName,
+		"resourceArn":        t.Arn,
+		"status":             t.Status,
+		"schemaDefinition":   t.SchemaDefinition,
+		"capacitySpecification": t.CapacitySpec,
+		"encryptionSpecification": t.EncryptionSpec,
+		"pointInTimeRecovery": t.PITR,
+		"ttl":                t.TTL,
+		"defaultTimeToLive":  t.DefaultTimeToLive,
+		"comment":            t.Comment,
+		"creationTimestamp":  rfc3339(t.CreatedAt),
+	}
+}
+
+// ── Type handlers ───────────────────────────────────────────────────────────
+
+func handleCreateType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	ksName := getStr(req, "keyspaceName")
+	typeName := getStr(req, "typeName")
+	if ksName == "" || typeName == "" {
+		return jsonErr(service.ErrValidation("keyspaceName and typeName are required."))
+	}
+	fields := getMapList(req, "fieldDefinitions")
+	if len(fields) == 0 {
+		return jsonErr(service.ErrValidation("fieldDefinitions is required."))
+	}
+	t, err := store.CreateType(ksName, typeName, fields)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"keyspaceArn": t.KeyspaceArn,
+		"typeName":    t.TypeName,
+	})
+}
+
+func handleDeleteType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteType(getStr(req, "keyspaceName"), getStr(req, "typeName")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"keyspaceArn": "arn:aws:cassandra::/keyspace/" + getStr(req, "keyspaceName"),
+		"typeName":    getStr(req, "typeName"),
+	})
+}
+
+func handleGetType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.GetType(getStr(req, "keyspaceName"), getStr(req, "typeName"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"keyspaceName":     t.KeyspaceName,
+		"typeName":         t.TypeName,
+		"keyspaceArn":      t.KeyspaceArn,
+		"fieldDefinitions": t.Fields,
+		"directReferringTables": t.DirectReferringTables,
+		"directParentTypes":     t.DirectParentTypes,
+		"maxNestingDepth":       t.MaxNestingDepth,
+		"status":                "ACTIVE",
+		"creationTimestamp":     rfc3339(t.CreatedAt),
+	})
+}
+
+func handleListTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListTypes(getStr(req, "keyspaceName"))
+	names := make([]string, 0, len(list))
+	for _, t := range list {
+		names = append(names, t.TypeName)
+	}
+	return jsonOK(map[string]any{"types": names})
+}
+
+// ── Tags ────────────────────────────────────────────────────────────────────
+
+func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	store.TagResource(arn, parseTagList(req, "tags"))
+	return jsonOK(map[string]any{})
+}
+
+func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	keys := make([]string, 0)
+	for _, t := range getMapList(req, "tags") {
+		if k := getStr(t, "key"); k != "" {
+			keys = append(keys, k)
+		}
+	}
+	store.UntagResource(arn, keys)
+	return jsonOK(map[string]any{})
+}
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	tags := store.ListTags(arn)
+	out := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		out = append(out, map[string]any{"key": k, "value": v})
+	}
+	return jsonOK(map[string]any{"tags": out})
+}

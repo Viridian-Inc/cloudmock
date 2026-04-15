@@ -22,528 +22,648 @@ func newGateway(t *testing.T) http.Handler {
 	return gateway.New(cfg, reg)
 }
 
-func svcReq(t *testing.T, action string, body any) *http.Request {
+func doCall(t *testing.T, h http.Handler, action string, body any) *httptest.ResponseRecorder {
 	t.Helper()
-	var bodyBytes []byte
-	if body != nil {
+	var data []byte
+	if body == nil {
+		data = []byte("{}")
+	} else {
 		var err error
-		bodyBytes, err = json.Marshal(body)
+		data, err = json.Marshal(body)
 		if err != nil {
 			t.Fatalf("marshal: %v", err)
 		}
-	} else {
-		bodyBytes = []byte("{}")
 	}
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(data))
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "GlobalAccelerator_V20180706."+action)
 	req.Header.Set("Authorization",
 		"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/globalaccelerator/aws4_request, SignedHeaders=host, Signature=abc123")
-	return req
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
 }
 
-
-func TestAddCustomRoutingEndpoints(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "AddCustomRoutingEndpoints", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("AddCustomRoutingEndpoints: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func decode(t *testing.T, w *httptest.ResponseRecorder, v any) {
+	t.Helper()
+	if err := json.Unmarshal(w.Body.Bytes(), v); err != nil {
+		t.Fatalf("decode: %v\nbody: %s", err, w.Body.String())
 	}
 }
 
-func TestAddEndpoints(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "AddEndpoints", nil))
+func mustOK(t *testing.T, w *httptest.ResponseRecorder, label string) {
+	t.Helper()
 	if w.Code != http.StatusOK {
-		t.Fatalf("AddEndpoints: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("%s: want 200, got %d: %s", label, w.Code, w.Body.String())
 	}
 }
 
-func TestAdvertiseByoipCidr(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "AdvertiseByoipCidr", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("AdvertiseByoipCidr: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Accelerator lifecycle ────────────────────────────────────────────────────
+
+func TestAcceleratorLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// Create
+	w := doCall(t, h, "CreateAccelerator", map[string]any{
+		"Name":          "my-accelerator",
+		"IpAddressType": "IPV4",
+		"Enabled":       true,
+		"Tags": []map[string]any{
+			{"Key": "env", "Value": "dev"},
+		},
+	})
+	mustOK(t, w, "CreateAccelerator")
+	var created struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+			Name           string `json:"Name"`
+			Status         string `json:"Status"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &created)
+	if created.Accelerator.AcceleratorArn == "" {
+		t.Fatalf("expected AcceleratorArn in response, got %s", w.Body.String())
+	}
+	if created.Accelerator.Name != "my-accelerator" {
+		t.Fatalf("unexpected Name: %s", created.Accelerator.Name)
+	}
+	arn := created.Accelerator.AcceleratorArn
+
+	// Describe
+	w = doCall(t, h, "DescribeAccelerator", map[string]any{"AcceleratorArn": arn})
+	mustOK(t, w, "DescribeAccelerator")
+
+	// List
+	w = doCall(t, h, "ListAccelerators", nil)
+	mustOK(t, w, "ListAccelerators")
+	var listed struct {
+		Accelerators []struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerators"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Accelerators) != 1 || listed.Accelerators[0].AcceleratorArn != arn {
+		t.Fatalf("unexpected listed accelerators: %+v", listed)
+	}
+
+	// Update
+	w = doCall(t, h, "UpdateAccelerator", map[string]any{
+		"AcceleratorArn": arn,
+		"Name":           "renamed-accelerator",
+		"Enabled":        false,
+	})
+	mustOK(t, w, "UpdateAccelerator")
+	var updated struct {
+		Accelerator struct {
+			Name    string `json:"Name"`
+			Enabled bool   `json:"Enabled"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &updated)
+	if updated.Accelerator.Name != "renamed-accelerator" || updated.Accelerator.Enabled {
+		t.Fatalf("update didn't take effect: %+v", updated)
+	}
+
+	// Attributes
+	w = doCall(t, h, "DescribeAcceleratorAttributes", map[string]any{"AcceleratorArn": arn})
+	mustOK(t, w, "DescribeAcceleratorAttributes")
+	w = doCall(t, h, "UpdateAcceleratorAttributes", map[string]any{
+		"AcceleratorArn":   arn,
+		"FlowLogsEnabled":  true,
+		"FlowLogsS3Bucket": "my-bucket",
+		"FlowLogsS3Prefix": "logs/",
+	})
+	mustOK(t, w, "UpdateAcceleratorAttributes")
+
+	// Delete
+	w = doCall(t, h, "DeleteAccelerator", map[string]any{"AcceleratorArn": arn})
+	mustOK(t, w, "DeleteAccelerator")
+	if w := doCall(t, h, "DescribeAccelerator", map[string]any{"AcceleratorArn": arn}); w.Code != http.StatusNotFound {
+		t.Fatalf("DescribeAccelerator after delete: want 404, got %d", w.Code)
 	}
 }
 
-func TestAllowCustomRoutingTraffic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "AllowCustomRoutingTraffic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("AllowCustomRoutingTraffic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCreateAcceleratorValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateAccelerator", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateAccelerator with no Name: want 400, got %d", w.Code)
 	}
 }
 
-func TestCreateAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Custom Routing Accelerator lifecycle ─────────────────────────────────────
+
+func TestCustomRoutingAcceleratorLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateCustomRoutingAccelerator", map[string]any{"Name": "cr-accel"})
+	mustOK(t, w, "CreateCustomRoutingAccelerator")
+	var created struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &created)
+	arn := created.Accelerator.AcceleratorArn
+	if arn == "" {
+		t.Fatalf("missing AcceleratorArn: %s", w.Body.String())
+	}
+
+	mustOK(t, doCall(t, h, "DescribeCustomRoutingAccelerator", map[string]any{"AcceleratorArn": arn}), "DescribeCustomRoutingAccelerator")
+
+	w = doCall(t, h, "ListCustomRoutingAccelerators", nil)
+	mustOK(t, w, "ListCustomRoutingAccelerators")
+	var listed struct {
+		Accelerators []struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerators"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Accelerators) != 1 {
+		t.Fatalf("expected 1 custom routing accelerator, got %d", len(listed.Accelerators))
+	}
+
+	mustOK(t, doCall(t, h, "UpdateCustomRoutingAccelerator", map[string]any{
+		"AcceleratorArn": arn,
+		"Name":           "cr-accel-2",
+	}), "UpdateCustomRoutingAccelerator")
+
+	mustOK(t, doCall(t, h, "DescribeCustomRoutingAcceleratorAttributes", map[string]any{"AcceleratorArn": arn}), "DescribeCustomRoutingAcceleratorAttributes")
+	mustOK(t, doCall(t, h, "UpdateCustomRoutingAcceleratorAttributes", map[string]any{
+		"AcceleratorArn":   arn,
+		"FlowLogsEnabled":  true,
+		"FlowLogsS3Bucket": "bucket",
+	}), "UpdateCustomRoutingAcceleratorAttributes")
+
+	mustOK(t, doCall(t, h, "DeleteCustomRoutingAccelerator", map[string]any{"AcceleratorArn": arn}), "DeleteCustomRoutingAccelerator")
+}
+
+func TestCreateCustomRoutingAcceleratorValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateCustomRoutingAccelerator", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestCreateCrossAccountAttachment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCrossAccountAttachment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCrossAccountAttachment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Listener lifecycle ───────────────────────────────────────────────────────
+
+func TestListenerLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateAccelerator", map[string]any{"Name": "a1"})
+	mustOK(t, w, "CreateAccelerator")
+	var ac struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &ac)
+	acceleratorArn := ac.Accelerator.AcceleratorArn
+
+	// Create listener
+	w = doCall(t, h, "CreateListener", map[string]any{
+		"AcceleratorArn": acceleratorArn,
+		"Protocol":       "TCP",
+		"PortRanges": []map[string]any{
+			{"FromPort": 80, "ToPort": 80},
+		},
+	})
+	mustOK(t, w, "CreateListener")
+	var ln struct {
+		Listener struct {
+			ListenerArn string `json:"ListenerArn"`
+		} `json:"Listener"`
+	}
+	decode(t, w, &ln)
+	listenerArn := ln.Listener.ListenerArn
+	if listenerArn == "" {
+		t.Fatalf("missing ListenerArn: %s", w.Body.String())
+	}
+
+	// Describe
+	mustOK(t, doCall(t, h, "DescribeListener", map[string]any{"ListenerArn": listenerArn}), "DescribeListener")
+
+	// List
+	w = doCall(t, h, "ListListeners", map[string]any{"AcceleratorArn": acceleratorArn})
+	mustOK(t, w, "ListListeners")
+	var listed struct {
+		Listeners []struct {
+			ListenerArn string `json:"ListenerArn"`
+		} `json:"Listeners"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Listeners) != 1 {
+		t.Fatalf("expected 1 listener, got %d", len(listed.Listeners))
+	}
+
+	// Update
+	mustOK(t, doCall(t, h, "UpdateListener", map[string]any{
+		"ListenerArn":    listenerArn,
+		"ClientAffinity": "SOURCE_IP",
+	}), "UpdateListener")
+
+	// Delete
+	mustOK(t, doCall(t, h, "DeleteListener", map[string]any{"ListenerArn": listenerArn}), "DeleteListener")
+	if w := doCall(t, h, "DescribeListener", map[string]any{"ListenerArn": listenerArn}); w.Code != http.StatusNotFound {
+		t.Fatalf("DescribeListener after delete: want 404, got %d", w.Code)
 	}
 }
 
-func TestCreateCustomRoutingAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCustomRoutingAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCustomRoutingAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCreateListenerValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateListener", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("CreateListener with no fields: want 400, got %d", w.Code)
 	}
 }
 
-func TestCreateCustomRoutingEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCustomRoutingEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCustomRoutingEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Custom Routing Listener lifecycle ────────────────────────────────────────
+
+func TestCustomRoutingListenerLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateCustomRoutingAccelerator", map[string]any{"Name": "cra"})
+	mustOK(t, w, "CreateCustomRoutingAccelerator")
+	var ac struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &ac)
+	acceleratorArn := ac.Accelerator.AcceleratorArn
+
+	w = doCall(t, h, "CreateCustomRoutingListener", map[string]any{
+		"AcceleratorArn": acceleratorArn,
+		"PortRanges": []map[string]any{
+			{"FromPort": 1000, "ToPort": 2000},
+		},
+	})
+	mustOK(t, w, "CreateCustomRoutingListener")
+	var ln struct {
+		Listener struct {
+			ListenerArn string `json:"ListenerArn"`
+		} `json:"Listener"`
+	}
+	decode(t, w, &ln)
+	listenerArn := ln.Listener.ListenerArn
+
+	mustOK(t, doCall(t, h, "DescribeCustomRoutingListener", map[string]any{"ListenerArn": listenerArn}), "DescribeCustomRoutingListener")
+
+	w = doCall(t, h, "ListCustomRoutingListeners", map[string]any{"AcceleratorArn": acceleratorArn})
+	mustOK(t, w, "ListCustomRoutingListeners")
+
+	mustOK(t, doCall(t, h, "UpdateCustomRoutingListener", map[string]any{
+		"ListenerArn": listenerArn,
+		"PortRanges": []map[string]any{
+			{"FromPort": 1000, "ToPort": 3000},
+		},
+	}), "UpdateCustomRoutingListener")
+
+	mustOK(t, doCall(t, h, "DeleteCustomRoutingListener", map[string]any{"ListenerArn": listenerArn}), "DeleteCustomRoutingListener")
+}
+
+func TestCreateCustomRoutingListenerValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateCustomRoutingListener", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestCreateCustomRoutingListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateCustomRoutingListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateCustomRoutingListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Endpoint Group lifecycle ─────────────────────────────────────────────────
+
+func TestEndpointGroupLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	// Set up accelerator + listener
+	w := doCall(t, h, "CreateAccelerator", map[string]any{"Name": "a1"})
+	mustOK(t, w, "CreateAccelerator")
+	var ac struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &ac)
+
+	w = doCall(t, h, "CreateListener", map[string]any{
+		"AcceleratorArn": ac.Accelerator.AcceleratorArn,
+		"Protocol":       "TCP",
+		"PortRanges":     []map[string]any{{"FromPort": 80, "ToPort": 80}},
+	})
+	mustOK(t, w, "CreateListener")
+	var ln struct {
+		Listener struct {
+			ListenerArn string `json:"ListenerArn"`
+		} `json:"Listener"`
+	}
+	decode(t, w, &ln)
+	listenerArn := ln.Listener.ListenerArn
+
+	// Create endpoint group
+	w = doCall(t, h, "CreateEndpointGroup", map[string]any{
+		"ListenerArn":         listenerArn,
+		"EndpointGroupRegion": "us-east-1",
+		"EndpointConfigurations": []map[string]any{
+			{"EndpointId": "i-12345", "Weight": 100},
+		},
+	})
+	mustOK(t, w, "CreateEndpointGroup")
+	var eg struct {
+		EndpointGroup struct {
+			EndpointGroupArn string `json:"EndpointGroupArn"`
+		} `json:"EndpointGroup"`
+	}
+	decode(t, w, &eg)
+	groupArn := eg.EndpointGroup.EndpointGroupArn
+
+	// Describe
+	mustOK(t, doCall(t, h, "DescribeEndpointGroup", map[string]any{"EndpointGroupArn": groupArn}), "DescribeEndpointGroup")
+
+	// List
+	w = doCall(t, h, "ListEndpointGroups", map[string]any{"ListenerArn": listenerArn})
+	mustOK(t, w, "ListEndpointGroups")
+	var listed struct {
+		EndpointGroups []struct {
+			EndpointGroupArn string `json:"EndpointGroupArn"`
+		} `json:"EndpointGroups"`
+	}
+	decode(t, w, &listed)
+	if len(listed.EndpointGroups) != 1 {
+		t.Fatalf("expected 1 endpoint group, got %d", len(listed.EndpointGroups))
+	}
+
+	// Update
+	mustOK(t, doCall(t, h, "UpdateEndpointGroup", map[string]any{
+		"EndpointGroupArn":      groupArn,
+		"TrafficDialPercentage": 50,
+	}), "UpdateEndpointGroup")
+
+	// Add endpoint
+	mustOK(t, doCall(t, h, "AddEndpoints", map[string]any{
+		"EndpointGroupArn": groupArn,
+		"EndpointConfigurations": []map[string]any{
+			{"EndpointId": "i-67890", "Weight": 50},
+		},
+	}), "AddEndpoints")
+
+	// Remove endpoint
+	mustOK(t, doCall(t, h, "RemoveEndpoints", map[string]any{
+		"EndpointGroupArn": groupArn,
+		"EndpointIdentifiers": []map[string]any{
+			{"EndpointId": "i-12345"},
+		},
+	}), "RemoveEndpoints")
+
+	// Delete
+	mustOK(t, doCall(t, h, "DeleteEndpointGroup", map[string]any{"EndpointGroupArn": groupArn}), "DeleteEndpointGroup")
+	if w := doCall(t, h, "DescribeEndpointGroup", map[string]any{"EndpointGroupArn": groupArn}); w.Code != http.StatusNotFound {
+		t.Fatalf("DescribeEndpointGroup after delete: want 404, got %d", w.Code)
 	}
 }
 
-func TestCreateEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestCreateEndpointGroupValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateEndpointGroup", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestCreateListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Custom Routing Endpoint Group lifecycle ──────────────────────────────────
+
+func TestCustomRoutingEndpointGroupLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateCustomRoutingAccelerator", map[string]any{"Name": "cra"})
+	mustOK(t, w, "CreateCustomRoutingAccelerator")
+	var ac struct {
+		Accelerator struct {
+			AcceleratorArn string `json:"AcceleratorArn"`
+		} `json:"Accelerator"`
+	}
+	decode(t, w, &ac)
+	acceleratorArn := ac.Accelerator.AcceleratorArn
+
+	w = doCall(t, h, "CreateCustomRoutingListener", map[string]any{
+		"AcceleratorArn": acceleratorArn,
+		"PortRanges":     []map[string]any{{"FromPort": 1000, "ToPort": 2000}},
+	})
+	mustOK(t, w, "CreateCustomRoutingListener")
+	var ln struct {
+		Listener struct {
+			ListenerArn string `json:"ListenerArn"`
+		} `json:"Listener"`
+	}
+	decode(t, w, &ln)
+	listenerArn := ln.Listener.ListenerArn
+
+	w = doCall(t, h, "CreateCustomRoutingEndpointGroup", map[string]any{
+		"ListenerArn":         listenerArn,
+		"EndpointGroupRegion": "us-east-1",
+		"DestinationConfigurations": []map[string]any{
+			{"FromPort": 1000, "ToPort": 2000, "Protocols": []string{"TCP"}},
+		},
+	})
+	mustOK(t, w, "CreateCustomRoutingEndpointGroup")
+	var eg struct {
+		EndpointGroup struct {
+			EndpointGroupArn string `json:"EndpointGroupArn"`
+		} `json:"EndpointGroup"`
+	}
+	decode(t, w, &eg)
+	groupArn := eg.EndpointGroup.EndpointGroupArn
+
+	mustOK(t, doCall(t, h, "DescribeCustomRoutingEndpointGroup", map[string]any{"EndpointGroupArn": groupArn}), "DescribeCustomRoutingEndpointGroup")
+
+	w = doCall(t, h, "ListCustomRoutingEndpointGroups", map[string]any{"ListenerArn": listenerArn})
+	mustOK(t, w, "ListCustomRoutingEndpointGroups")
+
+	mustOK(t, doCall(t, h, "AddCustomRoutingEndpoints", map[string]any{
+		"EndpointGroupArn": groupArn,
+		"EndpointConfigurations": []map[string]any{
+			{"EndpointId": "subnet-12345"},
+		},
+	}), "AddCustomRoutingEndpoints")
+
+	mustOK(t, doCall(t, h, "AllowCustomRoutingTraffic", map[string]any{
+		"EndpointGroupArn":     groupArn,
+		"EndpointId":           "subnet-12345",
+		"DestinationAddresses": []string{"10.0.0.1"},
+		"DestinationPorts":     []int{80},
+	}), "AllowCustomRoutingTraffic")
+
+	mustOK(t, doCall(t, h, "DenyCustomRoutingTraffic", map[string]any{
+		"EndpointGroupArn":     groupArn,
+		"EndpointId":           "subnet-12345",
+		"DestinationAddresses": []string{"10.0.0.1"},
+		"DestinationPorts":     []int{80},
+	}), "DenyCustomRoutingTraffic")
+
+	mustOK(t, doCall(t, h, "ListCustomRoutingPortMappings", map[string]any{"AcceleratorArn": acceleratorArn}), "ListCustomRoutingPortMappings")
+
+	mustOK(t, doCall(t, h, "ListCustomRoutingPortMappingsByDestination", map[string]any{
+		"EndpointId":         "subnet-12345",
+		"DestinationAddress": "10.0.0.1",
+	}), "ListCustomRoutingPortMappingsByDestination")
+
+	mustOK(t, doCall(t, h, "RemoveCustomRoutingEndpoints", map[string]any{
+		"EndpointGroupArn": groupArn,
+		"EndpointIds":      []string{"subnet-12345"},
+	}), "RemoveCustomRoutingEndpoints")
+
+	mustOK(t, doCall(t, h, "DeleteCustomRoutingEndpointGroup", map[string]any{"EndpointGroupArn": groupArn}), "DeleteCustomRoutingEndpointGroup")
+}
+
+func TestCreateCustomRoutingEndpointGroupValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateCustomRoutingEndpointGroup", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestDeleteAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── BYOIP CIDR lifecycle ─────────────────────────────────────────────────────
+
+func TestByoipCidrLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "ProvisionByoipCidr", map[string]any{"Cidr": "192.168.0.0/24"})
+	mustOK(t, w, "ProvisionByoipCidr")
+
+	mustOK(t, doCall(t, h, "AdvertiseByoipCidr", map[string]any{"Cidr": "192.168.0.0/24"}), "AdvertiseByoipCidr")
+
+	w = doCall(t, h, "ListByoipCidrs", nil)
+	mustOK(t, w, "ListByoipCidrs")
+	var listed struct {
+		ByoipCidrs []struct {
+			Cidr  string `json:"Cidr"`
+			State string `json:"State"`
+		} `json:"ByoipCidrs"`
+	}
+	decode(t, w, &listed)
+	if len(listed.ByoipCidrs) != 1 || listed.ByoipCidrs[0].Cidr != "192.168.0.0/24" {
+		t.Fatalf("unexpected listed cidrs: %+v", listed)
+	}
+	if listed.ByoipCidrs[0].State != "ADVERTISING" {
+		t.Fatalf("expected ADVERTISING state, got %s", listed.ByoipCidrs[0].State)
+	}
+
+	mustOK(t, doCall(t, h, "WithdrawByoipCidr", map[string]any{"Cidr": "192.168.0.0/24"}), "WithdrawByoipCidr")
+	mustOK(t, doCall(t, h, "DeprovisionByoipCidr", map[string]any{"Cidr": "192.168.0.0/24"}), "DeprovisionByoipCidr")
+}
+
+func TestProvisionByoipCidrValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "ProvisionByoipCidr", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestDeleteCrossAccountAttachment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCrossAccountAttachment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCrossAccountAttachment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Cross Account Attachment lifecycle ───────────────────────────────────────
+
+func TestCrossAccountAttachmentLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	w := doCall(t, h, "CreateCrossAccountAttachment", map[string]any{
+		"Name":       "att-1",
+		"Principals": []string{"123456789012"},
+		"Resources": []map[string]any{
+			{"EndpointId": "i-12345", "Region": "us-east-1"},
+		},
+	})
+	mustOK(t, w, "CreateCrossAccountAttachment")
+	var att struct {
+		CrossAccountAttachment struct {
+			AttachmentArn string `json:"AttachmentArn"`
+		} `json:"CrossAccountAttachment"`
+	}
+	decode(t, w, &att)
+	arn := att.CrossAccountAttachment.AttachmentArn
+	if arn == "" {
+		t.Fatalf("missing AttachmentArn: %s", w.Body.String())
+	}
+
+	mustOK(t, doCall(t, h, "DescribeCrossAccountAttachment", map[string]any{"AttachmentArn": arn}), "DescribeCrossAccountAttachment")
+
+	w = doCall(t, h, "ListCrossAccountAttachments", nil)
+	mustOK(t, w, "ListCrossAccountAttachments")
+	var listed struct {
+		CrossAccountAttachments []struct {
+			AttachmentArn string `json:"AttachmentArn"`
+		} `json:"CrossAccountAttachments"`
+	}
+	decode(t, w, &listed)
+	if len(listed.CrossAccountAttachments) != 1 {
+		t.Fatalf("expected 1 attachment, got %d", len(listed.CrossAccountAttachments))
+	}
+
+	mustOK(t, doCall(t, h, "UpdateCrossAccountAttachment", map[string]any{
+		"AttachmentArn": arn,
+		"Name":          "att-2",
+		"AddPrincipals": []string{"210987654321"},
+	}), "UpdateCrossAccountAttachment")
+
+	mustOK(t, doCall(t, h, "ListCrossAccountResourceAccounts", nil), "ListCrossAccountResourceAccounts")
+	mustOK(t, doCall(t, h, "ListCrossAccountResources", map[string]any{
+		"ResourceOwnerAwsAccountId": "123456789012",
+	}), "ListCrossAccountResources")
+
+	mustOK(t, doCall(t, h, "DeleteCrossAccountAttachment", map[string]any{"AttachmentArn": arn}), "DeleteCrossAccountAttachment")
+}
+
+func TestCreateCrossAccountAttachmentValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "CreateCrossAccountAttachment", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
 
-func TestDeleteCustomRoutingAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCustomRoutingAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCustomRoutingAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+// ── Tag handlers ─────────────────────────────────────────────────────────────
+
+func TestTagsLifecycle(t *testing.T) {
+	h := newGateway(t)
+	arn := "arn:aws:globalaccelerator::000000000000:accelerator/abc"
+
+	mustOK(t, doCall(t, h, "TagResource", map[string]any{
+		"ResourceArn": arn,
+		"Tags": []map[string]any{
+			{"Key": "env", "Value": "dev"},
+		},
+	}), "TagResource")
+
+	w := doCall(t, h, "ListTagsForResource", map[string]any{"ResourceArn": arn})
+	mustOK(t, w, "ListTagsForResource")
+	var listed struct {
+		Tags []struct {
+			Key   string `json:"Key"`
+			Value string `json:"Value"`
+		} `json:"Tags"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Tags) != 1 || listed.Tags[0].Value != "dev" {
+		t.Fatalf("unexpected tags: %+v", listed)
+	}
+
+	mustOK(t, doCall(t, h, "UntagResource", map[string]any{
+		"ResourceArn": arn,
+		"TagKeys":     []string{"env"},
+	}), "UntagResource")
+
+	w = doCall(t, h, "ListTagsForResource", map[string]any{"ResourceArn": arn})
+	mustOK(t, w, "ListTagsForResource")
+	decode(t, w, &listed)
+	if len(listed.Tags) != 0 {
+		t.Fatalf("expected 0 tags after untag, got %d", len(listed.Tags))
 	}
 }
 
-func TestDeleteCustomRoutingEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCustomRoutingEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCustomRoutingEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestTagResourceValidation(t *testing.T) {
+	h := newGateway(t)
+	w := doCall(t, h, "TagResource", map[string]any{})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("want 400, got %d", w.Code)
 	}
 }
-
-func TestDeleteCustomRoutingListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteCustomRoutingListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteCustomRoutingListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeleteListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDenyCustomRoutingTraffic(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DenyCustomRoutingTraffic", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DenyCustomRoutingTraffic: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDeprovisionByoipCidr(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeprovisionByoipCidr", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeprovisionByoipCidr: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeAcceleratorAttributes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeAcceleratorAttributes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeAcceleratorAttributes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCrossAccountAttachment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCrossAccountAttachment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCrossAccountAttachment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCustomRoutingAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCustomRoutingAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCustomRoutingAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCustomRoutingAcceleratorAttributes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCustomRoutingAcceleratorAttributes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCustomRoutingAcceleratorAttributes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCustomRoutingEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCustomRoutingEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCustomRoutingEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeCustomRoutingListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeCustomRoutingListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeCustomRoutingListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestDescribeListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DescribeListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DescribeListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListAccelerators(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListAccelerators", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListAccelerators: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListByoipCidrs(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListByoipCidrs", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListByoipCidrs: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCrossAccountAttachments(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCrossAccountAttachments", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCrossAccountAttachments: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCrossAccountResourceAccounts(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCrossAccountResourceAccounts", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCrossAccountResourceAccounts: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCrossAccountResources(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCrossAccountResources", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCrossAccountResources: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomRoutingAccelerators(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomRoutingAccelerators", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomRoutingAccelerators: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomRoutingEndpointGroups(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomRoutingEndpointGroups", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomRoutingEndpointGroups: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomRoutingListeners(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomRoutingListeners", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomRoutingListeners: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomRoutingPortMappings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomRoutingPortMappings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomRoutingPortMappings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListCustomRoutingPortMappingsByDestination(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListCustomRoutingPortMappingsByDestination", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListCustomRoutingPortMappingsByDestination: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListEndpointGroups(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListEndpointGroups", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListEndpointGroups: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListListeners(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListListeners", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListListeners: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTagsForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTagsForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestProvisionByoipCidr(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ProvisionByoipCidr", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ProvisionByoipCidr: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestRemoveCustomRoutingEndpoints(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "RemoveCustomRoutingEndpoints", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("RemoveCustomRoutingEndpoints: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestRemoveEndpoints(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "RemoveEndpoints", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("RemoveEndpoints: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "TagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("TagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUntagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UntagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateAcceleratorAttributes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateAcceleratorAttributes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateAcceleratorAttributes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCrossAccountAttachment(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCrossAccountAttachment", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCrossAccountAttachment: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCustomRoutingAccelerator(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCustomRoutingAccelerator", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCustomRoutingAccelerator: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCustomRoutingAcceleratorAttributes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCustomRoutingAcceleratorAttributes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCustomRoutingAcceleratorAttributes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateCustomRoutingListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateCustomRoutingListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateCustomRoutingListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateEndpointGroup(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateEndpointGroup", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateEndpointGroup: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateListener(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateListener", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateListener: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestWithdrawByoipCidr(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "WithdrawByoipCidr", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("WithdrawByoipCidr: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-

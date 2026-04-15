@@ -1,1539 +1,15 @@
 package servicecatalog
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
 	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
-// ── Generated request/response types ─────────────────────────────────────────
-
-type AcceptPortfolioShareInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	PortfolioShareType *string `json:"PortfolioShareType,omitempty"`
-}
-
-type AcceptPortfolioShareOutput struct {
-}
-
-type AccessLevelFilter struct {
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type AssociateBudgetWithResourceInput struct {
-	BudgetName string `json:"BudgetName,omitempty"`
-	ResourceId string `json:"ResourceId,omitempty"`
-}
-
-type AssociateBudgetWithResourceOutput struct {
-}
-
-type AssociatePrincipalWithPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	PrincipalARN string `json:"PrincipalARN,omitempty"`
-	PrincipalType string `json:"PrincipalType,omitempty"`
-}
-
-type AssociatePrincipalWithPortfolioOutput struct {
-}
-
-type AssociateProductWithPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	SourcePortfolioId *string `json:"SourcePortfolioId,omitempty"`
-}
-
-type AssociateProductWithPortfolioOutput struct {
-}
-
-type AssociateServiceActionWithProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken *string `json:"IdempotencyToken,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type AssociateServiceActionWithProvisioningArtifactOutput struct {
-}
-
-type AssociateTagOptionWithResourceInput struct {
-	ResourceId string `json:"ResourceId,omitempty"`
-	TagOptionId string `json:"TagOptionId,omitempty"`
-}
-
-type AssociateTagOptionWithResourceOutput struct {
-}
-
-type BatchAssociateServiceActionWithProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ServiceActionAssociations []ServiceActionAssociation `json:"ServiceActionAssociations,omitempty"`
-}
-
-type BatchAssociateServiceActionWithProvisioningArtifactOutput struct {
-	FailedServiceActionAssociations []FailedServiceActionAssociation `json:"FailedServiceActionAssociations,omitempty"`
-}
-
-type BatchDisassociateServiceActionFromProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ServiceActionAssociations []ServiceActionAssociation `json:"ServiceActionAssociations,omitempty"`
-}
-
-type BatchDisassociateServiceActionFromProvisioningArtifactOutput struct {
-	FailedServiceActionAssociations []FailedServiceActionAssociation `json:"FailedServiceActionAssociations,omitempty"`
-}
-
-type BudgetDetail struct {
-	BudgetName *string `json:"BudgetName,omitempty"`
-}
-
-type CloudWatchDashboard struct {
-	Name *string `json:"Name,omitempty"`
-}
-
-type CodeStarParameters struct {
-	ArtifactPath string `json:"ArtifactPath,omitempty"`
-	Branch string `json:"Branch,omitempty"`
-	ConnectionArn string `json:"ConnectionArn,omitempty"`
-	Repository string `json:"Repository,omitempty"`
-}
-
-type ConstraintDetail struct {
-	ConstraintId *string `json:"ConstraintId,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Owner *string `json:"Owner,omitempty"`
-	PortfolioId *string `json:"PortfolioId,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type ConstraintSummary struct {
-	Description *string `json:"Description,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type CopyProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	CopyOptions []string `json:"CopyOptions,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	SourceProductArn string `json:"SourceProductArn,omitempty"`
-	SourceProvisioningArtifactIdentifiers []map[string]string `json:"SourceProvisioningArtifactIdentifiers,omitempty"`
-	TargetProductId *string `json:"TargetProductId,omitempty"`
-	TargetProductName *string `json:"TargetProductName,omitempty"`
-}
-
-type CopyProductOutput struct {
-	CopyProductToken *string `json:"CopyProductToken,omitempty"`
-}
-
-type CreateConstraintInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Parameters string `json:"Parameters,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	Type string `json:"Type,omitempty"`
-}
-
-type CreateConstraintOutput struct {
-	ConstraintDetail *ConstraintDetail `json:"ConstraintDetail,omitempty"`
-	ConstraintParameters *string `json:"ConstraintParameters,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type CreatePortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	DisplayName string `json:"DisplayName,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	ProviderName string `json:"ProviderName,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreatePortfolioOutput struct {
-	PortfolioDetail *PortfolioDetail `json:"PortfolioDetail,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreatePortfolioShareInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccountId *string `json:"AccountId,omitempty"`
-	OrganizationNode *OrganizationNode `json:"OrganizationNode,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	SharePrincipals bool `json:"SharePrincipals,omitempty"`
-	ShareTagOptions bool `json:"ShareTagOptions,omitempty"`
-}
-
-type CreatePortfolioShareOutput struct {
-	PortfolioShareToken *string `json:"PortfolioShareToken,omitempty"`
-}
-
-type CreateProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Distributor *string `json:"Distributor,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Name string `json:"Name,omitempty"`
-	Owner string `json:"Owner,omitempty"`
-	ProductType string `json:"ProductType,omitempty"`
-	ProvisioningArtifactParameters *ProvisioningArtifactProperties `json:"ProvisioningArtifactParameters,omitempty"`
-	SourceConnection *SourceConnection `json:"SourceConnection,omitempty"`
-	SupportDescription *string `json:"SupportDescription,omitempty"`
-	SupportEmail *string `json:"SupportEmail,omitempty"`
-	SupportUrl *string `json:"SupportUrl,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateProductOutput struct {
-	ProductViewDetail *ProductViewDetail `json:"ProductViewDetail,omitempty"`
-	ProvisioningArtifactDetail *ProvisioningArtifactDetail `json:"ProvisioningArtifactDetail,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateProvisionedProductPlanInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	NotificationArns []string `json:"NotificationArns,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	PlanName string `json:"PlanName,omitempty"`
-	PlanType string `json:"PlanType,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisionedProductName string `json:"ProvisionedProductName,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningParameters []UpdateProvisioningParameter `json:"ProvisioningParameters,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type CreateProvisionedProductPlanOutput struct {
-	PlanId *string `json:"PlanId,omitempty"`
-	PlanName *string `json:"PlanName,omitempty"`
-	ProvisionProductId *string `json:"ProvisionProductId,omitempty"`
-	ProvisionedProductName *string `json:"ProvisionedProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type CreateProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Parameters ProvisioningArtifactProperties `json:"Parameters,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-}
-
-type CreateProvisioningArtifactOutput struct {
-	Info map[string]string `json:"Info,omitempty"`
-	ProvisioningArtifactDetail *ProvisioningArtifactDetail `json:"ProvisioningArtifactDetail,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type CreateServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Definition map[string]string `json:"Definition,omitempty"`
-	DefinitionType string `json:"DefinitionType,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Name string `json:"Name,omitempty"`
-}
-
-type CreateServiceActionOutput struct {
-	ServiceActionDetail *ServiceActionDetail `json:"ServiceActionDetail,omitempty"`
-}
-
-type CreateTagOptionInput struct {
-	Key string `json:"Key,omitempty"`
-	Value string `json:"Value,omitempty"`
-}
-
-type CreateTagOptionOutput struct {
-	TagOptionDetail *TagOptionDetail `json:"TagOptionDetail,omitempty"`
-}
-
-type DeleteConstraintInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DeleteConstraintOutput struct {
-}
-
-type DeletePortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DeletePortfolioOutput struct {
-}
-
-type DeletePortfolioShareInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccountId *string `json:"AccountId,omitempty"`
-	OrganizationNode *OrganizationNode `json:"OrganizationNode,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-}
-
-type DeletePortfolioShareOutput struct {
-	PortfolioShareToken *string `json:"PortfolioShareToken,omitempty"`
-}
-
-type DeleteProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DeleteProductOutput struct {
-}
-
-type DeleteProvisionedProductPlanInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IgnoreErrors bool `json:"IgnoreErrors,omitempty"`
-	PlanId string `json:"PlanId,omitempty"`
-}
-
-type DeleteProvisionedProductPlanOutput struct {
-}
-
-type DeleteProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type DeleteProvisioningArtifactOutput struct {
-}
-
-type DeleteServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-	IdempotencyToken *string `json:"IdempotencyToken,omitempty"`
-}
-
-type DeleteServiceActionOutput struct {
-}
-
-type DeleteTagOptionInput struct {
-	Id string `json:"Id,omitempty"`
-}
-
-type DeleteTagOptionOutput struct {
-}
-
-type DescribeConstraintInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DescribeConstraintOutput struct {
-	ConstraintDetail *ConstraintDetail `json:"ConstraintDetail,omitempty"`
-	ConstraintParameters *string `json:"ConstraintParameters,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type DescribeCopyProductStatusInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	CopyProductToken string `json:"CopyProductToken,omitempty"`
-}
-
-type DescribeCopyProductStatusOutput struct {
-	CopyProductStatus *string `json:"CopyProductStatus,omitempty"`
-	StatusDetail *string `json:"StatusDetail,omitempty"`
-	TargetProductId *string `json:"TargetProductId,omitempty"`
-}
-
-type DescribePortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DescribePortfolioOutput struct {
-	Budgets []BudgetDetail `json:"Budgets,omitempty"`
-	PortfolioDetail *PortfolioDetail `json:"PortfolioDetail,omitempty"`
-	TagOptions []TagOptionDetail `json:"TagOptions,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type DescribePortfolioShareStatusInput struct {
-	PortfolioShareToken string `json:"PortfolioShareToken,omitempty"`
-}
-
-type DescribePortfolioShareStatusOutput struct {
-	OrganizationNodeValue *string `json:"OrganizationNodeValue,omitempty"`
-	PortfolioId *string `json:"PortfolioId,omitempty"`
-	PortfolioShareToken *string `json:"PortfolioShareToken,omitempty"`
-	ShareDetails *ShareDetails `json:"ShareDetails,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type DescribePortfolioSharesInput struct {
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	Type string `json:"Type,omitempty"`
-}
-
-type DescribePortfolioSharesOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	PortfolioShareDetails []PortfolioShareDetail `json:"PortfolioShareDetails,omitempty"`
-}
-
-type DescribeProductAsAdminInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	SourcePortfolioId *string `json:"SourcePortfolioId,omitempty"`
-}
-
-type DescribeProductAsAdminOutput struct {
-	Budgets []BudgetDetail `json:"Budgets,omitempty"`
-	ProductViewDetail *ProductViewDetail `json:"ProductViewDetail,omitempty"`
-	ProvisioningArtifactSummaries []ProvisioningArtifactSummary `json:"ProvisioningArtifactSummaries,omitempty"`
-	TagOptions []TagOptionDetail `json:"TagOptions,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type DescribeProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type DescribeProductOutput struct {
-	Budgets []BudgetDetail `json:"Budgets,omitempty"`
-	LaunchPaths []LaunchPath `json:"LaunchPaths,omitempty"`
-	ProductViewSummary *ProductViewSummary `json:"ProductViewSummary,omitempty"`
-	ProvisioningArtifacts []ProvisioningArtifact `json:"ProvisioningArtifacts,omitempty"`
-}
-
-type DescribeProductViewInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DescribeProductViewOutput struct {
-	ProductViewSummary *ProductViewSummary `json:"ProductViewSummary,omitempty"`
-	ProvisioningArtifacts []ProvisioningArtifact `json:"ProvisioningArtifacts,omitempty"`
-}
-
-type DescribeProvisionedProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type DescribeProvisionedProductOutput struct {
-	CloudWatchDashboards []CloudWatchDashboard `json:"CloudWatchDashboards,omitempty"`
-	ProvisionedProductDetail *ProvisionedProductDetail `json:"ProvisionedProductDetail,omitempty"`
-}
-
-type DescribeProvisionedProductPlanInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PlanId string `json:"PlanId,omitempty"`
-}
-
-type DescribeProvisionedProductPlanOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisionedProductPlanDetails *ProvisionedProductPlanDetails `json:"ProvisionedProductPlanDetails,omitempty"`
-	ResourceChanges []ResourceChange `json:"ResourceChanges,omitempty"`
-}
-
-type DescribeProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IncludeProvisioningArtifactParameters bool `json:"IncludeProvisioningArtifactParameters,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProductName *string `json:"ProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningArtifactName *string `json:"ProvisioningArtifactName,omitempty"`
-	Verbose bool `json:"Verbose,omitempty"`
-}
-
-type DescribeProvisioningArtifactOutput struct {
-	Info map[string]string `json:"Info,omitempty"`
-	ProvisioningArtifactDetail *ProvisioningArtifactDetail `json:"ProvisioningArtifactDetail,omitempty"`
-	ProvisioningArtifactParameters []ProvisioningArtifactParameter `json:"ProvisioningArtifactParameters,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type DescribeProvisioningParametersInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	PathName *string `json:"PathName,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProductName *string `json:"ProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningArtifactName *string `json:"ProvisioningArtifactName,omitempty"`
-}
-
-type DescribeProvisioningParametersOutput struct {
-	ConstraintSummaries []ConstraintSummary `json:"ConstraintSummaries,omitempty"`
-	ProvisioningArtifactOutputKeys []ProvisioningArtifactOutput `json:"ProvisioningArtifactOutputKeys,omitempty"`
-	ProvisioningArtifactOutputs []ProvisioningArtifactOutput `json:"ProvisioningArtifactOutputs,omitempty"`
-	ProvisioningArtifactParameters []ProvisioningArtifactParameter `json:"ProvisioningArtifactParameters,omitempty"`
-	ProvisioningArtifactPreferences *ProvisioningArtifactPreferences `json:"ProvisioningArtifactPreferences,omitempty"`
-	TagOptions []TagOptionSummary `json:"TagOptions,omitempty"`
-	UsageInstructions []UsageInstruction `json:"UsageInstructions,omitempty"`
-}
-
-type DescribeRecordInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-}
-
-type DescribeRecordOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-	RecordOutputs []RecordOutput `json:"RecordOutputs,omitempty"`
-}
-
-type DescribeServiceActionExecutionParametersInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ProvisionedProductId string `json:"ProvisionedProductId,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type DescribeServiceActionExecutionParametersOutput struct {
-	ServiceActionParameters []ExecutionParameter `json:"ServiceActionParameters,omitempty"`
-}
-
-type DescribeServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Id string `json:"Id,omitempty"`
-}
-
-type DescribeServiceActionOutput struct {
-	ServiceActionDetail *ServiceActionDetail `json:"ServiceActionDetail,omitempty"`
-}
-
-type DescribeTagOptionInput struct {
-	Id string `json:"Id,omitempty"`
-}
-
-type DescribeTagOptionOutput struct {
-	TagOptionDetail *TagOptionDetail `json:"TagOptionDetail,omitempty"`
-}
-
-type DisableAWSOrganizationsAccessInput struct {
-}
-
-type DisableAWSOrganizationsAccessOutput struct {
-}
-
-type DisassociateBudgetFromResourceInput struct {
-	BudgetName string `json:"BudgetName,omitempty"`
-	ResourceId string `json:"ResourceId,omitempty"`
-}
-
-type DisassociateBudgetFromResourceOutput struct {
-}
-
-type DisassociatePrincipalFromPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	PrincipalARN string `json:"PrincipalARN,omitempty"`
-	PrincipalType *string `json:"PrincipalType,omitempty"`
-}
-
-type DisassociatePrincipalFromPortfolioOutput struct {
-}
-
-type DisassociateProductFromPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-}
-
-type DisassociateProductFromPortfolioOutput struct {
-}
-
-type DisassociateServiceActionFromProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken *string `json:"IdempotencyToken,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type DisassociateServiceActionFromProvisioningArtifactOutput struct {
-}
-
-type DisassociateTagOptionFromResourceInput struct {
-	ResourceId string `json:"ResourceId,omitempty"`
-	TagOptionId string `json:"TagOptionId,omitempty"`
-}
-
-type DisassociateTagOptionFromResourceOutput struct {
-}
-
-type EnableAWSOrganizationsAccessInput struct {
-}
-
-type EnableAWSOrganizationsAccessOutput struct {
-}
-
-type EngineWorkflowResourceIdentifier struct {
-	UniqueTag *UniqueTagResourceIdentifier `json:"UniqueTag,omitempty"`
-}
-
-type ExecuteProvisionedProductPlanInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	PlanId string `json:"PlanId,omitempty"`
-}
-
-type ExecuteProvisionedProductPlanOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type ExecuteProvisionedProductServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ExecuteToken string `json:"ExecuteToken,omitempty"`
-	Parameters map[string][]string `json:"Parameters,omitempty"`
-	ProvisionedProductId string `json:"ProvisionedProductId,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type ExecuteProvisionedProductServiceActionOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type ExecutionParameter struct {
-	DefaultValues []string `json:"DefaultValues,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type FailedServiceActionAssociation struct {
-	ErrorCode *string `json:"ErrorCode,omitempty"`
-	ErrorMessage *string `json:"ErrorMessage,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ServiceActionId *string `json:"ServiceActionId,omitempty"`
-}
-
-type GetAWSOrganizationsAccessStatusInput struct {
-}
-
-type GetAWSOrganizationsAccessStatusOutput struct {
-	AccessStatus *string `json:"AccessStatus,omitempty"`
-}
-
-type GetProvisionedProductOutputsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	OutputKeys []string `json:"OutputKeys,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProvisionedProductId *string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductName *string `json:"ProvisionedProductName,omitempty"`
-}
-
-type GetProvisionedProductOutputsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	Outputs []RecordOutput `json:"Outputs,omitempty"`
-}
-
-type ImportAsProvisionedProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	PhysicalId string `json:"PhysicalId,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisionedProductName string `json:"ProvisionedProductName,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type ImportAsProvisionedProductOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type LastSync struct {
-	LastSuccessfulSyncProvisioningArtifactId *string `json:"LastSuccessfulSyncProvisioningArtifactId,omitempty"`
-	LastSuccessfulSyncTime *time.Time `json:"LastSuccessfulSyncTime,omitempty"`
-	LastSyncStatus *string `json:"LastSyncStatus,omitempty"`
-	LastSyncStatusMessage *string `json:"LastSyncStatusMessage,omitempty"`
-	LastSyncTime *time.Time `json:"LastSyncTime,omitempty"`
-}
-
-type LaunchPath struct {
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type LaunchPathSummary struct {
-	ConstraintSummaries []ConstraintSummary `json:"ConstraintSummaries,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type ListAcceptedPortfolioSharesInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioShareType *string `json:"PortfolioShareType,omitempty"`
-}
-
-type ListAcceptedPortfolioSharesOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	PortfolioDetails []PortfolioDetail `json:"PortfolioDetails,omitempty"`
-}
-
-type ListBudgetsForResourceInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ResourceId string `json:"ResourceId,omitempty"`
-}
-
-type ListBudgetsForResourceOutput struct {
-	Budgets []BudgetDetail `json:"Budgets,omitempty"`
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-}
-
-type ListConstraintsForPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-}
-
-type ListConstraintsForPortfolioOutput struct {
-	ConstraintDetails []ConstraintDetail `json:"ConstraintDetails,omitempty"`
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-}
-
-type ListLaunchPathsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-}
-
-type ListLaunchPathsOutput struct {
-	LaunchPathSummaries []LaunchPathSummary `json:"LaunchPathSummaries,omitempty"`
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-}
-
-type ListOrganizationPortfolioAccessInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	OrganizationNodeType string `json:"OrganizationNodeType,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-}
-
-type ListOrganizationPortfolioAccessOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	OrganizationNodes []OrganizationNode `json:"OrganizationNodes,omitempty"`
-}
-
-type ListPortfolioAccessInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	OrganizationParentId *string `json:"OrganizationParentId,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-}
-
-type ListPortfolioAccessOutput struct {
-	AccountIds []string `json:"AccountIds,omitempty"`
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-}
-
-type ListPortfoliosForProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-}
-
-type ListPortfoliosForProductOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	PortfolioDetails []PortfolioDetail `json:"PortfolioDetails,omitempty"`
-}
-
-type ListPortfoliosInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-}
-
-type ListPortfoliosOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	PortfolioDetails []PortfolioDetail `json:"PortfolioDetails,omitempty"`
-}
-
-type ListPrincipalsForPortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-}
-
-type ListPrincipalsForPortfolioOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	Principals []Principal `json:"Principals,omitempty"`
-}
-
-type ListProvisionedProductPlansInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccessLevelFilter *AccessLevelFilter `json:"AccessLevelFilter,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProvisionProductId *string `json:"ProvisionProductId,omitempty"`
-}
-
-type ListProvisionedProductPlansOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisionedProductPlans []ProvisionedProductPlanSummary `json:"ProvisionedProductPlans,omitempty"`
-}
-
-type ListProvisioningArtifactsForServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type ListProvisioningArtifactsForServiceActionOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisioningArtifactViews []ProvisioningArtifactView `json:"ProvisioningArtifactViews,omitempty"`
-}
-
-type ListProvisioningArtifactsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-}
-
-type ListProvisioningArtifactsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisioningArtifactDetails []ProvisioningArtifactDetail `json:"ProvisioningArtifactDetails,omitempty"`
-}
-
-type ListRecordHistoryInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccessLevelFilter *AccessLevelFilter `json:"AccessLevelFilter,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	SearchFilter *ListRecordHistorySearchFilter `json:"SearchFilter,omitempty"`
-}
-
-type ListRecordHistoryOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	RecordDetails []RecordDetail `json:"RecordDetails,omitempty"`
-}
-
-type ListRecordHistorySearchFilter struct {
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type ListResourcesForTagOptionInput struct {
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ResourceType *string `json:"ResourceType,omitempty"`
-	TagOptionId string `json:"TagOptionId,omitempty"`
-}
-
-type ListResourcesForTagOptionOutput struct {
-	PageToken *string `json:"PageToken,omitempty"`
-	ResourceDetails []ResourceDetail `json:"ResourceDetails,omitempty"`
-}
-
-type ListServiceActionsForProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type ListServiceActionsForProvisioningArtifactOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ServiceActionSummaries []ServiceActionSummary `json:"ServiceActionSummaries,omitempty"`
-}
-
-type ListServiceActionsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-}
-
-type ListServiceActionsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ServiceActionSummaries []ServiceActionSummary `json:"ServiceActionSummaries,omitempty"`
-}
-
-type ListStackInstancesForProvisionedProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	ProvisionedProductId string `json:"ProvisionedProductId,omitempty"`
-}
-
-type ListStackInstancesForProvisionedProductOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	StackInstances []StackInstance `json:"StackInstances,omitempty"`
-}
-
-type ListTagOptionsFilters struct {
-	Active bool `json:"Active,omitempty"`
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type ListTagOptionsInput struct {
-	Filters *ListTagOptionsFilters `json:"Filters,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-}
-
-type ListTagOptionsOutput struct {
-	PageToken *string `json:"PageToken,omitempty"`
-	TagOptionDetails []TagOptionDetail `json:"TagOptionDetails,omitempty"`
-}
-
-type NotifyProvisionProductEngineWorkflowResultInput struct {
-	FailureReason *string `json:"FailureReason,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Outputs []RecordOutput `json:"Outputs,omitempty"`
-	RecordId string `json:"RecordId,omitempty"`
-	ResourceIdentifier *EngineWorkflowResourceIdentifier `json:"ResourceIdentifier,omitempty"`
-	Status string `json:"Status,omitempty"`
-	WorkflowToken string `json:"WorkflowToken,omitempty"`
-}
-
-type NotifyProvisionProductEngineWorkflowResultOutput struct {
-}
-
-type NotifyTerminateProvisionedProductEngineWorkflowResultInput struct {
-	FailureReason *string `json:"FailureReason,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	RecordId string `json:"RecordId,omitempty"`
-	Status string `json:"Status,omitempty"`
-	WorkflowToken string `json:"WorkflowToken,omitempty"`
-}
-
-type NotifyTerminateProvisionedProductEngineWorkflowResultOutput struct {
-}
-
-type NotifyUpdateProvisionedProductEngineWorkflowResultInput struct {
-	FailureReason *string `json:"FailureReason,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	Outputs []RecordOutput `json:"Outputs,omitempty"`
-	RecordId string `json:"RecordId,omitempty"`
-	Status string `json:"Status,omitempty"`
-	WorkflowToken string `json:"WorkflowToken,omitempty"`
-}
-
-type NotifyUpdateProvisionedProductEngineWorkflowResultOutput struct {
-}
-
-type OrganizationNode struct {
-	Type *string `json:"Type,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type ParameterConstraints struct {
-	AllowedPattern *string `json:"AllowedPattern,omitempty"`
-	AllowedValues []string `json:"AllowedValues,omitempty"`
-	ConstraintDescription *string `json:"ConstraintDescription,omitempty"`
-	MaxLength *string `json:"MaxLength,omitempty"`
-	MaxValue *string `json:"MaxValue,omitempty"`
-	MinLength *string `json:"MinLength,omitempty"`
-	MinValue *string `json:"MinValue,omitempty"`
-}
-
-type PortfolioDetail struct {
-	ARN *string `json:"ARN,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	DisplayName *string `json:"DisplayName,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	ProviderName *string `json:"ProviderName,omitempty"`
-}
-
-type PortfolioShareDetail struct {
-	Accepted bool `json:"Accepted,omitempty"`
-	PrincipalId *string `json:"PrincipalId,omitempty"`
-	SharePrincipals bool `json:"SharePrincipals,omitempty"`
-	ShareTagOptions bool `json:"ShareTagOptions,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type Principal struct {
-	PrincipalARN *string `json:"PrincipalARN,omitempty"`
-	PrincipalType *string `json:"PrincipalType,omitempty"`
-}
-
-type ProductViewAggregationValue struct {
-	ApproximateCount int `json:"ApproximateCount,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type ProductViewDetail struct {
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	ProductARN *string `json:"ProductARN,omitempty"`
-	ProductViewSummary *ProductViewSummary `json:"ProductViewSummary,omitempty"`
-	SourceConnection *SourceConnectionDetail `json:"SourceConnection,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type ProductViewSummary struct {
-	Distributor *string `json:"Distributor,omitempty"`
-	HasDefaultPath bool `json:"HasDefaultPath,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Owner *string `json:"Owner,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ShortDescription *string `json:"ShortDescription,omitempty"`
-	SupportDescription *string `json:"SupportDescription,omitempty"`
-	SupportEmail *string `json:"SupportEmail,omitempty"`
-	SupportUrl *string `json:"SupportUrl,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type ProvisionProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	NotificationArns []string `json:"NotificationArns,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	PathName *string `json:"PathName,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProductName *string `json:"ProductName,omitempty"`
-	ProvisionToken string `json:"ProvisionToken,omitempty"`
-	ProvisionedProductName string `json:"ProvisionedProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningArtifactName *string `json:"ProvisioningArtifactName,omitempty"`
-	ProvisioningParameters []ProvisioningParameter `json:"ProvisioningParameters,omitempty"`
-	ProvisioningPreferences *ProvisioningPreferences `json:"ProvisioningPreferences,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type ProvisionProductOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type ProvisionedProductAttribute struct {
-	Arn *string `json:"Arn,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	IdempotencyToken *string `json:"IdempotencyToken,omitempty"`
-	LastProvisioningRecordId *string `json:"LastProvisioningRecordId,omitempty"`
-	LastRecordId *string `json:"LastRecordId,omitempty"`
-	LastSuccessfulProvisioningRecordId *string `json:"LastSuccessfulProvisioningRecordId,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	PhysicalId *string `json:"PhysicalId,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProductName *string `json:"ProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningArtifactName *string `json:"ProvisioningArtifactName,omitempty"`
-	Status *string `json:"Status,omitempty"`
-	StatusMessage *string `json:"StatusMessage,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-	Type *string `json:"Type,omitempty"`
-	UserArn *string `json:"UserArn,omitempty"`
-	UserArnSession *string `json:"UserArnSession,omitempty"`
-}
-
-type ProvisionedProductDetail struct {
-	Arn *string `json:"Arn,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	IdempotencyToken *string `json:"IdempotencyToken,omitempty"`
-	LastProvisioningRecordId *string `json:"LastProvisioningRecordId,omitempty"`
-	LastRecordId *string `json:"LastRecordId,omitempty"`
-	LastSuccessfulProvisioningRecordId *string `json:"LastSuccessfulProvisioningRecordId,omitempty"`
-	LaunchRoleArn *string `json:"LaunchRoleArn,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	Status *string `json:"Status,omitempty"`
-	StatusMessage *string `json:"StatusMessage,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type ProvisionedProductPlanDetails struct {
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	NotificationArns []string `json:"NotificationArns,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	PlanId *string `json:"PlanId,omitempty"`
-	PlanName *string `json:"PlanName,omitempty"`
-	PlanType *string `json:"PlanType,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProvisionProductId *string `json:"ProvisionProductId,omitempty"`
-	ProvisionProductName *string `json:"ProvisionProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningParameters []UpdateProvisioningParameter `json:"ProvisioningParameters,omitempty"`
-	Status *string `json:"Status,omitempty"`
-	StatusMessage *string `json:"StatusMessage,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-	UpdatedTime *time.Time `json:"UpdatedTime,omitempty"`
-}
-
-type ProvisionedProductPlanSummary struct {
-	PlanId *string `json:"PlanId,omitempty"`
-	PlanName *string `json:"PlanName,omitempty"`
-	PlanType *string `json:"PlanType,omitempty"`
-	ProvisionProductId *string `json:"ProvisionProductId,omitempty"`
-	ProvisionProductName *string `json:"ProvisionProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type ProvisioningArtifact struct {
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Guidance *string `json:"Guidance,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type ProvisioningArtifactDetail struct {
-	Active bool `json:"Active,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Guidance *string `json:"Guidance,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	SourceRevision *string `json:"SourceRevision,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type ProvisioningArtifactOutput struct {
-	Description *string `json:"Description,omitempty"`
-	Key *string `json:"Key,omitempty"`
-}
-
-type ProvisioningArtifactParameter struct {
-	DefaultValue *string `json:"DefaultValue,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	IsNoEcho bool `json:"IsNoEcho,omitempty"`
-	ParameterConstraints *ParameterConstraints `json:"ParameterConstraints,omitempty"`
-	ParameterKey *string `json:"ParameterKey,omitempty"`
-	ParameterType *string `json:"ParameterType,omitempty"`
-}
-
-type ProvisioningArtifactPreferences struct {
-	StackSetAccounts []string `json:"StackSetAccounts,omitempty"`
-	StackSetRegions []string `json:"StackSetRegions,omitempty"`
-}
-
-type ProvisioningArtifactProperties struct {
-	Description *string `json:"Description,omitempty"`
-	DisableTemplateValidation bool `json:"DisableTemplateValidation,omitempty"`
-	Info map[string]string `json:"Info,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type ProvisioningArtifactSummary struct {
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	ProvisioningArtifactMetadata map[string]string `json:"ProvisioningArtifactMetadata,omitempty"`
-}
-
-type ProvisioningArtifactView struct {
-	ProductViewSummary *ProductViewSummary `json:"ProductViewSummary,omitempty"`
-	ProvisioningArtifact *ProvisioningArtifact `json:"ProvisioningArtifact,omitempty"`
-}
-
-type ProvisioningParameter struct {
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type ProvisioningPreferences struct {
-	StackSetAccounts []string `json:"StackSetAccounts,omitempty"`
-	StackSetFailureToleranceCount int `json:"StackSetFailureToleranceCount,omitempty"`
-	StackSetFailureTolerancePercentage int `json:"StackSetFailureTolerancePercentage,omitempty"`
-	StackSetMaxConcurrencyCount int `json:"StackSetMaxConcurrencyCount,omitempty"`
-	StackSetMaxConcurrencyPercentage int `json:"StackSetMaxConcurrencyPercentage,omitempty"`
-	StackSetRegions []string `json:"StackSetRegions,omitempty"`
-}
-
-type RecordDetail struct {
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	LaunchRoleArn *string `json:"LaunchRoleArn,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProvisionedProductId *string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductName *string `json:"ProvisionedProductName,omitempty"`
-	ProvisionedProductType *string `json:"ProvisionedProductType,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	RecordErrors []RecordError `json:"RecordErrors,omitempty"`
-	RecordId *string `json:"RecordId,omitempty"`
-	RecordTags []RecordTag `json:"RecordTags,omitempty"`
-	RecordType *string `json:"RecordType,omitempty"`
-	Status *string `json:"Status,omitempty"`
-	UpdatedTime *time.Time `json:"UpdatedTime,omitempty"`
-}
-
-type RecordError struct {
-	Code *string `json:"Code,omitempty"`
-	Description *string `json:"Description,omitempty"`
-}
-
-type RecordOutput struct {
-	Description *string `json:"Description,omitempty"`
-	OutputKey *string `json:"OutputKey,omitempty"`
-	OutputValue *string `json:"OutputValue,omitempty"`
-}
-
-type RecordTag struct {
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type RejectPortfolioShareInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	PortfolioShareType *string `json:"PortfolioShareType,omitempty"`
-}
-
-type RejectPortfolioShareOutput struct {
-}
-
-type ResourceChange struct {
-	Action *string `json:"Action,omitempty"`
-	Details []ResourceChangeDetail `json:"Details,omitempty"`
-	LogicalResourceId *string `json:"LogicalResourceId,omitempty"`
-	PhysicalResourceId *string `json:"PhysicalResourceId,omitempty"`
-	Replacement *string `json:"Replacement,omitempty"`
-	ResourceType *string `json:"ResourceType,omitempty"`
-	Scope []string `json:"Scope,omitempty"`
-}
-
-type ResourceChangeDetail struct {
-	CausingEntity *string `json:"CausingEntity,omitempty"`
-	Evaluation *string `json:"Evaluation,omitempty"`
-	Target *ResourceTargetDefinition `json:"Target,omitempty"`
-}
-
-type ResourceDetail struct {
-	ARN *string `json:"ARN,omitempty"`
-	CreatedTime *time.Time `json:"CreatedTime,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type ResourceTargetDefinition struct {
-	Attribute *string `json:"Attribute,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	RequiresRecreation *string `json:"RequiresRecreation,omitempty"`
-}
-
-type ScanProvisionedProductsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccessLevelFilter *AccessLevelFilter `json:"AccessLevelFilter,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-}
-
-type ScanProvisionedProductsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisionedProducts []ProvisionedProductDetail `json:"ProvisionedProducts,omitempty"`
-}
-
-type SearchProductsAsAdminInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Filters map[string][]string `json:"Filters,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	PortfolioId *string `json:"PortfolioId,omitempty"`
-	ProductSource *string `json:"ProductSource,omitempty"`
-	SortBy *string `json:"SortBy,omitempty"`
-	SortOrder *string `json:"SortOrder,omitempty"`
-}
-
-type SearchProductsAsAdminOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProductViewDetails []ProductViewDetail `json:"ProductViewDetails,omitempty"`
-}
-
-type SearchProductsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Filters map[string][]string `json:"Filters,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	SortBy *string `json:"SortBy,omitempty"`
-	SortOrder *string `json:"SortOrder,omitempty"`
-}
-
-type SearchProductsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProductViewAggregations map[string][]ProductViewAggregationValue `json:"ProductViewAggregations,omitempty"`
-	ProductViewSummaries []ProductViewSummary `json:"ProductViewSummaries,omitempty"`
-}
-
-type SearchProvisionedProductsInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccessLevelFilter *AccessLevelFilter `json:"AccessLevelFilter,omitempty"`
-	Filters map[string][]string `json:"Filters,omitempty"`
-	PageSize int `json:"PageSize,omitempty"`
-	PageToken *string `json:"PageToken,omitempty"`
-	SortBy *string `json:"SortBy,omitempty"`
-	SortOrder *string `json:"SortOrder,omitempty"`
-}
-
-type SearchProvisionedProductsOutput struct {
-	NextPageToken *string `json:"NextPageToken,omitempty"`
-	ProvisionedProducts []ProvisionedProductAttribute `json:"ProvisionedProducts,omitempty"`
-	TotalResultsCount int `json:"TotalResultsCount,omitempty"`
-}
-
-type ServiceActionAssociation struct {
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-	ServiceActionId string `json:"ServiceActionId,omitempty"`
-}
-
-type ServiceActionDetail struct {
-	Definition map[string]string `json:"Definition,omitempty"`
-	ServiceActionSummary *ServiceActionSummary `json:"ServiceActionSummary,omitempty"`
-}
-
-type ServiceActionSummary struct {
-	DefinitionType *string `json:"DefinitionType,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type ShareDetails struct {
-	ShareErrors []ShareError `json:"ShareErrors,omitempty"`
-	SuccessfulShares []string `json:"SuccessfulShares,omitempty"`
-}
-
-type ShareError struct {
-	Accounts []string `json:"Accounts,omitempty"`
-	Error *string `json:"Error,omitempty"`
-	Message *string `json:"Message,omitempty"`
-}
-
-type SourceConnection struct {
-	ConnectionParameters SourceConnectionParameters `json:"ConnectionParameters,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type SourceConnectionDetail struct {
-	ConnectionParameters *SourceConnectionParameters `json:"ConnectionParameters,omitempty"`
-	LastSync *LastSync `json:"LastSync,omitempty"`
-	Type *string `json:"Type,omitempty"`
-}
-
-type SourceConnectionParameters struct {
-	CodeStar *CodeStarParameters `json:"CodeStar,omitempty"`
-}
-
-type StackInstance struct {
-	Account *string `json:"Account,omitempty"`
-	Region *string `json:"Region,omitempty"`
-	StackInstanceStatus *string `json:"StackInstanceStatus,omitempty"`
-}
-
-type Tag struct {
-	Key string `json:"Key,omitempty"`
-	Value string `json:"Value,omitempty"`
-}
-
-type TagOptionDetail struct {
-	Active bool `json:"Active,omitempty"`
-	Id *string `json:"Id,omitempty"`
-	Key *string `json:"Key,omitempty"`
-	Owner *string `json:"Owner,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type TagOptionSummary struct {
-	Key *string `json:"Key,omitempty"`
-	Values []string `json:"Values,omitempty"`
-}
-
-type TerminateProvisionedProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IgnoreErrors bool `json:"IgnoreErrors,omitempty"`
-	ProvisionedProductId *string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductName *string `json:"ProvisionedProductName,omitempty"`
-	RetainPhysicalResources bool `json:"RetainPhysicalResources,omitempty"`
-	TerminateToken string `json:"TerminateToken,omitempty"`
-}
-
-type TerminateProvisionedProductOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type UniqueTagResourceIdentifier struct {
-	Key *string `json:"Key,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type UpdateConstraintInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Id string `json:"Id,omitempty"`
-	Parameters *string `json:"Parameters,omitempty"`
-}
-
-type UpdateConstraintOutput struct {
-	ConstraintDetail *ConstraintDetail `json:"ConstraintDetail,omitempty"`
-	ConstraintParameters *string `json:"ConstraintParameters,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type UpdatePortfolioInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AddTags []Tag `json:"AddTags,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	DisplayName *string `json:"DisplayName,omitempty"`
-	Id string `json:"Id,omitempty"`
-	ProviderName *string `json:"ProviderName,omitempty"`
-	RemoveTags []string `json:"RemoveTags,omitempty"`
-}
-
-type UpdatePortfolioOutput struct {
-	PortfolioDetail *PortfolioDetail `json:"PortfolioDetail,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type UpdatePortfolioShareInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AccountId *string `json:"AccountId,omitempty"`
-	OrganizationNode *OrganizationNode `json:"OrganizationNode,omitempty"`
-	PortfolioId string `json:"PortfolioId,omitempty"`
-	SharePrincipals bool `json:"SharePrincipals,omitempty"`
-	ShareTagOptions bool `json:"ShareTagOptions,omitempty"`
-}
-
-type UpdatePortfolioShareOutput struct {
-	PortfolioShareToken *string `json:"PortfolioShareToken,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type UpdateProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	AddTags []Tag `json:"AddTags,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Distributor *string `json:"Distributor,omitempty"`
-	Id string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	Owner *string `json:"Owner,omitempty"`
-	RemoveTags []string `json:"RemoveTags,omitempty"`
-	SourceConnection *SourceConnection `json:"SourceConnection,omitempty"`
-	SupportDescription *string `json:"SupportDescription,omitempty"`
-	SupportEmail *string `json:"SupportEmail,omitempty"`
-	SupportUrl *string `json:"SupportUrl,omitempty"`
-}
-
-type UpdateProductOutput struct {
-	ProductViewDetail *ProductViewDetail `json:"ProductViewDetail,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-}
-
-type UpdateProvisionedProductInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	PathId *string `json:"PathId,omitempty"`
-	PathName *string `json:"PathName,omitempty"`
-	ProductId *string `json:"ProductId,omitempty"`
-	ProductName *string `json:"ProductName,omitempty"`
-	ProvisionedProductId *string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductName *string `json:"ProvisionedProductName,omitempty"`
-	ProvisioningArtifactId *string `json:"ProvisioningArtifactId,omitempty"`
-	ProvisioningArtifactName *string `json:"ProvisioningArtifactName,omitempty"`
-	ProvisioningParameters []UpdateProvisioningParameter `json:"ProvisioningParameters,omitempty"`
-	ProvisioningPreferences *UpdateProvisioningPreferences `json:"ProvisioningPreferences,omitempty"`
-	Tags []Tag `json:"Tags,omitempty"`
-	UpdateToken string `json:"UpdateToken,omitempty"`
-}
-
-type UpdateProvisionedProductOutput struct {
-	RecordDetail *RecordDetail `json:"RecordDetail,omitempty"`
-}
-
-type UpdateProvisionedProductPropertiesInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	IdempotencyToken string `json:"IdempotencyToken,omitempty"`
-	ProvisionedProductId string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductProperties map[string]string `json:"ProvisionedProductProperties,omitempty"`
-}
-
-type UpdateProvisionedProductPropertiesOutput struct {
-	ProvisionedProductId *string `json:"ProvisionedProductId,omitempty"`
-	ProvisionedProductProperties map[string]string `json:"ProvisionedProductProperties,omitempty"`
-	RecordId *string `json:"RecordId,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type UpdateProvisioningArtifactInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Active bool `json:"Active,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Guidance *string `json:"Guidance,omitempty"`
-	Name *string `json:"Name,omitempty"`
-	ProductId string `json:"ProductId,omitempty"`
-	ProvisioningArtifactId string `json:"ProvisioningArtifactId,omitempty"`
-}
-
-type UpdateProvisioningArtifactOutput struct {
-	Info map[string]string `json:"Info,omitempty"`
-	ProvisioningArtifactDetail *ProvisioningArtifactDetail `json:"ProvisioningArtifactDetail,omitempty"`
-	Status *string `json:"Status,omitempty"`
-}
-
-type UpdateProvisioningParameter struct {
-	Key *string `json:"Key,omitempty"`
-	UsePreviousValue bool `json:"UsePreviousValue,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type UpdateProvisioningPreferences struct {
-	StackSetAccounts []string `json:"StackSetAccounts,omitempty"`
-	StackSetFailureToleranceCount int `json:"StackSetFailureToleranceCount,omitempty"`
-	StackSetFailureTolerancePercentage int `json:"StackSetFailureTolerancePercentage,omitempty"`
-	StackSetMaxConcurrencyCount int `json:"StackSetMaxConcurrencyCount,omitempty"`
-	StackSetMaxConcurrencyPercentage int `json:"StackSetMaxConcurrencyPercentage,omitempty"`
-	StackSetOperationType *string `json:"StackSetOperationType,omitempty"`
-	StackSetRegions []string `json:"StackSetRegions,omitempty"`
-}
-
-type UpdateServiceActionInput struct {
-	AcceptLanguage *string `json:"AcceptLanguage,omitempty"`
-	Definition map[string]string `json:"Definition,omitempty"`
-	Description *string `json:"Description,omitempty"`
-	Id string `json:"Id,omitempty"`
-	Name *string `json:"Name,omitempty"`
-}
-
-type UpdateServiceActionOutput struct {
-	ServiceActionDetail *ServiceActionDetail `json:"ServiceActionDetail,omitempty"`
-}
-
-type UpdateTagOptionInput struct {
-	Active bool `json:"Active,omitempty"`
-	Id string `json:"Id,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-type UpdateTagOptionOutput struct {
-	TagOptionDetail *TagOptionDetail `json:"TagOptionDetail,omitempty"`
-}
-
-type UsageInstruction struct {
-	Type *string `json:"Type,omitempty"`
-	Value *string `json:"Value,omitempty"`
-}
-
-
-
-// ── Handler helpers ──────────────────────────────────────────────────────────
+// ── HTTP / JSON helpers ─────────────────────────────────────────────────────
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -1548,821 +24,1816 @@ func parseJSON(body []byte, v any) *service.AWSError {
 		return nil
 	}
 	if err := gojson.Unmarshal(body, v); err != nil {
-		return service.NewAWSError("InvalidParameterException",
+		return service.NewAWSError("InvalidParametersException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}
 	return nil
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
+// ── Map / value helpers (Service Catalog uses PascalCase) ───────────────────
 
-func handleAcceptPortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AcceptPortfolioShareInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
 	}
-	// TODO: implement AcceptPortfolioShare business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AcceptPortfolioShare"})
+	return ""
 }
 
-func handleAssociateBudgetWithResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AssociateBudgetWithResourceInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStrPtr(m map[string]any, key string) *string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return &s
+		}
 	}
-	// TODO: implement AssociateBudgetWithResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AssociateBudgetWithResource"})
+	return nil
 }
 
-func handleAssociatePrincipalWithPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AssociatePrincipalWithPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getBool(m map[string]any, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
 	}
-	// TODO: implement AssociatePrincipalWithPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AssociatePrincipalWithPortfolio"})
+	return false
 }
 
-func handleAssociateProductWithPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AssociateProductWithPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getBoolPtr(m map[string]any, key string) *bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return &b
+		}
 	}
-	// TODO: implement AssociateProductWithPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AssociateProductWithPortfolio"})
+	return nil
 }
 
-func handleAssociateServiceActionWithProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AssociateServiceActionWithProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getMap(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if mm, ok := v.(map[string]any); ok {
+			return mm
+		}
 	}
-	// TODO: implement AssociateServiceActionWithProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AssociateServiceActionWithProvisioningArtifact"})
+	return nil
 }
 
-func handleAssociateTagOptionWithResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req AssociateTagOptionWithResourceInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStrMap(m map[string]any, key string) map[string]string {
+	mm := getMap(m, key)
+	if mm == nil {
+		return nil
 	}
-	// TODO: implement AssociateTagOptionWithResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "AssociateTagOptionWithResource"})
+	out := make(map[string]string, len(mm))
+	for k, v := range mm {
+		if s, ok := v.(string); ok {
+			out[k] = s
+		}
+	}
+	return out
 }
 
-func handleBatchAssociateServiceActionWithProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req BatchAssociateServiceActionWithProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getMapList(m map[string]any, key string) []map[string]any {
+	v, ok := m[key]
+	if !ok {
+		return nil
 	}
-	// TODO: implement BatchAssociateServiceActionWithProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "BatchAssociateServiceActionWithProvisioningArtifact"})
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(arr))
+	for _, x := range arr {
+		if xm, ok := x.(map[string]any); ok {
+			out = append(out, xm)
+		}
+	}
+	return out
 }
 
-func handleBatchDisassociateServiceActionFromProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req BatchDisassociateServiceActionFromProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func getStrList(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
 	}
-	// TODO: implement BatchDisassociateServiceActionFromProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "BatchDisassociateServiceActionFromProvisioningArtifact"})
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, x := range arr {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
-func handleCopyProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CopyProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+// parseTagList parses the Service Catalog Tags array of {Key, Value} entries.
+func parseTagList(m map[string]any, key string) map[string]string {
+	out := make(map[string]string)
+	for _, t := range getMapList(m, key) {
+		k := getStr(t, "Key")
+		v := getStr(t, "Value")
+		if k != "" {
+			out[k] = v
+		}
 	}
-	// TODO: implement CopyProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CopyProduct"})
+	return out
 }
 
-func handleCreateConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateConstraintInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+func tagListFromMap(m map[string]string) []map[string]any {
+	out := make([]map[string]any, 0, len(m))
+	for k, v := range m {
+		out = append(out, map[string]any{"Key": k, "Value": v})
 	}
-	// TODO: implement CreateConstraint business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateConstraint"})
+	return out
 }
+
+func rfc3339(t time.Time) string { return t.Format(time.RFC3339) }
+
+// ── Resource → response converters ──────────────────────────────────────────
+
+func portfolioDetail(p *StoredPortfolio) map[string]any {
+	return map[string]any{
+		"Id":           p.Id,
+		"ARN":          p.Arn,
+		"DisplayName":  p.DisplayName,
+		"Description":  p.Description,
+		"ProviderName": p.ProviderName,
+		"CreatedTime":  rfc3339(p.CreatedTime),
+	}
+}
+
+func productViewDetail(p *StoredProduct) map[string]any {
+	return map[string]any{
+		"ProductViewSummary": productViewSummary(p),
+		"Status":             p.Status,
+		"ProductARN":         p.Arn,
+		"CreatedTime":        rfc3339(p.CreatedTime),
+	}
+}
+
+func productViewSummary(p *StoredProduct) map[string]any {
+	return map[string]any{
+		"Id":               p.Id,
+		"ProductId":        p.Id,
+		"Name":             p.Name,
+		"Owner":            p.Owner,
+		"ShortDescription": p.ShortDescription,
+		"Type":             p.Type,
+		"Distributor":      p.Distributor,
+		"HasDefaultPath":   false,
+		"SupportEmail":     p.SupportEmail,
+		"SupportDescription": p.SupportDescription,
+		"SupportUrl":       p.SupportUrl,
+	}
+}
+
+func provisioningArtifactDetail(pa *StoredProvisioningArtifact) map[string]any {
+	return map[string]any{
+		"Id":          pa.Id,
+		"Name":        pa.Name,
+		"Description": pa.Description,
+		"Type":        pa.Type,
+		"CreatedTime": rfc3339(pa.CreatedTime),
+		"Active":      pa.Active,
+		"Guidance":    pa.Guidance,
+	}
+}
+
+func provisioningArtifactSummary(pa *StoredProvisioningArtifact) map[string]any {
+	return map[string]any{
+		"Id":          pa.Id,
+		"Name":        pa.Name,
+		"Description": pa.Description,
+		"CreatedTime": rfc3339(pa.CreatedTime),
+		"ProvisioningArtifactMetadata": map[string]any{},
+	}
+}
+
+func constraintDetail(c *StoredConstraint) map[string]any {
+	return map[string]any{
+		"ConstraintId": c.Id,
+		"Type":         c.Type,
+		"Description":  c.Description,
+		"Owner":        c.Owner,
+		"PortfolioId":  c.PortfolioId,
+		"ProductId":    c.ProductId,
+	}
+}
+
+func tagOptionDetail(t *StoredTagOption) map[string]any {
+	return map[string]any{
+		"Id":     t.Id,
+		"Key":    t.Key,
+		"Value":  t.Value,
+		"Active": t.Active,
+		"Owner":  t.Owner,
+	}
+}
+
+func provisionedProductDetail(pp *StoredProvisionedProduct) map[string]any {
+	return map[string]any{
+		"Id":            pp.Id,
+		"Name":          pp.Name,
+		"Type":          pp.Type,
+		"Arn":           pp.Arn,
+		"Status":        pp.Status,
+		"StatusMessage": pp.StatusMessage,
+		"CreatedTime":   rfc3339(pp.CreatedTime),
+		"LastRecordId":  pp.LastRecordId,
+		"LastProvisioningRecordId": pp.LastRecordId,
+		"LastSuccessfulProvisioningRecordId": pp.LastRecordId,
+		"ProductId":     pp.ProductId,
+		"ProductName":   pp.ProductName,
+		"ProvisioningArtifactId":   pp.ProvisioningArtifactId,
+		"ProvisioningArtifactName": pp.ProvisioningArtifactName,
+		"UserArn":       pp.UserArn,
+		"UserArnSession": pp.UserArnSession,
+		"LaunchRoleArn": pp.LaunchRoleArn,
+		"IdempotencyToken": pp.IdempotencyToken,
+	}
+}
+
+func provisionedProductAttribute(pp *StoredProvisionedProduct) map[string]any {
+	out := provisionedProductDetail(pp)
+	out["Tags"] = tagListFromMap(pp.Tags)
+	return out
+}
+
+func recordDetail(r *StoredRecord) map[string]any {
+	return map[string]any{
+		"RecordId":               r.Id,
+		"ProvisionedProductName": r.ProvisionedProductName,
+		"ProvisionedProductType": r.ProvisionedProductType,
+		"RecordType":             r.RecordType,
+		"ProvisionedProductId":   r.ProvisionedProductId,
+		"Status":                 r.Status,
+		"CreatedTime":            rfc3339(r.CreatedTime),
+		"UpdatedTime":            rfc3339(r.UpdatedTime),
+		"ProductId":              r.ProductId,
+		"ProvisioningArtifactId": r.ProvisioningArtifactId,
+		"PathId":                 r.PathId,
+		"RecordErrors":           r.RecordErrors,
+		"RecordTags":             tagListFromMap(r.RecordTags),
+	}
+}
+
+func serviceActionDetail(sa *StoredServiceAction) map[string]any {
+	return map[string]any{
+		"ServiceActionSummary": map[string]any{
+			"Id":             sa.Id,
+			"Name":           sa.Name,
+			"Description":    sa.Description,
+			"DefinitionType": sa.DefinitionType,
+		},
+		"Definition": sa.Definition,
+	}
+}
+
+func planDetail(p *StoredPlan) map[string]any {
+	return map[string]any{
+		"PlanName":               p.Name,
+		"PlanId":                 p.Id,
+		"ProductId":              p.ProductId,
+		"PlanType":               p.Type,
+		"PathId":                 p.PathId,
+		"ProvisioningArtifactId": p.ProvisioningArtifactId,
+		"ProvisionedProductName": p.ProvisionedProductName,
+		"NotificationArns":       p.NotificationArns,
+		"ProvisioningParameters": p.ProvisioningParameters,
+		"Tags":                   tagListFromMap(p.Tags),
+		"Status":                 p.Status,
+		"StatusMessage":          p.StatusMessage,
+		"UpdatedTime":            rfc3339(p.UpdatedTime),
+	}
+}
+
+func planSummary(p *StoredPlan) map[string]any {
+	return map[string]any{
+		"PlanName":               p.Name,
+		"PlanId":                 p.Id,
+		"PlanType":               p.Type,
+		"ProvisionProductId":     p.ProductId,
+		"ProvisionProductName":   p.ProvisionedProductName,
+		"ProvisioningArtifactId": p.ProvisioningArtifactId,
+	}
+}
+
+// ── Portfolio handlers ─────────────────────────────────────────────────────
 
 func handleCreatePortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreatePortfolioInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement CreatePortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreatePortfolio"})
-}
-
-func handleCreatePortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreatePortfolioShareInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	p, err := store.CreatePortfolio(
+		getStr(req, "DisplayName"),
+		getStr(req, "Description"),
+		getStr(req, "ProviderName"),
+		parseTagList(req, "Tags"),
+	)
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement CreatePortfolioShare business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreatePortfolioShare"})
-}
-
-func handleCreateProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateProduct"})
-}
-
-func handleCreateProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateProvisionedProductPlanInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateProvisionedProductPlan business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateProvisionedProductPlan"})
-}
-
-func handleCreateProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateProvisioningArtifact"})
-}
-
-func handleCreateServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateServiceActionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateServiceAction"})
-}
-
-func handleCreateTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateTagOptionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement CreateTagOption business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateTagOption"})
-}
-
-func handleDeleteConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteConstraintInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteConstraint business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteConstraint"})
+	return jsonOK(map[string]any{
+		"PortfolioDetail": portfolioDetail(p),
+		"Tags":            tagListFromMap(p.Tags),
+	})
 }
 
 func handleDeletePortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeletePortfolioInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement DeletePortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeletePortfolio"})
-}
-
-func handleDeletePortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeletePortfolioShareInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if err := store.DeletePortfolio(getStr(req, "Id")); err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement DeletePortfolioShare business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeletePortfolioShare"})
-}
-
-func handleDeleteProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteProduct"})
-}
-
-func handleDeleteProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteProvisionedProductPlanInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteProvisionedProductPlan business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteProvisionedProductPlan"})
-}
-
-func handleDeleteProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteProvisioningArtifact"})
-}
-
-func handleDeleteServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteServiceActionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteServiceAction"})
-}
-
-func handleDeleteTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteTagOptionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteTagOption business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteTagOption"})
-}
-
-func handleDescribeConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeConstraintInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeConstraint business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeConstraint"})
-}
-
-func handleDescribeCopyProductStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeCopyProductStatusInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeCopyProductStatus business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeCopyProductStatus"})
+	return jsonOK(map[string]any{})
 }
 
 func handleDescribePortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribePortfolioInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement DescribePortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribePortfolio"})
-}
-
-func handleDescribePortfolioShareStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribePortfolioShareStatusInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	p, err := store.GetPortfolio(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement DescribePortfolioShareStatus business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribePortfolioShareStatus"})
-}
-
-func handleDescribePortfolioShares(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribePortfolioSharesInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribePortfolioShares business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribePortfolioShares"})
-}
-
-func handleDescribeProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProduct"})
-}
-
-func handleDescribeProductAsAdmin(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProductAsAdminInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProductAsAdmin business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProductAsAdmin"})
-}
-
-func handleDescribeProductView(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProductViewInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProductView business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProductView"})
-}
-
-func handleDescribeProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProvisionedProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProvisionedProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProvisionedProduct"})
-}
-
-func handleDescribeProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProvisionedProductPlanInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProvisionedProductPlan business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProvisionedProductPlan"})
-}
-
-func handleDescribeProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProvisioningArtifact"})
-}
-
-func handleDescribeProvisioningParameters(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeProvisioningParametersInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeProvisioningParameters business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeProvisioningParameters"})
-}
-
-func handleDescribeRecord(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeRecordInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeRecord business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeRecord"})
-}
-
-func handleDescribeServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeServiceActionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeServiceAction"})
-}
-
-func handleDescribeServiceActionExecutionParameters(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeServiceActionExecutionParametersInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeServiceActionExecutionParameters business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeServiceActionExecutionParameters"})
-}
-
-func handleDescribeTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DescribeTagOptionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DescribeTagOption business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DescribeTagOption"})
-}
-
-func handleDisableAWSOrganizationsAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisableAWSOrganizationsAccessInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisableAWSOrganizationsAccess business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisableAWSOrganizationsAccess"})
-}
-
-func handleDisassociateBudgetFromResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisassociateBudgetFromResourceInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisassociateBudgetFromResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisassociateBudgetFromResource"})
-}
-
-func handleDisassociatePrincipalFromPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisassociatePrincipalFromPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisassociatePrincipalFromPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisassociatePrincipalFromPortfolio"})
-}
-
-func handleDisassociateProductFromPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisassociateProductFromPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisassociateProductFromPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisassociateProductFromPortfolio"})
-}
-
-func handleDisassociateServiceActionFromProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisassociateServiceActionFromProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisassociateServiceActionFromProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisassociateServiceActionFromProvisioningArtifact"})
-}
-
-func handleDisassociateTagOptionFromResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DisassociateTagOptionFromResourceInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DisassociateTagOptionFromResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DisassociateTagOptionFromResource"})
-}
-
-func handleEnableAWSOrganizationsAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req EnableAWSOrganizationsAccessInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement EnableAWSOrganizationsAccess business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "EnableAWSOrganizationsAccess"})
-}
-
-func handleExecuteProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ExecuteProvisionedProductPlanInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ExecuteProvisionedProductPlan business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ExecuteProvisionedProductPlan"})
-}
-
-func handleExecuteProvisionedProductServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ExecuteProvisionedProductServiceActionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ExecuteProvisionedProductServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ExecuteProvisionedProductServiceAction"})
-}
-
-func handleGetAWSOrganizationsAccessStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetAWSOrganizationsAccessStatusInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement GetAWSOrganizationsAccessStatus business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetAWSOrganizationsAccessStatus"})
-}
-
-func handleGetProvisionedProductOutputs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetProvisionedProductOutputsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement GetProvisionedProductOutputs business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetProvisionedProductOutputs"})
-}
-
-func handleImportAsProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ImportAsProvisionedProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ImportAsProvisionedProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ImportAsProvisionedProduct"})
-}
-
-func handleListAcceptedPortfolioShares(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListAcceptedPortfolioSharesInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListAcceptedPortfolioShares business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListAcceptedPortfolioShares"})
-}
-
-func handleListBudgetsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListBudgetsForResourceInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListBudgetsForResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListBudgetsForResource"})
-}
-
-func handleListConstraintsForPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListConstraintsForPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListConstraintsForPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListConstraintsForPortfolio"})
-}
-
-func handleListLaunchPaths(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListLaunchPathsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListLaunchPaths business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListLaunchPaths"})
-}
-
-func handleListOrganizationPortfolioAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListOrganizationPortfolioAccessInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListOrganizationPortfolioAccess business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListOrganizationPortfolioAccess"})
-}
-
-func handleListPortfolioAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListPortfolioAccessInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListPortfolioAccess business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListPortfolioAccess"})
+	return jsonOK(map[string]any{
+		"PortfolioDetail": portfolioDetail(p),
+		"Tags":            tagListFromMap(p.Tags),
+		"TagOptions":      []any{},
+		"Budgets":         []any{},
+	})
 }
 
 func handleListPortfolios(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListPortfoliosInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	list := store.ListPortfolios()
+	out := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		out = append(out, portfolioDetail(p))
 	}
-	// TODO: implement ListPortfolios business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListPortfolios"})
+	return jsonOK(map[string]any{"PortfolioDetails": out})
 }
 
 func handleListPortfoliosForProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListPortfoliosForProductInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement ListPortfoliosForProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListPortfoliosForProduct"})
-}
-
-func handleListPrincipalsForPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListPrincipalsForPortfolioInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	list := store.ListPortfoliosForProduct(getStr(req, "ProductId"))
+	out := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		out = append(out, portfolioDetail(p))
 	}
-	// TODO: implement ListPrincipalsForPortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListPrincipalsForPortfolio"})
-}
-
-func handleListProvisionedProductPlans(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListProvisionedProductPlansInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListProvisionedProductPlans business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListProvisionedProductPlans"})
-}
-
-func handleListProvisioningArtifacts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListProvisioningArtifactsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListProvisioningArtifacts business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListProvisioningArtifacts"})
-}
-
-func handleListProvisioningArtifactsForServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListProvisioningArtifactsForServiceActionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListProvisioningArtifactsForServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListProvisioningArtifactsForServiceAction"})
-}
-
-func handleListRecordHistory(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListRecordHistoryInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListRecordHistory business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListRecordHistory"})
-}
-
-func handleListResourcesForTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListResourcesForTagOptionInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListResourcesForTagOption business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListResourcesForTagOption"})
-}
-
-func handleListServiceActions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListServiceActionsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListServiceActions business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListServiceActions"})
-}
-
-func handleListServiceActionsForProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListServiceActionsForProvisioningArtifactInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListServiceActionsForProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListServiceActionsForProvisioningArtifact"})
-}
-
-func handleListStackInstancesForProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListStackInstancesForProvisionedProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListStackInstancesForProvisionedProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListStackInstancesForProvisionedProduct"})
-}
-
-func handleListTagOptions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTagOptionsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ListTagOptions business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTagOptions"})
-}
-
-func handleNotifyProvisionProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req NotifyProvisionProductEngineWorkflowResultInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement NotifyProvisionProductEngineWorkflowResult business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "NotifyProvisionProductEngineWorkflowResult"})
-}
-
-func handleNotifyTerminateProvisionedProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req NotifyTerminateProvisionedProductEngineWorkflowResultInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement NotifyTerminateProvisionedProductEngineWorkflowResult business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "NotifyTerminateProvisionedProductEngineWorkflowResult"})
-}
-
-func handleNotifyUpdateProvisionedProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req NotifyUpdateProvisionedProductEngineWorkflowResultInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement NotifyUpdateProvisionedProductEngineWorkflowResult business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "NotifyUpdateProvisionedProductEngineWorkflowResult"})
-}
-
-func handleProvisionProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ProvisionProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ProvisionProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ProvisionProduct"})
-}
-
-func handleRejectPortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req RejectPortfolioShareInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement RejectPortfolioShare business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "RejectPortfolioShare"})
-}
-
-func handleScanProvisionedProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ScanProvisionedProductsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement ScanProvisionedProducts business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ScanProvisionedProducts"})
-}
-
-func handleSearchProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req SearchProductsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement SearchProducts business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "SearchProducts"})
-}
-
-func handleSearchProductsAsAdmin(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req SearchProductsAsAdminInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement SearchProductsAsAdmin business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "SearchProductsAsAdmin"})
-}
-
-func handleSearchProvisionedProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req SearchProvisionedProductsInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement SearchProvisionedProducts business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "SearchProvisionedProducts"})
-}
-
-func handleTerminateProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TerminateProvisionedProductInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement TerminateProvisionedProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TerminateProvisionedProduct"})
-}
-
-func handleUpdateConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateConstraintInput
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement UpdateConstraint business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateConstraint"})
+	return jsonOK(map[string]any{"PortfolioDetails": out})
 }
 
 func handleUpdatePortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdatePortfolioInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdatePortfolio business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdatePortfolio"})
+	removeKeys := getStrList(req, "RemoveTags")
+	addTags := parseTagList(req, "AddTags")
+	p, err := store.UpdatePortfolio(
+		getStr(req, "Id"),
+		getStrPtr(req, "DisplayName"),
+		getStrPtr(req, "Description"),
+		getStrPtr(req, "ProviderName"),
+		addTags,
+		removeKeys,
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"PortfolioDetail": portfolioDetail(p),
+		"Tags":            tagListFromMap(p.Tags),
+	})
+}
+
+// ── Portfolio share handlers ───────────────────────────────────────────────
+
+func handleCreatePortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	accountID := getStr(req, "AccountId")
+	shareType := "ACCOUNT"
+	if node := getMap(req, "OrganizationNode"); node != nil {
+		shareType = getStr(node, "Type")
+		accountID = getStr(node, "Value")
+		if shareType == "" {
+			shareType = "ORGANIZATION"
+		}
+	}
+	token, err := store.CreatePortfolioShare(
+		getStr(req, "PortfolioId"),
+		accountID,
+		shareType,
+		getBool(req, "SharePrincipals"),
+		getBool(req, "ShareTagOptions"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"PortfolioShareToken": token})
+}
+
+func handleDeletePortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	accountID := getStr(req, "AccountId")
+	shareType := "ACCOUNT"
+	if node := getMap(req, "OrganizationNode"); node != nil {
+		shareType = getStr(node, "Type")
+		accountID = getStr(node, "Value")
+		if shareType == "" {
+			shareType = "ORGANIZATION"
+		}
+	}
+	token, err := store.DeletePortfolioShare(getStr(req, "PortfolioId"), accountID, shareType)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"PortfolioShareToken": token})
+}
+
+func handleDescribePortfolioShares(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	shares := store.ListPortfolioShares(getStr(req, "PortfolioId"), getStr(req, "Type"))
+	out := make([]map[string]any, 0, len(shares))
+	for _, sh := range shares {
+		out = append(out, map[string]any{
+			"PrincipalId":     sh.AccountId,
+			"Type":            sh.Type,
+			"Accepted":        sh.Accepted,
+			"ShareTagOptions": sh.ShareTagOptions,
+			"SharePrincipals": sh.SharePrincipals,
+		})
+	}
+	return jsonOK(map[string]any{"PortfolioShareDetails": out})
+}
+
+func handleDescribePortfolioShareStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	token := getStr(req, "PortfolioShareToken")
+	return jsonOK(map[string]any{
+		"PortfolioShareToken": token,
+		"Status":              "COMPLETED",
+		"ShareDetails": map[string]any{
+			"SuccessfulShares": []any{},
+			"ShareErrors":      []any{},
+		},
+	})
+}
+
+func handleListPortfolioAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	shares := store.ListPortfolioShares(getStr(req, "PortfolioId"), "ACCOUNT")
+	accounts := make([]string, 0, len(shares))
+	for _, sh := range shares {
+		accounts = append(accounts, sh.AccountId)
+	}
+	return jsonOK(map[string]any{"AccountIds": accounts})
 }
 
 func handleUpdatePortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdatePortfolioShareInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdatePortfolioShare business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdatePortfolioShare"})
+	accountID := getStr(req, "AccountId")
+	shareType := "ACCOUNT"
+	if node := getMap(req, "OrganizationNode"); node != nil {
+		shareType = getStr(node, "Type")
+		accountID = getStr(node, "Value")
+		if shareType == "" {
+			shareType = "ORGANIZATION"
+		}
+	}
+	token, err := store.UpdatePortfolioShare(
+		getStr(req, "PortfolioId"),
+		accountID,
+		shareType,
+		getBoolPtr(req, "SharePrincipals"),
+		getBoolPtr(req, "ShareTagOptions"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"PortfolioShareToken": token,
+		"Status":              "COMPLETED",
+	})
+}
+
+func handleAcceptPortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AcceptPortfolioShare(getStr(req, "PortfolioId"), getStr(req, "PortfolioShareType")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleRejectPortfolioShare(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.RejectPortfolioShare(getStr(req, "PortfolioId"), getStr(req, "PortfolioShareType")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListAcceptedPortfolioShares(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	out := make([]map[string]any, 0)
+	for _, p := range store.ListPortfolios() {
+		shares := store.ListPortfolioShares(p.Id, "")
+		for _, sh := range shares {
+			if sh.Accepted {
+				out = append(out, portfolioDetail(p))
+				break
+			}
+		}
+	}
+	return jsonOK(map[string]any{"PortfolioDetails": out})
+}
+
+func handleListOrganizationPortfolioAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	shareType := getStr(req, "OrganizationNodeType")
+	shares := store.ListPortfolioShares(getStr(req, "PortfolioId"), shareType)
+	out := make([]map[string]any, 0, len(shares))
+	for _, sh := range shares {
+		out = append(out, map[string]any{
+			"Type":  sh.Type,
+			"Value": sh.AccountId,
+		})
+	}
+	return jsonOK(map[string]any{"OrganizationNodes": out})
+}
+
+// ── Product handlers ───────────────────────────────────────────────────────
+
+func handleCreateProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pap := getMap(req, "ProvisioningArtifactParameters")
+	var artName, artDesc, artType string
+	var info map[string]string
+	if pap != nil {
+		artName = getStr(pap, "Name")
+		artDesc = getStr(pap, "Description")
+		artType = getStr(pap, "Type")
+		info = getStrMap(pap, "Info")
+	}
+	prod, pa, err := store.CreateProduct(
+		getStr(req, "Name"),
+		getStr(req, "Owner"),
+		getStr(req, "Description"),
+		getStr(req, "Distributor"),
+		getStr(req, "ProductType"),
+		getStr(req, "SupportDescription"),
+		getStr(req, "SupportEmail"),
+		getStr(req, "SupportUrl"),
+		parseTagList(req, "Tags"),
+		artName, artDesc, artType, info,
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	resp := map[string]any{
+		"ProductViewDetail": productViewDetail(prod),
+		"Tags":              tagListFromMap(prod.Tags),
+	}
+	if pa != nil {
+		resp["ProvisioningArtifactDetail"] = provisioningArtifactDetail(pa)
+	}
+	return jsonOK(resp)
+}
+
+func handleDeleteProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteProduct(getStr(req, "Id")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "Id")
+	name := getStr(req, "Name")
+	var p *StoredProduct
+	var err *service.AWSError
+	if id != "" {
+		p, err = store.GetProduct(id)
+	} else if name != "" {
+		p, err = store.GetProductByName(name)
+	} else {
+		return jsonErr(errInvalidParam("Id or Name is required"))
+	}
+	if err != nil {
+		return jsonErr(err)
+	}
+	pas, _ := store.ListProvisioningArtifacts(p.Id)
+	artifacts := make([]map[string]any, 0, len(pas))
+	for _, pa := range pas {
+		artifacts = append(artifacts, provisioningArtifactDetail(pa))
+	}
+	return jsonOK(map[string]any{
+		"ProductViewSummary":     productViewSummary(p),
+		"ProvisioningArtifacts":  artifacts,
+		"Budgets":                []any{},
+		"LaunchPaths":            []any{},
+	})
+}
+
+func handleDescribeProductAsAdmin(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "Id")
+	name := getStr(req, "Name")
+	var p *StoredProduct
+	var err *service.AWSError
+	if id != "" {
+		p, err = store.GetProduct(id)
+	} else if name != "" {
+		p, err = store.GetProductByName(name)
+	} else {
+		return jsonErr(errInvalidParam("Id or Name is required"))
+	}
+	if err != nil {
+		return jsonErr(err)
+	}
+	pas, _ := store.ListProvisioningArtifacts(p.Id)
+	summaries := make([]map[string]any, 0, len(pas))
+	for _, pa := range pas {
+		summaries = append(summaries, provisioningArtifactSummary(pa))
+	}
+	return jsonOK(map[string]any{
+		"ProductViewDetail":             productViewDetail(p),
+		"ProvisioningArtifactSummaries": summaries,
+		"Tags":                          tagListFromMap(p.Tags),
+		"TagOptions":                    []any{},
+		"Budgets":                       []any{},
+	})
+}
+
+func handleDescribeProductView(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	p, err := store.GetProduct(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	pas, _ := store.ListProvisioningArtifacts(p.Id)
+	views := make([]map[string]any, 0, len(pas))
+	for _, pa := range pas {
+		views = append(views, map[string]any{
+			"Id":          pa.Id,
+			"Name":        pa.Name,
+			"Description": pa.Description,
+			"Type":        pa.Type,
+			"CreatedTime": rfc3339(pa.CreatedTime),
+		})
+	}
+	return jsonOK(map[string]any{
+		"ProductViewSummary":    productViewSummary(p),
+		"ProvisioningArtifacts": views,
+	})
+}
+
+func handleSearchProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	_ = req
+	list := store.ListProducts()
+	views := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		views = append(views, productViewSummary(p))
+	}
+	return jsonOK(map[string]any{
+		"ProductViewSummaries":   views,
+		"ProductViewAggregations": map[string]any{},
+	})
+}
+
+func handleSearchProductsAsAdmin(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListProducts()
+	details := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		details = append(details, productViewDetail(p))
+	}
+	return jsonOK(map[string]any{"ProductViewDetails": details})
 }
 
 func handleUpdateProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateProductInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateProduct"})
+	p, err := store.UpdateProduct(
+		getStr(req, "Id"),
+		getStrPtr(req, "Name"),
+		getStrPtr(req, "Owner"),
+		getStrPtr(req, "Description"),
+		getStrPtr(req, "Distributor"),
+		getStrPtr(req, "SupportDescription"),
+		getStrPtr(req, "SupportEmail"),
+		getStrPtr(req, "SupportUrl"),
+		parseTagList(req, "AddTags"),
+		getStrList(req, "RemoveTags"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProductViewDetail": productViewDetail(p),
+		"Tags":              tagListFromMap(p.Tags),
+	})
 }
 
-func handleUpdateProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateProvisionedProductInput
+// ── Provisioning artifact handlers ─────────────────────────────────────────
+
+func handleCreateProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateProvisionedProduct business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateProvisionedProduct"})
+	params := getMap(req, "Parameters")
+	if params == nil {
+		return jsonErr(errInvalidParam("Parameters is required"))
+	}
+	pa, err := store.CreateProvisioningArtifact(
+		getStr(req, "ProductId"),
+		getStr(params, "Name"),
+		getStr(params, "Description"),
+		getStr(params, "Type"),
+		getStrMap(params, "Info"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisioningArtifactDetail": provisioningArtifactDetail(pa),
+		"Info":                       pa.Info,
+		"Status":                     "AVAILABLE",
+	})
 }
 
-func handleUpdateProvisionedProductProperties(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateProvisionedProductPropertiesInput
+func handleDeleteProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateProvisionedProductProperties business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateProvisionedProductProperties"})
+	if err := store.DeleteProvisioningArtifact(getStr(req, "ProductId"), getStr(req, "ProvisioningArtifactId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pa, err := store.GetProvisioningArtifact(getStr(req, "ProductId"), getStr(req, "ProvisioningArtifactId"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisioningArtifactDetail": provisioningArtifactDetail(pa),
+		"Info":                       pa.Info,
+		"Status":                     "AVAILABLE",
+	})
+}
+
+func handleListProvisioningArtifacts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pas, err := store.ListProvisioningArtifacts(getStr(req, "ProductId"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	out := make([]map[string]any, 0, len(pas))
+	for _, pa := range pas {
+		out = append(out, provisioningArtifactDetail(pa))
+	}
+	return jsonOK(map[string]any{"ProvisioningArtifactDetails": out})
 }
 
 func handleUpdateProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateProvisioningArtifactInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateProvisioningArtifact business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateProvisioningArtifact"})
+	pa, err := store.UpdateProvisioningArtifact(
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStrPtr(req, "Name"),
+		getStrPtr(req, "Description"),
+		getStrPtr(req, "Guidance"),
+		getBoolPtr(req, "Active"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisioningArtifactDetail": provisioningArtifactDetail(pa),
+		"Info":                       pa.Info,
+		"Status":                     "AVAILABLE",
+	})
 }
 
-func handleUpdateServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateServiceActionInput
+// ── Constraint handlers ────────────────────────────────────────────────────
+
+func handleCreateConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateServiceAction business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateServiceAction"})
+	c, err := store.CreateConstraint(
+		getStr(req, "PortfolioId"),
+		getStr(req, "ProductId"),
+		getStr(req, "Type"),
+		getStr(req, "Parameters"),
+		getStr(req, "Description"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ConstraintDetail":     constraintDetail(c),
+		"ConstraintParameters": c.Parameters,
+		"Status":               c.Status,
+	})
+}
+
+func handleDeleteConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteConstraint(getStr(req, "Id")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	c, err := store.GetConstraint(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ConstraintDetail":     constraintDetail(c),
+		"ConstraintParameters": c.Parameters,
+		"Status":               c.Status,
+	})
+}
+
+func handleListConstraintsForPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListConstraintsForPortfolio(getStr(req, "PortfolioId"), getStr(req, "ProductId"))
+	out := make([]map[string]any, 0, len(list))
+	for _, c := range list {
+		out = append(out, constraintDetail(c))
+	}
+	return jsonOK(map[string]any{"ConstraintDetails": out})
+}
+
+func handleUpdateConstraint(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	c, err := store.UpdateConstraint(
+		getStr(req, "Id"),
+		getStrPtr(req, "Description"),
+		getStrPtr(req, "Parameters"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ConstraintDetail":     constraintDetail(c),
+		"ConstraintParameters": c.Parameters,
+		"Status":               c.Status,
+	})
+}
+
+// ── Principal handlers ─────────────────────────────────────────────────────
+
+func handleAssociatePrincipalWithPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AssociatePrincipal(
+		getStr(req, "PortfolioId"),
+		getStr(req, "PrincipalARN"),
+		getStr(req, "PrincipalType"),
+	); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDisassociatePrincipalFromPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DisassociatePrincipal(
+		getStr(req, "PortfolioId"),
+		getStr(req, "PrincipalARN"),
+	); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListPrincipalsForPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListPrincipals(getStr(req, "PortfolioId"))
+	out := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		out = append(out, map[string]any{
+			"PrincipalARN":  p.PrincipalARN,
+			"PrincipalType": p.PrincipalType,
+		})
+	}
+	return jsonOK(map[string]any{"Principals": out})
+}
+
+// ── Tag option handlers ────────────────────────────────────────────────────
+
+func handleCreateTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.CreateTagOption(getStr(req, "Key"), getStr(req, "Value"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"TagOptionDetail": tagOptionDetail(t)})
+}
+
+func handleDeleteTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteTagOption(getStr(req, "Id")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	t, err := store.GetTagOption(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"TagOptionDetail": tagOptionDetail(t)})
+}
+
+func handleListTagOptions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	filters := getMap(req, "Filters")
+	var key, value string
+	var active *bool
+	if filters != nil {
+		key = getStr(filters, "Key")
+		value = getStr(filters, "Value")
+		active = getBoolPtr(filters, "Active")
+	}
+	list := store.ListTagOptions(key, value, active)
+	out := make([]map[string]any, 0, len(list))
+	for _, t := range list {
+		out = append(out, tagOptionDetail(t))
+	}
+	return jsonOK(map[string]any{"TagOptionDetails": out})
 }
 
 func handleUpdateTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UpdateTagOptionInput
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UpdateTagOption business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UpdateTagOption"})
+	t, err := store.UpdateTagOption(
+		getStr(req, "Id"),
+		getStrPtr(req, "Value"),
+		getBoolPtr(req, "Active"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"TagOptionDetail": tagOptionDetail(t)})
 }
 
+func handleAssociateTagOptionWithResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AssociateTagOption(getStr(req, "ResourceId"), getStr(req, "TagOptionId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDisassociateTagOptionFromResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DisassociateTagOption(getStr(req, "ResourceId"), getStr(req, "TagOptionId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListResourcesForTagOption(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	resources := store.ListResourcesForTagOption(getStr(req, "TagOptionId"))
+	out := make([]map[string]any, 0, len(resources))
+	for _, id := range resources {
+		out = append(out, map[string]any{
+			"Id":          id,
+			"Name":        id,
+			"Description": "",
+			"CreatedTime": rfc3339(time.Now().UTC()),
+		})
+	}
+	return jsonOK(map[string]any{"ResourceDetails": out})
+}
+
+// ── Portfolio ↔ Product association handlers ───────────────────────────────
+
+func handleAssociateProductWithPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AssociateProductWithPortfolio(getStr(req, "PortfolioId"), getStr(req, "ProductId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDisassociateProductFromPortfolio(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DisassociateProductFromPortfolio(getStr(req, "PortfolioId"), getStr(req, "ProductId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Service action association handlers ────────────────────────────────────
+
+func handleAssociateServiceActionWithProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AssociateServiceActionWithArtifact(
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStr(req, "ServiceActionId"),
+	); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDisassociateServiceActionFromProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DisassociateServiceActionFromArtifact(
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStr(req, "ServiceActionId"),
+	); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleBatchAssociateServiceActionWithProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	failed := make([]map[string]any, 0)
+	for _, assoc := range getMapList(req, "ServiceActionAssociations") {
+		err := store.AssociateServiceActionWithArtifact(
+			getStr(assoc, "ProductId"),
+			getStr(assoc, "ProvisioningArtifactId"),
+			getStr(assoc, "ServiceActionId"),
+		)
+		if err != nil {
+			failed = append(failed, map[string]any{
+				"ServiceActionId":         getStr(assoc, "ServiceActionId"),
+				"ProductId":               getStr(assoc, "ProductId"),
+				"ProvisioningArtifactId":  getStr(assoc, "ProvisioningArtifactId"),
+				"ErrorCode":               err.Code,
+				"ErrorMessage":            err.Message,
+			})
+		}
+	}
+	return jsonOK(map[string]any{"FailedServiceActionAssociations": failed})
+}
+
+func handleBatchDisassociateServiceActionFromProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	failed := make([]map[string]any, 0)
+	for _, assoc := range getMapList(req, "ServiceActionAssociations") {
+		_ = store.DisassociateServiceActionFromArtifact(
+			getStr(assoc, "ProductId"),
+			getStr(assoc, "ProvisioningArtifactId"),
+			getStr(assoc, "ServiceActionId"),
+		)
+	}
+	return jsonOK(map[string]any{"FailedServiceActionAssociations": failed})
+}
+
+func handleListServiceActionsForProvisioningArtifact(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListServiceActionsForArtifact(getStr(req, "ProductId"), getStr(req, "ProvisioningArtifactId"))
+	out := make([]map[string]any, 0, len(list))
+	for _, sa := range list {
+		out = append(out, map[string]any{
+			"Id":             sa.Id,
+			"Name":           sa.Name,
+			"Description":    sa.Description,
+			"DefinitionType": sa.DefinitionType,
+		})
+	}
+	return jsonOK(map[string]any{"ServiceActionSummaries": out})
+}
+
+func handleListProvisioningArtifactsForServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pas := store.ListArtifactsForServiceAction(getStr(req, "ServiceActionId"))
+	out := make([]map[string]any, 0, len(pas))
+	for _, pa := range pas {
+		out = append(out, map[string]any{
+			"ProductViewSummary":   map[string]any{"ProductId": pa.ProductId},
+			"ProvisioningArtifact": provisioningArtifactDetail(pa),
+		})
+	}
+	return jsonOK(map[string]any{"ProvisioningArtifactViews": out})
+}
+
+// ── Service action handlers ────────────────────────────────────────────────
+
+func handleCreateServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	sa, err := store.CreateServiceAction(
+		getStr(req, "Name"),
+		getStr(req, "DefinitionType"),
+		getStrMap(req, "Definition"),
+		getStr(req, "Description"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ServiceActionDetail": serviceActionDetail(sa)})
+}
+
+func handleDeleteServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeleteServiceAction(getStr(req, "Id")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	sa, err := store.GetServiceAction(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ServiceActionDetail": serviceActionDetail(sa)})
+}
+
+func handleDescribeServiceActionExecutionParameters(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	return jsonOK(map[string]any{"ServiceActionParameters": []any{}})
+}
+
+func handleListServiceActions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListServiceActions()
+	out := make([]map[string]any, 0, len(list))
+	for _, sa := range list {
+		out = append(out, map[string]any{
+			"Id":             sa.Id,
+			"Name":           sa.Name,
+			"Description":    sa.Description,
+			"DefinitionType": sa.DefinitionType,
+		})
+	}
+	return jsonOK(map[string]any{"ServiceActionSummaries": out})
+}
+
+func handleUpdateServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	sa, err := store.UpdateServiceAction(
+		getStr(req, "Id"),
+		getStrPtr(req, "Name"),
+		getStrPtr(req, "Description"),
+		getStrMap(req, "Definition"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"ServiceActionDetail": serviceActionDetail(sa)})
+}
+
+// ── Provisioned product handlers ───────────────────────────────────────────
+
+func handleProvisionProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pp, rec, err := store.ProvisionProduct(
+		getStr(req, "ProvisionedProductName"),
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStr(req, "PathId"),
+		getStr(req, "ProvisionToken"),
+		parseTagList(req, "Tags"),
+		"arn:aws:iam::"+store.accountID+":user/cloudmock",
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	_ = pp
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+func handleUpdateProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "ProvisionedProductId")
+	if id == "" {
+		id = getStr(req, "ProvisionedProductName")
+	}
+	_, rec, err := store.UpdateProvisionedProduct(
+		id,
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStr(req, "PathId"),
+		parseTagList(req, "Tags"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+func handleTerminateProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "ProvisionedProductId")
+	if id == "" {
+		id = getStr(req, "ProvisionedProductName")
+	}
+	rec, err := store.TerminateProvisionedProduct(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+func handleDescribeProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "Id")
+	if id == "" {
+		id = getStr(req, "Name")
+	}
+	pp, err := store.GetProvisionedProduct(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisionedProductDetail": provisionedProductDetail(pp),
+		"CloudWatchDashboards":     []any{},
+	})
+}
+
+func handleScanProvisionedProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListProvisionedProducts()
+	out := make([]map[string]any, 0, len(list))
+	for _, pp := range list {
+		out = append(out, provisionedProductDetail(pp))
+	}
+	return jsonOK(map[string]any{"ProvisionedProducts": out})
+}
+
+func handleSearchProvisionedProducts(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	list := store.ListProvisionedProducts()
+	out := make([]map[string]any, 0, len(list))
+	for _, pp := range list {
+		out = append(out, provisionedProductAttribute(pp))
+	}
+	return jsonOK(map[string]any{
+		"ProvisionedProducts": out,
+		"TotalResultsCount":   len(out),
+	})
+}
+
+func handleListLaunchPaths(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	productID := getStr(req, "ProductId")
+	if _, err := store.GetProduct(productID); err != nil {
+		return jsonErr(err)
+	}
+	portfolios := store.ListPortfoliosForProduct(productID)
+	paths := make([]map[string]any, 0, len(portfolios))
+	for _, p := range portfolios {
+		paths = append(paths, map[string]any{
+			"Id":          "lpv-" + p.Id,
+			"Name":        p.DisplayName,
+			"ConstraintSummaries": []any{},
+			"Tags":        []any{},
+		})
+	}
+	return jsonOK(map[string]any{"LaunchPathSummaries": paths})
+}
+
+func handleDescribeRecord(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	r, err := store.GetRecord(getStr(req, "Id"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"RecordDetail":  recordDetail(r),
+		"RecordOutputs": []any{},
+	})
+}
+
+func handleListRecordHistory(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	var ppID, ppName string
+	if filt := getMap(req, "SearchFilter"); filt != nil {
+		key := getStr(filt, "Key")
+		val := getStr(filt, "Value")
+		if key == "provisionedproduct" {
+			ppName = val
+		} else if key == "provisionedproductid" {
+			ppID = val
+		}
+	}
+	records := store.ListRecords(ppID, ppName)
+	out := make([]map[string]any, 0, len(records))
+	for _, r := range records {
+		out = append(out, recordDetail(r))
+	}
+	return jsonOK(map[string]any{"RecordDetails": out})
+}
+
+func handleGetProvisionedProductOutputs(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "ProvisionedProductId")
+	if id == "" {
+		id = getStr(req, "ProvisionedProductName")
+	}
+	pp, err := store.GetProvisionedProduct(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	outputs := pp.Outputs
+	if outputs == nil {
+		outputs = []map[string]any{}
+	}
+	return jsonOK(map[string]any{"Outputs": outputs})
+}
+
+func handleExecuteProvisionedProductServiceAction(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pp, err := store.GetProvisionedProduct(getStr(req, "ProvisionedProductId"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	if _, err := store.GetServiceAction(getStr(req, "ServiceActionId")); err != nil {
+		return jsonErr(err)
+	}
+	rec := &StoredRecord{
+		Id:                     newID("rec"),
+		ProvisionedProductName: pp.Name,
+		ProvisionedProductType: pp.Type,
+		RecordType:             "EXECUTE_PROVISIONED_PRODUCT_SERVICE_ACTION",
+		ProvisionedProductId:   pp.Id,
+		Status:                 "SUCCEEDED",
+		CreatedTime:             time.Now().UTC(),
+		UpdatedTime:             time.Now().UTC(),
+	}
+	store.mu.Lock()
+	store.records[rec.Id] = rec
+	store.mu.Unlock()
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+func handleNotifyProvisionProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	_ = req
+	return jsonOK(map[string]any{})
+}
+
+func handleNotifyTerminateProvisionedProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	_ = req
+	return jsonOK(map[string]any{})
+}
+
+func handleNotifyUpdateProvisionedProductEngineWorkflowResult(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	_ = req
+	return jsonOK(map[string]any{})
+}
+
+func handleUpdateProvisionedProductProperties(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pp, recordID, err := store.UpdateProvisionedProductProperties(
+		getStr(req, "ProvisionedProductId"),
+		getMap(req, "ProvisionedProductProperties"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisionedProductId":         pp.Id,
+		"ProvisionedProductProperties": getMap(req, "ProvisionedProductProperties"),
+		"RecordId":                     recordID,
+		"Status":                       "SUCCEEDED",
+	})
+}
+
+func handleImportAsProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	pp, rec, err := store.ProvisionProduct(
+		getStr(req, "ProvisionedProductName"),
+		getStr(req, "ProductId"),
+		getStr(req, "ProvisioningArtifactId"),
+		"",
+		getStr(req, "IdempotencyToken"),
+		nil,
+		"arn:aws:iam::"+store.accountID+":user/cloudmock",
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	pp.Type = "CFN_STACK"
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+// ── Plan handlers ──────────────────────────────────────────────────────────
+
+func handleCreateProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	p, err := store.CreatePlan(
+		getStr(req, "PlanName"),
+		getStr(req, "PlanType"),
+		getStr(req, "ProductId"),
+		getStr(req, "PathId"),
+		getStr(req, "ProvisioningArtifactId"),
+		getStr(req, "ProvisionedProductName"),
+		getMapList(req, "ProvisioningParameters"),
+		getStrList(req, "NotificationArns"),
+		parseTagList(req, "Tags"),
+	)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"PlanName":               p.Name,
+		"PlanId":                 p.Id,
+		"ProvisionProductId":     p.ProductId,
+		"ProvisionedProductName": p.ProvisionedProductName,
+		"ProvisioningArtifactId": p.ProvisioningArtifactId,
+	})
+}
+
+func handleDeleteProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DeletePlan(getStr(req, "PlanId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDescribeProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	p, err := store.GetPlan(getStr(req, "PlanId"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisionedProductPlanDetails": planDetail(p),
+		"ResourceChanges":               []any{},
+	})
+}
+
+func handleListProvisionedProductPlans(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	list := store.ListPlans(getStr(req, "ProvisionProductId"))
+	out := make([]map[string]any, 0, len(list))
+	for _, p := range list {
+		out = append(out, planSummary(p))
+	}
+	return jsonOK(map[string]any{"ProvisionedProductPlans": out})
+}
+
+func handleExecuteProvisionedProductPlan(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.ExecutePlan(getStr(req, "PlanId")); err != nil {
+		return jsonErr(err)
+	}
+	rec := &StoredRecord{
+		Id:          newID("rec"),
+		Status:      "SUCCEEDED",
+		RecordType:  "EXECUTE_PROVISIONED_PRODUCT_PLAN",
+		CreatedTime: time.Now().UTC(),
+		UpdatedTime: time.Now().UTC(),
+	}
+	store.mu.Lock()
+	store.records[rec.Id] = rec
+	store.mu.Unlock()
+	return jsonOK(map[string]any{"RecordDetail": recordDetail(rec)})
+}
+
+// ── Budget handlers ────────────────────────────────────────────────────────
+
+func handleAssociateBudgetWithResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.AssociateBudget(getStr(req, "BudgetName"), getStr(req, "ResourceId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDisassociateBudgetFromResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	if err := store.DisassociateBudget(getStr(req, "BudgetName"), getStr(req, "ResourceId")); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleListBudgetsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	budgets := store.ListBudgetsForResource(getStr(req, "ResourceId"))
+	out := make([]map[string]any, 0, len(budgets))
+	for _, b := range budgets {
+		out = append(out, map[string]any{"BudgetName": b})
+	}
+	return jsonOK(map[string]any{"Budgets": out})
+}
+
+// ── AWS Organizations access ───────────────────────────────────────────────
+
+func handleEnableAWSOrganizationsAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	store.SetAWSOrganizationsAccess("ENABLED")
+	return jsonOK(map[string]any{})
+}
+
+func handleDisableAWSOrganizationsAccess(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	store.SetAWSOrganizationsAccess("DISABLED")
+	return jsonOK(map[string]any{})
+}
+
+func handleGetAWSOrganizationsAccessStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	return jsonOK(map[string]any{"AccessStatus": store.GetAWSOrganizationsAccess()})
+}
+
+// ── Copy product ───────────────────────────────────────────────────────────
+
+func handleCopyProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	source := getStr(req, "SourceProductArn")
+	if source == "" {
+		return jsonErr(errInvalidParam("SourceProductArn is required"))
+	}
+	target := getStr(req, "TargetProductId")
+	token := store.StartCopyProduct(source, target)
+	return jsonOK(map[string]any{"CopyProductToken": token})
+}
+
+func handleDescribeCopyProductStatus(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	op, err := store.GetCopyOperation(getStr(req, "CopyProductToken"))
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"CopyProductStatus": op.Status,
+		"StatusDetail":      op.StatusDetail,
+		"TargetProductId":   op.TargetProductId,
+	})
+}
+
+// ── DescribeProvisioningParameters ─────────────────────────────────────────
+
+func handleDescribeProvisioningParameters(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	productID := getStr(req, "ProductId")
+	if productID == "" {
+		productID = getStr(req, "ProductName")
+		if productID != "" {
+			if p, err := store.GetProductByName(productID); err == nil {
+				productID = p.Id
+			}
+		}
+	}
+	if _, err := store.GetProduct(productID); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{
+		"ProvisioningArtifactParameters":     []any{},
+		"ConstraintSummaries":                 []any{},
+		"UsageInstructions":                   []any{},
+		"TagOptions":                          []any{},
+		"ProvisioningArtifactPreferences":     map[string]any{},
+		"ProvisioningArtifactOutputs":         []any{},
+		"ProvisioningArtifactOutputKeys":      []any{},
+	})
+}
+
+// ── ListStackInstancesForProvisionedProduct ────────────────────────────────
+
+func handleListStackInstancesForProvisionedProduct(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "ProvisionedProductId")
+	if _, err := store.GetProvisionedProduct(id); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{"StackInstances": []any{}})
+}

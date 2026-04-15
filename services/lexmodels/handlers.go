@@ -1,834 +1,15 @@
 package lexmodels
 
 import (
-	gojson "github.com/goccy/go-json"
 	"net/http"
 	"time"
+
+	gojson "github.com/goccy/go-json"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
 
-// ── Generated request/response types ─────────────────────────────────────────
-
-type BotAliasMetadata struct {
-	BotName *string `json:"botName,omitempty"`
-	BotVersion *string `json:"botVersion,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ConversationLogs *ConversationLogsResponse `json:"conversationLogs,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-}
-
-type BotChannelAssociation struct {
-	BotAlias *string `json:"botAlias,omitempty"`
-	BotConfiguration map[string]string `json:"botConfiguration,omitempty"`
-	BotName *string `json:"botName,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Type *string `json:"type,omitempty"`
-}
-
-type BotMetadata struct {
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type BuiltinIntentMetadata struct {
-	Signature *string `json:"signature,omitempty"`
-	SupportedLocales []string `json:"supportedLocales,omitempty"`
-}
-
-type BuiltinIntentSlot struct {
-	Name *string `json:"name,omitempty"`
-}
-
-type BuiltinSlotTypeMetadata struct {
-	Signature *string `json:"signature,omitempty"`
-	SupportedLocales []string `json:"supportedLocales,omitempty"`
-}
-
-type CodeHook struct {
-	MessageVersion string `json:"messageVersion,omitempty"`
-	Uri string `json:"uri,omitempty"`
-}
-
-type ConversationLogsRequest struct {
-	IamRoleArn string `json:"iamRoleArn,omitempty"`
-	LogSettings []LogSettingsRequest `json:"logSettings,omitempty"`
-}
-
-type ConversationLogsResponse struct {
-	IamRoleArn *string `json:"iamRoleArn,omitempty"`
-	LogSettings []LogSettingsResponse `json:"logSettings,omitempty"`
-}
-
-type CreateBotVersionRequest struct {
-	Checksum *string `json:"checksum,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type CreateBotVersionResponse struct {
-	AbortStatement *Statement `json:"abortStatement,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ChildDirected bool `json:"childDirected,omitempty"`
-	ClarificationPrompt *Prompt `json:"clarificationPrompt,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DetectSentiment bool `json:"detectSentiment,omitempty"`
-	EnableModelImprovements bool `json:"enableModelImprovements,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	IdleSessionTTLInSeconds int `json:"idleSessionTTLInSeconds,omitempty"`
-	Intents []Intent `json:"intents,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Locale *string `json:"locale,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Version *string `json:"version,omitempty"`
-	VoiceId *string `json:"voiceId,omitempty"`
-}
-
-type CreateIntentVersionRequest struct {
-	Checksum *string `json:"checksum,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type CreateIntentVersionResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	ConclusionStatement *Statement `json:"conclusionStatement,omitempty"`
-	ConfirmationPrompt *Prompt `json:"confirmationPrompt,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DialogCodeHook *CodeHook `json:"dialogCodeHook,omitempty"`
-	FollowUpPrompt *FollowUpPrompt `json:"followUpPrompt,omitempty"`
-	FulfillmentActivity *FulfillmentActivity `json:"fulfillmentActivity,omitempty"`
-	InputContexts []InputContext `json:"inputContexts,omitempty"`
-	KendraConfiguration *KendraConfiguration `json:"kendraConfiguration,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	OutputContexts []OutputContext `json:"outputContexts,omitempty"`
-	ParentIntentSignature *string `json:"parentIntentSignature,omitempty"`
-	RejectionStatement *Statement `json:"rejectionStatement,omitempty"`
-	SampleUtterances []string `json:"sampleUtterances,omitempty"`
-	Slots []Slot `json:"slots,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type CreateSlotTypeVersionRequest struct {
-	Checksum *string `json:"checksum,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type CreateSlotTypeVersionResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	EnumerationValues []EnumerationValue `json:"enumerationValues,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ParentSlotTypeSignature *string `json:"parentSlotTypeSignature,omitempty"`
-	SlotTypeConfigurations []SlotTypeConfiguration `json:"slotTypeConfigurations,omitempty"`
-	ValueSelectionStrategy *string `json:"valueSelectionStrategy,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type DeleteBotAliasRequest struct {
-	BotName string `json:"botName,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type DeleteBotChannelAssociationRequest struct {
-	BotAlias string `json:"aliasName,omitempty"`
-	BotName string `json:"botName,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type DeleteBotRequest struct {
-	Name string `json:"name,omitempty"`
-}
-
-type DeleteBotVersionRequest struct {
-	Name string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type DeleteIntentRequest struct {
-	Name string `json:"name,omitempty"`
-}
-
-type DeleteIntentVersionRequest struct {
-	Name string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type DeleteSlotTypeRequest struct {
-	Name string `json:"name,omitempty"`
-}
-
-type DeleteSlotTypeVersionRequest struct {
-	Name string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type DeleteUtterancesRequest struct {
-	BotName string `json:"botName,omitempty"`
-	UserId string `json:"userId,omitempty"`
-}
-
-type EnumerationValue struct {
-	Synonyms []string `json:"synonyms,omitempty"`
-	Value string `json:"value,omitempty"`
-}
-
-type FollowUpPrompt struct {
-	Prompt Prompt `json:"prompt,omitempty"`
-	RejectionStatement Statement `json:"rejectionStatement,omitempty"`
-}
-
-type FulfillmentActivity struct {
-	CodeHook *CodeHook `json:"codeHook,omitempty"`
-	Type string `json:"type,omitempty"`
-}
-
-type GetBotAliasRequest struct {
-	BotName string `json:"botName,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type GetBotAliasResponse struct {
-	BotName *string `json:"botName,omitempty"`
-	BotVersion *string `json:"botVersion,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ConversationLogs *ConversationLogsResponse `json:"conversationLogs,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-}
-
-type GetBotAliasesRequest struct {
-	BotName string `json:"botName,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NameContains *string `json:"nameContains,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotAliasesResponse struct {
-	BotAliases []BotAliasMetadata `json:"BotAliases,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotChannelAssociationRequest struct {
-	BotAlias string `json:"aliasName,omitempty"`
-	BotName string `json:"botName,omitempty"`
-	Name string `json:"name,omitempty"`
-}
-
-type GetBotChannelAssociationResponse struct {
-	BotAlias *string `json:"botAlias,omitempty"`
-	BotConfiguration map[string]string `json:"botConfiguration,omitempty"`
-	BotName *string `json:"botName,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Type *string `json:"type,omitempty"`
-}
-
-type GetBotChannelAssociationsRequest struct {
-	BotAlias string `json:"aliasName,omitempty"`
-	BotName string `json:"botName,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NameContains *string `json:"nameContains,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotChannelAssociationsResponse struct {
-	BotChannelAssociations []BotChannelAssociation `json:"botChannelAssociations,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotRequest struct {
-	Name string `json:"name,omitempty"`
-	VersionOrAlias string `json:"versionoralias,omitempty"`
-}
-
-type GetBotResponse struct {
-	AbortStatement *Statement `json:"abortStatement,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ChildDirected bool `json:"childDirected,omitempty"`
-	ClarificationPrompt *Prompt `json:"clarificationPrompt,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DetectSentiment bool `json:"detectSentiment,omitempty"`
-	EnableModelImprovements bool `json:"enableModelImprovements,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	IdleSessionTTLInSeconds int `json:"idleSessionTTLInSeconds,omitempty"`
-	Intents []Intent `json:"intents,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Locale *string `json:"locale,omitempty"`
-	Name *string `json:"name,omitempty"`
-	NluIntentConfidenceThreshold float64 `json:"nluIntentConfidenceThreshold,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Version *string `json:"version,omitempty"`
-	VoiceId *string `json:"voiceId,omitempty"`
-}
-
-type GetBotVersionsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	Name string `json:"name,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotVersionsResponse struct {
-	Bots []BotMetadata `json:"bots,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	NameContains *string `json:"nameContains,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBotsResponse struct {
-	Bots []BotMetadata `json:"bots,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBuiltinIntentRequest struct {
-	Signature string `json:"signature,omitempty"`
-}
-
-type GetBuiltinIntentResponse struct {
-	Signature *string `json:"signature,omitempty"`
-	Slots []BuiltinIntentSlot `json:"slots,omitempty"`
-	SupportedLocales []string `json:"supportedLocales,omitempty"`
-}
-
-type GetBuiltinIntentsRequest struct {
-	Locale *string `json:"locale,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-	SignatureContains *string `json:"signatureContains,omitempty"`
-}
-
-type GetBuiltinIntentsResponse struct {
-	Intents []BuiltinIntentMetadata `json:"intents,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetBuiltinSlotTypesRequest struct {
-	Locale *string `json:"locale,omitempty"`
-	MaxResults int `json:"maxResults,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-	SignatureContains *string `json:"signatureContains,omitempty"`
-}
-
-type GetBuiltinSlotTypesResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	SlotTypes []BuiltinSlotTypeMetadata `json:"slotTypes,omitempty"`
-}
-
-type GetExportRequest struct {
-	ExportType string `json:"exportType,omitempty"`
-	Name string `json:"name,omitempty"`
-	ResourceType string `json:"resourceType,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type GetExportResponse struct {
-	ExportStatus *string `json:"exportStatus,omitempty"`
-	ExportType *string `json:"exportType,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ResourceType *string `json:"resourceType,omitempty"`
-	Url *string `json:"url,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type GetImportRequest struct {
-	ImportId string `json:"importId,omitempty"`
-}
-
-type GetImportResponse struct {
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	FailureReason []string `json:"failureReason,omitempty"`
-	ImportId *string `json:"importId,omitempty"`
-	ImportStatus *string `json:"importStatus,omitempty"`
-	MergeStrategy *string `json:"mergeStrategy,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ResourceType *string `json:"resourceType,omitempty"`
-}
-
-type GetIntentRequest struct {
-	Name string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type GetIntentResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	ConclusionStatement *Statement `json:"conclusionStatement,omitempty"`
-	ConfirmationPrompt *Prompt `json:"confirmationPrompt,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DialogCodeHook *CodeHook `json:"dialogCodeHook,omitempty"`
-	FollowUpPrompt *FollowUpPrompt `json:"followUpPrompt,omitempty"`
-	FulfillmentActivity *FulfillmentActivity `json:"fulfillmentActivity,omitempty"`
-	InputContexts []InputContext `json:"inputContexts,omitempty"`
-	KendraConfiguration *KendraConfiguration `json:"kendraConfiguration,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	OutputContexts []OutputContext `json:"outputContexts,omitempty"`
-	ParentIntentSignature *string `json:"parentIntentSignature,omitempty"`
-	RejectionStatement *Statement `json:"rejectionStatement,omitempty"`
-	SampleUtterances []string `json:"sampleUtterances,omitempty"`
-	Slots []Slot `json:"slots,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type GetIntentVersionsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	Name string `json:"name,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetIntentVersionsResponse struct {
-	Intents []IntentMetadata `json:"intents,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetIntentsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	NameContains *string `json:"nameContains,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetIntentsResponse struct {
-	Intents []IntentMetadata `json:"intents,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetMigrationRequest struct {
-	MigrationId string `json:"migrationId,omitempty"`
-}
-
-type GetMigrationResponse struct {
-	Alerts []MigrationAlert `json:"alerts,omitempty"`
-	MigrationId *string `json:"migrationId,omitempty"`
-	MigrationStatus *string `json:"migrationStatus,omitempty"`
-	MigrationStrategy *string `json:"migrationStrategy,omitempty"`
-	MigrationTimestamp *time.Time `json:"migrationTimestamp,omitempty"`
-	V1BotLocale *string `json:"v1BotLocale,omitempty"`
-	V1BotName *string `json:"v1BotName,omitempty"`
-	V1BotVersion *string `json:"v1BotVersion,omitempty"`
-	V2BotId *string `json:"v2BotId,omitempty"`
-	V2BotRole *string `json:"v2BotRole,omitempty"`
-}
-
-type GetMigrationsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	MigrationStatusEquals *string `json:"migrationStatusEquals,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-	SortByAttribute *string `json:"sortByAttribute,omitempty"`
-	SortByOrder *string `json:"sortByOrder,omitempty"`
-	V1BotNameContains *string `json:"v1BotNameContains,omitempty"`
-}
-
-type GetMigrationsResponse struct {
-	MigrationSummaries []MigrationSummary `json:"migrationSummaries,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetSlotTypeRequest struct {
-	Name string `json:"name,omitempty"`
-	Version string `json:"version,omitempty"`
-}
-
-type GetSlotTypeResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	EnumerationValues []EnumerationValue `json:"enumerationValues,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ParentSlotTypeSignature *string `json:"parentSlotTypeSignature,omitempty"`
-	SlotTypeConfigurations []SlotTypeConfiguration `json:"slotTypeConfigurations,omitempty"`
-	ValueSelectionStrategy *string `json:"valueSelectionStrategy,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type GetSlotTypeVersionsRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	Name string `json:"name,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetSlotTypeVersionsResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	SlotTypes []SlotTypeMetadata `json:"slotTypes,omitempty"`
-}
-
-type GetSlotTypesRequest struct {
-	MaxResults int `json:"maxResults,omitempty"`
-	NameContains *string `json:"nameContains,omitempty"`
-	NextToken *string `json:"nextToken,omitempty"`
-}
-
-type GetSlotTypesResponse struct {
-	NextToken *string `json:"nextToken,omitempty"`
-	SlotTypes []SlotTypeMetadata `json:"slotTypes,omitempty"`
-}
-
-type GetUtterancesViewRequest struct {
-	BotName string `json:"botname,omitempty"`
-	BotVersions []string `json:"bot_versions,omitempty"`
-	StatusType string `json:"status_type,omitempty"`
-}
-
-type GetUtterancesViewResponse struct {
-	BotName *string `json:"botName,omitempty"`
-	Utterances []UtteranceList `json:"utterances,omitempty"`
-}
-
-type InputContext struct {
-	Name string `json:"name,omitempty"`
-}
-
-type Intent struct {
-	IntentName string `json:"intentName,omitempty"`
-	IntentVersion string `json:"intentVersion,omitempty"`
-}
-
-type IntentMetadata struct {
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type KendraConfiguration struct {
-	KendraIndex string `json:"kendraIndex,omitempty"`
-	QueryFilterString *string `json:"queryFilterString,omitempty"`
-	Role string `json:"role,omitempty"`
-}
-
-type ListTagsForResourceRequest struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type ListTagsForResourceResponse struct {
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type LogSettingsRequest struct {
-	Destination string `json:"destination,omitempty"`
-	KmsKeyArn *string `json:"kmsKeyArn,omitempty"`
-	LogType string `json:"logType,omitempty"`
-	ResourceArn string `json:"resourceArn,omitempty"`
-}
-
-type LogSettingsResponse struct {
-	Destination *string `json:"destination,omitempty"`
-	KmsKeyArn *string `json:"kmsKeyArn,omitempty"`
-	LogType *string `json:"logType,omitempty"`
-	ResourceArn *string `json:"resourceArn,omitempty"`
-	ResourcePrefix *string `json:"resourcePrefix,omitempty"`
-}
-
-type Message struct {
-	Content string `json:"content,omitempty"`
-	ContentType string `json:"contentType,omitempty"`
-	GroupNumber int `json:"groupNumber,omitempty"`
-}
-
-type MigrationAlert struct {
-	Details []string `json:"details,omitempty"`
-	Message *string `json:"message,omitempty"`
-	ReferenceURLs []string `json:"referenceURLs,omitempty"`
-	Type *string `json:"type,omitempty"`
-}
-
-type MigrationSummary struct {
-	MigrationId *string `json:"migrationId,omitempty"`
-	MigrationStatus *string `json:"migrationStatus,omitempty"`
-	MigrationStrategy *string `json:"migrationStrategy,omitempty"`
-	MigrationTimestamp *time.Time `json:"migrationTimestamp,omitempty"`
-	V1BotLocale *string `json:"v1BotLocale,omitempty"`
-	V1BotName *string `json:"v1BotName,omitempty"`
-	V1BotVersion *string `json:"v1BotVersion,omitempty"`
-	V2BotId *string `json:"v2BotId,omitempty"`
-	V2BotRole *string `json:"v2BotRole,omitempty"`
-}
-
-type OutputContext struct {
-	Name string `json:"name,omitempty"`
-	TimeToLiveInSeconds int `json:"timeToLiveInSeconds,omitempty"`
-	TurnsToLive int `json:"turnsToLive,omitempty"`
-}
-
-type Prompt struct {
-	MaxAttempts int `json:"maxAttempts,omitempty"`
-	Messages []Message `json:"messages,omitempty"`
-	ResponseCard *string `json:"responseCard,omitempty"`
-}
-
-type PutBotAliasRequest struct {
-	BotName string `json:"botName,omitempty"`
-	BotVersion string `json:"botVersion,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ConversationLogs *ConversationLogsRequest `json:"conversationLogs,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Name string `json:"name,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type PutBotAliasResponse struct {
-	BotName *string `json:"botName,omitempty"`
-	BotVersion *string `json:"botVersion,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ConversationLogs *ConversationLogsResponse `json:"conversationLogs,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type PutBotRequest struct {
-	AbortStatement *Statement `json:"abortStatement,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ChildDirected bool `json:"childDirected,omitempty"`
-	ClarificationPrompt *Prompt `json:"clarificationPrompt,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DetectSentiment bool `json:"detectSentiment,omitempty"`
-	EnableModelImprovements bool `json:"enableModelImprovements,omitempty"`
-	IdleSessionTTLInSeconds int `json:"idleSessionTTLInSeconds,omitempty"`
-	Intents []Intent `json:"intents,omitempty"`
-	Locale string `json:"locale,omitempty"`
-	Name string `json:"name,omitempty"`
-	NluIntentConfidenceThreshold float64 `json:"nluIntentConfidenceThreshold,omitempty"`
-	ProcessBehavior *string `json:"processBehavior,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-	VoiceId *string `json:"voiceId,omitempty"`
-}
-
-type PutBotResponse struct {
-	AbortStatement *Statement `json:"abortStatement,omitempty"`
-	Checksum *string `json:"checksum,omitempty"`
-	ChildDirected bool `json:"childDirected,omitempty"`
-	ClarificationPrompt *Prompt `json:"clarificationPrompt,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DetectSentiment bool `json:"detectSentiment,omitempty"`
-	EnableModelImprovements bool `json:"enableModelImprovements,omitempty"`
-	FailureReason *string `json:"failureReason,omitempty"`
-	IdleSessionTTLInSeconds int `json:"idleSessionTTLInSeconds,omitempty"`
-	Intents []Intent `json:"intents,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Locale *string `json:"locale,omitempty"`
-	Name *string `json:"name,omitempty"`
-	NluIntentConfidenceThreshold float64 `json:"nluIntentConfidenceThreshold,omitempty"`
-	Status *string `json:"status,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-	Version *string `json:"version,omitempty"`
-	VoiceId *string `json:"voiceId,omitempty"`
-}
-
-type PutIntentRequest struct {
-	Checksum *string `json:"checksum,omitempty"`
-	ConclusionStatement *Statement `json:"conclusionStatement,omitempty"`
-	ConfirmationPrompt *Prompt `json:"confirmationPrompt,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DialogCodeHook *CodeHook `json:"dialogCodeHook,omitempty"`
-	FollowUpPrompt *FollowUpPrompt `json:"followUpPrompt,omitempty"`
-	FulfillmentActivity *FulfillmentActivity `json:"fulfillmentActivity,omitempty"`
-	InputContexts []InputContext `json:"inputContexts,omitempty"`
-	KendraConfiguration *KendraConfiguration `json:"kendraConfiguration,omitempty"`
-	Name string `json:"name,omitempty"`
-	OutputContexts []OutputContext `json:"outputContexts,omitempty"`
-	ParentIntentSignature *string `json:"parentIntentSignature,omitempty"`
-	RejectionStatement *Statement `json:"rejectionStatement,omitempty"`
-	SampleUtterances []string `json:"sampleUtterances,omitempty"`
-	Slots []Slot `json:"slots,omitempty"`
-}
-
-type PutIntentResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	ConclusionStatement *Statement `json:"conclusionStatement,omitempty"`
-	ConfirmationPrompt *Prompt `json:"confirmationPrompt,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	DialogCodeHook *CodeHook `json:"dialogCodeHook,omitempty"`
-	FollowUpPrompt *FollowUpPrompt `json:"followUpPrompt,omitempty"`
-	FulfillmentActivity *FulfillmentActivity `json:"fulfillmentActivity,omitempty"`
-	InputContexts []InputContext `json:"inputContexts,omitempty"`
-	KendraConfiguration *KendraConfiguration `json:"kendraConfiguration,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	OutputContexts []OutputContext `json:"outputContexts,omitempty"`
-	ParentIntentSignature *string `json:"parentIntentSignature,omitempty"`
-	RejectionStatement *Statement `json:"rejectionStatement,omitempty"`
-	SampleUtterances []string `json:"sampleUtterances,omitempty"`
-	Slots []Slot `json:"slots,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type PutSlotTypeRequest struct {
-	Checksum *string `json:"checksum,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	Description *string `json:"description,omitempty"`
-	EnumerationValues []EnumerationValue `json:"enumerationValues,omitempty"`
-	Name string `json:"name,omitempty"`
-	ParentSlotTypeSignature *string `json:"parentSlotTypeSignature,omitempty"`
-	SlotTypeConfigurations []SlotTypeConfiguration `json:"slotTypeConfigurations,omitempty"`
-	ValueSelectionStrategy *string `json:"valueSelectionStrategy,omitempty"`
-}
-
-type PutSlotTypeResponse struct {
-	Checksum *string `json:"checksum,omitempty"`
-	CreateVersion bool `json:"createVersion,omitempty"`
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	EnumerationValues []EnumerationValue `json:"enumerationValues,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ParentSlotTypeSignature *string `json:"parentSlotTypeSignature,omitempty"`
-	SlotTypeConfigurations []SlotTypeConfiguration `json:"slotTypeConfigurations,omitempty"`
-	ValueSelectionStrategy *string `json:"valueSelectionStrategy,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type Slot struct {
-	DefaultValueSpec *SlotDefaultValueSpec `json:"defaultValueSpec,omitempty"`
-	Description *string `json:"description,omitempty"`
-	Name string `json:"name,omitempty"`
-	ObfuscationSetting *string `json:"obfuscationSetting,omitempty"`
-	Priority int `json:"priority,omitempty"`
-	ResponseCard *string `json:"responseCard,omitempty"`
-	SampleUtterances []string `json:"sampleUtterances,omitempty"`
-	SlotConstraint string `json:"slotConstraint,omitempty"`
-	SlotType *string `json:"slotType,omitempty"`
-	SlotTypeVersion *string `json:"slotTypeVersion,omitempty"`
-	ValueElicitationPrompt *Prompt `json:"valueElicitationPrompt,omitempty"`
-}
-
-type SlotDefaultValue struct {
-	DefaultValue string `json:"defaultValue,omitempty"`
-}
-
-type SlotDefaultValueSpec struct {
-	DefaultValueList []SlotDefaultValue `json:"defaultValueList,omitempty"`
-}
-
-type SlotTypeConfiguration struct {
-	RegexConfiguration *SlotTypeRegexConfiguration `json:"regexConfiguration,omitempty"`
-}
-
-type SlotTypeMetadata struct {
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	Description *string `json:"description,omitempty"`
-	LastUpdatedDate *time.Time `json:"lastUpdatedDate,omitempty"`
-	Name *string `json:"name,omitempty"`
-	Version *string `json:"version,omitempty"`
-}
-
-type SlotTypeRegexConfiguration struct {
-	Pattern string `json:"pattern,omitempty"`
-}
-
-type StartImportRequest struct {
-	MergeStrategy string `json:"mergeStrategy,omitempty"`
-	Payload []byte `json:"payload,omitempty"`
-	ResourceType string `json:"resourceType,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type StartImportResponse struct {
-	CreatedDate *time.Time `json:"createdDate,omitempty"`
-	ImportId *string `json:"importId,omitempty"`
-	ImportStatus *string `json:"importStatus,omitempty"`
-	MergeStrategy *string `json:"mergeStrategy,omitempty"`
-	Name *string `json:"name,omitempty"`
-	ResourceType *string `json:"resourceType,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type StartMigrationRequest struct {
-	MigrationStrategy string `json:"migrationStrategy,omitempty"`
-	V1BotName string `json:"v1BotName,omitempty"`
-	V1BotVersion string `json:"v1BotVersion,omitempty"`
-	V2BotName string `json:"v2BotName,omitempty"`
-	V2BotRole string `json:"v2BotRole,omitempty"`
-}
-
-type StartMigrationResponse struct {
-	MigrationId *string `json:"migrationId,omitempty"`
-	MigrationStrategy *string `json:"migrationStrategy,omitempty"`
-	MigrationTimestamp *time.Time `json:"migrationTimestamp,omitempty"`
-	V1BotLocale *string `json:"v1BotLocale,omitempty"`
-	V1BotName *string `json:"v1BotName,omitempty"`
-	V1BotVersion *string `json:"v1BotVersion,omitempty"`
-	V2BotId *string `json:"v2BotId,omitempty"`
-	V2BotRole *string `json:"v2BotRole,omitempty"`
-}
-
-type Statement struct {
-	Messages []Message `json:"messages,omitempty"`
-	ResponseCard *string `json:"responseCard,omitempty"`
-}
-
-type Tag struct {
-	Key string `json:"key,omitempty"`
-	Value string `json:"value,omitempty"`
-}
-
-type TagResourceRequest struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-	Tags []Tag `json:"tags,omitempty"`
-}
-
-type TagResourceResponse struct {
-}
-
-type UntagResourceRequest struct {
-	ResourceArn string `json:"resourceArn,omitempty"`
-	TagKeys []string `json:"tagKeys,omitempty"`
-}
-
-type UntagResourceResponse struct {
-}
-
-type UtteranceData struct {
-	Count int `json:"count,omitempty"`
-	DistinctUsers int `json:"distinctUsers,omitempty"`
-	FirstUtteredDate *time.Time `json:"firstUtteredDate,omitempty"`
-	LastUtteredDate *time.Time `json:"lastUtteredDate,omitempty"`
-	UtteranceString *string `json:"utteranceString,omitempty"`
-}
-
-type UtteranceList struct {
-	BotVersion *string `json:"botVersion,omitempty"`
-	Utterances []UtteranceData `json:"utterances,omitempty"`
-}
-
-
-
-// ── Handler helpers ──────────────────────────────────────────────────────────
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 func jsonOK(body any) (*service.Response, error) {
 	return &service.Response{StatusCode: http.StatusOK, Body: body, Format: service.FormatJSON}, nil
@@ -843,389 +24,1265 @@ func parseJSON(body []byte, v any) *service.AWSError {
 		return nil
 	}
 	if err := gojson.Unmarshal(body, v); err != nil {
-		return service.NewAWSError("InvalidParameterException",
+		return service.NewAWSError("BadRequestException",
 			"Request body is not valid JSON.", http.StatusBadRequest)
 	}
 	return nil
 }
 
-// ── Handlers ─────────────────────────────────────────────────────────────────
+func getStr(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func getInt(m map[string]any, key string) int {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return int(n)
+		case int:
+			return n
+		}
+	}
+	return 0
+}
+
+func getFloat(m map[string]any, key string) float64 {
+	if v, ok := m[key]; ok {
+		switch n := v.(type) {
+		case float64:
+			return n
+		case int:
+			return float64(n)
+		}
+	}
+	return 0
+}
+
+func getBool(m map[string]any, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func getMap(m map[string]any, key string) map[string]any {
+	if v, ok := m[key]; ok {
+		if mm, ok := v.(map[string]any); ok {
+			return mm
+		}
+	}
+	return nil
+}
+
+func getMapList(m map[string]any, key string) []map[string]any {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]map[string]any, 0, len(arr))
+	for _, x := range arr {
+		if xm, ok := x.(map[string]any); ok {
+			out = append(out, xm)
+		}
+	}
+	return out
+}
+
+func getStrList(m map[string]any, key string) []string {
+	v, ok := m[key]
+	if !ok {
+		return nil
+	}
+	arr, ok := v.([]any)
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(arr))
+	for _, x := range arr {
+		if s, ok := x.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// parseTagList accepts either Lex's flat {tagKey,tagValue} or the more common
+// {key,value} schema, returning a flat map.
+func parseTagList(m map[string]any, key string) map[string]string {
+	out := make(map[string]string)
+	for _, t := range getMapList(m, key) {
+		k := getStr(t, "key")
+		if k == "" {
+			k = getStr(t, "Key")
+		}
+		v := getStr(t, "value")
+		if v == "" {
+			v = getStr(t, "Value")
+		}
+		if k != "" {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+func tagListToMaps(tags map[string]string) []map[string]any {
+	out := make([]map[string]any, 0, len(tags))
+	for k, v := range tags {
+		out = append(out, map[string]any{"key": k, "value": v})
+	}
+	return out
+}
+
+// rfc3339 formats a time as Lex's documented createdDate / lastUpdatedDate.
+func rfc3339(t time.Time) string { return t.Format(time.RFC3339) }
+
+// pathParam pulls /v1/.../{name} segments from the request URL when present.
+// Lex Models V1 uses REST bindings, but real SDK clients usually send JSON.
+// We support both shapes by falling back to the body.
+func pathParam(ctx *service.RequestContext, key string) string {
+	if ctx == nil || ctx.Params == nil {
+		return ""
+	}
+	return ctx.Params[key]
+}
+
+// ── Bot response shaping ─────────────────────────────────────────────────────
+
+func botToMap(b *StoredBot) map[string]any {
+	out := map[string]any{
+		"name":                         b.Name,
+		"version":                      b.Version,
+		"description":                  b.Description,
+		"locale":                       b.Locale,
+		"status":                       b.Status,
+		"checksum":                     b.Checksum,
+		"createdDate":                  rfc3339(b.CreatedAt),
+		"lastUpdatedDate":              rfc3339(b.LastUpdatedAt),
+		"idleSessionTTLInSeconds":      b.IdleSessionTTLInSeconds,
+		"childDirected":                b.ChildDirected,
+		"detectSentiment":              b.DetectSentiment,
+		"enableModelImprovements":      b.EnableModelImprovements,
+		"nluIntentConfidenceThreshold": b.NluIntentConfidenceThreshold,
+		"intents":                      b.Intents,
+	}
+	if b.VoiceID != "" {
+		out["voiceId"] = b.VoiceID
+	}
+	if b.FailureReason != "" {
+		out["failureReason"] = b.FailureReason
+	}
+	if b.ClarificationPrompt != nil {
+		out["clarificationPrompt"] = b.ClarificationPrompt
+	}
+	if b.AbortStatement != nil {
+		out["abortStatement"] = b.AbortStatement
+	}
+	return out
+}
+
+func botMetadata(b *StoredBot) map[string]any {
+	return map[string]any{
+		"name":            b.Name,
+		"version":         b.Version,
+		"description":     b.Description,
+		"status":          b.Status,
+		"createdDate":     rfc3339(b.CreatedAt),
+		"lastUpdatedDate": rfc3339(b.LastUpdatedAt),
+	}
+}
+
+func intentToMap(in *StoredIntent) map[string]any {
+	out := map[string]any{
+		"name":             in.Name,
+		"version":          in.Version,
+		"description":      in.Description,
+		"checksum":         in.Checksum,
+		"createdDate":      rfc3339(in.CreatedAt),
+		"lastUpdatedDate":  rfc3339(in.LastUpdatedAt),
+		"slots":            in.Slots,
+		"sampleUtterances": in.SampleUtterances,
+	}
+	if in.ParentIntentSignature != "" {
+		out["parentIntentSignature"] = in.ParentIntentSignature
+	}
+	if in.ConfirmationPrompt != nil {
+		out["confirmationPrompt"] = in.ConfirmationPrompt
+	}
+	if in.RejectionStatement != nil {
+		out["rejectionStatement"] = in.RejectionStatement
+	}
+	if in.FollowUpPrompt != nil {
+		out["followUpPrompt"] = in.FollowUpPrompt
+	}
+	if in.ConclusionStatement != nil {
+		out["conclusionStatement"] = in.ConclusionStatement
+	}
+	if in.DialogCodeHook != nil {
+		out["dialogCodeHook"] = in.DialogCodeHook
+	}
+	if in.FulfillmentActivity != nil {
+		out["fulfillmentActivity"] = in.FulfillmentActivity
+	}
+	if in.InputContexts != nil {
+		out["inputContexts"] = in.InputContexts
+	}
+	if in.OutputContexts != nil {
+		out["outputContexts"] = in.OutputContexts
+	}
+	if in.KendraConfiguration != nil {
+		out["kendraConfiguration"] = in.KendraConfiguration
+	}
+	return out
+}
+
+func intentMetadata(in *StoredIntent) map[string]any {
+	return map[string]any{
+		"name":            in.Name,
+		"version":         in.Version,
+		"description":     in.Description,
+		"createdDate":     rfc3339(in.CreatedAt),
+		"lastUpdatedDate": rfc3339(in.LastUpdatedAt),
+	}
+}
+
+func slotTypeToMap(st *StoredSlotType) map[string]any {
+	out := map[string]any{
+		"name":              st.Name,
+		"version":           st.Version,
+		"description":       st.Description,
+		"checksum":          st.Checksum,
+		"createdDate":       rfc3339(st.CreatedAt),
+		"lastUpdatedDate":   rfc3339(st.LastUpdatedAt),
+		"enumerationValues": st.EnumerationValues,
+	}
+	if st.ValueSelectionStrategy != "" {
+		out["valueSelectionStrategy"] = st.ValueSelectionStrategy
+	}
+	if st.ParentSlotTypeSignature != "" {
+		out["parentSlotTypeSignature"] = st.ParentSlotTypeSignature
+	}
+	if st.SlotTypeConfigurations != nil {
+		out["slotTypeConfigurations"] = st.SlotTypeConfigurations
+	}
+	return out
+}
+
+func slotTypeMetadata(st *StoredSlotType) map[string]any {
+	return map[string]any{
+		"name":            st.Name,
+		"version":         st.Version,
+		"description":     st.Description,
+		"createdDate":     rfc3339(st.CreatedAt),
+		"lastUpdatedDate": rfc3339(st.LastUpdatedAt),
+	}
+}
+
+func botAliasToMap(a *StoredBotAlias) map[string]any {
+	out := map[string]any{
+		"name":            a.Name,
+		"botName":         a.BotName,
+		"botVersion":      a.BotVersion,
+		"description":     a.Description,
+		"checksum":        a.Checksum,
+		"createdDate":     rfc3339(a.CreatedAt),
+		"lastUpdatedDate": rfc3339(a.LastUpdatedAt),
+	}
+	if a.ConversationLogs != nil {
+		out["conversationLogs"] = a.ConversationLogs
+	}
+	return out
+}
+
+func channelAssocToMap(c *StoredChannelAssoc) map[string]any {
+	out := map[string]any{
+		"name":             c.Name,
+		"botName":          c.BotName,
+		"botAlias":         c.BotAlias,
+		"description":      c.Description,
+		"type":             c.Type,
+		"status":           c.Status,
+		"botConfiguration": c.BotConfiguration,
+		"createdDate":      rfc3339(c.CreatedAt),
+	}
+	if c.FailureReason != "" {
+		out["failureReason"] = c.FailureReason
+	}
+	return out
+}
+
+func importToMap(i *StoredImport) map[string]any {
+	return map[string]any{
+		"importId":      i.ImportID,
+		"name":          i.Name,
+		"resourceType":  i.ResourceType,
+		"mergeStrategy": i.MergeStrategy,
+		"importStatus":  i.Status,
+		"failureReason": i.FailureReason,
+		"createdDate":   rfc3339(i.CreatedAt),
+	}
+}
+
+func migrationToMap(m *StoredMigration) map[string]any {
+	return map[string]any{
+		"migrationId":        m.MigrationID,
+		"migrationStatus":    m.Status,
+		"migrationStrategy":  m.MigrationStrategy,
+		"migrationTimestamp": rfc3339(m.StartedAt),
+		"v1BotName":          m.V1BotName,
+		"v1BotVersion":       m.V1BotVersion,
+		"v1BotLocale":        m.V1BotLocale,
+		"v2BotId":            m.V2BotID,
+		"v2BotRole":          m.V2BotRole,
+		"alerts":             m.Alerts,
+	}
+}
+
+// ── Builtin catalogue (returned by GetBuiltin*) ─────────────────────────────
+
+var builtinIntents = []map[string]any{
+	{"signature": "AMAZON.HelpIntent", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.CancelIntent", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.StopIntent", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.YesIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.NoIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.RepeatIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.StartOverIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.PauseIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.ResumeIntent", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.FallbackIntent", "supportedLocales": []string{"en-US"}},
+}
+
+var builtinSlotTypes = []map[string]any{
+	{"signature": "AMAZON.DATE", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.TIME", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.NUMBER", "supportedLocales": []string{"en-US", "en-GB", "en-AU"}},
+	{"signature": "AMAZON.US_FIRST_NAME", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.US_CITY", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.US_STATE", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.PhoneNumber", "supportedLocales": []string{"en-US"}},
+	{"signature": "AMAZON.Country", "supportedLocales": []string{"en-US", "en-GB"}},
+	{"signature": "AMAZON.AlphaNumeric", "supportedLocales": []string{"en-US"}},
+}
+
+func filterBuiltins(list []map[string]any, locale, contains string) []map[string]any {
+	out := make([]map[string]any, 0, len(list))
+	for _, item := range list {
+		if contains != "" {
+			sig := item["signature"].(string)
+			if !containsCaseInsensitive(sig, contains) {
+				continue
+			}
+		}
+		if locale != "" {
+			locales, _ := item["supportedLocales"].([]string)
+			if !containsStr(locales, locale) {
+				continue
+			}
+		}
+		out = append(out, item)
+	}
+	return out
+}
+
+func containsStr(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}
+
+func containsCaseInsensitive(haystack, needle string) bool {
+	return contains(toLower(haystack), toLower(needle))
+}
+
+func toLower(s string) string {
+	out := make([]byte, len(s))
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c >= 'A' && c <= 'Z' {
+			c += 'a' - 'A'
+		}
+		out[i] = c
+	}
+	return string(out)
+}
+
+// ── Bot handlers ─────────────────────────────────────────────────────────────
+
+func handlePutBot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	bot := &StoredBot{
+		Name:                         name,
+		Description:                  getStr(req, "description"),
+		Locale:                       getStr(req, "locale"),
+		VoiceID:                      getStr(req, "voiceId"),
+		ProcessBehavior:              getStr(req, "processBehavior"),
+		IdleSessionTTLInSeconds:      getInt(req, "idleSessionTTLInSeconds"),
+		NluIntentConfidenceThreshold: getFloat(req, "nluIntentConfidenceThreshold"),
+		ChildDirected:                getBool(req, "childDirected"),
+		DetectSentiment:              getBool(req, "detectSentiment"),
+		EnableModelImprovements:      getBool(req, "enableModelImprovements"),
+		CreateVersion:                getBool(req, "createVersion"),
+		Intents:                      getMapList(req, "intents"),
+		ClarificationPrompt:          getMap(req, "clarificationPrompt"),
+		AbortStatement:               getMap(req, "abortStatement"),
+	}
+	saved, err := store.PutBot(bot)
+	if err != nil {
+		return jsonErr(err)
+	}
+	if tags := parseTagList(req, "tags"); len(tags) > 0 {
+		store.TagResource(store.botArn(saved.Name), tags)
+	}
+	if saved.CreateVersion {
+		if _, vErr := store.CreateBotVersion(saved.Name); vErr != nil {
+			return jsonErr(vErr)
+		}
+	}
+	resp := botToMap(saved)
+	resp["createVersion"] = saved.CreateVersion
+	resp["tags"] = tagListToMaps(store.ListTags(store.botArn(saved.Name)))
+	return jsonOK(resp)
+}
 
 func handleCreateBotVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateBotVersionRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement CreateBotVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateBotVersion"})
-}
-
-func handleCreateIntentVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateIntentVersionRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
 	}
-	// TODO: implement CreateIntentVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateIntentVersion"})
-}
-
-func handleCreateSlotTypeVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req CreateSlotTypeVersionRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
 	}
-	// TODO: implement CreateSlotTypeVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "CreateSlotTypeVersion"})
-}
-
-func handleDeleteBot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteBotRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	bot, err := store.CreateBotVersion(name)
+	if err != nil {
+		return jsonErr(err)
 	}
-	// TODO: implement DeleteBot business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteBot"})
-}
-
-func handleDeleteBotAlias(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteBotAliasRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteBotAlias business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteBotAlias"})
-}
-
-func handleDeleteBotChannelAssociation(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteBotChannelAssociationRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteBotChannelAssociation business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteBotChannelAssociation"})
-}
-
-func handleDeleteBotVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteBotVersionRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteBotVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteBotVersion"})
-}
-
-func handleDeleteIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteIntentRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteIntent business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteIntent"})
-}
-
-func handleDeleteIntentVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteIntentVersionRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteIntentVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteIntentVersion"})
-}
-
-func handleDeleteSlotType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteSlotTypeRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteSlotType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteSlotType"})
-}
-
-func handleDeleteSlotTypeVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteSlotTypeVersionRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteSlotTypeVersion business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteSlotTypeVersion"})
-}
-
-func handleDeleteUtterances(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req DeleteUtterancesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
-	}
-	// TODO: implement DeleteUtterances business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "DeleteUtterances"})
+	return jsonOK(botToMap(bot))
 }
 
 func handleGetBot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetBot business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBot"})
-}
-
-func handleGetBotAlias(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotAliasRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
 	}
-	// TODO: implement GetBotAlias business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBotAlias"})
-}
-
-func handleGetBotAliases(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotAliasesRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	version := getStr(req, "versionoralias")
+	if version == "" {
+		version = getStr(req, "versionOrAlias")
 	}
-	// TODO: implement GetBotAliases business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBotAliases"})
-}
-
-func handleGetBotChannelAssociation(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotChannelAssociationRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if version == "" {
+		version = pathParam(ctx, "versionoralias")
 	}
-	// TODO: implement GetBotChannelAssociation business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBotChannelAssociation"})
-}
-
-func handleGetBotChannelAssociations(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotChannelAssociationsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if version == "" {
+		version = LatestVersion
 	}
-	// TODO: implement GetBotChannelAssociations business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBotChannelAssociations"})
-}
-
-func handleGetBotVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotVersionsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
 	}
-	// TODO: implement GetBotVersions business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBotVersions"})
+	bot, err := store.GetBot(name, version)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(botToMap(bot))
 }
 
 func handleGetBots(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBotsRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetBots business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBots"})
+	contains := getStr(req, "nameContains")
+	bots := store.ListBots(contains)
+	out := make([]map[string]any, 0, len(bots))
+	for _, b := range bots {
+		out = append(out, botMetadata(b))
+	}
+	return jsonOK(map[string]any{"bots": out})
 }
 
-func handleGetBuiltinIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBuiltinIntentRequest
+func handleGetBotVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetBuiltinIntent business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBuiltinIntent"})
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	versions, err := store.ListBotVersions(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	out := make([]map[string]any, 0, len(versions))
+	for _, b := range versions {
+		out = append(out, botMetadata(b))
+	}
+	return jsonOK(map[string]any{"bots": out})
 }
 
-func handleGetBuiltinIntents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBuiltinIntentsRequest
+func handleDeleteBot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetBuiltinIntents business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBuiltinIntents"})
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	if err := store.DeleteBot(name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
 }
 
-func handleGetBuiltinSlotTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetBuiltinSlotTypesRequest
+func handleDeleteBotVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetBuiltinSlotTypes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetBuiltinSlotTypes"})
+	name := getStr(req, "name")
+	version := getStr(req, "version")
+	if name == "" || version == "" {
+		return jsonErr(service.ErrValidation("name and version are required."))
+	}
+	if err := store.DeleteBotVersion(name, version); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
 }
 
-func handleGetExport(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetExportRequest
+// ── Intent handlers ──────────────────────────────────────────────────────────
+
+func handlePutIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetExport business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetExport"})
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	in := &StoredIntent{
+		Name:                  name,
+		Description:           getStr(req, "description"),
+		ParentIntentSignature: getStr(req, "parentIntentSignature"),
+		Slots:                 getMapList(req, "slots"),
+		SampleUtterances:      getStrList(req, "sampleUtterances"),
+		ConfirmationPrompt:    getMap(req, "confirmationPrompt"),
+		RejectionStatement:    getMap(req, "rejectionStatement"),
+		FollowUpPrompt:        getMap(req, "followUpPrompt"),
+		ConclusionStatement:   getMap(req, "conclusionStatement"),
+		DialogCodeHook:        getMap(req, "dialogCodeHook"),
+		FulfillmentActivity:   getMap(req, "fulfillmentActivity"),
+		InputContexts:         getMapList(req, "inputContexts"),
+		OutputContexts:        getMapList(req, "outputContexts"),
+		KendraConfiguration:   getMap(req, "kendraConfiguration"),
+	}
+	saved, err := store.PutIntent(in)
+	if err != nil {
+		return jsonErr(err)
+	}
+	createVersion := getBool(req, "createVersion")
+	if createVersion {
+		if _, vErr := store.CreateIntentVersion(saved.Name); vErr != nil {
+			return jsonErr(vErr)
+		}
+	}
+	resp := intentToMap(saved)
+	resp["createVersion"] = createVersion
+	return jsonOK(resp)
 }
 
-func handleGetImport(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetImportRequest
+func handleCreateIntentVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetImport business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetImport"})
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	in, err := store.CreateIntentVersion(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(intentToMap(in))
 }
 
 func handleGetIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetIntentRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetIntent business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetIntent"})
-}
-
-func handleGetIntentVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetIntentVersionsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
 	}
-	// TODO: implement GetIntentVersions business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetIntentVersions"})
+	version := getStr(req, "version")
+	if version == "" {
+		version = LatestVersion
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	in, err := store.GetIntent(name, version)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(intentToMap(in))
 }
 
 func handleGetIntents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetIntentsRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetIntents business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetIntents"})
+	intents := store.ListIntents(getStr(req, "nameContains"))
+	out := make([]map[string]any, 0, len(intents))
+	for _, in := range intents {
+		out = append(out, intentMetadata(in))
+	}
+	return jsonOK(map[string]any{"intents": out})
 }
 
-func handleGetMigration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetMigrationRequest
+func handleGetIntentVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetMigration business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetMigration"})
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	versions, err := store.ListIntentVersions(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	out := make([]map[string]any, 0, len(versions))
+	for _, in := range versions {
+		out = append(out, intentMetadata(in))
+	}
+	return jsonOK(map[string]any{"intents": out})
 }
 
-func handleGetMigrations(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetMigrationsRequest
+func handleDeleteIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetMigrations business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetMigrations"})
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	if err := store.DeleteIntent(name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+func handleDeleteIntentVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	version := getStr(req, "version")
+	if name == "" || version == "" {
+		return jsonErr(service.ErrValidation("name and version are required."))
+	}
+	if err := store.DeleteIntentVersion(name, version); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Slot type handlers ───────────────────────────────────────────────────────
+
+func handlePutSlotType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	if name == "" {
+		name = pathParam(ctx, "name")
+	}
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	st := &StoredSlotType{
+		Name:                    name,
+		Description:             getStr(req, "description"),
+		ValueSelectionStrategy:  getStr(req, "valueSelectionStrategy"),
+		ParentSlotTypeSignature: getStr(req, "parentSlotTypeSignature"),
+		EnumerationValues:       getMapList(req, "enumerationValues"),
+		SlotTypeConfigurations:  getMapList(req, "slotTypeConfigurations"),
+	}
+	saved, err := store.PutSlotType(st)
+	if err != nil {
+		return jsonErr(err)
+	}
+	createVersion := getBool(req, "createVersion")
+	if createVersion {
+		if _, vErr := store.CreateSlotTypeVersion(saved.Name); vErr != nil {
+			return jsonErr(vErr)
+		}
+	}
+	resp := slotTypeToMap(saved)
+	resp["createVersion"] = createVersion
+	return jsonOK(resp)
+}
+
+func handleCreateSlotTypeVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	st, err := store.CreateSlotTypeVersion(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(slotTypeToMap(st))
 }
 
 func handleGetSlotType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetSlotTypeRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetSlotType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetSlotType"})
-}
-
-func handleGetSlotTypeVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetSlotTypeVersionsRequest
-	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
-		return jsonErr(awsErr)
+	name := getStr(req, "name")
+	version := getStr(req, "version")
+	if version == "" {
+		version = LatestVersion
 	}
-	// TODO: implement GetSlotTypeVersions business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetSlotTypeVersions"})
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	st, err := store.GetSlotType(name, version)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(slotTypeToMap(st))
 }
 
 func handleGetSlotTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetSlotTypesRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetSlotTypes business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetSlotTypes"})
+	types := store.ListSlotTypes(getStr(req, "nameContains"))
+	out := make([]map[string]any, 0, len(types))
+	for _, st := range types {
+		out = append(out, slotTypeMetadata(st))
+	}
+	return jsonOK(map[string]any{"slotTypes": out})
 }
 
-func handleGetUtterancesView(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req GetUtterancesViewRequest
+func handleGetSlotTypeVersions(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement GetUtterancesView business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "GetUtterancesView"})
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	versions, err := store.ListSlotTypeVersions(name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	out := make([]map[string]any, 0, len(versions))
+	for _, st := range versions {
+		out = append(out, slotTypeMetadata(st))
+	}
+	return jsonOK(map[string]any{"slotTypes": out})
 }
 
-func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req ListTagsForResourceRequest
+func handleDeleteSlotType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement ListTagsForResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "ListTagsForResource"})
+	name := getStr(req, "name")
+	if name == "" {
+		return jsonErr(service.ErrValidation("name is required."))
+	}
+	if err := store.DeleteSlotType(name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
 }
 
-func handlePutBot(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req PutBotRequest
+func handleDeleteSlotTypeVersion(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement PutBot business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "PutBot"})
+	name := getStr(req, "name")
+	version := getStr(req, "version")
+	if name == "" || version == "" {
+		return jsonErr(service.ErrValidation("name and version are required."))
+	}
+	if err := store.DeleteSlotTypeVersion(name, version); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
 }
+
+// ── Bot alias handlers ───────────────────────────────────────────────────────
 
 func handlePutBotAlias(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req PutBotAliasRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement PutBotAlias business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "PutBotAlias"})
+	name := getStr(req, "name")
+	botName := getStr(req, "botName")
+	if name == "" || botName == "" {
+		return jsonErr(service.ErrValidation("name and botName are required."))
+	}
+	alias := &StoredBotAlias{
+		Name:             name,
+		BotName:          botName,
+		BotVersion:       getStr(req, "botVersion"),
+		Description:      getStr(req, "description"),
+		ConversationLogs: getMap(req, "conversationLogs"),
+	}
+	saved, err := store.PutBotAlias(alias)
+	if err != nil {
+		return jsonErr(err)
+	}
+	if tags := parseTagList(req, "tags"); len(tags) > 0 {
+		store.TagResource(store.botAliasArn(botName, name), tags)
+	}
+	resp := botAliasToMap(saved)
+	resp["tags"] = tagListToMaps(store.ListTags(store.botAliasArn(botName, name)))
+	return jsonOK(resp)
 }
 
-func handlePutIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req PutIntentRequest
+func handleGetBotAlias(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement PutIntent business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "PutIntent"})
+	name := getStr(req, "name")
+	botName := getStr(req, "botName")
+	if name == "" || botName == "" {
+		return jsonErr(service.ErrValidation("name and botName are required."))
+	}
+	alias, err := store.GetBotAlias(botName, name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(botAliasToMap(alias))
 }
 
-func handlePutSlotType(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req PutSlotTypeRequest
+func handleGetBotAliases(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement PutSlotType business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "PutSlotType"})
+	botName := getStr(req, "botName")
+	if botName == "" {
+		return jsonErr(service.ErrValidation("botName is required."))
+	}
+	aliases := store.ListBotAliases(botName, getStr(req, "nameContains"))
+	out := make([]map[string]any, 0, len(aliases))
+	for _, a := range aliases {
+		out = append(out, botAliasToMap(a))
+	}
+	return jsonOK(map[string]any{"BotAliases": out})
+}
+
+func handleDeleteBotAlias(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	botName := getStr(req, "botName")
+	if name == "" || botName == "" {
+		return jsonErr(service.ErrValidation("name and botName are required."))
+	}
+	if err := store.DeleteBotAlias(botName, name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Channel association handlers ─────────────────────────────────────────────
+
+func handleGetBotChannelAssociation(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	botName := getStr(req, "botName")
+	alias := getStr(req, "aliasName")
+	if alias == "" {
+		alias = getStr(req, "botAlias")
+	}
+	if name == "" || botName == "" || alias == "" {
+		return jsonErr(service.ErrValidation("name, botName, and aliasName are required."))
+	}
+	a, err := store.GetChannelAssoc(botName, alias, name)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(channelAssocToMap(a))
+}
+
+func handleGetBotChannelAssociations(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	botName := getStr(req, "botName")
+	alias := getStr(req, "aliasName")
+	if alias == "" {
+		alias = getStr(req, "botAlias")
+	}
+	if botName == "" || alias == "" {
+		return jsonErr(service.ErrValidation("botName and aliasName are required."))
+	}
+	list := store.ListChannelAssocs(botName, alias, getStr(req, "nameContains"))
+	out := make([]map[string]any, 0, len(list))
+	for _, a := range list {
+		out = append(out, channelAssocToMap(a))
+	}
+	return jsonOK(map[string]any{"botChannelAssociations": out})
+}
+
+func handleDeleteBotChannelAssociation(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	botName := getStr(req, "botName")
+	alias := getStr(req, "aliasName")
+	if alias == "" {
+		alias = getStr(req, "botAlias")
+	}
+	if name == "" || botName == "" || alias == "" {
+		return jsonErr(service.ErrValidation("name, botName, and aliasName are required."))
+	}
+	if err := store.DeleteChannelAssoc(botName, alias, name); err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(map[string]any{})
+}
+
+// ── Builtin / catalog handlers ───────────────────────────────────────────────
+
+func handleGetBuiltinIntent(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	signature := getStr(req, "signature")
+	if signature == "" {
+		return jsonErr(service.ErrValidation("signature is required."))
+	}
+	for _, b := range builtinIntents {
+		if b["signature"] == signature {
+			return jsonOK(map[string]any{
+				"signature":        signature,
+				"supportedLocales": b["supportedLocales"],
+				"slots":            []any{},
+			})
+		}
+	}
+	return jsonErr(service.NewAWSError("NotFoundException",
+		"Builtin intent not found: "+signature, 404))
+}
+
+func handleGetBuiltinIntents(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	out := filterBuiltins(builtinIntents, getStr(req, "locale"), getStr(req, "signatureContains"))
+	return jsonOK(map[string]any{"intents": out})
+}
+
+func handleGetBuiltinSlotTypes(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	out := filterBuiltins(builtinSlotTypes, getStr(req, "locale"), getStr(req, "signatureContains"))
+	return jsonOK(map[string]any{"slotTypes": out})
+}
+
+// ── Export / import / migration handlers ─────────────────────────────────────
+
+func handleGetExport(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	name := getStr(req, "name")
+	resourceType := getStr(req, "resourceType")
+	version := getStr(req, "version")
+	exportType := getStr(req, "exportType")
+	if name == "" || resourceType == "" || exportType == "" {
+		return jsonErr(service.ErrValidation("name, resourceType, and exportType are required."))
+	}
+	if version == "" {
+		version = LatestVersion
+	}
+	// Verify the resource exists. This mirrors real Lex which rejects exports
+	// for unknown resources rather than producing an empty payload.
+	switch resourceType {
+	case "BOT":
+		if _, err := store.GetBot(name, version); err != nil {
+			return jsonErr(err)
+		}
+	case "INTENT":
+		if _, err := store.GetIntent(name, version); err != nil {
+			return jsonErr(err)
+		}
+	case "SLOT_TYPE":
+		if _, err := store.GetSlotType(name, version); err != nil {
+			return jsonErr(err)
+		}
+	}
+	return jsonOK(map[string]any{
+		"name":         name,
+		"version":      version,
+		"resourceType": resourceType,
+		"exportType":   exportType,
+		"exportStatus": "READY",
+		"url":          "https://cloudmock.local/lex/exports/" + name + "/" + version,
+	})
 }
 
 func handleStartImport(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req StartImportRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement StartImport business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "StartImport"})
+	resourceType := getStr(req, "resourceType")
+	mergeStrategy := getStr(req, "mergeStrategy")
+	if resourceType == "" || mergeStrategy == "" {
+		return jsonErr(service.ErrValidation("resourceType and mergeStrategy are required."))
+	}
+	imp := store.StartImport("imported-"+resourceType, resourceType, mergeStrategy, parseTagList(req, "tags"))
+	resp := importToMap(imp)
+	resp["tags"] = tagListToMaps(imp.Tags)
+	return jsonOK(resp)
+}
+
+func handleGetImport(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "importId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("importId is required."))
+	}
+	imp, err := store.GetImport(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(importToMap(imp))
 }
 
 func handleStartMigration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req StartMigrationRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement StartMigration business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "StartMigration"})
+	v1Name := getStr(req, "v1BotName")
+	v1Version := getStr(req, "v1BotVersion")
+	v2Role := getStr(req, "v2BotRole")
+	strategy := getStr(req, "migrationStrategy")
+	if v1Name == "" || v1Version == "" || v2Role == "" || strategy == "" {
+		return jsonErr(service.ErrValidation(
+			"v1BotName, v1BotVersion, v2BotRole, and migrationStrategy are required."))
+	}
+	if _, err := store.GetBot(v1Name, v1Version); err != nil {
+		return jsonErr(err)
+	}
+	m := store.StartMigration(strategy, v1Name, v1Version, getStr(req, "v2BotName"), v2Role)
+	return jsonOK(migrationToMap(m))
+}
+
+func handleGetMigration(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	id := getStr(req, "migrationId")
+	if id == "" {
+		return jsonErr(service.ErrValidation("migrationId is required."))
+	}
+	m, err := store.GetMigration(id)
+	if err != nil {
+		return jsonErr(err)
+	}
+	return jsonOK(migrationToMap(m))
+}
+
+func handleGetMigrations(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	migrations := store.ListMigrations()
+	out := make([]map[string]any, 0, len(migrations))
+	for _, m := range migrations {
+		out = append(out, migrationToMap(m))
+	}
+	return jsonOK(map[string]any{"migrationSummaries": out})
+}
+
+// ── Utterance handlers ───────────────────────────────────────────────────────
+
+func handleGetUtterancesView(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	botName := getStr(req, "botname")
+	if botName == "" {
+		botName = getStr(req, "botName")
+	}
+	if botName == "" {
+		botName = pathParam(ctx, "botname")
+	}
+	if botName == "" {
+		return jsonErr(service.ErrValidation("botName is required."))
+	}
+	versions := getStrList(req, "bot_versions")
+	if len(versions) == 0 {
+		versions = []string{LatestVersion}
+	}
+	utterances := store.GetUtterances(botName)
+	utteranceData := make([]map[string]any, 0, len(utterances))
+	now := time.Now().UTC()
+	for _, u := range utterances {
+		utteranceData = append(utteranceData, map[string]any{
+			"utteranceString":  u,
+			"count":            1,
+			"distinctUsers":    1,
+			"firstUtteredDate": rfc3339(now),
+			"lastUtteredDate":  rfc3339(now),
+		})
+	}
+	out := make([]map[string]any, 0, len(versions))
+	for _, v := range versions {
+		out = append(out, map[string]any{
+			"botVersion": v,
+			"utterances": utteranceData,
+		})
+	}
+	return jsonOK(map[string]any{
+		"botName":    botName,
+		"utterances": out,
+	})
+}
+
+func handleDeleteUtterances(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	botName := getStr(req, "botName")
+	if botName == "" {
+		return jsonErr(service.ErrValidation("botName is required."))
+	}
+	store.DeleteUtterances(botName)
+	return jsonOK(map[string]any{})
+}
+
+// ── Tag handlers ─────────────────────────────────────────────────────────────
+
+func handleListTagsForResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
+	var req map[string]any
+	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
+		return jsonErr(awsErr)
+	}
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	return jsonOK(map[string]any{"tags": tagListToMaps(store.ListTags(arn))})
 }
 
 func handleTagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req TagResourceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement TagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "TagResource"})
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	tags := parseTagList(req, "tags")
+	if len(tags) == 0 {
+		return jsonErr(service.ErrValidation("tags is required."))
+	}
+	store.TagResource(arn, tags)
+	return jsonOK(map[string]any{})
 }
 
 func handleUntagResource(ctx *service.RequestContext, store *Store) (*service.Response, error) {
-	var req UntagResourceRequest
+	var req map[string]any
 	if awsErr := parseJSON(ctx.Body, &req); awsErr != nil {
 		return jsonErr(awsErr)
 	}
-	// TODO: implement UntagResource business logic
-	return jsonOK(map[string]any{"status": "ok", "action": "UntagResource"})
+	arn := getStr(req, "resourceArn")
+	if arn == "" {
+		return jsonErr(service.ErrValidation("resourceArn is required."))
+	}
+	keys := getStrList(req, "tagKeys")
+	store.UntagResource(arn, keys)
+	return jsonOK(map[string]any{})
 }
-

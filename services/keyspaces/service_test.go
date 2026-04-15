@@ -22,195 +22,216 @@ func newGateway(t *testing.T) http.Handler {
 	return gateway.New(cfg, reg)
 }
 
-func svcReq(t *testing.T, action string, body any) *http.Request {
+func doCall(t *testing.T, h http.Handler, action string, body any) *httptest.ResponseRecorder {
 	t.Helper()
-	var bodyBytes []byte
-	if body != nil {
+	var data []byte
+	if body == nil {
+		data = []byte("{}")
+	} else {
 		var err error
-		bodyBytes, err = json.Marshal(body)
+		data, err = json.Marshal(body)
 		if err != nil {
 			t.Fatalf("marshal: %v", err)
 		}
-	} else {
-		bodyBytes = []byte("{}")
 	}
-	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(bodyBytes))
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(data))
 	req.Header.Set("Content-Type", "application/x-amz-json-1.1")
 	req.Header.Set("X-Amz-Target", "KeyspacesService."+action)
 	req.Header.Set("Authorization",
-		"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/cassandra/aws4_request, SignedHeaders=host, Signature=abc123")
-	return req
+		"AWS4-HMAC-SHA256 Credential=AKIAIOSFODNN7EXAMPLE/20240101/us-east-1/cassandra/aws4_request, SignedHeaders=host, Signature=abc")
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, req)
+	return w
 }
 
-
-func TestCreateKeyspace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateKeyspace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateKeyspace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func decode(t *testing.T, w *httptest.ResponseRecorder, v any) {
+	t.Helper()
+	if err := json.Unmarshal(w.Body.Bytes(), v); err != nil {
+		t.Fatalf("decode: %v\nbody: %s", err, w.Body.String())
 	}
 }
 
-func TestCreateTable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateTable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("CreateTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func simpleSchema() map[string]any {
+	return map[string]any{
+		"allColumns": []map[string]any{
+			{"name": "id", "type": "uuid"},
+			{"name": "value", "type": "text"},
+		},
+		"partitionKeys": []map[string]any{
+			{"name": "id"},
+		},
 	}
 }
 
-func TestCreateType(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "CreateType", nil))
+func TestKeyspaceLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	if w := doCall(t, h, "CreateKeyspace", map[string]any{
+		"keyspaceName": "my_ks",
+		"replicationSpecification": map[string]any{
+			"replicationStrategy": "SINGLE_REGION",
+		},
+	}); w.Code != http.StatusOK {
+		t.Fatalf("CreateKeyspace: want 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	w := doCall(t, h, "GetKeyspace", map[string]any{"keyspaceName": "my_ks"})
 	if w.Code != http.StatusOK {
-		t.Fatalf("CreateType: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("GetKeyspace: want 200, got %d", w.Code)
+	}
+
+	w = doCall(t, h, "ListKeyspaces", nil)
+	var listed struct {
+		Keyspaces []struct {
+			KeyspaceName string `json:"keyspaceName"`
+		} `json:"keyspaces"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Keyspaces) != 1 || listed.Keyspaces[0].KeyspaceName != "my_ks" {
+		t.Fatalf("unexpected: %+v", listed)
+	}
+
+	if w := doCall(t, h, "UpdateKeyspace", map[string]any{
+		"keyspaceName": "my_ks",
+		"replicationSpecification": map[string]any{
+			"replicationStrategy": "MULTI_REGION",
+			"regionList":          []string{"us-east-1", "us-west-2"},
+		},
+	}); w.Code != http.StatusOK {
+		t.Fatalf("UpdateKeyspace: want 200, got %d", w.Code)
+	}
+
+	if w := doCall(t, h, "DeleteKeyspace", map[string]any{"keyspaceName": "my_ks"}); w.Code != http.StatusOK {
+		t.Fatalf("DeleteKeyspace: want 200, got %d", w.Code)
+	}
+	if w := doCall(t, h, "GetKeyspace", map[string]any{"keyspaceName": "my_ks"}); w.Code != http.StatusNotFound {
+		t.Fatalf("GetKeyspace after delete: want 404, got %d", w.Code)
 	}
 }
 
-func TestDeleteKeyspace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteKeyspace", nil))
+func TestTableLifecycle(t *testing.T) {
+	h := newGateway(t)
+
+	doCall(t, h, "CreateKeyspace", map[string]any{"keyspaceName": "ks1"})
+
+	w := doCall(t, h, "CreateTable", map[string]any{
+		"keyspaceName":     "ks1",
+		"tableName":        "t1",
+		"schemaDefinition": simpleSchema(),
+		"capacitySpecification": map[string]any{
+			"throughputMode": "PAY_PER_REQUEST",
+		},
+	})
 	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteKeyspace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("CreateTable: want 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	if w := doCall(t, h, "GetTable", map[string]any{"keyspaceName": "ks1", "tableName": "t1"}); w.Code != http.StatusOK {
+		t.Fatalf("GetTable: want 200, got %d", w.Code)
+	}
+
+	w = doCall(t, h, "ListTables", map[string]any{"keyspaceName": "ks1"})
+	var listed struct {
+		Tables []struct {
+			TableName string `json:"tableName"`
+		} `json:"tables"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Tables) != 1 || listed.Tables[0].TableName != "t1" {
+		t.Fatalf("unexpected tables: %+v", listed)
+	}
+
+	if w := doCall(t, h, "GetTableAutoScalingSettings", map[string]any{"keyspaceName": "ks1", "tableName": "t1"}); w.Code != http.StatusOK {
+		t.Fatalf("GetTableAutoScalingSettings: want 200, got %d", w.Code)
+	}
+
+	if w := doCall(t, h, "UpdateTable", map[string]any{
+		"keyspaceName":      "ks1",
+		"tableName":         "t1",
+		"defaultTimeToLive": 60,
+	}); w.Code != http.StatusOK {
+		t.Fatalf("UpdateTable: want 200, got %d", w.Code)
+	}
+
+	if w := doCall(t, h, "RestoreTable", map[string]any{
+		"sourceKeyspaceName": "ks1",
+		"sourceTableName":    "t1",
+		"targetKeyspaceName": "ks1",
+		"targetTableName":    "t1_restored",
+	}); w.Code != http.StatusOK {
+		t.Fatalf("RestoreTable: want 200, got %d", w.Code)
+	}
+
+	if w := doCall(t, h, "DeleteTable", map[string]any{"keyspaceName": "ks1", "tableName": "t1"}); w.Code != http.StatusOK {
+		t.Fatalf("DeleteTable: want 200, got %d", w.Code)
 	}
 }
 
-func TestDeleteTable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteTable", nil))
+func TestTypeLifecycle(t *testing.T) {
+	h := newGateway(t)
+	doCall(t, h, "CreateKeyspace", map[string]any{"keyspaceName": "ks"})
+
+	w := doCall(t, h, "CreateType", map[string]any{
+		"keyspaceName": "ks",
+		"typeName":     "address",
+		"fieldDefinitions": []map[string]any{
+			{"name": "street", "type": "text"},
+			{"name": "zip", "type": "text"},
+		},
+	})
 	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+		t.Fatalf("CreateType: want 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	if w := doCall(t, h, "GetType", map[string]any{"keyspaceName": "ks", "typeName": "address"}); w.Code != http.StatusOK {
+		t.Fatalf("GetType: want 200, got %d", w.Code)
+	}
+
+	w = doCall(t, h, "ListTypes", map[string]any{"keyspaceName": "ks"})
+	var listed struct {
+		Types []string `json:"types"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Types) != 1 || listed.Types[0] != "address" {
+		t.Fatalf("unexpected types: %+v", listed)
+	}
+
+	if w := doCall(t, h, "DeleteType", map[string]any{"keyspaceName": "ks", "typeName": "address"}); w.Code != http.StatusOK {
+		t.Fatalf("DeleteType: want 200, got %d", w.Code)
 	}
 }
 
-func TestDeleteType(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "DeleteType", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("DeleteType: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
+func TestTagsLifecycle(t *testing.T) {
+	h := newGateway(t)
+	arn := "arn:aws:cassandra:us-east-1:000000000000:/keyspace/ks"
+
+	if w := doCall(t, h, "TagResource", map[string]any{
+		"resourceArn": arn,
+		"tags": []map[string]any{
+			{"key": "env", "value": "dev"},
+		},
+	}); w.Code != http.StatusOK {
+		t.Fatalf("TagResource: want 200, got %d", w.Code)
+	}
+
+	w := doCall(t, h, "ListTagsForResource", map[string]any{"resourceArn": arn})
+	var listed struct {
+		Tags []struct {
+			Key   string `json:"key"`
+			Value string `json:"value"`
+		} `json:"tags"`
+	}
+	decode(t, w, &listed)
+	if len(listed.Tags) != 1 || listed.Tags[0].Value != "dev" {
+		t.Fatalf("unexpected tags: %+v", listed)
+	}
+
+	if w := doCall(t, h, "UntagResource", map[string]any{
+		"resourceArn": arn,
+		"tags": []map[string]any{
+			{"key": "env"},
+		},
+	}); w.Code != http.StatusOK {
+		t.Fatalf("UntagResource: want 200, got %d", w.Code)
 	}
 }
-
-func TestGetKeyspace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetKeyspace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetKeyspace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetTable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetTable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetTableAutoScalingSettings(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetTableAutoScalingSettings", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetTableAutoScalingSettings: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestGetType(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "GetType", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GetType: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListKeyspaces(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListKeyspaces", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListKeyspaces: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTables(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTables", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTables: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTagsForResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTagsForResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTagsForResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestListTypes(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "ListTypes", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("ListTypes: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestRestoreTable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "RestoreTable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("RestoreTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestTagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "TagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("TagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUntagResource(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UntagResource", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UntagResource: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateKeyspace(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateKeyspace", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateKeyspace: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-
-func TestUpdateTable(t *testing.T) {
-	handler := newGateway(t)
-	w := httptest.NewRecorder()
-	handler.ServeHTTP(w, svcReq(t, "UpdateTable", nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("UpdateTable: expected 200, got %d\nbody: %s", w.Code, w.Body.String())
-	}
-}
-

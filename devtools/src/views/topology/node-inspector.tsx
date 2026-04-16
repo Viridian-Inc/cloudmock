@@ -46,16 +46,23 @@ function relativeTime(iso: string): string {
 }
 
 function getServiceKey(node: TopoNode): string {
-  // For IaC nodes (external/plugin), use the ID suffix which is more specific
-  // e.g., "external:bff-service" → "bff-service", not "external"
-  if (node.service === 'external' || node.service === 'plugin') {
+  // IaC-imported resources (microservices and lambda functions) carry
+  // node.service='lambda' even though each node is a distinct function.
+  // Using node.service would collapse every compute node to the same key,
+  // so fall back to the ID suffix (the specific resource name) for any
+  // namespaced ID. Same logic applies to external/plugin nodes.
+  const namespaced = node.id.startsWith('microservice:') ||
+    node.id.startsWith('lambda:') ||
+    node.service === 'external' ||
+    node.service === 'plugin';
+  if (namespaced) {
     const colonIdx = node.id.indexOf(':');
     if (colonIdx >= 0) {
-      return node.id.substring(colonIdx + 1); // "bff-service"
+      return node.id.substring(colonIdx + 1);
     }
-    return node.label; // fallback to label
+    return node.label;
   }
-  // For AWS service nodes, use the service field
+  // AWS service nodes: use the service field (dynamodb, s3, etc.)
   return node.service || node.id.replace(/^svc:|^ms:/, '');
 }
 

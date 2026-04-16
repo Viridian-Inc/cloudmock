@@ -478,9 +478,8 @@ export function getSpecEndpointsForService(
   }
   if (tagged.length > 0) return tagged;
 
-  // 3. fallback — flatten all specs so the user at least sees what they wired up.
-  if (specs.length > 0) {
-    return specs.flatMap((s) => s.endpoints);
-  }
+  // No match — return empty rather than echoing every loaded spec's endpoints
+  // back for every service. The old flatMap fallback made unrelated compute
+  // nodes all look identical.
   return [];
 }

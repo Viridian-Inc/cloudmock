@@ -144,7 +144,7 @@ jobs:
           fi
           git commit -m "chore: update Homebrew formula for v${VERSION}"
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push && exit 0
+            git pull --rebase --autostash origin main && git push && exit 0
             echo "push attempt $i failed, retrying..."
             sleep $((i * 2))
           done
@@ -199,7 +199,7 @@ jobs:
           fi
           git commit -m "chore: bump npm packages to v${VERSION}"
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push && exit 0
+            git pull --rebase --autostash origin main && git push && exit 0
             echo "push attempt $i failed, retrying..."
             sleep $((i * 2))
           done
@@ -244,7 +244,7 @@ jobs:
           fi
           git commit -m "chore: bump snap version to v${VERSION}"
           for i in 1 2 3 4 5; do
-            git pull --rebase origin main && git push && exit 0
+            git pull --rebase --autostash origin main && git push && exit 0
             echo "push attempt $i failed, retrying..."
             sleep $((i * 2))
           done

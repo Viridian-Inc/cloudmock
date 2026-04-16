@@ -323,13 +323,18 @@ export function computeTimeRange(
 
   const timestamps = flows.map((f) => new Date(f.timestamp).getTime());
   const oldest = Math.min(...timestamps);
+  const newest = Math.max(...timestamps);
 
-  // Always end at now
-  const end = now;
+  // End at `now` so live traffic lands inside the range, but fall back to the
+  // newest flow timestamp if traffic is stale (otherwise flows captured hours
+  // ago would all sit to the left of the window and the list would be empty).
+  const end = newest > now - windowMs ? now : newest;
 
-  // Start at windowMs before end, but extend back to include oldest if within 2x window
+  // Start at `end - window`, but if that would exclude the oldest visible
+  // flow, extend back far enough to show everything we fetched. Previously
+  // this was capped at 2x window, which silently hid flows older than 10 min.
   let start = end - windowMs;
-  if (oldest < start && oldest >= end - windowMs * 2) {
+  if (oldest < start) {
     start = oldest;
   }
 

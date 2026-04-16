@@ -751,17 +751,19 @@ interface SidebarIncidentsProps {
 }
 
 function SidebarIncidents({ incidents, serviceName }: SidebarIncidentsProps) {
+  // Filter strictly to incidents that affect this service. Previously this
+  // also OR'd in any `status === 'active'` incident, which surfaced every
+  // active incident system-wide.
   const serviceIncidents = useMemo(() => {
     const svcLower = serviceName.toLowerCase();
     return incidents.filter((inc) =>
-      inc.affected_services.some((s) => s.toLowerCase() === svcLower) ||
-      inc.status === 'active',
+      inc.affected_services.some((s) => s.toLowerCase() === svcLower),
     );
   }, [incidents, serviceName]);
 
   if (serviceIncidents.length === 0) {
     return (
-      <div class="sidebar-section">
+      <div class="sidebar-section sidebar-section-flex">
         <div class="sidebar-section-title">Incidents</div>
         <div class="sidebar-section-empty">No active incidents</div>
       </div>
@@ -769,7 +771,7 @@ function SidebarIncidents({ incidents, serviceName }: SidebarIncidentsProps) {
   }
 
   return (
-    <div class="sidebar-section">
+    <div class="sidebar-section sidebar-section-flex">
       <div class="sidebar-section-title">
         Incidents
         <span class="sidebar-section-count">{serviceIncidents.length}</span>
@@ -1028,16 +1030,18 @@ export function RequestTracePanel({
     });
   }, []);
 
-  // Filter flows by time range + method filter (derived state)
+  // Filter flows by time range + method filter (derived state).
+  // If hiding OPTIONS would empty the list entirely (service only sees CORS
+  // preflights, e.g. a pure-API backend), fall back to showing everything —
+  // an empty "0 requests" panel is worse than seeing OPTIONS traffic.
   const filteredFlows = useMemo(() => {
-    let result = flows.filter((f) => {
+    const inRange = flows.filter((f) => {
       const ts = new Date(f.timestamp).getTime();
       return ts >= timeRange.start && ts <= timeRange.end;
     });
-    if (hideOptions) {
-      result = filterFlowsByMethod(result, new Set(['OPTIONS']));
-    }
-    return result;
+    if (!hideOptions) return inRange;
+    const nonOptions = filterFlowsByMethod(inRange, new Set(['OPTIONS']));
+    return nonOptions.length > 0 ? nonOptions : inRange;
   }, [flows, timeRange, hideOptions]);
 
   const handleScrub = useCallback((range: { start: number; end: number }) => {
@@ -1243,14 +1247,16 @@ export function RequestTracePanel({
           {/* Incidents */}
           <SidebarIncidents incidents={incidents} serviceName={serviceName} />
 
-          {/* Blast Radius */}
-          <div class="sidebar-section">
-            <BlastRadiusBar
-              nodeId={node.id}
-              edges={edges}
-              allNodes={allNodes}
-              metrics={metrics}
-            />
+          {/* Blast Radius — equal-height flex section with its own scroll */}
+          <div class="sidebar-section sidebar-section-flex">
+            <div class="sidebar-blast-scroll">
+              <BlastRadiusBar
+                nodeId={node.id}
+                edges={edges}
+                allNodes={allNodes}
+                metrics={metrics}
+              />
+            </div>
           </div>
         </div>
 

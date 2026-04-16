@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'preact/hooks';
 import { api } from '../../lib/api';
+import { peek } from '../../lib/pane-stack';
 import './logs.css';
 
 interface LogEntry {
@@ -66,7 +67,21 @@ export function LogsView() {
               {filtered.map((l, i) => (
                 <tr key={i}>
                   <td class="logs-ts">{new Date(l.timestamp).toLocaleString()}</td>
-                  <td class="logs-svc">{l.service}</td>
+                  <td class="logs-svc">
+                    <button
+                      class="logs-svc-link"
+                      onClick={() =>
+                        peek({
+                          view: 'activity',
+                          params: { service: l.service },
+                          title: l.service,
+                        })
+                      }
+                      title={`Peek ${l.service} activity`}
+                    >
+                      {l.service}
+                    </button>
+                  </td>
                   <td>
                     <span class={`severity-badge severity-${l.severity.toLowerCase()}`}>
                       {l.severity}

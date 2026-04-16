@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'preact/hooks';
 import { getAdminBase } from '../../lib/api';
+import { peek } from '../../lib/pane-stack';
 import type { RequestEvent } from '../../lib/types';
 import { buildCurlCommand, byteSize, formatBytes, isXml, tokenizeJson, type JsonToken } from './event-utils';
 
@@ -479,14 +480,15 @@ export function EventDetail({ event, allEvents = [] }: EventDetailProps) {
               <button
                 class="btn btn-ghost btn-view-trace"
                 onClick={() => {
-                  document.dispatchEvent(
-                    new CustomEvent('neureaux:navigate-traces', {
-                      detail: { traceId: event.trace_id },
-                    }),
-                  );
+                  peek({
+                    view: 'traces',
+                    segments: [event.trace_id!],
+                    title: `Trace ${event.trace_id!.slice(0, 8)}`,
+                  });
                 }}
+                title="Open trace in a peek pane (Esc to close)"
               >
-                View Trace {'\u2192'}
+                Peek Trace {'\u2192'}
               </button>
             </span>
           </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
+import { peek } from '../../lib/pane-stack';
 import { LineChart } from './line-chart';
 import { TimeRangeSelector } from '../../components/time-range-selector/time-range-selector';
 import './metrics.css';
@@ -828,14 +829,46 @@ export function MetricsView() {
                         onChange={() => toggleServiceSelection(svc.service)}
                       />
                     </td>
-                    <td class="metrics-service-name">{svc.service}</td>
+                    <td class="metrics-service-name">
+                      <button
+                        class="metrics-service-link"
+                        onClick={() =>
+                          peek({
+                            view: 'activity',
+                            params: { service: svc.service },
+                            title: svc.service,
+                          })
+                        }
+                        title={`Peek recent activity for ${svc.service}`}
+                      >
+                        {svc.service}
+                      </button>
+                    </td>
                     <td class="metrics-mono">{svc.total_requests}</td>
                     <td class="metrics-mono">{formatLatency(svc.avg_latency_ms)}</td>
                     <td class="metrics-mono">{formatLatency(svc.p50_ms)}</td>
                     <td class="metrics-mono">{formatLatency(svc.p95_ms)}</td>
                     <td class="metrics-mono">{formatLatency(svc.p99_ms)}</td>
-                    <td class={`metrics-mono ${svc.error_rate > 0.05 ? 'metrics-error' : svc.error_rate > 0.01 ? 'metrics-warning' : ''}`}>
-                      {formatRate(svc.error_rate)}
+                    <td
+                      class={`metrics-mono ${svc.error_rate > 0.05 ? 'metrics-error' : svc.error_rate > 0.01 ? 'metrics-warning' : ''}`}
+                    >
+                      {svc.error_rate > 0 ? (
+                        <button
+                          class="metrics-service-link metrics-service-link-error"
+                          onClick={() =>
+                            peek({
+                              view: 'activity',
+                              params: { service: svc.service, status: '5xx' },
+                              title: `${svc.service} · errors`,
+                            })
+                          }
+                          title={`Peek ${svc.service} errors`}
+                        >
+                          {formatRate(svc.error_rate)}
+                        </button>
+                      ) : (
+                        formatRate(svc.error_rate)
+                      )}
                     </td>
                   </tr>
                 ))}

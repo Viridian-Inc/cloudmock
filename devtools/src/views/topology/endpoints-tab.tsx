@@ -1,12 +1,127 @@
 import { useState, useEffect, useMemo, useCallback } from 'preact/hooks';
+import { api } from '../../lib/api';
 import {
-  scanOpenAPISpecs,
+  scanOpenAPISpecsDetailed,
   getSpecEndpointsForService,
+  getScanPaths,
+  setScanPaths,
   type OpenAPISpec,
   type OpenAPIEndpoint,
   type OpenAPIParameter,
   type OpenAPIResponse,
+  type ScanAttempt,
 } from './openapi-scanner';
+
+/* ---------- Observed-from-traffic endpoint derivation ---------- */
+
+interface RawRequest {
+  Service?: string; service?: string;
+  Method?: string; method?: string;
+  Path?: string; path?: string;
+  Action?: string; action?: string;
+  StatusCode?: number; status_code?: number;
+}
+
+interface ObservedEndpoint {
+  method: string;
+  path: string;
+  action?: string;
+  count: number;
+  lastStatus?: number;
+}
+
+/** Fuzzy service-name match: strips -handler/-sync/-service suffixes and
+ *  checks both directions case-insensitively. */
+function serviceMatches(svcKey: string, recordedService: string): boolean {
+  const normalize = (s: string) =>
+    s.toLowerCase().replace(/[-_](handler|sync|service|lambda|fn)$/i, '');
+  const a = normalize(svcKey);
+  const b = normalize(recordedService);
+  if (a === b) return true;
+  if (a.includes(b) || b.includes(a)) return true;
+  return false;
+}
+
+function deriveObservedEndpoints(requests: RawRequest[], svcKey: string): ObservedEndpoint[] {
+  const bucket = new Map<string, ObservedEndpoint>();
+  for (const r of requests) {
+    const svc = r.Service ?? r.service ?? '';
+    if (!serviceMatches(svcKey, svc)) continue;
+    const method = (r.Method ?? r.method ?? 'UNKNOWN').toUpperCase();
+    let path = r.Path ?? r.path ?? '/';
+    // Strip query string for aggregation — keeps GET /x?a=1 and GET /x?a=2 together.
+    const q = path.indexOf('?');
+    if (q >= 0) path = path.slice(0, q);
+    const action = r.Action ?? r.action ?? undefined;
+    const key = `${method} ${path} ${action ?? ''}`;
+    const existing = bucket.get(key);
+    if (existing) {
+      existing.count += 1;
+      existing.lastStatus = r.StatusCode ?? r.status_code ?? existing.lastStatus;
+    } else {
+      bucket.set(key, {
+        method,
+        path,
+        action,
+        count: 1,
+        lastStatus: r.StatusCode ?? r.status_code,
+      });
+    }
+  }
+  // Sort by count descending
+  return [...bucket.values()].sort((a, b) => b.count - a.count);
+}
+
+function ObservedSection({ endpoints }: { endpoints: ObservedEndpoint[] }) {
+  return (
+    <div>
+      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '8px' }}>
+        {endpoints.length} endpoint{endpoints.length !== 1 ? 's' : ''} · observed from traffic
+      </div>
+      <div class="endpoint-group">
+        <div class="endpoint-group-header">Observed</div>
+        {endpoints.map((ep, i) => (
+          <div key={i} class="endpoint-row" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px' }}>
+            <span
+              class="endpoint-method"
+              style={{
+                background: METHOD_COLORS[ep.method] ?? 'var(--bg-tertiary)',
+                color: 'white',
+                fontWeight: 600,
+                padding: '1px 6px',
+                borderRadius: '3px',
+                fontSize: '10px',
+                minWidth: '52px',
+                textAlign: 'center',
+              }}
+            >
+              {ep.method}
+            </span>
+            <span class="endpoint-path" style={{ flex: 1, fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+              {ep.path}
+              {ep.action && (
+                <span style={{ color: 'var(--text-tertiary)', marginLeft: '6px' }}>
+                  [{ep.action}]
+                </span>
+              )}
+            </span>
+            <span style={{ fontSize: '10px', color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>
+              {ep.count}×
+            </span>
+            {ep.lastStatus !== undefined && (
+              <span
+                class={`status-pill ${ep.lastStatus >= 500 ? 'status-5xx' : ep.lastStatus >= 400 ? 'status-4xx' : 'status-2xx'}`}
+                style={{ fontSize: '9px' }}
+              >
+                {ep.lastStatus}
+              </span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export interface ManifestRoute {
   method: string;
@@ -327,9 +442,150 @@ function OpenAPISection({
   );
 }
 
+function NoEndpointsHint({
+  svcKey,
+  reason,
+  specs,
+  attempts,
+  onRescan,
+}: {
+  svcKey: string;
+  reason: 'no-manifest' | 'no-routes';
+  specs: OpenAPISpec[];
+  attempts: ScanAttempt[];
+  onRescan: () => void;
+}) {
+  const [url, setUrl] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [scanPaths, setScanPathsState] = useState<string[]>(() => getScanPaths());
+
+  const addAndRescan = useCallback(() => {
+    const trimmed = url.trim();
+    if (!trimmed) return;
+    if (!trimmed.startsWith('http') && !trimmed.endsWith('.yaml') && !trimmed.endsWith('.yml') && !trimmed.endsWith('.json')) {
+      setError('Enter a full URL (http://...) or a file path ending in .yaml/.json');
+      return;
+    }
+    const existing = getScanPaths();
+    if (!existing.includes(trimmed)) {
+      const next = [...existing, trimmed];
+      setScanPaths(next);
+      setScanPathsState(next);
+    }
+    setUrl('');
+    setError(null);
+    onRescan();
+  }, [url, onRescan]);
+
+  const removePath = useCallback((p: string) => {
+    const next = getScanPaths().filter((x) => x !== p);
+    setScanPaths(next);
+    setScanPathsState(next);
+    onRescan();
+  }, [onRescan]);
+
+  return (
+    <div class="inspector-placeholder" style={{ textAlign: 'left', padding: '14px 16px', fontSize: '12px', lineHeight: 1.5 }}>
+      <div style={{ marginBottom: '10px', color: 'var(--text-secondary)' }}>
+        {reason === 'no-manifest'
+          ? <>No manifest entry for <code>{svcKey}</code>.</>
+          : <>No route metadata for <code>{svcKey}</code>.</>}
+      </div>
+
+      {/* Diagnostic — shows exactly why nothing matched, so the user can fix it. */}
+      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)', marginBottom: '10px', padding: '8px 10px', background: 'var(--bg-elevated)', borderRadius: '4px', fontFamily: 'var(--font-mono)', lineHeight: 1.7 }}>
+        <div>Looking up: <span style={{ color: 'var(--text-primary)' }}>{svcKey}</span></div>
+        {attempts.length === 0 && scanPaths.length === 0 && (
+          <div style={{ color: 'var(--warning)' }}>No scan paths configured. Add one below.</div>
+        )}
+        {attempts.length > 0 && (
+          <div>
+            Tried {attempts.length} path{attempts.length === 1 ? '' : 's'}:
+            <ul style={{ paddingLeft: '14px', margin: '2px 0' }}>
+              {attempts.map((a, i) => (
+                <li key={i} style={{ display: 'flex', gap: '8px', alignItems: 'baseline' }}>
+                  <span style={{ color: a.ok ? 'var(--success-bright)' : 'var(--error)', flexShrink: 0 }}>
+                    {a.ok ? '\u2713' : '\u2717'}
+                  </span>
+                  <span style={{ flex: 1, wordBreak: 'break-all' }}>
+                    <span style={{ color: 'var(--text-primary)' }}>{a.path}</span>
+                    {a.ok ? (
+                      <span style={{ color: 'var(--text-tertiary)' }}>
+                        {' '}— {a.title} ({a.endpointCount} endpoints)
+                      </span>
+                    ) : (
+                      <span style={{ color: 'var(--text-tertiary)' }}>
+                        {' '}— {a.error}
+                      </span>
+                    )}
+                  </span>
+                  {scanPaths.includes(a.path) && (
+                    <button
+                      onClick={() => removePath(a.path)}
+                      style={{ background: 'none', border: 'none', color: 'var(--text-tertiary)', cursor: 'pointer', padding: 0, fontSize: '10px' }}
+                      title="Remove"
+                    >
+                      {'\u2715'}
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        <div>
+          Total specs loaded: <span style={{ color: specs.length > 0 ? 'var(--success-bright)' : 'var(--warning)' }}>{specs.length}</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', marginBottom: '6px' }}>
+        Add a spec URL:
+      </div>
+      <div style={{ display: 'flex', gap: '6px', marginBottom: '6px' }}>
+        <input
+          class="input"
+          type="text"
+          placeholder="http://localhost:3000/openapi.json"
+          value={url}
+          onInput={(e) => setUrl((e.target as HTMLInputElement).value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') addAndRescan(); }}
+          style={{ flex: 1, fontSize: '11px' }}
+        />
+        <button class="btn btn-primary" style={{ fontSize: '11px', padding: '4px 10px' }} onClick={addAndRescan}>
+          Scan
+        </button>
+      </div>
+      {error && (
+        <div style={{ fontSize: '10px', color: 'var(--error)', marginBottom: '6px' }}>{error}</div>
+      )}
+      <div style={{ fontSize: '10px', color: 'var(--text-tertiary)' }}>
+        Paths are saved and re-used for every service in the topology.
+      </div>
+    </div>
+  );
+}
+
 export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
   const [openApiSpecs, setOpenApiSpecs] = useState<OpenAPISpec[]>([]);
   const [specScanned, setSpecScanned] = useState(false);
+  const [attempts, setAttempts] = useState<ScanAttempt[]>([]);
+  const [observed, setObserved] = useState<ObservedEndpoint[]>([]);
+
+  // Pull recent traffic and aggregate endpoints matching this service. Works
+  // for any service that has ever received a request — no manifest or spec
+  // required. This is the universal fallback and runs regardless of whether
+  // manifest/spec data exists, so it can also supplement them.
+  useEffect(() => {
+    let cancelled = false;
+    api<RawRequest[]>('/api/requests?level=all&limit=500')
+      .then((reqs) => {
+        if (cancelled) return;
+        const list = Array.isArray(reqs) ? reqs : [];
+        setObserved(deriveObservedEndpoints(list, svcKey));
+      })
+      .catch(() => { if (!cancelled) setObserved([]); });
+    return () => { cancelled = true; };
+  }, [svcKey]);
 
   const service = useMemo(() => {
     if (!manifest) return null;
@@ -367,13 +623,23 @@ export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
 
   const hasManifestRoutes = groups.length > 0;
 
+  const rescan = useCallback(() => {
+    setSpecScanned(false);
+    scanOpenAPISpecsDetailed().then(({ specs, attempts }) => {
+      setOpenApiSpecs(specs);
+      setAttempts(attempts);
+      setSpecScanned(true);
+    }).catch(() => setSpecScanned(true));
+  }, []);
+
   // Scan for OpenAPI specs when manifest has no routes for this service
   useEffect(() => {
     if (hasManifestRoutes || specScanned) return;
     let cancelled = false;
-    scanOpenAPISpecs().then((specs) => {
+    scanOpenAPISpecsDetailed().then(({ specs, attempts }) => {
       if (!cancelled) {
         setOpenApiSpecs(specs);
+        setAttempts(attempts);
         setSpecScanned(true);
       }
     }).catch(() => {
@@ -395,6 +661,11 @@ export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
     );
   }
 
+  // Priority:
+  //   1. manifest with routes → authoritative
+  //   2. OpenAPI spec matching this service → authoritative
+  //   3. observed traffic → show what's actually being called (works for any handler with traffic)
+  //   4. empty state + scan input
   if (!service && specEndpoints.length === 0) {
     if (!specScanned) {
       return (
@@ -403,11 +674,8 @@ export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
         </div>
       );
     }
-    return (
-      <div class="inspector-placeholder">
-        No manifest entry found for "{svcKey}".
-      </div>
-    );
+    if (observed.length > 0) return <ObservedSection endpoints={observed} />;
+    return <NoEndpointsHint svcKey={svcKey} reason="no-manifest" specs={openApiSpecs} attempts={attempts} onRescan={rescan} />;
   }
 
   // Show OpenAPI spec endpoints if manifest has no routes
@@ -416,11 +684,8 @@ export function EndpointsTab({ svcKey, manifest }: EndpointsTabProps) {
   }
 
   if (!hasManifestRoutes) {
-    return (
-      <div class="inspector-placeholder">
-        No routes defined for this service.
-      </div>
-    );
+    if (observed.length > 0) return <ObservedSection endpoints={observed} />;
+    return <NoEndpointsHint svcKey={svcKey} reason="no-routes" specs={openApiSpecs} attempts={attempts} onRescan={rescan} />;
   }
 
   return (

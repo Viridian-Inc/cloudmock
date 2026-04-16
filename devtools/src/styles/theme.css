@@ -201,8 +201,11 @@ body {
   overflow: hidden;
 }
 .workspace-content {
-  overflow: auto;
+  /* PaneStack owns its own scrolling — this just provides the flexbox shell. */
   position: relative;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
 }
 .placeholder-view {
   display: flex;

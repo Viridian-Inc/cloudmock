@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { api } from '../../lib/api';
 import { EnvPicker } from '../env-picker/env-picker';
+import { TipBanner } from '../tip-banner/tip-banner';
 import './source-bar.css';
 
 interface ConnectedSource {
@@ -155,6 +156,7 @@ export function SourceBar() {
         </div>
       )}
       <div class="source-bar-spacer" />
+      <TipBanner />
       <EnvPicker value={env} onChange={setEnv} />
     </div>
   );

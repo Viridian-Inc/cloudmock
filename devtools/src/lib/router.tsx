@@ -34,7 +34,8 @@ export type PathPatch = {
   params?: Record<string, string | null | undefined>;
 };
 
-const RouterContext = createContext<(Route & Navigation) | null>(null);
+// Exported so pane-scoped routers can re-provide a different Route (see pane-stack).
+export const RouterContext = createContext<(Route & Navigation) | null>(null);
 
 // Parses "#/view/seg1/seg2?k=v&k2=v2" → Route.
 function parseHash(hash: string): Route {

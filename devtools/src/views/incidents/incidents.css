@@ -415,6 +415,29 @@
 .related-trace-row:hover {
   background: var(--bg-tertiary);
 }
+.related-trace-row-clickable {
+  cursor: pointer;
+}
+.related-trace-row-clickable:hover {
+  background: var(--bg-elevated);
+}
+
+.incident-peek-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-bottom: 1px dashed transparent;
+  transition: border-color 0.15s;
+}
+.incident-peek-link:hover {
+  border-bottom-color: currentColor;
+}
+.incident-peek-chip {
+  margin-right: 8px;
+}
 
 .related-trace-service {
   font-weight: 500;

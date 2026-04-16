@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { getTipsEnabled, setTipsEnabled, resetDismissedTips, onTipsChange } from '../../lib/tips';
 
 const STORAGE_KEY = 'cloudmock-font-size';
 const THEME_STORAGE_KEY = 'cloudmock-theme';
@@ -28,6 +29,10 @@ export function Appearance() {
   });
 
   const [theme, setTheme] = useState<Theme>(getSavedTheme);
+  const [tipsEnabled, setTipsEnabledState] = useState(getTipsEnabled);
+
+  // Re-sync if another tab or the TipBanner dismisses/changes tip state.
+  useEffect(() => onTipsChange(() => setTipsEnabledState(getTipsEnabled())), []);
 
   useEffect(() => {
     document.documentElement.style.fontSize = `${fontSize}px`;
@@ -85,6 +90,40 @@ export function Appearance() {
         </div>
         <p class="settings-section-desc">
           Adjusts the base font size for the application. Default is {DEFAULT_SIZE}px.
+        </p>
+      </div>
+
+      <div class="settings-field">
+        <label class="settings-label">UI Tips</label>
+        <div class="appearance-theme-toggle">
+          <button
+            class={`appearance-theme-option ${tipsEnabled ? 'appearance-theme-option-active' : ''}`}
+            onClick={() => {
+              setTipsEnabled(true);
+              setTipsEnabledState(true);
+            }}
+          >
+            Show
+          </button>
+          <button
+            class={`appearance-theme-option ${!tipsEnabled ? 'appearance-theme-option-active' : ''}`}
+            onClick={() => {
+              setTipsEnabled(false);
+              setTipsEnabledState(false);
+            }}
+          >
+            Hide
+          </button>
+          <button
+            class="appearance-theme-option"
+            onClick={() => resetDismissedTips()}
+            title="Show previously dismissed tips again"
+          >
+            Reset dismissed
+          </button>
+        </div>
+        <p class="settings-section-desc">
+          Small dismissible hints in the header that teach non-obvious shortcuts.
         </p>
       </div>
     </div>

@@ -9,6 +9,8 @@
 .logs-table tr:hover { background: var(--bg-tertiary); }
 .logs-ts { white-space: nowrap; color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px; }
 .logs-svc { color: var(--text-secondary); }
+.logs-svc-link { background: none; border: none; padding: 0; font: inherit; color: inherit; cursor: pointer; border-bottom: 1px dashed transparent; transition: border-color 0.15s, color 0.15s; }
+.logs-svc-link:hover { color: var(--text-accent); border-bottom-color: var(--text-accent); }
 .logs-msg { font-family: var(--font-mono); font-size: 11px; white-space: pre-wrap; word-break: break-all; }
 .severity-badge { font-size: 10px; padding: 2px 6px; border-radius: 4px; font-weight: 600; text-transform: uppercase; }
 .severity-debug { background: var(--bg-tertiary); color: var(--text-tertiary); }

@@ -1,0 +1,212 @@
+/* Pane stack — horizontal drill-down panes.
+ *
+ * Base view: flex 1 1 auto, shrinks as peek panes arrive but keeps a min width.
+ * Peek panes: fixed-minimum width, share remaining space. Rightmost is "focused"
+ * (full opacity + active border); older ones dim slightly and can be clicked
+ * to close everything further right.
+ * Collapsed rail: thin vertical strip of chips for 3rd+ older panes.
+ */
+
+.pane-stack {
+  display: flex;
+  flex-direction: row;
+  height: 100%;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-stack-base {
+  flex: 1 1 0;
+  min-width: 320px;
+  height: 100%;
+  overflow: auto;
+  position: relative;
+}
+
+/* Leftmost rail of collapsed panes (3rd oldest and beyond). Vertical strip of
+ * chips — clicking one closes that pane AND everything to its right, because
+ * the user is effectively saying "I want to end the chain here."
+ */
+.pane-stack-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+  width: 44px;
+  min-width: 44px;
+  background: var(--bg-tertiary);
+  border-left: 1px solid var(--border-default);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.pane-stack-rail-chip {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 4px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.pane-stack-rail-chip:hover {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border-color: var(--border-hover);
+}
+.pane-stack-rail-chip-view {
+  font-weight: 600;
+  color: var(--text-accent);
+}
+.pane-stack-rail-chip-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  opacity: 0.75;
+  max-height: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Each peek pane is a card-like column with its own header + body. The left
+ * border acts as a visual separator + hit target implying "drill direction".
+ */
+.pane-stack-peek {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 420px;
+  min-width: 360px;
+  max-width: 780px;
+  height: 100%;
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-default);
+  box-shadow: -8px 0 16px -10px rgba(0, 0, 0, 0.45);
+  transition: opacity 0.15s;
+}
+
+.pane-stack-peek-focused {
+  opacity: 1;
+}
+.pane-stack-peek-dim {
+  /* Slightly dim and tighter so the user's eye lands on the rightmost (focused) pane.
+   * The full-body overlay below captures clicks to refocus. */
+  opacity: 0.82;
+  flex-basis: 380px;
+}
+.pane-stack-peek-dim:hover {
+  opacity: 0.95;
+}
+
+.pane-stack-peek-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  height: var(--source-bar-height);
+  padding: 0 12px;
+  border-bottom: 1px solid var(--border-default);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.pane-stack-peek-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pane-stack-peek-kind {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-accent);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.pane-stack-peek-label {
+  font-size: 13px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.pane-stack-peek-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pane-stack-peek-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, color 0.15s;
+}
+.pane-stack-peek-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.pane-stack-peek-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  position: relative;
+}
+
+/* Overlay covers the dim body so a single click refocuses — without stealing
+ * interaction from the rightmost (focused) pane. */
+.pane-stack-peek-focus-overlay {
+  position: absolute;
+  inset: var(--source-bar-height) 0 0 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  z-index: 2;
+}
+.pane-stack-peek-focus-overlay:hover {
+  background: rgba(97, 175, 255, 0.04);
+}
+
+/* Narrow viewport — stack vertically under 900px so panes don't squeeze. */
+@media (max-width: 900px) {
+  .pane-stack {
+    flex-direction: column;
+  }
+  .pane-stack-base, .pane-stack-peek {
+    flex: 1 1 auto;
+    max-width: none;
+    border-left: none;
+    border-top: 1px solid var(--border-default);
+  }
+  .pane-stack-rail {
+    display: none;
+  }
+}

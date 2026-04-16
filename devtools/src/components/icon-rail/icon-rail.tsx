@@ -2,6 +2,7 @@ import type { JSX } from 'preact';
 import type { ViewId } from '../../app';
 import { t } from '../../lib/i18n';
 import { hrefFor } from '../../lib/router';
+import { peek } from '../../lib/pane-stack';
 import {
   ZapIcon,
   TopologyIcon,
@@ -141,15 +142,35 @@ function RailLink({
       key={item.id}
       href={href}
       class={`rail-item${isActive ? ' active' : ''}`}
-      title={label}
+      title={`${label} — click to navigate · Alt/Option-click (or middle-click) to open as a peek pane`}
       role="tab"
       aria-selected={isActive}
       aria-label={label}
       onClick={(e: MouseEvent) => {
-        // Let cmd/ctrl/shift/middle-click fall through to default (new tab).
-        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
         e.preventDefault();
+        // Alt/Option-click → open as a peek pane alongside the current view.
+        // Unique id so repeated Alt-clicks stack instead of focusing the
+        // existing pane (side-by-side compare).
+        if (e.altKey || e.button === 1) {
+          peek({
+            view: item.id,
+            title: label,
+            id: `${item.id}:${Date.now().toString(36)}`,
+          });
+          return;
+        }
+        // Plain click replaces the main view (standard nav).
         onViewChange(item.id);
+      }}
+      onAuxClick={(e: MouseEvent) => {
+        if (e.button === 1) {
+          e.preventDefault();
+          peek({
+            view: item.id,
+            title: label,
+            id: `${item.id}:${Date.now().toString(36)}`,
+          });
+        }
       }}
     >
       <IconCmp class="rail-item-icon" />

@@ -1090,6 +1090,86 @@ func handleListPolicyVersions(store *Store, form url.Values) (*service.Response,
 	})
 }
 
+type xmlCreatePolicyVersionResponse struct {
+	XMLName xml.Name                     `xml:"CreatePolicyVersionResponse"`
+	Xmlns   string                       `xml:"xmlns,attr"`
+	Result  xmlCreatePolicyVersionResult `xml:"CreatePolicyVersionResult"`
+	Meta    xmlResponseMetadata          `xml:"ResponseMetadata"`
+}
+
+type xmlCreatePolicyVersionResult struct {
+	PolicyVersion xmlPolicyVersion `xml:"PolicyVersion"`
+}
+
+// handleCreatePolicyVersion accepts a new policy document. Cloudmock collapses
+// all versions into a single stored document, so the incoming document
+// replaces whatever was there; the returned VersionId is always "v1" and
+// always default. Pulumi uses this as part of "update managed policy" — it
+// creates a new version with SetAsDefault=true, then deletes the prior
+// non-default versions.
+func handleCreatePolicyVersion(store *Store, form url.Values) (*service.Response, error) {
+	policyArn := form.Get("PolicyArn")
+	if policyArn == "" {
+		return iamErr("ValidationError", "PolicyArn is required.", http.StatusBadRequest)
+	}
+	document := form.Get("PolicyDocument")
+	if document == "" {
+		return iamErr("ValidationError", "PolicyDocument is required.", http.StatusBadRequest)
+	}
+
+	if err := store.UpdatePolicyDocument(policyArn, document); err != nil {
+		return errFromStore(err)
+	}
+	policy, err := store.GetPolicy(policyArn)
+	if err != nil {
+		return errFromStore(err)
+	}
+
+	return xmlOK(&xmlCreatePolicyVersionResponse{
+		Xmlns: iamXmlns,
+		Result: xmlCreatePolicyVersionResult{
+			PolicyVersion: xmlPolicyVersion{
+				VersionId:        "v1",
+				IsDefaultVersion: true,
+				CreateDate:       policy.CreateDate.Format(timeFmt),
+			},
+		},
+		Meta: xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+type xmlDeletePolicyVersionResponse struct {
+	XMLName xml.Name            `xml:"DeletePolicyVersionResponse"`
+	Xmlns   string              `xml:"xmlns,attr"`
+	Meta    xmlResponseMetadata `xml:"ResponseMetadata"`
+}
+
+// handleDeletePolicyVersion matches AWS semantics for cloudmock's single-
+// version model. Requests to delete the default version (v1) return
+// DeleteConflict (AWS forbids deleting the default). Requests to delete any
+// other VersionId are no-ops that return success — Pulumi's "trim old
+// versions" flow sees there's nothing left to delete and moves on cleanly.
+func handleDeletePolicyVersion(store *Store, form url.Values) (*service.Response, error) {
+	policyArn := form.Get("PolicyArn")
+	if policyArn == "" {
+		return iamErr("ValidationError", "PolicyArn is required.", http.StatusBadRequest)
+	}
+	versionId := form.Get("VersionId")
+	if versionId == "" {
+		return iamErr("ValidationError", "VersionId is required.", http.StatusBadRequest)
+	}
+	if _, err := store.GetPolicy(policyArn); err != nil {
+		return errFromStore(err)
+	}
+	if versionId == "v1" {
+		return iamErr("DeleteConflict", "Cannot delete the default version of a policy. Use SetDefaultPolicyVersion first.", http.StatusConflict)
+	}
+	return xmlOK(&xmlDeletePolicyVersionResponse{
+		Xmlns: iamXmlns,
+		Meta:  xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
 // ---- Group handlers ----
 
 func handleCreateGroup(store *Store, form url.Values) (*service.Response, error) {

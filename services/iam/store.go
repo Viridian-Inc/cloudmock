@@ -500,6 +500,21 @@ func (s *Store) DeletePolicy(policyArn string) error {
 	return nil
 }
 
+// UpdatePolicyDocument replaces the stored policy document. Cloudmock models
+// every policy as a single versioned entity — CreatePolicyVersion calls this
+// to mutate the default (only) version in place.
+func (s *Store) UpdatePolicyDocument(policyArn, document string) error {
+	s.policiesMu.Lock()
+	defer s.policiesMu.Unlock()
+
+	policy, ok := s.policies[policyArn]
+	if !ok {
+		return fmt.Errorf("NoSuchEntity: Policy %s does not exist", policyArn)
+	}
+	policy.Document = document
+	return nil
+}
+
 func (s *Store) AttachUserPolicy(userName, policyArn string) error {
 	// Lock order: usersMu -> policiesMu
 	s.usersMu.Lock()

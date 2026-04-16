@@ -226,6 +226,10 @@ func (s *IAMService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleGetPolicyVersion(s.store, form)
 	case "ListPolicyVersions":
 		return handleListPolicyVersions(s.store, form)
+	case "CreatePolicyVersion":
+		return handleCreatePolicyVersion(s.store, form)
+	case "DeletePolicyVersion":
+		return handleDeletePolicyVersion(s.store, form)
 	// Groups
 	case "CreateGroup":
 		return handleCreateGroup(s.store, form)

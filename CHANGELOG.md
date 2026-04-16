@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.8.2 (2026-04-15)
+
+### Added
+- **Devtools topology pans while zooming** — mouse-wheel zoom now anchors to the cursor position instead of the canvas origin. Point at a node, scroll in, and the node stays under your cursor. Previously every zoom step required a follow-up pan because the transform origin was fixed at `(0,0)`.
+- **Hash-based router for the devtools UI** — new `devtools/src/lib/router.tsx` (170 lines, zero deps) turns every view, selection, tab, and filter into a URL. `#/traces/abc123?tab=flamegraph&compare=xyz` deep-links straight to the compare view of two specific traces. Back/forward buttons work, middle-click on nav items opens a new tab, and legacy `#service=...` / `#trace=...` formats are normalised so older bookmarks still resolve.
+- **IAM inline role policies + policy versions** — `ListRolePolicies`, `GetPolicyVersion`, `ListPolicyVersions`, `CreatePolicyVersion`, `DeletePolicyVersion`. Pulumi's post-`CreateRole` refresh calls `ListRolePolicies` and treated the previous `ServiceUnavailable` as a hard failure, so every `aws.iam.Role` resource errored despite being created. This unblocks Pulumi-driven AWS stacks running against cloudmock.
+
+### Fixed
+- Multiple devtools views (`activity`, `traces`, `incidents`, `services`, `settings`, `icon-rail`) migrated to route through the new router. Selections, active tabs, and filter state now survive a refresh or a shared link.
+
 ## v1.8.1 (2026-04-14)
 
 ### Fixed

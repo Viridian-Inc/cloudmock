@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'preact/hooks';
 import { SplitPanel } from '../../components/panels/split-panel';
 import { cachedApi } from '../../lib/api';
+import { useRouter, useRouteParam } from '../../lib/router';
 import { Waterfall } from './waterfall';
 import { Flamegraph } from './flamegraph';
 import { CompareView } from './compare-view';
@@ -186,46 +187,42 @@ function DetailPanel({
 }
 
 export function TracesView() {
+  const router = useRouter();
+  // URL shape: #/traces/<traceId>?tab=waterfall|flamegraph&compare=<otherTraceId>
+  const selectedId = router.segments[0] ?? null;
+  const setSelectedId = (id: string | null) =>
+    router.push({ segments: id ? [id] : [] });
+
   const [traces, setTraces] = useState<TraceSummary[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [compareMode, setCompareMode] = useState(false);
-  const [compareTraceId, setCompareTraceId] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>('waterfall');
+  const [compareTab, setCompareTab] = useRouteParam('compare', '');
+  const compareMode = compareTab !== '';
+  const compareTraceId = compareTab && compareTab !== 'pending' ? compareTab : null;
+  const [viewTab, setViewTab] = useRouteParam('tab', 'waterfall');
+  const viewMode: ViewMode = viewTab === 'flamegraph' ? 'flamegraph' : 'waterfall';
+  const setViewMode = (mode: ViewMode) => setViewTab(mode === 'waterfall' ? null : mode);
 
   useEffect(() => {
     cachedApi<TraceSummary[]>('/api/traces', 'traces:list')
-      .then((data) => {
-        setTraces(data);
-
-        // Check URL hash for #trace={id} from cross-view navigation
-        const hash = window.location.hash;
-        const traceMatch = hash.match(/^#trace=(.+)/);
-        if (traceMatch) {
-          const traceId = decodeURIComponent(traceMatch[1]);
-          setSelectedId(traceId);
-          // Clear the hash after consuming it
-          history.replaceState(null, '', window.location.pathname + window.location.search);
-        }
-      })
+      .then((data) => setTraces(data))
       .catch(() => setTraces([]));
   }, []);
 
   const handleToggleCompare = () => {
+    // compare="" leaves the param present but empty → still signals compare mode
+    // without a second trace picked. compare=null removes the param entirely.
     if (compareMode) {
-      // Exiting compare mode: clear compare selection
-      setCompareMode(false);
-      setCompareTraceId(null);
+      setCompareTab(null);
     } else {
-      setCompareMode(true);
-      setCompareTraceId(null);
+      setCompareTab('pending');
     }
   };
+  const setCompareTraceId = (id: string | null) => setCompareTab(id || 'pending');
 
   const handleSelect = (id: string) => {
     setSelectedId(id);
     // When selecting a new primary trace in compare mode, reset the second trace
     if (compareMode) {
-      setCompareTraceId(null);
+      setCompareTab('pending');
     }
   };
 

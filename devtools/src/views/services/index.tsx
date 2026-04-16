@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'preact/hooks';
+import { useRouter } from '../../lib/router';
 import { SplitPanel } from '../../components/panels/split-panel';
 import { api, cachedApi, getServices, getResources } from '../../lib/api';
 import type { ServiceInfo } from '../../lib/types';
@@ -61,10 +62,16 @@ async function loadAppServicesFromIaC(): Promise<AppService[]> {
 }
 
 export function ServicesView() {
+  const router = useRouter();
+  // URL: #/services/<type>/<name>  where <type> is 'app' or 'aws'
+  const segType = router.segments[0];
+  const segName = router.segments[1] ?? null;
+  const selectedType: 'app' | 'aws' | null =
+    segType === 'app' || segType === 'aws' ? segType : null;
+  const selectedService = selectedType ? segName : null;
+
   const [services, setServices] = useState<ServiceInfo[]>([]);
   const [appServices, setAppServices] = useState<AppService[]>([]);
-  const [selectedService, setSelectedService] = useState<string | null>(null);
-  const [selectedType, setSelectedType] = useState<'app' | 'aws' | null>(null);
   const [resources, setResources] = useState<any>(null);
   const [loadingResources, setLoadingResources] = useState(false);
 
@@ -88,14 +95,12 @@ export function ServicesView() {
   }, [selectedService, selectedType]);
 
   const handleSelectApp = (id: string) => {
-    setSelectedService(id);
-    setSelectedType('app');
+    router.push({ view: 'services', segments: ['app', id] });
     setResources(null);
   };
 
   const handleSelectAws = (name: string) => {
-    setSelectedService(name);
-    setSelectedType('aws');
+    router.push({ view: 'services', segments: ['aws', name] });
   };
 
   const selectedApp = selectedType === 'app'

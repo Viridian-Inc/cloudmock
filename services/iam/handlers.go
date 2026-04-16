@@ -962,6 +962,134 @@ func handleListAttachedRolePolicies(store *Store, form url.Values) (*service.Res
 	})
 }
 
+// ---- Inline role policies ----
+
+type xmlListRolePoliciesResponse struct {
+	XMLName xml.Name                  `xml:"ListRolePoliciesResponse"`
+	Xmlns   string                    `xml:"xmlns,attr"`
+	Result  xmlListRolePoliciesResult `xml:"ListRolePoliciesResult"`
+	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+}
+
+type xmlListRolePoliciesResult struct {
+	PolicyNames []string `xml:"PolicyNames>member"`
+	IsTruncated bool     `xml:"IsTruncated"`
+}
+
+// handleListRolePolicies returns names of inline policies embedded on a role.
+// Cloudmock doesn't model inline role policies yet (only managed-policy
+// attachments via Attach/DetachRolePolicy), so this reports an empty list
+// for any existing role. Pulumi's post-create refresh needs this call to
+// succeed; without it, every IAM role resource fails after a successful
+// CreateRole.
+func handleListRolePolicies(store *Store, form url.Values) (*service.Response, error) {
+	roleName := form.Get("RoleName")
+	if roleName == "" {
+		return iamErr("ValidationError", "RoleName is required.", http.StatusBadRequest)
+	}
+	if _, err := store.GetRole(roleName); err != nil {
+		return errFromStore(err)
+	}
+	return xmlOK(&xmlListRolePoliciesResponse{
+		Xmlns:  iamXmlns,
+		Result: xmlListRolePoliciesResult{PolicyNames: nil},
+		Meta:   xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+// ---- Policy versions ----
+
+type xmlPolicyVersion struct {
+	Document         string `xml:"Document,omitempty"`
+	VersionId        string `xml:"VersionId"`
+	IsDefaultVersion bool   `xml:"IsDefaultVersion"`
+	CreateDate       string `xml:"CreateDate"`
+}
+
+type xmlGetPolicyVersionResponse struct {
+	XMLName xml.Name                  `xml:"GetPolicyVersionResponse"`
+	Xmlns   string                    `xml:"xmlns,attr"`
+	Result  xmlGetPolicyVersionResult `xml:"GetPolicyVersionResult"`
+	Meta    xmlResponseMetadata       `xml:"ResponseMetadata"`
+}
+
+type xmlGetPolicyVersionResult struct {
+	PolicyVersion xmlPolicyVersion `xml:"PolicyVersion"`
+}
+
+type xmlListPolicyVersionsResponse struct {
+	XMLName xml.Name                    `xml:"ListPolicyVersionsResponse"`
+	Xmlns   string                      `xml:"xmlns,attr"`
+	Result  xmlListPolicyVersionsResult `xml:"ListPolicyVersionsResult"`
+	Meta    xmlResponseMetadata         `xml:"ResponseMetadata"`
+}
+
+type xmlListPolicyVersionsResult struct {
+	Versions    []xmlPolicyVersion `xml:"Versions>member"`
+	IsTruncated bool               `xml:"IsTruncated"`
+}
+
+// handleGetPolicyVersion returns the policy document for a specific version of
+// a managed policy. Cloudmock stores only the latest document and treats every
+// policy as having a single version ("v1"). The document is URL-encoded in the
+// response, matching the real IAM API contract — AWS SDKs URL-decode the
+// Document field before surfacing it.
+func handleGetPolicyVersion(store *Store, form url.Values) (*service.Response, error) {
+	policyArn := form.Get("PolicyArn")
+	if policyArn == "" {
+		return iamErr("ValidationError", "PolicyArn is required.", http.StatusBadRequest)
+	}
+	versionId := form.Get("VersionId")
+	if versionId == "" {
+		versionId = "v1"
+	}
+
+	policy, err := store.GetPolicy(policyArn)
+	if err != nil {
+		return errFromStore(err)
+	}
+
+	return xmlOK(&xmlGetPolicyVersionResponse{
+		Xmlns: iamXmlns,
+		Result: xmlGetPolicyVersionResult{
+			PolicyVersion: xmlPolicyVersion{
+				Document:         url.QueryEscape(policy.Document),
+				VersionId:        versionId,
+				IsDefaultVersion: versionId == "v1",
+				CreateDate:       policy.CreateDate.Format(timeFmt),
+			},
+		},
+		Meta: xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
+// handleListPolicyVersions reports all versions of a managed policy. Cloudmock
+// models only a single version per policy, so this always returns a one-entry
+// list marked as the default version.
+func handleListPolicyVersions(store *Store, form url.Values) (*service.Response, error) {
+	policyArn := form.Get("PolicyArn")
+	if policyArn == "" {
+		return iamErr("ValidationError", "PolicyArn is required.", http.StatusBadRequest)
+	}
+
+	policy, err := store.GetPolicy(policyArn)
+	if err != nil {
+		return errFromStore(err)
+	}
+
+	return xmlOK(&xmlListPolicyVersionsResponse{
+		Xmlns: iamXmlns,
+		Result: xmlListPolicyVersionsResult{
+			Versions: []xmlPolicyVersion{{
+				VersionId:        "v1",
+				IsDefaultVersion: true,
+				CreateDate:       policy.CreateDate.Format(timeFmt),
+			}},
+		},
+		Meta: xmlResponseMetadata{RequestID: newRequestID()},
+	})
+}
+
 // ---- Group handlers ----
 
 func handleCreateGroup(store *Store, form url.Values) (*service.Response, error) {

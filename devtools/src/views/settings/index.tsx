@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useRouteSelection, hrefFor, useRouter } from '../../lib/router';
 import { Connections } from './connections';
 import { RoutingView } from '../routing';
 import { Config } from './config';
@@ -22,20 +22,24 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'account', label: 'Account' },
 ];
 
+const TAB_IDS = new Set<Tab>(TABS.map((t) => t.id));
+
 export function SettingsView() {
-  const [activeTab, setActiveTab] = useState<Tab>('connections');
+  const router = useRouter();
+  const [raw] = useRouteSelection();
+  const activeTab: Tab = raw && TAB_IDS.has(raw as Tab) ? (raw as Tab) : 'connections';
 
   return (
     <div class="settings-view">
       <div class="settings-tabs">
         {TABS.map((t) => (
-          <button
+          <a
             key={t.id}
+            href={hrefFor({ view: 'settings', segments: [t.id] }, router)}
             class={`tab ${activeTab === t.id ? 'active' : ''}`}
-            onClick={() => setActiveTab(t.id)}
           >
             {t.label}
-          </button>
+          </a>
         ))}
       </div>
       <div class="settings-content">

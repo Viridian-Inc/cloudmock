@@ -1,6 +1,7 @@
 import type { JSX } from 'preact';
 import type { ViewId } from '../../app';
 import { t } from '../../lib/i18n';
+import { hrefFor } from '../../lib/router';
 import {
   ZapIcon,
   TopologyIcon,
@@ -122,52 +123,57 @@ const BOTTOM_ITEMS: NavItem[] = [
   { id: 'settings', icon: SettingsIcon, i18nKey: 'nav.settings' },
 ];
 
+function RailLink({
+  item,
+  activeView,
+  onViewChange,
+}: {
+  item: NavItem;
+  activeView: ViewId;
+  onViewChange: (v: ViewId) => void;
+}) {
+  const label = t(item.i18nKey);
+  const IconCmp = item.icon;
+  const isActive = activeView === item.id;
+  const href = hrefFor({ view: item.id, segments: [], params: {} });
+  return (
+    <a
+      key={item.id}
+      href={href}
+      class={`rail-item${isActive ? ' active' : ''}`}
+      title={label}
+      role="tab"
+      aria-selected={isActive}
+      aria-label={label}
+      onClick={(e: MouseEvent) => {
+        // Let cmd/ctrl/shift/middle-click fall through to default (new tab).
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+        onViewChange(item.id);
+      }}
+    >
+      <IconCmp class="rail-item-icon" />
+      <span class="rail-item-label">{label}</span>
+    </a>
+  );
+}
+
 export function IconRail({ activeView, onViewChange }: IconRailProps) {
   return (
     <nav class="icon-rail" role="navigation" aria-label="Main navigation">
       {NAV_GROUPS.map((group) => (
         <div key={group.label} class="rail-group">
           <div class="rail-group-label">{group.label}</div>
-          {group.items.map((item) => {
-            const label = t(item.i18nKey);
-            const IconCmp = item.icon;
-            return (
-              <button
-                key={item.id}
-                class={`rail-item${activeView === item.id ? ' active' : ''}`}
-                onClick={() => onViewChange(item.id)}
-                title={label}
-                role="tab"
-                aria-selected={activeView === item.id}
-                aria-label={label}
-              >
-                <IconCmp class="rail-item-icon" />
-                <span class="rail-item-label">{label}</span>
-              </button>
-            );
-          })}
+          {group.items.map((item) => (
+            <RailLink key={item.id} item={item} activeView={activeView} onViewChange={onViewChange} />
+          ))}
         </div>
       ))}
       <div class="rail-spacer" />
       <div class="rail-group">
-        {BOTTOM_ITEMS.map((item) => {
-          const label = t(item.i18nKey);
-          const IconCmp = item.icon;
-          return (
-            <button
-              key={item.id}
-              class={`rail-item${activeView === item.id ? ' active' : ''}`}
-              onClick={() => onViewChange(item.id)}
-              title={label}
-              role="tab"
-              aria-selected={activeView === item.id}
-              aria-label={label}
-            >
-              <IconCmp class="rail-item-icon" />
-              <span class="rail-item-label">{label}</span>
-            </button>
-          );
-        })}
+        {BOTTOM_ITEMS.map((item) => (
+          <RailLink key={item.id} item={item} activeView={activeView} onViewChange={onViewChange} />
+        ))}
       </div>
     </nav>
   );

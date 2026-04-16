@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { ConnectionProvider, useConnection } from './lib/connection';
 import { AuthProvider, useAuth } from './lib/auth';
+import { RouterProvider, useRouter } from './lib/router';
 import { setAdminBase, setAuthToken } from './lib/api';
 import type { Environment } from './lib/environments';
 import { IconRail } from './components/icon-rail/icon-rail';
@@ -137,8 +138,19 @@ const SHORTCUT_VIEWS: Record<string, ViewId> = {
   settings: 'settings',
 };
 
+function isKnownView(v: string): v is ViewId {
+  return Object.prototype.hasOwnProperty.call(VIEW_COMPONENTS, v);
+}
+
 function Workspace() {
-  const [activeView, setActiveView] = useState<ViewId>('activity');
+  const router = useRouter();
+  const activeView: ViewId = isKnownView(router.view) ? router.view : 'activity';
+  const setActiveView = useCallback(
+    (v: ViewId) => {
+      router.push({ view: v, segments: [] });
+    },
+    [router],
+  );
   const { state, connect, isFirstLaunch } = useConnection();
   const { auth, fetchSaaSConfig } = useAuth();
   const [showPicker, setShowPicker] = useState(isFirstLaunch);
@@ -185,27 +197,24 @@ function Workspace() {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.service) {
-        // Set hash so ActivityView picks up the filter on mount
-        window.location.hash = `service=${encodeURIComponent(detail.service)}`;
-        setActiveView('activity');
+        router.push({ view: 'activity', segments: [], params: { service: detail.service } });
       }
     };
     document.addEventListener('neureaux:navigate-activity', handler);
     return () => document.removeEventListener('neureaux:navigate-activity', handler);
-  }, []);
+  }, [router]);
 
   // Listen for navigate-traces event from activity event detail
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.traceId) {
-        window.location.hash = `trace=${encodeURIComponent(detail.traceId)}`;
-        setActiveView('traces');
+        router.push({ view: 'traces', segments: [detail.traceId] });
       }
     };
     document.addEventListener('neureaux:navigate-traces', handler);
     return () => document.removeEventListener('neureaux:navigate-traces', handler);
-  }, []);
+  }, [router]);
 
   // Keyboard shortcut handler
   const handleShortcut = useCallback(
@@ -279,10 +288,12 @@ function Workspace() {
 
 export function App() {
   return (
-    <AuthProvider>
-      <ConnectionProvider>
-        <Workspace />
-      </ConnectionProvider>
-    </AuthProvider>
+    <RouterProvider>
+      <AuthProvider>
+        <ConnectionProvider>
+          <Workspace />
+        </ConnectionProvider>
+      </AuthProvider>
+    </RouterProvider>
   );
 }

@@ -220,6 +220,12 @@ func (s *IAMService) HandleRequest(ctx *service.RequestContext) (*service.Respon
 		return handleListAttachedUserPolicies(s.store, form)
 	case "ListAttachedRolePolicies":
 		return handleListAttachedRolePolicies(s.store, form)
+	case "ListRolePolicies":
+		return handleListRolePolicies(s.store, form)
+	case "GetPolicyVersion":
+		return handleGetPolicyVersion(s.store, form)
+	case "ListPolicyVersions":
+		return handleListPolicyVersions(s.store, form)
 	// Groups
 	case "CreateGroup":
 		return handleCreateGroup(s.store, form)

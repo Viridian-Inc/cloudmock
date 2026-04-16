@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import { SplitPanel } from '../../components/panels/split-panel';
 import { api, getAdminBase } from '../../lib/api';
 import type { RequestEvent } from '../../lib/types';
+import { useRouter } from '../../lib/router';
 import { EventList } from './event-list';
 import { EventDetail } from './event-detail';
 import './activity.css';
@@ -11,21 +12,17 @@ interface Filters {
   status: string;
 }
 
-/** Read initial service filter from URL hash: #service=dynamodb */
-function getInitialServiceFilter(): string {
-  const hash = window.location.hash;
-  const match = hash.match(/[#&]service=([^&]*)/);
-  return match ? decodeURIComponent(match[1]) : '';
-}
-
 export function ActivityView() {
+  const router = useRouter();
+  const urlService = router.params.service ?? '';
+  const urlStatus = router.params.status ?? '';
   const [requests, setRequests] = useState<RequestEvent[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<Filters>(() => ({
-    service: getInitialServiceFilter(),
-    status: '',
+    service: urlService,
+    status: urlStatus,
   }));
   const [connected, setConnected] = useState(false);
   const [dataSource, setDataSource] = useState<'loading' | 'sse' | 'polling'>('loading');
@@ -146,16 +143,29 @@ export function ActivityView() {
     return () => document.removeEventListener('neureaux:navigate-activity', handler);
   }, []);
 
-  // Sync service filter to URL hash
+  // Sync service + status filters to URL query params.
   useEffect(() => {
-    if (filters.service) {
-      window.location.hash = `service=${encodeURIComponent(filters.service)}`;
-    } else {
-      if (window.location.hash.includes('service=')) {
-        window.location.hash = '';
-      }
-    }
-  }, [filters.service]);
+    router.setParams(
+      {
+        service: filters.service || null,
+        status: filters.status || null,
+      },
+      { replace: true },
+    );
+    // router identity changes on every param change; listing only the filter
+    // values avoids a feedback loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.service, filters.status]);
+
+  // If another view navigated here with a service filter (e.g. topology node
+  // inspector → activity), pick up the URL change.
+  useEffect(() => {
+    setFilters((prev) =>
+      prev.service === urlService && prev.status === urlStatus
+        ? prev
+        : { service: urlService, status: urlStatus },
+    );
+  }, [urlService, urlStatus]);
 
   const handleTogglePause = useCallback(() => setPaused((p) => !p), []);
   const handleTogglePin = useCallback(() => setPinned((p) => !p), []);

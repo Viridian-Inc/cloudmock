@@ -358,8 +358,16 @@ export const TopologyCanvas = forwardRef<TopologyCanvasHandle, CanvasProps>(func
 
   const handleWheel = useCallback((e: WheelEvent) => {
     e.preventDefault();
-    setScale((s) => Math.max(0.15, Math.min(2.5, s * (e.deltaY > 0 ? 0.92 : 1.08))));
-  }, []);
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const cx = e.clientX - rect.left;
+    const cy = e.clientY - rect.top;
+    const newScale = Math.max(0.15, Math.min(2.5, scale * (e.deltaY > 0 ? 0.92 : 1.08)));
+    if (newScale === scale) return;
+    const factor = newScale / scale;
+    setScale(newScale);
+    setPan({ x: cx - (cx - pan.x) * factor, y: cy - (cy - pan.y) * factor });
+  }, [scale, pan]);
 
   const handleMouseDown = useCallback((e: MouseEvent) => {
     if (e.button !== 0) return;

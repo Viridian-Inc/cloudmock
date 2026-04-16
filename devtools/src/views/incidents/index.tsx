@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useRouteSelection } from '../../lib/router';
 import { SplitPanel } from '../../components/panels/split-panel';
 import { api } from '../../lib/api';
 import './incidents.css';
@@ -689,8 +690,8 @@ function IncidentDetail({
 }
 
 export function IncidentsView() {
+  const [selectedId, setSelectedId] = useRouteSelection();
   const [incidents, setIncidents] = useState<Incident[]>([]);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchIncidents = useCallback(() => {

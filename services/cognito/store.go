@@ -31,8 +31,9 @@ type UserPool struct {
 	Policies             map[string]any
 	AutoVerifiedAttributes []string
 	Schema               []map[string]any
-	Clients              map[string]*UserPoolClient // keyed by ClientId
-	Users                map[string]*User           // keyed by Username (case-insensitive: stored lowercase)
+	Clients              map[string]*UserPoolClient   // keyed by ClientId
+	Users                map[string]*User             // keyed by Username (case-insensitive: stored lowercase)
+	IdentityProviders    map[string]*IdentityProvider // keyed by ProviderName
 }
 
 // UserPoolClient holds all metadata for a Cognito User Pool App Client.
@@ -155,6 +156,7 @@ func (s *Store) CreateUserPool(name string, policies map[string]any, autoVerifie
 		Schema:               schema,
 		Clients:              make(map[string]*UserPoolClient),
 		Users:                make(map[string]*User),
+		IdentityProviders:    make(map[string]*IdentityProvider),
 	}
 
 	s.mu.Lock()

@@ -6,6 +6,7 @@ import type { DomainConfig } from '../../lib/domains';
 import type { ManifestService } from './endpoints-tab';
 import { computeHealthState } from '../../lib/health';
 import { getAdminBase } from '../../lib/api';
+import { peek } from '../../lib/pane-stack';
 
 interface ServiceBrowserProps {
   nodes: TopoNode[];
@@ -252,6 +253,21 @@ export function ServiceBrowser({
                 {svc.incidentCount > 0 && (
                   <span class="domain-service-incident-badge">{svc.incidentCount}</span>
                 )}
+                <button
+                  class="domain-service-peek-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    peek({
+                      view: 'activity',
+                      params: { service: svc.svcKey },
+                      title: svc.node.label,
+                    });
+                  }}
+                  title={`Peek ${svc.node.label} activity in a new pane`}
+                  aria-label={`Peek ${svc.node.label}`}
+                >
+                  {'\u2197'}
+                </button>
                 <button
                   class={`domain-service-route-toggle ${(routingModes[svc.svcKey] || 'local') === 'cloud' ? 'cloud' : 'local'}`}
                   onClick={(e) => { e.stopPropagation(); toggleRouting(svc.svcKey); }}

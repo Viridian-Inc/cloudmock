@@ -90,9 +90,13 @@ type SavedView struct {
 }
 
 // IaCTopologyConfig holds the topology graph pushed from the IaC layer.
+// Services carries the per-microservice route manifest so the devtools
+// EndpointsTab can render real endpoints for each compute node instead
+// of falling back to the AWS-plugin action registry.
 type IaCTopologyConfig struct {
-	Nodes []TopologyNodeV2 `json:"nodes"`
-	Edges []TopologyEdgeV2 `json:"edges"`
+	Nodes    []TopologyNodeV2       `json:"nodes"`
+	Edges    []TopologyEdgeV2       `json:"edges"`
+	Services []iac.MicroserviceDef  `json:"services,omitempty"`
 }
 
 // API is the admin HTTP handler.
@@ -1366,12 +1370,17 @@ func (a *API) handleTopologyConfig(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		a.iacTopologyMu.RLock()
 		cfg := a.iacTopology
+		services := a.iacMicroservices
 		a.iacTopologyMu.RUnlock()
+		// Always merge in the live microservice manifest so the UI's endpoints
+		// view can resolve routes even when no IaC topology has been PUT.
 		if cfg == nil {
-			writeJSON(w, http.StatusOK, IaCTopologyConfig{})
+			writeJSON(w, http.StatusOK, IaCTopologyConfig{Services: services})
 			return
 		}
-		writeJSON(w, http.StatusOK, cfg)
+		out := *cfg
+		out.Services = services
+		writeJSON(w, http.StatusOK, out)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
 	}

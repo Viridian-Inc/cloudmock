@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { ConnectionProvider, useConnection } from './lib/connection';
 import { AuthProvider, useAuth } from './lib/auth';
 import { RouterProvider, useRouter } from './lib/router';
+import { PaneStackProvider, PaneRouterScope, type Pane } from './lib/pane-stack';
+import { PaneStack } from './components/pane-stack/pane-stack';
 import { setAdminBase, setAuthToken } from './lib/api';
 import type { Environment } from './lib/environments';
 import { IconRail } from './components/icon-rail/icon-rail';
@@ -252,6 +254,16 @@ function Workspace() {
 
   const ViewComponent = VIEW_COMPONENTS[activeView];
 
+  const renderPane = useCallback((pane: Pane) => {
+    const view = isKnownView(pane.view) ? pane.view : 'activity';
+    const PaneView = VIEW_COMPONENTS[view];
+    return (
+      <PaneRouterScope pane={pane}>
+        <PaneView />
+      </PaneRouterScope>
+    );
+  }, []);
+
   return (
     <>
       <CommandPalette onNavigate={setActiveView} />
@@ -266,9 +278,10 @@ function Workspace() {
         <div class="workspace-main">
           <SourceBar />
           <div class="workspace-content">
-            <ErrorBoundary>
-              <ViewComponent />
-            </ErrorBoundary>
+            <PaneStack
+              base={<ViewComponent />}
+              renderPane={renderPane}
+            />
           </div>
           <StatusBar
             connected={state.connected}
@@ -289,11 +302,13 @@ function Workspace() {
 export function App() {
   return (
     <RouterProvider>
-      <AuthProvider>
-        <ConnectionProvider>
-          <Workspace />
-        </ConnectionProvider>
-      </AuthProvider>
+      <PaneStackProvider>
+        <AuthProvider>
+          <ConnectionProvider>
+            <Workspace />
+          </ConnectionProvider>
+        </AuthProvider>
+      </PaneStackProvider>
     </RouterProvider>
   );
 }

@@ -60,6 +60,12 @@ func (s *CognitoService) Actions() []service.Action {
 		{Name: "ForgotPassword", Method: http.MethodPost, IAMAction: "cognito-idp:ForgotPassword"},
 		{Name: "ConfirmForgotPassword", Method: http.MethodPost, IAMAction: "cognito-idp:ConfirmForgotPassword"},
 		{Name: "ChangePassword", Method: http.MethodPost, IAMAction: "cognito-idp:ChangePassword"},
+		// Identity providers (SAML / OIDC federation)
+		{Name: "CreateIdentityProvider", Method: http.MethodPost, IAMAction: "cognito-idp:CreateIdentityProvider"},
+		{Name: "DescribeIdentityProvider", Method: http.MethodPost, IAMAction: "cognito-idp:DescribeIdentityProvider"},
+		{Name: "UpdateIdentityProvider", Method: http.MethodPost, IAMAction: "cognito-idp:UpdateIdentityProvider"},
+		{Name: "DeleteIdentityProvider", Method: http.MethodPost, IAMAction: "cognito-idp:DeleteIdentityProvider"},
+		{Name: "ListIdentityProviders", Method: http.MethodPost, IAMAction: "cognito-idp:ListIdentityProviders"},
 	}
 }
 
@@ -172,6 +178,17 @@ func (s *CognitoService) HandleRequest(ctx *service.RequestContext) (*service.Re
 		return handleConfirmForgotPassword(ctx, s.store)
 	case "ChangePassword":
 		return handleChangePassword(ctx, s.store)
+	// Identity providers (SAML / OIDC federation)
+	case "CreateIdentityProvider":
+		return handleCreateIdentityProvider(ctx, s.store)
+	case "DescribeIdentityProvider":
+		return handleDescribeIdentityProvider(ctx, s.store)
+	case "UpdateIdentityProvider":
+		return handleUpdateIdentityProvider(ctx, s.store)
+	case "DeleteIdentityProvider":
+		return handleDeleteIdentityProvider(ctx, s.store)
+	case "ListIdentityProviders":
+		return handleListIdentityProviders(ctx, s.store)
 	default:
 		return &service.Response{Format: service.FormatJSON},
 			service.NewAWSError("InvalidAction",

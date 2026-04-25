@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { useRouteSelection } from '../../lib/router';
 import { SplitPanel } from '../../components/panels/split-panel';
 import { api } from '../../lib/api';
+import { peek } from '../../lib/pane-stack';
 import './incidents.css';
 
 interface Incident {
@@ -415,7 +416,18 @@ function RelatedTraces({ incident }: { incident: Incident }) {
             </thead>
             <tbody>
               {traces.map((t) => (
-                <tr key={t.TraceID} class="related-trace-row">
+                <tr
+                  key={t.TraceID}
+                  class="related-trace-row related-trace-row-clickable"
+                  onClick={() =>
+                    peek({
+                      view: 'traces',
+                      segments: [t.TraceID],
+                      title: `Trace ${t.TraceID.slice(0, 8)}`,
+                    })
+                  }
+                  title="Peek this trace in a new pane"
+                >
                   <td>
                     <span class="related-trace-service">{t.RootService}</span>
                   </td>
@@ -648,8 +660,43 @@ function IncidentDetail({
         </div>
         <div class="incident-detail-field">
           <span class="incident-field-label">Service</span>
-          <span class="incident-field-value incident-field-accent">{incident.service}</span>
+          <button
+            class="incident-field-value incident-field-accent incident-peek-link"
+            onClick={() =>
+              peek({
+                view: 'activity',
+                params: { service: incident.service },
+                title: incident.service,
+              })
+            }
+            title={`Peek ${incident.service} activity in a new pane`}
+          >
+            {incident.service} {'\u2197'}
+          </button>
         </div>
+        {incident.affected_services && incident.affected_services.length > 1 && (
+          <div class="incident-detail-field">
+            <span class="incident-field-label">Affected</span>
+            <span class="incident-field-value">
+              {incident.affected_services.map((s, i) => (
+                <button
+                  key={s}
+                  class="incident-peek-link incident-peek-chip"
+                  onClick={() =>
+                    peek({
+                      view: 'activity',
+                      params: { service: s },
+                      title: s,
+                    })
+                  }
+                  title={`Peek ${s} activity`}
+                >
+                  {s}{i < incident.affected_services!.length - 1 ? ' ' : ''}
+                </button>
+              ))}
+            </span>
+          </div>
+        )}
         <div class="incident-detail-field">
           <span class="incident-field-label">Created</span>
           <span class="incident-field-value">{formatTime(incident.timestamp)}</span>

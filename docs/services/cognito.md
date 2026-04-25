@@ -22,6 +22,35 @@
 | `SignUp` | User self-registration |
 | `InitiateAuth` | Starts the authentication flow |
 | `AdminConfirmSignUp` | Confirms a user's registration (admin API) |
+| `CreateGroup` | Creates a user pool group |
+| `DeleteGroup` | Deletes a group |
+| `GetGroup` | Returns group details |
+| `ListGroups` | Returns all groups in a pool |
+| `AdminAddUserToGroup` | Adds a user to a group (admin API) |
+| `AdminRemoveUserFromGroup` | Removes a user from a group (admin API) |
+| `ForgotPassword` | Initiates password reset |
+| `ConfirmForgotPassword` | Completes password reset with a code |
+| `ChangePassword` | Changes a user's password via access token |
+| `CreateIdentityProvider` | Registers a SAML/OIDC federated IdP on the pool |
+| `DescribeIdentityProvider` | Returns the full IdP record incl. `ProviderDetails` |
+| `UpdateIdentityProvider` | Partial update — omitted fields are preserved |
+| `DeleteIdentityProvider` | Removes the federated IdP from the pool |
+| `ListIdentityProviders` | Returns summaries (no `ProviderDetails`) |
+
+### Identity providers
+
+Supported `ProviderType` values match AWS's enum: `SAML`, `OIDC`,
+`Google`, `Facebook`, `LoginWithAmazon`, `SignInWithApple`. Any other
+value returns `InvalidParameterException` at Create.
+
+`ProviderDetails` is a flat `string→string` map. For SAML that's
+typically `MetadataURL` / `MetadataFile` / `IDPSignout`; for OIDC it's
+`client_id` / `client_secret` / `oidc_issuer` / `authorize_url` /
+`token_url` / `attributes_url` / `jwks_uri` / `authorize_scopes` /
+`attributes_request_method`.
+
+Creating a provider with a name that already exists on the pool
+returns `DuplicateProviderException`.
 
 ## Examples
 

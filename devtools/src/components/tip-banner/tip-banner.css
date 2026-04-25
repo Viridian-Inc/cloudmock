@@ -1,0 +1,65 @@
+/* Tip banner — subtle inline hint in the source-bar area. Not a modal,
+ * not a toast; sits in the flow between sources and the env picker so it
+ * doesn't steal focus or block the canvas.
+ */
+
+.tip-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--info-subtle);
+  border: 1px solid var(--border-default);
+  color: var(--text-secondary);
+  font-size: 11px;
+  max-width: 520px;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.tip-banner-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.tip-banner-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tip-banner-close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--text-tertiary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 11px;
+  transition: background 0.15s, color 0.15s;
+}
+.tip-banner-close:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+@media (max-width: 1100px) {
+  .tip-banner {
+    max-width: 260px;
+  }
+}
+
+@media (max-width: 800px) {
+  .tip-banner {
+    display: none;
+  }
+}

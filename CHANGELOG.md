@@ -1,5 +1,22 @@
 # Changelog
 
+## v1.9.0 (2026-04-16)
+
+### Added
+- **Pane-stack navigation in devtools** — in-place drill-down from the topology connections tab peeks into the activity view filtered to the clicked service instead of bouncing through a dead trace-detail route. Pane state lives alongside the router so peeks are deep-linkable.
+- **Tip banner component + tips library** — contextual inline hints across logs, metrics, incidents, and settings views.
+- **`services` on `GET /api/topology/config`** — the endpoint now returns the IaC-extracted microservice manifest (name, routes, tables) alongside nodes and edges. Devtools previously fell back to `/api/services` (AWS plugin actions with synthesized paths) because this field didn't exist, which is why every compute card looked identical.
+
+### Fixed
+- **Every IaC compute node showed the same endpoint.** Three compounding bugs in the devtools endpoints tab:
+  - `getServiceKey()` collapsed every `microservice:*` node to `"lambda"` because microservice nodes carry `node.service="lambda"`. The function now reads the ID suffix for `microservice:*` and `lambda:*` IDs the same way it already did for `external:*` / `plugin:*`.
+  - `getSpecEndpointsForService()` had a fallback that dumped every loaded OpenAPI spec's endpoints back for any unmatched service, so one loaded spec echoed onto every compute card. Unmatched services now return empty.
+  - Combined with the new `services` field above, the endpoints tab now resolves real per-microservice routes from the IaC import instead of the AWS plugin action registry.
+
+### Changed
+- Devtools view polish across incidents, logs, metrics, topology, settings/appearance, icon rail, and source bar.
+- Embedded dashboard bundle rebuilt.
+
 ## v1.8.3 (2026-04-15)
 
 ### Added

@@ -320,18 +320,51 @@ function extractEndpoints(spec: Record<string, unknown>): OpenAPIEndpoint[] {
  * Scan for OpenAPI spec files from the configured paths.
  * Tries to fetch each path from the Vite dev server.
  */
-export async function scanOpenAPISpecs(): Promise<OpenAPISpec[]> {
+export interface ScanAttempt {
+  path: string;
+  ok: boolean;
+  error?: string;
+  endpointCount?: number;
+  title?: string;
+}
+
+/** Holds both successful specs and per-path diagnostics for every attempted URL. */
+export interface ScanResult {
+  specs: OpenAPISpec[];
+  attempts: ScanAttempt[];
+}
+
+export async function scanOpenAPISpecsDetailed(): Promise<ScanResult> {
   const paths = getScanPaths();
   const specs: OpenAPISpec[] = [];
+  const attempts: ScanAttempt[] = [];
 
   const results = await Promise.allSettled(
     paths.map(async (path) => {
       const url = path.startsWith('http') ? path : `/${path}`;
-      const res = await fetch(url);
-      if (!res.ok) return null;
+      let res: Response;
+      try {
+        res = await fetch(url);
+      } catch (e) {
+        // TypeError on fetch is usually a CORS or network failure. Record it
+        // so the diagnostic can surface the real reason.
+        throw new Error(`fetch failed for ${url}: ${(e as Error).message || 'network/CORS error'}`);
+      }
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText} at ${url}`);
       const text = await res.text();
+      // Vite's dev server serves `index.html` for any unmatched path under
+      // SPA mode — so `/openapi.yaml` returns HTML, not a 404. Drop anything
+      // that clearly isn't a spec before we try to parse.
+      const head = text.trimStart().slice(0, 16).toLowerCase();
+      if (head.startsWith('<!doctype') || head.startsWith('<html')) {
+        throw new Error(`HTML response at ${url} (likely SPA fallback — wrong URL)`);
+      }
       const parsed = parseSpec(text, path);
-      if (!parsed) return null;
+      if (!parsed) throw new Error(`couldn't parse ${url} as YAML or JSON`);
+      // Sanity check: a real OpenAPI/Swagger doc advertises itself.
+      if (!parsed.openapi && !parsed.swagger && !parsed.paths) {
+        throw new Error(`${url} parsed but has no openapi/swagger/paths — not a spec`);
+      }
 
       const info = parsed.info as Record<string, unknown> | undefined;
       const title = info?.title ? String(info.title) : path;
@@ -358,13 +391,32 @@ export async function scanOpenAPISpecs(): Promise<OpenAPISpec[]> {
     }),
   );
 
-  for (const result of results) {
+  for (let i = 0; i < results.length; i++) {
+    const result = results[i];
+    const path = paths[i];
     if (result.status === 'fulfilled' && result.value) {
       specs.push(result.value);
+      attempts.push({
+        path,
+        ok: true,
+        endpointCount: result.value.endpoints.length,
+        title: result.value.title,
+      });
+    } else {
+      const err = result.status === 'rejected'
+        ? (result.reason instanceof Error ? result.reason.message : String(result.reason))
+        : 'unknown';
+      attempts.push({ path, ok: false, error: err });
     }
   }
 
-  return specs;
+  return { specs, attempts };
+}
+
+/** Back-compat: return only successful specs. */
+export async function scanOpenAPISpecs(): Promise<OpenAPISpec[]> {
+  const r = await scanOpenAPISpecsDetailed();
+  return r.specs;
 }
 
 /**
@@ -393,15 +445,41 @@ export function matchSpecToService(
 
 /**
  * Get endpoints from OpenAPI specs for a specific service.
+ *
+ * Match priority:
+ *   1. spec whose title / basePath mentions the service name
+ *   2. spec whose endpoint tags include the service name
+ *   3. fallback: if the user configured any specs at all, return everything
+ *      from all of them — they added those paths deliberately, so showing
+ *      their full API surface is more useful than "No route metadata."
  */
 export function getSpecEndpointsForService(
   specs: OpenAPISpec[],
   serviceName: string,
 ): OpenAPIEndpoint[] {
+  // 1. title / basePath match
   for (const spec of specs) {
     if (matchSpecToService(spec, serviceName)) {
       return spec.endpoints;
     }
   }
+
+  // 2. tag match — OpenAPI ops often tag routes with their owning service/module.
+  const svcLower = serviceName.toLowerCase().replace(/[-_]/g, '');
+  const tagged: OpenAPIEndpoint[] = [];
+  for (const spec of specs) {
+    for (const ep of spec.endpoints) {
+      const hasTag = ep.tags?.some((t) => {
+        const tl = t.toLowerCase().replace(/[-_]/g, '');
+        return tl.includes(svcLower) || svcLower.includes(tl);
+      });
+      if (hasTag) tagged.push(ep);
+    }
+  }
+  if (tagged.length > 0) return tagged;
+
+  // No match — return empty rather than echoing every loaded spec's endpoints
+  // back for every service. The old flatMap fallback made unrelated compute
+  // nodes all look identical.
   return [];
 }

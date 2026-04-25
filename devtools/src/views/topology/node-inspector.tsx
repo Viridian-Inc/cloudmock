@@ -9,6 +9,7 @@ import { Sparkline } from './sparkline';
 import { EndpointsTab, type ManifestService } from './endpoints-tab';
 import { DeployDetail } from './deploy-detail';
 import { RequestTracePanel } from './request-trace-panel';
+import { peek } from '../../lib/pane-stack';
 
 type TabId = 'metrics' | 'endpoints' | 'deploys' | 'incidents' | 'connections';
 
@@ -45,16 +46,23 @@ function relativeTime(iso: string): string {
 }
 
 function getServiceKey(node: TopoNode): string {
-  // For IaC nodes (external/plugin), use the ID suffix which is more specific
-  // e.g., "external:bff-service" → "bff-service", not "external"
-  if (node.service === 'external' || node.service === 'plugin') {
+  // IaC-imported resources (microservices and lambda functions) carry
+  // node.service='lambda' even though each node is a distinct function.
+  // Using node.service would collapse every compute node to the same key,
+  // so fall back to the ID suffix (the specific resource name) for any
+  // namespaced ID. Same logic applies to external/plugin nodes.
+  const namespaced = node.id.startsWith('microservice:') ||
+    node.id.startsWith('lambda:') ||
+    node.service === 'external' ||
+    node.service === 'plugin';
+  if (namespaced) {
     const colonIdx = node.id.indexOf(':');
     if (colonIdx >= 0) {
-      return node.id.substring(colonIdx + 1); // "bff-service"
+      return node.id.substring(colonIdx + 1);
     }
-    return node.label; // fallback to label
+    return node.label;
   }
-  // For AWS service nodes, use the service field
+  // AWS service nodes: use the service field (dynamodb, s3, etc.)
   return node.service || node.id.replace(/^svc:|^ms:/, '');
 }
 
@@ -329,7 +337,20 @@ function DeploysTab({ svcKey, deploys }: DeploysTabProps) {
   });
 
   if (filtered.length === 0) {
-    return <div class="inspector-placeholder">No recent deploys for this service.</div>;
+    return (
+      <div class="inspector-placeholder" style={{ textAlign: 'left', padding: '14px 16px', fontSize: '12px', lineHeight: 1.5 }}>
+        <div style={{ marginBottom: '10px', color: 'var(--text-secondary)' }}>
+          No recent deploys for <code>{svcKey}</code>.
+        </div>
+        <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
+          Deploys surface here when your CI publishes events to cloudmock:
+        </div>
+        <pre style={{ fontSize: '10px', fontFamily: 'var(--font-mono)', background: 'var(--bg-elevated)', padding: '8px 10px', borderRadius: '4px', marginTop: '6px', overflowX: 'auto' }}>
+{`curl -X POST $CLOUDMOCK/api/deploys \\
+  -d '{"service":"${svcKey}","commit":"abc123","author":"you"}'`}
+        </pre>
+      </div>
+    );
   }
 
   return (
@@ -422,11 +443,15 @@ function ConnectionsTab({ node, edges, allNodes }: ConnectionsTabProps) {
   const handleViewTraces = (serviceId: string) => {
     const svc = nodeMap.get(serviceId);
     const serviceName = svc?.service || serviceId.replace(/^svc:/, '');
-    document.dispatchEvent(
-      new CustomEvent('neureaux:navigate-traces', {
-        detail: { traceId: serviceName },
-      }),
-    );
+    // Peek into activity filtered to the service rather than dropping into the
+    // traces view with a service name as a fake id — the old behavior navigated
+    // into a trace-detail route that would render empty. The drill-down chain is
+    // now: topology → activity(service) → [user clicks an event to peek a trace].
+    peek({
+      view: 'activity',
+      params: { service: serviceName },
+      title: serviceName,
+    });
   };
 
   return (

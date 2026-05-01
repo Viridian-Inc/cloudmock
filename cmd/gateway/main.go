@@ -391,6 +391,8 @@ func main() {
 
 	cfg.ApplyEnv()
 
+	gateway.SetServicePrefixes(cfg.ServicePrefixes)
+
 	// Test mode: strip all observability, disable dashboard/admin/OTLP for maximum throughput.
 	// Use CLOUDMOCK_TEST_MODE=true when CloudMock is a test dependency.
 	testMode := os.Getenv("CLOUDMOCK_TEST_MODE") == "true" || os.Getenv("CLOUDMOCK_TEST_MODE") == "1"

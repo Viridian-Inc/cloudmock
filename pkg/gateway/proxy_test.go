@@ -10,7 +10,7 @@ func TestBuildRoutes_LocalhostRoutesExist(t *testing.T) {
 
 	// Verify all expected .localhost hosts are present
 	expectedHosts := []string{
-		"autotend-app.localhost",
+		"app.localhost",
 		"cloudmock.localhost",
 		"bff.localhost",
 		"api.localhost",
@@ -36,22 +36,22 @@ func TestBuildRoutes_LocalhostRoutesExist(t *testing.T) {
 func TestBuildRoutes_CustomDomainRoutesUseDomains(t *testing.T) {
 	routes := BuildRoutes("example.com", "mock.dev")
 
-	// Check autotend custom domain routes
-	atDomain := "localhost.example.com"
+	// Check primary-domain routes are present
+	primaryDomain := "localhost.example.com"
 	cmDomain := "localhost.mock.dev"
 
-	foundAT := false
+	foundPrimary := false
 	foundCM := false
 	for _, r := range routes {
-		if r.Host == atDomain || strings.HasSuffix(r.Host, "."+atDomain) {
-			foundAT = true
+		if r.Host == primaryDomain || strings.HasSuffix(r.Host, "."+primaryDomain) {
+			foundPrimary = true
 		}
 		if r.Host == cmDomain {
 			foundCM = true
 		}
 	}
 
-	if !foundAT {
+	if !foundPrimary {
 		t.Error("expected custom domain routes for localhost.example.com, not found")
 	}
 	if !foundCM {

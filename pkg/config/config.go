@@ -347,6 +347,10 @@ type Config struct {
 	SCM            SCMConfig                `yaml:"scm" json:"scm"`
 	Services       map[string]ServiceConfig `yaml:"services"`
 	Accounts       []AccountConfig          `yaml:"accounts"`
+	// ServicePrefixes are stripped from topology node labels and recognized as
+	// caller identifiers in request logs. Empty by default; set to e.g.
+	// ["mycorp-", "mycorp_"] to recognize your IaC naming convention.
+	ServicePrefixes []string `yaml:"service_prefixes" json:"service_prefixes"`
 }
 
 // SCMConfig holds source code management integration configuration.

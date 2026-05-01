@@ -72,18 +72,18 @@ func backend(port int) string {
 
 // BuildRoutes generates the routing table dynamically from domain names and port config.
 // Order matters — more specific paths must come first.
-func BuildRoutes(autotendDomain, cloudmockDomain string) []ProxyRoute {
-	return BuildRoutesWithPorts(autotendDomain, cloudmockDomain, DefaultServicePorts())
+func BuildRoutes(primaryDomain, cloudmockDomain string) []ProxyRoute {
+	return BuildRoutesWithPorts(primaryDomain, cloudmockDomain, DefaultServicePorts())
 }
 
 // BuildRoutesWithPorts generates routes using explicit port configuration.
-func BuildRoutesWithPorts(autotendDomain, cloudmockDomain string, p ServicePorts) []ProxyRoute {
-	at := "localhost." + autotendDomain
+func BuildRoutesWithPorts(primaryDomain, cloudmockDomain string, p ServicePorts) []ProxyRoute {
+	primary := "localhost." + primaryDomain
 	cm := "localhost." + cloudmockDomain
 
 	return []ProxyRoute{
 		// .localhost domains (RFC 6761, zero config)
-		{Host: "autotend-app.localhost", Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "app.localhost", Path: "/", Backend: backend(p.App), PreserveHost: true},
 		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: backend(p.Gateway)},
 		{Host: "cloudmock.localhost", Path: "/api/", Backend: backend(p.Admin)},
 		{Host: "cloudmock.localhost", Path: "/", Backend: backend(p.Dashboard)},
@@ -93,14 +93,14 @@ func BuildRoutesWithPorts(autotendDomain, cloudmockDomain string, p ServicePorts
 		{Host: "admin.localhost", Path: "/", Backend: backend(p.Admin)},
 		{Host: "graphql.localhost", Path: "/", Backend: backend(p.GraphQL)},
 
-		// custom domain: autotend app services
-		{Host: "autotend-app." + at, Path: "/", Backend: backend(p.App), PreserveHost: true},
-		{Host: "bff." + at, Path: "", Backend: backend(p.BFF)},
-		{Host: "api." + at, Path: "", Backend: backend(p.Gateway)},
-		{Host: "auth." + at, Path: "", Backend: backend(p.Gateway)},
-		{Host: "admin." + at, Path: "", Backend: backend(p.Admin)},
-		{Host: "graphql." + at, Path: "", Backend: backend(p.GraphQL)},
-		{Host: at, Path: "/", Backend: backend(p.App), PreserveHost: true},
+		// custom domain: app services
+		{Host: "app." + primary, Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "bff." + primary, Path: "", Backend: backend(p.BFF)},
+		{Host: "api." + primary, Path: "", Backend: backend(p.Gateway)},
+		{Host: "auth." + primary, Path: "", Backend: backend(p.Gateway)},
+		{Host: "admin." + primary, Path: "", Backend: backend(p.Admin)},
+		{Host: "graphql." + primary, Path: "", Backend: backend(p.GraphQL)},
+		{Host: primary, Path: "/", Backend: backend(p.App), PreserveHost: true},
 
 		// custom domain: cloudmock dashboard
 		{Host: cm, Path: "/_cloudmock/", Backend: backend(p.Gateway)},

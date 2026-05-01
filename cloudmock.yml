@@ -90,3 +90,9 @@ slo:
 #     runtimes:
 #       - nodejs20.x
 #       - python3.12
+
+# Project-specific identifier prefixes. Stripped from topology node labels and
+# used to recognize caller-service IDs in User-Agent / X-Cloudmock-Source.
+# service_prefixes:
+#   - mycorp-
+#   - mycorp_

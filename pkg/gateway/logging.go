@@ -628,9 +628,32 @@ func extractTraceMetadata(r *http.Request) map[string]string {
 	return meta
 }
 
+// servicePrefixes are User-Agent / source-name prefixes that identify caller
+// services in request logs (e.g. ["mycorp-"]). Set once at startup via
+// SetServicePrefixes; empty by default.
+var (
+	servicePrefixesMu sync.RWMutex
+	servicePrefixes   []string
+)
+
+// SetServicePrefixes configures the prefixes used by extractCallerID to
+// recognize caller-service identifiers embedded in User-Agent or
+// X-Cloudmock-Source headers. Safe to call once during startup.
+func SetServicePrefixes(prefixes []string) {
+	servicePrefixesMu.Lock()
+	defer servicePrefixesMu.Unlock()
+	servicePrefixes = append([]string(nil), prefixes...)
+}
+
+func getServicePrefixes() []string {
+	servicePrefixesMu.RLock()
+	defer servicePrefixesMu.RUnlock()
+	return servicePrefixes
+}
+
 func extractCallerID(r *http.Request) string {
 	// Prefer explicit source header from SDK-instrumented Lambda functions
-	// e.g. X-Cloudmock-Source: autotend-order-handler
+	// e.g. X-Cloudmock-Source: mycorp-order-handler
 	if src := r.Header.Get("X-Cloudmock-Source"); src != "" {
 		return src
 	}
@@ -638,11 +661,14 @@ func extractCallerID(r *http.Request) string {
 	// Fall back to User-Agent which AWS SDKs set to "aws-sdk-nodejs/3.x" etc.
 	// Some custom SDK configs include the function name
 	if ua := r.Header.Get("User-Agent"); ua != "" {
-		// Check for Lambda function name pattern in User-Agent
-		// e.g. "aws-sdk-nodejs/3.x autotend-order-handler"
-		if strings.Contains(ua, "autotend-") {
+		// Check for caller-service prefixes in the User-Agent
+		// e.g. "aws-sdk-nodejs/3.x mycorp-order-handler"
+		for _, prefix := range getServicePrefixes() {
+			if !strings.Contains(ua, prefix) {
+				continue
+			}
 			for _, part := range strings.Fields(ua) {
-				if strings.HasPrefix(part, "autotend-") {
+				if strings.HasPrefix(part, prefix) {
 					return part
 				}
 			}

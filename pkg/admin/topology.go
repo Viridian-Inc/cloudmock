@@ -471,8 +471,9 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 
 	// Clean labels: strip project prefixes and env suffixes for display
 	env := a.environment()
+	prefixes := a.servicePrefixes()
 	for i := range nodes {
-		nodes[i].Label = cleanNodeLabel(nodes[i].Label, env)
+		nodes[i].Label = cleanNodeLabel(nodes[i].Label, env, prefixes)
 	}
 
 	// Enrich edges with latency stats from request log
@@ -487,10 +488,10 @@ func (a *API) buildDynamicTopology() TopologyResponseV2 {
 	}
 }
 
-// cleanNodeLabel strips common IaC prefixes and environment suffixes from node labels.
-func cleanNodeLabel(label, env string) string {
+// cleanNodeLabel strips configured IaC prefixes and the environment suffix from node labels.
+func cleanNodeLabel(label, env string, prefixes []string) string {
 	cleaned := label
-	for _, prefix := range []string{"autotend-", "autotend_"} {
+	for _, prefix := range prefixes {
 		cleaned = strings.TrimPrefix(cleaned, prefix)
 	}
 	if env != "" {
@@ -923,6 +924,15 @@ func (a *API) environment() string {
 		return a.cfg.IaCEnv
 	}
 	return "dev"
+}
+
+// servicePrefixes returns the configured service-name prefixes (e.g. ["mycorp-"])
+// used to strip noise from topology labels and recognize caller IDs in logs.
+func (a *API) servicePrefixes() []string {
+	if a.cfg == nil {
+		return nil
+	}
+	return a.cfg.ServicePrefixes
 }
 
 // serviceHasActivity checks if a service has received any traffic in the request log.

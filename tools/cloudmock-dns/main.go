@@ -21,12 +21,12 @@ const resolverDir = "/etc/resolver"
 const baseDNSPort = 15353
 
 type domainConfig struct {
-	Autotend  string
+	Primary   string
 	Cloudmock string
 }
 
 var defaultDomains = domainConfig{
-	Autotend:  "cloudmock.app",
+	Primary:   "cloudmock.app",
 	Cloudmock: "cloudmock.app",
 }
 
@@ -50,8 +50,12 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 		return defaultDomains, fmt.Errorf("domains is not a map in %s", path)
 	}
 	dc := defaultDomains
-	if v, ok := domainsMap["autotend"].(string); ok {
-		dc.Autotend = v
+	// "primary" is the canonical key; "autotend" is accepted as a legacy
+	// alias so existing autotend-infra Pulumi configs keep working.
+	if v, ok := domainsMap["primary"].(string); ok {
+		dc.Primary = v
+	} else if v, ok := domainsMap["autotend"].(string); ok {
+		dc.Primary = v
 	}
 	if v, ok := domainsMap["cloudmock"].(string); ok {
 		dc.Cloudmock = v
@@ -61,7 +65,7 @@ func parsePulumiConfig(path string) (domainConfig, error) {
 
 func (dc domainConfig) sortedDomains() []struct{ key, domain string } {
 	pairs := []struct{ key, domain string }{
-		{"cloudmock", dc.Autotend},
+		{"primary", dc.Primary},
 		{"cloudmock", dc.Cloudmock},
 	}
 	sort.Slice(pairs, func(i, j int) bool { return pairs[i].key < pairs[j].key })
@@ -81,16 +85,16 @@ func (dc domainConfig) resolverEntries() []struct{ path, content string } {
 }
 
 func (dc domainConfig) hostsEntries() []string {
-	at := "localhost." + dc.Autotend
+	primary := "localhost." + dc.Primary
 	cm := "localhost." + dc.Cloudmock
 	return []string{
-		"127.0.0.1  " + at,
-		"127.0.0.1  app." + at,
-		"127.0.0.1  bff." + at,
-		"127.0.0.1  api." + at,
-		"127.0.0.1  auth." + at,
-		"127.0.0.1  admin." + at,
-		"127.0.0.1  graphql." + at,
+		"127.0.0.1  " + primary,
+		"127.0.0.1  app." + primary,
+		"127.0.0.1  bff." + primary,
+		"127.0.0.1  api." + primary,
+		"127.0.0.1  auth." + primary,
+		"127.0.0.1  admin." + primary,
+		"127.0.0.1  graphql." + primary,
 		"127.0.0.1  " + cm,
 	}
 }
@@ -243,7 +247,7 @@ func autoSetupLinux(dc domainConfig) {
 	fmt.Println("  Create /etc/systemd/resolved.conf.d/cloudmock.conf:")
 	fmt.Println("    [Resolve]")
 	fmt.Println("    DNS=127.0.0.1")
-	fmt.Printf("    Domains=~%s ~%s\n", dc.Autotend, dc.Cloudmock)
+	fmt.Printf("    Domains=~%s ~%s\n", dc.Primary, dc.Cloudmock)
 	fmt.Println("  Then: sudo systemctl restart systemd-resolved")
 	fmt.Println()
 	fmt.Println("Option B — /etc/hosts (no cloudmock DNS needed):")
@@ -263,7 +267,7 @@ func internalResolverSetup(dc domainConfig) {
 }
 
 func printLocalDomains(dc domainConfig) {
-	at := dc.Autotend
+	at := dc.Primary
 	cm := dc.Cloudmock
 	fmt.Println()
 	fmt.Println("  Zero-config (works immediately, no setup needed):")
@@ -313,7 +317,7 @@ func setup(dc domainConfig) {
 	for _, e := range entries {
 		fmt.Printf("  %s\n", e)
 	}
-	fmt.Printf("\nYou can now access: http://localhost.%s\n", dc.Autotend)
+	fmt.Printf("\nYou can now access: http://localhost.%s\n", dc.Primary)
 	fmt.Println("\nTip: 'cloudmock-dns auto' sets up a DNS resolver instead (no /etc/hosts needed).")
 }
 
@@ -353,7 +357,7 @@ func remove(dc domainConfig) {
 			}
 			if inBlock {
 				if strings.HasPrefix(strings.TrimSpace(line), "127.0.0.1") &&
-					(strings.Contains(line, "localhost."+dc.Autotend) || strings.Contains(line, "localhost."+dc.Cloudmock)) {
+					(strings.Contains(line, "localhost."+dc.Primary) || strings.Contains(line, "localhost."+dc.Cloudmock)) {
 					continue
 				}
 				if strings.TrimSpace(line) == "" {

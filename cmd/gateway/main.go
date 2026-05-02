@@ -52,6 +52,7 @@ import (
 	pgImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 	promImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/prometheus"
 	"github.com/Viridian-Inc/cloudmock/pkg/dns"
+	"github.com/Viridian-Inc/cloudmock/pkg/edge"
 	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 	"github.com/Viridian-Inc/cloudmock/pkg/profiling"
 	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
@@ -2085,13 +2086,13 @@ func main() {
 			cloudmockDomain = "cloudmock.app"
 		}
 
-		routes := gateway.BuildRoutes(primaryDomain, cloudmockDomain)
-		certs, certsErr := gateway.EnsureCerts(primaryDomain, cloudmockDomain)
+		routes := edge.BuildRoutes(primaryDomain, cloudmockDomain)
+		certs, certsErr := edge.EnsureCerts(primaryDomain, cloudmockDomain)
 		if certsErr != nil {
 			slog.Warn("proxy: TLS certs unavailable, starting HTTP only", "error", certsErr)
 			certs = nil
 		}
-		gateway.StartProxyWithOpts(routes, certs, gateway.ProxyOpts{
+		edge.StartProxyWithOpts(routes, certs, edge.ProxyOpts{
 			RequestLog:  requestLog,
 			Stats:       requestStats,
 			Broadcaster: adminAPI.Broadcaster(),

@@ -171,3 +171,75 @@ func TestImportPulumiDir(t *testing.T) {
 		t.Logf("  %s (pk=%s sk=%s gsis=%d lsis=%d)", table.Name, table.HashKey, table.RangeKey, len(table.GSIs), len(table.LSIs))
 	}
 }
+
+const microserviceFixtureSrc = "this.bff = new MyCorpLambdaModuleResource(`mycorp-lep-bff-dev`, {\n" +
+	"  name: \"bff\",\n" +
+	"  allowedTables: [tables.membership, tables.session],\n" +
+	"});\n" +
+	"this.attendance = new MyCorpLambdaModuleResource(`mycorp-lep-attendance-dev`, {\n" +
+	"  name: \"attendance\",\n" +
+	"  allowedTables: [tables.attendance],\n" +
+	"});\n"
+
+func TestParseLambdaEndpoints_NoClassesRegistered(t *testing.T) {
+	SetMicroserviceClasses(nil)
+	t.Cleanup(func() { SetMicroserviceClasses(nil) })
+
+	got := parseLambdaEndpoints(microserviceFixtureSrc, "dev")
+	if len(got) != 0 {
+		t.Errorf("expected empty result with no classes registered, got %d", len(got))
+	}
+}
+
+func TestParseLambdaEndpoints_RegisteredClass(t *testing.T) {
+	SetMicroserviceClasses([]string{"MyCorpLambdaModuleResource"})
+	t.Cleanup(func() { SetMicroserviceClasses(nil) })
+
+	got := parseLambdaEndpoints(microserviceFixtureSrc, "dev")
+	if len(got) != 2 {
+		t.Fatalf("expected 2 microservices, got %d: %+v", len(got), got)
+	}
+
+	byName := map[string]MicroserviceDef{}
+	for _, ms := range got {
+		byName[ms.Name] = ms
+	}
+
+	bff, ok := byName["bff"]
+	if !ok {
+		t.Fatalf("expected 'bff' microservice, got %v", byName)
+	}
+	if want := []string{"membership-dev", "session-dev"}; !equalStringSlices(bff.Tables, want) {
+		t.Errorf("bff.Tables = %v, want %v", bff.Tables, want)
+	}
+
+	attendance, ok := byName["attendance"]
+	if !ok {
+		t.Fatalf("expected 'attendance' microservice, got %v", byName)
+	}
+	if want := []string{"attendance-dev"}; !equalStringSlices(attendance.Tables, want) {
+		t.Errorf("attendance.Tables = %v, want %v", attendance.Tables, want)
+	}
+}
+
+func TestParseLambdaEndpoints_UnregisteredClassIgnored(t *testing.T) {
+	SetMicroserviceClasses([]string{"OtherCorpLambdaResource"})
+	t.Cleanup(func() { SetMicroserviceClasses(nil) })
+
+	got := parseLambdaEndpoints(microserviceFixtureSrc, "dev")
+	if len(got) != 0 {
+		t.Errorf("expected 0 microservices when registered class doesn't match, got %d", len(got))
+	}
+}
+
+func equalStringSlices(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}

@@ -351,6 +351,11 @@ type Config struct {
 	// caller identifiers in request logs. Empty by default; set to e.g.
 	// ["mycorp-", "mycorp_"] to recognize your IaC naming convention.
 	ServicePrefixes []string `yaml:"service_prefixes" json:"service_prefixes"`
+	// IaCMicroserviceClasses are TypeScript class names whose `new` invocations
+	// in a Pulumi project denote a Lambda-backed microservice (extracted as a
+	// MicroserviceDef). Empty by default — set to e.g.
+	// ["MyCorpLambdaModuleResource"] to wire your own pattern.
+	IaCMicroserviceClasses []string `yaml:"iac_microservice_classes" json:"iac_microservice_classes"`
 }
 
 // SCMConfig holds source code management integration configuration.

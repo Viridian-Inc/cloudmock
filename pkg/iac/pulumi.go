@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 )
@@ -214,8 +215,9 @@ func ImportPulumiDir(dir string, environment string, logger *slog.Logger) (*IaCI
 			}
 		}
 
-		// Lambda endpoint microservices (AutotendLambdaEndpointModuleResource)
-		if strings.Contains(src, "AutotendLambdaEndpointModuleResource") && strings.Contains(src, "name:") {
+		// Lambda endpoint microservices — only extracted when the user has
+		// registered one or more class names via SetMicroserviceClasses.
+		if sourceMatchesMicroserviceClass(src) && strings.Contains(src, "name:") {
 			microservices := parseLambdaEndpoints(src, environment)
 			if len(microservices) > 0 {
 				logger.Info("found Lambda endpoint microservices in IaC", "file", path, "count", len(microservices))
@@ -523,45 +525,88 @@ func extractLSIs(block string) []LSIDef {
 	return lsis
 }
 
-// parseLambdaEndpoints extracts AutotendLambdaEndpointModuleResource definitions.
-// These are the high-level microservice definitions with name and table dependencies.
+// microserviceClasses holds the user-registered TypeScript class names that
+// denote a Lambda-backed microservice in a Pulumi project. Empty means no
+// microservice extraction (the generic default).
+var (
+	microserviceClassesMu sync.RWMutex
+	microserviceClasses   []string
+)
+
+// SetMicroserviceClasses configures which `new <Class>(...)` TypeScript
+// invocations parseLambdaEndpoints should treat as microservice definitions.
+// Pass nil or [] to disable microservice extraction. Safe to call once at
+// startup.
+func SetMicroserviceClasses(classes []string) {
+	microserviceClassesMu.Lock()
+	defer microserviceClassesMu.Unlock()
+	microserviceClasses = append([]string(nil), classes...)
+}
+
+func getMicroserviceClasses() []string {
+	microserviceClassesMu.RLock()
+	defer microserviceClassesMu.RUnlock()
+	return microserviceClasses
+}
+
+// sourceMatchesMicroserviceClass returns true if src contains any registered
+// microservice class name. Cheap pre-filter before the regex pass.
+func sourceMatchesMicroserviceClass(src string) bool {
+	for _, class := range getMicroserviceClasses() {
+		if strings.Contains(src, class) {
+			return true
+		}
+	}
+	return false
+}
+
+// parseLambdaEndpoints extracts microservice definitions from `new <Class>(...)`
+// invocations whose class name has been registered via SetMicroserviceClasses.
+// Each match is expected to take the shape:
+//
+//	new <Class>(`some-resource-name`, { name: "service-name", allowedTables: [tables.foo, tables.bar], ... })
 func parseLambdaEndpoints(src string, env string) []MicroserviceDef {
 	var services []MicroserviceDef
-	// Match: new AutotendLambdaEndpointModuleResource(`autotend-lep-NAME-env`, { name: "NAME", ...
-	pattern := regexp.MustCompile(`new\s+AutotendLambdaEndpointModuleResource\s*\(\s*` + "`" + `[^` + "`" + `]+` + "`" + `\s*,\s*\{`)
-	matches := pattern.FindAllStringIndex(src, -1)
+	classes := getMicroserviceClasses()
+	if len(classes) == 0 {
+		return services
+	}
 
-	for _, match := range matches {
-		blockStart := match[1] - 1
-		blockEnd := findMatchingBrace(src, blockStart)
-		if blockEnd < 0 {
-			continue
-		}
-		block := src[blockStart : blockEnd+1]
+	tablePattern := regexp.MustCompile(`tables\.(\w+)`)
 
-		// Extract name
-		name := extractStringField(block, "name")
-		if name == "" {
-			continue
-		}
+	for _, class := range classes {
+		pattern := regexp.MustCompile(`new\s+` + regexp.QuoteMeta(class) + `\s*\(\s*` + "`" + `[^` + "`" + `]+` + "`" + `\s*,\s*\{`)
+		matches := pattern.FindAllStringIndex(src, -1)
 
-		// Extract table dependencies from allowedTables array
-		var tables []string
-		tablePattern := regexp.MustCompile(`tables\.(\w+)`)
-		if atStart := strings.Index(block, "allowedTables:"); atStart >= 0 {
-			atEnd := strings.Index(block[atStart:], "]")
-			if atEnd > 0 {
-				atBlock := block[atStart : atStart+atEnd]
-				for _, tm := range tablePattern.FindAllStringSubmatch(atBlock, -1) {
-					tables = append(tables, tm[1]+"-"+env)
+		for _, match := range matches {
+			blockStart := match[1] - 1
+			blockEnd := findMatchingBrace(src, blockStart)
+			if blockEnd < 0 {
+				continue
+			}
+			block := src[blockStart : blockEnd+1]
+
+			name := extractStringField(block, "name")
+			if name == "" {
+				continue
+			}
+
+			var tables []string
+			if atStart := strings.Index(block, "allowedTables:"); atStart >= 0 {
+				atEnd := strings.Index(block[atStart:], "]")
+				if atEnd > 0 {
+					atBlock := block[atStart : atStart+atEnd]
+					for _, tm := range tablePattern.FindAllStringSubmatch(atBlock, -1) {
+						tables = append(tables, tm[1]+"-"+env)
+					}
 				}
 			}
-		}
 
-		services = append(services, MicroserviceDef{
-			Name:   name,
-			Tables: tables,
-		})
+			services = append(services, MicroserviceDef{
+				Name:   name,
+				Tables: tables,
+			})
+		}
 	}
 	return services
 }

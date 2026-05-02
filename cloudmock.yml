@@ -96,3 +96,9 @@ slo:
 # service_prefixes:
 #   - mycorp-
 #   - mycorp_
+
+# TypeScript class names whose `new <Class>(...)` invocations in your Pulumi
+# project denote a Lambda-backed microservice. Empty by default — set this if
+# you have a custom Pulumi component that wraps Lambda + API routes.
+# iac_microservice_classes:
+#   - MyCorpLambdaModuleResource

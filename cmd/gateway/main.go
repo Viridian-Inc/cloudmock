@@ -393,6 +393,7 @@ func main() {
 	cfg.ApplyEnv()
 
 	gateway.SetServicePrefixes(cfg.ServicePrefixes)
+	iac.SetMicroserviceClasses(cfg.IaCMicroserviceClasses)
 
 	// Test mode: strip all observability, disable dashboard/admin/OTLP for maximum throughput.
 	// Use CLOUDMOCK_TEST_MODE=true when CloudMock is a test dependency.

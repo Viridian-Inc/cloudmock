@@ -7,10 +7,10 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"strings"
 	"sync"
 	"time"
 
+	"github.com/Viridian-Inc/cloudmock/pkg/awsendpoints"
 	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
@@ -70,8 +70,8 @@ func (r *Recorder) RoundTrip(req *http.Request) (*http.Response, error) {
 	latencyMs := float64(time.Since(start).Nanoseconds()) / 1e6
 
 	// Detect service and action.
-	svc := serviceFromAuth(req)
-	action := actionFromRequest(req)
+	svc := awsendpoints.ServiceFromAuth(req)
+	action := awsendpoints.Action(req)
 
 	headers := make(map[string]string, len(req.Header))
 	for k := range req.Header {
@@ -142,35 +142,3 @@ func (r *Recorder) Entries() []*traffic.CapturedEntry {
 	return out
 }
 
-// serviceFromAuth extracts the AWS service name from the Authorization header.
-func serviceFromAuth(req *http.Request) string {
-	auth := req.Header.Get("Authorization")
-	if auth == "" {
-		return ""
-	}
-	const prefix = "Credential="
-	idx := strings.Index(auth, prefix)
-	if idx < 0 {
-		return ""
-	}
-	rest := auth[idx+len(prefix):]
-	end := strings.IndexAny(rest, ", ")
-	if end >= 0 {
-		rest = rest[:end]
-	}
-	parts := strings.Split(rest, "/")
-	if len(parts) < 4 {
-		return ""
-	}
-	return strings.ToLower(parts[3])
-}
-
-// actionFromRequest extracts the AWS action from the request.
-func actionFromRequest(req *http.Request) string {
-	if target := req.Header.Get("X-Amz-Target"); target != "" {
-		if dot := strings.LastIndex(target, "."); dot >= 0 {
-			return target[dot+1:]
-		}
-	}
-	return req.URL.Query().Get("Action")
-}

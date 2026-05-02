@@ -99,3 +99,45 @@ func TestBuildRoutes_PathPrefixOrdering(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildRoutes_ServiceLabels(t *testing.T) {
+	routes := BuildRoutes("example.com", "mock.dev")
+
+	// Routes that should carry an explicit service label (so the request
+	// log shows the right thing without falling back to host-substring
+	// detection in logProxyRequest).
+	want := map[string]string{
+		"app.localhost":               "app",
+		"bff.localhost":               "bff",
+		"api.localhost":               "gateway",
+		"auth.localhost":              "cognito-idp",
+		"graphql.localhost":           "graphql",
+		"app.localhost.example.com":   "app",
+		"bff.localhost.example.com":   "bff",
+		"api.localhost.example.com":   "gateway",
+		"auth.localhost.example.com":  "cognito-idp",
+		"graphql.localhost.example.com": "graphql",
+		"localhost.example.com":       "app", // catch-all primary domain backends to App
+	}
+
+	got := map[string]string{}
+	for _, r := range routes {
+		if r.Service != "" {
+			got[r.Host] = r.Service
+		}
+	}
+
+	for host, svc := range want {
+		if got[host] != svc {
+			t.Errorf("Service for %q = %q, want %q", host, got[host], svc)
+		}
+	}
+
+	// cloudmock.localhost and admin.* routes intentionally omit Service —
+	// logProxyRequest already filters them out as internal traffic.
+	for _, r := range routes {
+		if (r.Host == "cloudmock.localhost" || strings.Contains(r.Host, "admin.")) && r.Service != "" {
+			t.Errorf("expected internal route %q to leave Service blank, got %q", r.Host, r.Service)
+		}
+	}
+}

@@ -36,6 +36,10 @@ type ProxyRoute struct {
 	Path         string // path prefix, e.g. "/bff/" — empty means match all
 	Backend      string // e.g. "http://localhost:3202"
 	PreserveHost bool   // if true, forward original Host header to backend
+	// Service is the logical service name attached to log entries when this
+	// route is matched. Empty falls back to a host-substring heuristic for
+	// backwards compatibility with hand-rolled route tables.
+	Service string
 }
 
 // ProxyServer is a virtual-host reverse proxy that routes requests
@@ -97,24 +101,24 @@ func BuildRoutesWithPorts(primaryDomain, cloudmockDomain string, p ServicePorts)
 
 	return []ProxyRoute{
 		// .localhost domains (RFC 6761, zero config)
-		{Host: "app.localhost", Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "app.localhost", Path: "/", Backend: backend(p.App), PreserveHost: true, Service: "app"},
 		{Host: "cloudmock.localhost", Path: "/_cloudmock/", Backend: backend(p.Gateway)},
 		{Host: "cloudmock.localhost", Path: "/api/", Backend: backend(p.Admin)},
 		{Host: "cloudmock.localhost", Path: "/", Backend: backend(p.Dashboard)},
-		{Host: "bff.localhost", Path: "/", Backend: backend(p.BFF)},
-		{Host: "api.localhost", Path: "/", Backend: backend(p.Gateway)},
-		{Host: "auth.localhost", Path: "/", Backend: backend(p.Gateway)},
+		{Host: "bff.localhost", Path: "/", Backend: backend(p.BFF), Service: "bff"},
+		{Host: "api.localhost", Path: "/", Backend: backend(p.Gateway), Service: "gateway"},
+		{Host: "auth.localhost", Path: "/", Backend: backend(p.Gateway), Service: "cognito-idp"},
 		{Host: "admin.localhost", Path: "/", Backend: backend(p.Admin)},
-		{Host: "graphql.localhost", Path: "/", Backend: backend(p.GraphQL)},
+		{Host: "graphql.localhost", Path: "/", Backend: backend(p.GraphQL), Service: "graphql"},
 
 		// custom domain: app services
-		{Host: "app." + primary, Path: "/", Backend: backend(p.App), PreserveHost: true},
-		{Host: "bff." + primary, Path: "", Backend: backend(p.BFF)},
-		{Host: "api." + primary, Path: "", Backend: backend(p.Gateway)},
-		{Host: "auth." + primary, Path: "", Backend: backend(p.Gateway)},
+		{Host: "app." + primary, Path: "/", Backend: backend(p.App), PreserveHost: true, Service: "app"},
+		{Host: "bff." + primary, Path: "", Backend: backend(p.BFF), Service: "bff"},
+		{Host: "api." + primary, Path: "", Backend: backend(p.Gateway), Service: "gateway"},
+		{Host: "auth." + primary, Path: "", Backend: backend(p.Gateway), Service: "cognito-idp"},
 		{Host: "admin." + primary, Path: "", Backend: backend(p.Admin)},
-		{Host: "graphql." + primary, Path: "", Backend: backend(p.GraphQL)},
-		{Host: primary, Path: "/", Backend: backend(p.App), PreserveHost: true},
+		{Host: "graphql." + primary, Path: "", Backend: backend(p.GraphQL), Service: "graphql"},
+		{Host: primary, Path: "/", Backend: backend(p.App), PreserveHost: true, Service: "app"},
 
 		// custom domain: cloudmock dashboard
 		{Host: cm, Path: "/_cloudmock/", Backend: backend(p.Gateway)},
@@ -205,18 +209,22 @@ func (ps *ProxyServer) logProxyRequest(r *http.Request, host string, route Proxy
 		return
 	}
 
-	// Determine service name from the route host
-	service := "proxy"
-	if strings.Contains(host, "bff") {
-		service = "bff"
-	} else if strings.Contains(host, "graphql") {
-		service = "graphql"
-	} else if strings.Contains(host, "auth") {
-		service = "cognito-idp"
-	} else if strings.Contains(host, "api.") {
-		service = "gateway"
-	} else if strings.Contains(host, "app") || host == route.Host {
-		service = "app"
+	// Prefer the route's declared service; fall back to a host-substring
+	// heuristic for hand-rolled routes that don't set Service.
+	service := route.Service
+	if service == "" {
+		service = "proxy"
+		if strings.Contains(host, "bff") {
+			service = "bff"
+		} else if strings.Contains(host, "graphql") {
+			service = "graphql"
+		} else if strings.Contains(host, "auth") {
+			service = "cognito-idp"
+		} else if strings.Contains(host, "api.") {
+			service = "gateway"
+		} else if strings.Contains(host, "app") || host == route.Host {
+			service = "app"
+		}
 	}
 
 	latencyMs := float64(latency.Nanoseconds()) / 1e6

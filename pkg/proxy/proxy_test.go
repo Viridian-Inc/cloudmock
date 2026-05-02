@@ -9,49 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/Viridian-Inc/cloudmock/pkg/awsendpoints"
 )
-
-func TestProxy_DetectsService(t *testing.T) {
-	tests := []struct {
-		name string
-		auth string
-		want string
-	}{
-		{
-			name: "s3 from auth header",
-			auth: "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=abc",
-			want: "s3",
-		},
-		{
-			name: "dynamodb from auth header",
-			auth: "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/dynamodb/aws4_request, SignedHeaders=host, Signature=abc",
-			want: "dynamodb",
-		},
-		{
-			name: "sts from auth header",
-			auth: "AWS4-HMAC-SHA256 Credential=AKID/20240101/us-east-1/sts/aws4_request, SignedHeaders=host, Signature=abc",
-			want: "sts",
-		},
-		{
-			name: "empty auth",
-			auth: "",
-			want: "",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", "/", nil)
-			if tt.auth != "" {
-				req.Header.Set("Authorization", tt.auth)
-			}
-			got := detectServiceFromAuth(req)
-			if got != tt.want {
-				t.Errorf("detectServiceFromAuth() = %q, want %q", got, tt.want)
-			}
-		})
-	}
-}
 
 // setupFakeAWS creates a fake AWS test server and configures the proxy to use it
 // for the given service. It returns the proxy and a cleanup function.
@@ -60,17 +20,15 @@ func setupFakeAWS(t *testing.T, service string, handler http.HandlerFunc) (*AWSP
 	fakeAWS := httptest.NewServer(handler)
 
 	p := New("us-east-1")
-	// Point the proxy's HTTP client at the fake server and override the endpoint.
 	fakeHost := strings.TrimPrefix(fakeAWS.URL, "http://")
-	origEndpoint := serviceEndpoints[service]
-	serviceEndpoints[service] = fakeHost
+	restore := awsendpoints.Override(service, fakeHost)
 
 	// Use a custom transport that speaks plain HTTP to the fake server.
 	p.httpClient = &http.Client{Transport: &http.Transport{}}
 
 	cleanup := func() {
 		fakeAWS.Close()
-		serviceEndpoints[service] = origEndpoint
+		restore()
 	}
 	return p, cleanup
 }
@@ -168,28 +126,6 @@ func TestProxy_SaveToFile(t *testing.T) {
 	entry := entries[0].(map[string]any)
 	if entry["service"] != "s3" {
 		t.Errorf("expected service 's3' in JSON, got %v", entry["service"])
-	}
-}
-
-func TestResolveEndpoint(t *testing.T) {
-	tests := []struct {
-		service string
-		region  string
-		want    string
-	}{
-		{"s3", "us-east-1", "s3.us-east-1.amazonaws.com"},
-		{"iam", "us-east-1", "iam.amazonaws.com"},
-		{"dynamodb", "eu-west-1", "dynamodb.eu-west-1.amazonaws.com"},
-		{"unknown-service", "us-east-1", ""},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.service, func(t *testing.T) {
-			got := resolveEndpoint(tt.service, tt.region)
-			if got != tt.want {
-				t.Errorf("resolveEndpoint(%q, %q) = %q, want %q", tt.service, tt.region, got, tt.want)
-			}
-		})
 	}
 }
 

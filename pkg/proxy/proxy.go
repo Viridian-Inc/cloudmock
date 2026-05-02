@@ -13,43 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Viridian-Inc/cloudmock/pkg/awsendpoints"
 	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
-
-// serviceEndpoints maps AWS service names to their endpoint format strings.
-// Use fmt.Sprintf(pattern, region) for regional services.
-var serviceEndpoints = map[string]string{
-	"s3":                      "s3.%s.amazonaws.com",
-	"dynamodb":                "dynamodb.%s.amazonaws.com",
-	"sqs":                     "sqs.%s.amazonaws.com",
-	"sns":                     "sns.%s.amazonaws.com",
-	"lambda":                  "lambda.%s.amazonaws.com",
-	"iam":                     "iam.amazonaws.com",
-	"sts":                     "sts.%s.amazonaws.com",
-	"kms":                     "kms.%s.amazonaws.com",
-	"kinesis":                 "kinesis.%s.amazonaws.com",
-	"firehose":                "firehose.%s.amazonaws.com",
-	"logs":                    "logs.%s.amazonaws.com",
-	"events":                  "events.%s.amazonaws.com",
-	"cloudwatch":              "monitoring.%s.amazonaws.com",
-	"cloudformation":          "cloudformation.%s.amazonaws.com",
-	"ec2":                     "ec2.%s.amazonaws.com",
-	"ecs":                     "ecs.%s.amazonaws.com",
-	"eks":                     "eks.%s.amazonaws.com",
-	"rds":                     "rds.%s.amazonaws.com",
-	"route53":                 "route53.amazonaws.com",
-	"cloudfront":              "cloudfront.amazonaws.com",
-	"ses":                     "email.%s.amazonaws.com",
-	"cognito-idp":             "cognito-idp.%s.amazonaws.com",
-	"apigateway":              "apigateway.%s.amazonaws.com",
-	"secretsmanager":          "secretsmanager.%s.amazonaws.com",
-	"ssm":                     "ssm.%s.amazonaws.com",
-	"stepfunctions":           "states.%s.amazonaws.com",
-	"codebuild":               "codebuild.%s.amazonaws.com",
-	"codepipeline":            "codepipeline.%s.amazonaws.com",
-	"configservice":           "config.%s.amazonaws.com",
-	"cloudtrail":              "cloudtrail.%s.amazonaws.com",
-}
 
 // AWSProxy is a reverse proxy that forwards requests to real AWS endpoints
 // and captures the request/response pairs as CapturedEntry values.
@@ -79,7 +45,7 @@ func New(region string) *AWSProxy {
 func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	start := time.Now()
 
-	svc := detectServiceFromAuth(r)
+	svc := awsendpoints.ServiceFromAuth(r)
 	if svc == "" {
 		http.Error(w, "could not detect AWS service from request", http.StatusBadGateway)
 		return
@@ -100,7 +66,7 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		targetURL = strings.TrimRight(p.testEndpoint, "/") + r.URL.RequestURI()
 		host = ""
 	} else {
-		host = resolveEndpoint(svc, p.region)
+		host = awsendpoints.Resolve(svc, p.region)
 		if host == "" {
 			http.Error(w, fmt.Sprintf("unknown service: %s", svc), http.StatusBadGateway)
 			return
@@ -147,7 +113,7 @@ func (p *AWSProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		headers[k] = r.Header.Get(k)
 	}
 
-	action := detectAction(r)
+	action := awsendpoints.Action(r)
 
 	p.mu.Lock()
 	p.entrySeq++
@@ -221,51 +187,3 @@ func (p *AWSProxy) Entries() []*traffic.CapturedEntry {
 	return out
 }
 
-// detectServiceFromAuth extracts the AWS service from the Authorization header
-// credential scope: Credential=AKID/date/region/SERVICE/aws4_request.
-func detectServiceFromAuth(r *http.Request) string {
-	auth := r.Header.Get("Authorization")
-	if auth == "" {
-		return ""
-	}
-
-	const prefix = "Credential="
-	idx := strings.Index(auth, prefix)
-	if idx < 0 {
-		return ""
-	}
-	rest := auth[idx+len(prefix):]
-
-	end := strings.IndexAny(rest, ", ")
-	if end >= 0 {
-		rest = rest[:end]
-	}
-
-	parts := strings.Split(rest, "/")
-	if len(parts) < 4 {
-		return ""
-	}
-	return strings.ToLower(parts[3])
-}
-
-// detectAction extracts the AWS action from the request.
-func detectAction(r *http.Request) string {
-	if target := r.Header.Get("X-Amz-Target"); target != "" {
-		if dot := strings.LastIndex(target, "."); dot >= 0 {
-			return target[dot+1:]
-		}
-	}
-	return r.URL.Query().Get("Action")
-}
-
-// resolveEndpoint returns the real AWS hostname for a service and region.
-func resolveEndpoint(service, region string) string {
-	pattern, ok := serviceEndpoints[service]
-	if !ok {
-		return ""
-	}
-	if !strings.Contains(pattern, "%s") {
-		return pattern // global service
-	}
-	return fmt.Sprintf(pattern, region)
-}

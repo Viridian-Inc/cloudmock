@@ -1,4 +1,10 @@
-package gateway
+// Package dns provides a minimal UDP DNS server that resolves a configured
+// domain (and any subdomain of it) to 127.0.0.1.
+//
+// It is intentionally dependency-free: DNS packets are parsed and constructed
+// using only the standard library. The server does no recursion or
+// forwarding — names that do not match the configured domain receive NXDOMAIN.
+package dns
 
 import (
 	"encoding/binary"
@@ -11,12 +17,9 @@ import (
 // Any A-record query for domain or *.domain is answered with 127.0.0.1.
 // All other queries receive an NXDOMAIN response (no forwarding).
 //
-// This is intentionally dependency-free — it parses and constructs DNS
-// packets manually using only the standard library.
-//
 // Typical usage (non-privileged port):
 //
-//	go gateway.StartDNSServer(15353, "localhost.autotend.io")
+//	go dns.StartDNSServer(15353, "localhost.example.com")
 func StartDNSServer(port int, domain string) {
 	addr := &net.UDPAddr{Port: port, IP: net.ParseIP("127.0.0.1")}
 	conn, err := net.ListenUDP("udp", addr)

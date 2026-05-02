@@ -51,6 +51,7 @@ import (
 	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
 	pgImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
 	promImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/prometheus"
+	"github.com/Viridian-Inc/cloudmock/pkg/dns"
 	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
 	"github.com/Viridian-Inc/cloudmock/pkg/profiling"
 	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
@@ -2096,8 +2097,8 @@ func main() {
 		})
 
 		// DNS servers resolve *.localhost.<domain> → 127.0.0.1
-		go gateway.StartDNSServer(15353, "localhost."+primaryDomain)
-		go gateway.StartDNSServer(15354, "localhost."+cloudmockDomain)
+		go dns.StartDNSServer(15353, "localhost."+primaryDomain)
+		go dns.StartDNSServer(15354, "localhost."+cloudmockDomain)
 	}
 
 	addr := fmt.Sprintf(":%d", cfg.Gateway.Port)

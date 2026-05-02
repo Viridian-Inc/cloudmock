@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/Viridian-Inc/cloudmock/pkg/awsendpoints"
 	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
@@ -49,17 +50,9 @@ func TestIntegration_RecordMultipleServices(t *testing.T) {
 	fakeHost := strings.TrimPrefix(mock.URL, "http://")
 
 	// Override endpoints for all three services to point at our mock server.
-	origS3 := serviceEndpoints["s3"]
-	origDynamo := serviceEndpoints["dynamodb"]
-	origSQS := serviceEndpoints["sqs"]
-	serviceEndpoints["s3"] = fakeHost
-	serviceEndpoints["dynamodb"] = fakeHost
-	serviceEndpoints["sqs"] = fakeHost
-	defer func() {
-		serviceEndpoints["s3"] = origS3
-		serviceEndpoints["dynamodb"] = origDynamo
-		serviceEndpoints["sqs"] = origSQS
-	}()
+	defer awsendpoints.Override("s3", fakeHost)()
+	defer awsendpoints.Override("dynamodb", fakeHost)()
+	defer awsendpoints.Override("sqs", fakeHost)()
 
 	p := New("us-east-1")
 	p.httpClient = &http.Client{Transport: &http.Transport{}}
@@ -136,14 +129,8 @@ func TestIntegration_SaveAndLoadRecording(t *testing.T) {
 
 	fakeHost := strings.TrimPrefix(mock.URL, "http://")
 
-	origS3 := serviceEndpoints["s3"]
-	origDynamo := serviceEndpoints["dynamodb"]
-	serviceEndpoints["s3"] = fakeHost
-	serviceEndpoints["dynamodb"] = fakeHost
-	defer func() {
-		serviceEndpoints["s3"] = origS3
-		serviceEndpoints["dynamodb"] = origDynamo
-	}()
+	defer awsendpoints.Override("s3", fakeHost)()
+	defer awsendpoints.Override("dynamodb", fakeHost)()
 
 	p := New("us-east-1")
 	p.httpClient = &http.Client{Transport: &http.Transport{}}

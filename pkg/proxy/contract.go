@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Viridian-Inc/cloudmock/pkg/awsendpoints"
 	"github.com/Viridian-Inc/cloudmock/pkg/traffic"
 )
 
@@ -98,8 +99,8 @@ func (cp *ContractProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		r.Body.Close()
 	}
 
-	svc := detectServiceFromAuth(r)
-	action := detectAction(r)
+	svc := awsendpoints.ServiceFromAuth(r)
+	action := awsendpoints.Action(r)
 
 	type proxyResult struct {
 		statusCode int

@@ -334,6 +334,16 @@ func buildIaCTopology(result *iac.IaCImportResult) ([]admin.TopologyNodeV2, []ad
 // `-ldflags="-X main.version=${VERSION}"` in .github/workflows/release.yml.
 var version = "dev"
 
+// writeStateAtomic writes the snapshot to path atomically (temp file +
+// rename) so a crash mid-write can't leave a corrupt/partial state file.
+func writeStateAtomic(path string, data []byte) error {
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmp, path)
+}
+
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.
 	logFormat := os.Getenv("CLOUDMOCK_LOG_FORMAT")
@@ -353,12 +363,20 @@ func main() {
 	iacDir := flag.String("iac", "", "path to Pulumi/Terraform project directory — auto-provisions DynamoDB tables, API routes from IaC source (auto-detected if not set)")
 	iacEnv := flag.String("iac-env", "dev", "environment name for IaC resource name resolution (e.g., dev, stage, prod)")
 	stateFile := flag.String("state", "", "path to cloudmock state JSON file for snapshot restore/save (env: CLOUDMOCK_STATE)")
+	stateInterval := flag.Duration("state-interval", 5*time.Second, "disk mode: how often to persist state to -state; 0 = only on graceful shutdown (env: CLOUDMOCK_STATE_INTERVAL)")
 	flag.Parse()
 
 	// Allow env var override for state file.
 	if *stateFile == "" {
 		if v := os.Getenv("CLOUDMOCK_STATE"); v != "" {
 			*stateFile = v
+		}
+	}
+	if v := os.Getenv("CLOUDMOCK_STATE_INTERVAL"); v != "" {
+		if d, perr := time.ParseDuration(v); perr == nil {
+			*stateInterval = d
+		} else {
+			slog.Warn("invalid CLOUDMOCK_STATE_INTERVAL; ignoring", "value", v, "error", perr)
 		}
 	}
 
@@ -2287,6 +2305,30 @@ func main() {
 		}
 	}
 
+	// Disk mode: periodically persist state to the snapshot file so dev
+	// state survives a CRASH or hard kill, not just a graceful shutdown.
+	// Gated on a state file (tests run without one → fully in-memory).
+	// Set -state-interval=0 for shutdown-only saves.
+	if *stateFile != "" && *stateInterval > 0 {
+		go func() {
+			ticker := time.NewTicker(*stateInterval)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-rootCtx.Done():
+					return
+				case <-ticker.C:
+					if data, err := snapshotpkg.Export(registry); err != nil {
+						slog.Error("periodic state export failed", "error", err)
+					} else if err := writeStateAtomic(*stateFile, data); err != nil {
+						slog.Error("periodic state save failed", "path", *stateFile, "error", err)
+					}
+				}
+			}
+		}()
+		slog.Info("disk mode enabled: periodic state persistence", "path", *stateFile, "interval", stateInterval.String())
+	}
+
 	// Wait for termination signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
@@ -2297,7 +2339,7 @@ func main() {
 	if *stateFile != "" {
 		if data, err := snapshotpkg.Export(registry); err != nil {
 			slog.Error("failed to export state on shutdown", "error", err)
-		} else if err := os.WriteFile(*stateFile, data, 0644); err != nil {
+		} else if err := writeStateAtomic(*stateFile, data); err != nil {
 			slog.Error("failed to write state file on shutdown", "path", *stateFile, "error", err)
 		} else {
 			slog.Info("state saved to snapshot file", "path", *stateFile)

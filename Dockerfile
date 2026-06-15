@@ -1,6 +1,10 @@
 # Stage 1: Build devtools UI
 FROM node:22-alpine AS dashboard
-RUN corepack enable && corepack prepare pnpm@latest --activate
+# Pin pnpm to v9 to match the release pipeline's build-devtools job
+# (pnpm/action-setup version: 9) and the lockfileVersion 9.0 lockfile.
+# Using pnpm@latest here let a newer major (pnpm 10+, with stricter
+# build-script/supply-chain gating) break `pnpm install --frozen-lockfile`.
+RUN corepack enable && corepack prepare pnpm@9 --activate
 WORKDIR /devtools
 COPY devtools/package.json devtools/pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile

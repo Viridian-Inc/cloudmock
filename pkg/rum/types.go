@@ -22,6 +22,7 @@ type RUMEvent struct {
 	URL       string    `json:"url"`
 	UserAgent string    `json:"user_agent"`
 	Timestamp time.Time `json:"timestamp"`
+	TraceID   string    `json:"trace_id,omitempty"` // backend distributed trace this event belongs to
 
 	// Exactly one of these will be populated, depending on Type.
 	PageLoad       *PageLoadEvent       `json:"page_load,omitempty"`
@@ -109,6 +110,7 @@ type ErrorGroup struct {
 	Sessions    int       `json:"sessions"`
 	LastSeen    time.Time `json:"last_seen"`
 	Stack       string    `json:"stack"`
+	TraceID     string    `json:"trace_id,omitempty"` // most-recent event's backend trace, if any
 }
 
 // SessionSummary is a lightweight view of a user session.

@@ -224,6 +224,9 @@ func (s *Store) ErrorGroups() ([]rum.ErrorGroup, error) {
 		g.Count++
 		if e.Timestamp.After(g.LastSeen) {
 			g.LastSeen = e.Timestamp
+			if e.TraceID != "" {
+				g.TraceID = e.TraceID // representative: the most recent occurrence's trace
+			}
 		}
 		groupSessions[fp][e.SessionID] = struct{}{}
 	}

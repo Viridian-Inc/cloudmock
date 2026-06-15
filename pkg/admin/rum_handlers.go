@@ -176,6 +176,9 @@ func (a *API) handleRUMErrors(w http.ResponseWriter, r *http.Request) {
 			"affected_sessions": g.Sessions,
 			"last_seen":         g.LastSeen.Format("2006-01-02T15:04:05Z"),
 			"sample_stack":      g.Stack,
+			// Correlate the RUM JS error to its backend distributed trace.
+			"trace_id":          g.TraceID,
+			"has_backend_trace": g.TraceID != "" && a.traceStore != nil && a.traceStore.Get(g.TraceID) != nil,
 		}
 	}
 	writeJSON(w, http.StatusOK, result)

@@ -3,6 +3,7 @@ package iam
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"sync"
@@ -1036,13 +1037,67 @@ type AttachedPolicy struct {
 	PolicyArn  string
 }
 
-// registerPolicyWithEngine parses a JSON policy document and registers it with the IAM engine.
+// registerPolicyWithEngine parses a JSON policy document and registers it with
+// the IAM engine so policies attached via AttachUserPolicy/AttachRolePolicy are
+// actually evaluated. Best-effort: malformed documents are ignored.
 func (s *Store) registerPolicyWithEngine(principal, document string) {
-	// Best-effort: parse the policy doc and add to engine
-	// The engine uses pkg/iam.Policy type, not the managed policy wrapper
-	// For simplicity, we don't parse JSON here — the engine integration
-	// happens when callers use the pkg/iam store directly.
-	// This is a placeholder for future enhancement.
+	if s.engine == nil || document == "" {
+		return
+	}
+	if policy, ok := parsePolicyDocument(document); ok {
+		s.engine.AddPolicy(principal, policy)
+	}
+}
+
+// flexStrings unmarshals an IAM Action/Resource field, which AWS allows to be
+// either a single string or an array of strings.
+type flexStrings []string
+
+func (f *flexStrings) UnmarshalJSON(data []byte) error {
+	var one string
+	if err := json.Unmarshal(data, &one); err == nil {
+		*f = flexStrings{one}
+		return nil
+	}
+	var many []string
+	if err := json.Unmarshal(data, &many); err != nil {
+		return err
+	}
+	*f = many
+	return nil
+}
+
+// parsePolicyDocument parses an IAM policy JSON document into an iampkg.Policy,
+// tolerating the AWS convention where Action/Resource may be a string or array.
+// Returns ok=false for documents that don't parse or carry no statements.
+func parsePolicyDocument(document string) (*iampkg.Policy, bool) {
+	var doc struct {
+		Version   string `json:"Version"`
+		Statement []struct {
+			SID       string                       `json:"Sid"`
+			Effect    string                       `json:"Effect"`
+			Action    flexStrings                  `json:"Action"`
+			Resource  flexStrings                  `json:"Resource"`
+			Condition map[string]map[string]string `json:"Condition"`
+		} `json:"Statement"`
+	}
+	if err := json.Unmarshal([]byte(document), &doc); err != nil {
+		return nil, false
+	}
+	if len(doc.Statement) == 0 {
+		return nil, false
+	}
+	policy := &iampkg.Policy{Version: doc.Version}
+	for _, st := range doc.Statement {
+		policy.Statements = append(policy.Statements, iampkg.Statement{
+			SID:        st.SID,
+			Effect:     st.Effect,
+			Actions:    st.Action,
+			Resources:  st.Resource,
+			Conditions: st.Condition,
+		})
+	}
+	return policy, true
 }
 
 func generateID(prefix string, hexLen int) string {

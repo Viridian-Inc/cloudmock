@@ -16,6 +16,9 @@ type ErrorGroup struct {
 	Status    string            `json:"status"`  // "unresolved", "resolved", "ignored"
 	Release   string            `json:"release"` // release/deploy where first seen
 	Tags      map[string]string `json:"tags"`
+	// AutoExplanation is a deterministic summary generated once the group
+	// crosses AutoExplainThreshold occurrences.
+	AutoExplanation string `json:"auto_explanation,omitempty"`
 }
 
 // ErrorEvent represents a single error occurrence.

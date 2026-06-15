@@ -81,6 +81,11 @@ func (s *Store) IngestError(event errs.ErrorEvent) error {
 		}
 	}
 
+	// Auto-generate an explanation once the group crosses the threshold.
+	if g.Count == errs.AutoExplainThreshold && g.AutoExplanation == "" {
+		g.AutoExplanation = errs.BuildAutoExplanation(g)
+	}
+
 	// Write event to circular buffer.
 	s.events[s.pos] = event
 	s.pos = (s.pos + 1) % s.cap

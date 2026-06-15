@@ -197,6 +197,53 @@ func (a *API) handleGitHubWebhook(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "processed", "pipeline_id": pipeline.ID})
 }
 
+// handleGitLabWebhook processes GitLab CI "Pipeline Hook" events, mirroring
+// handleGitHubWebhook. POST /api/webhooks/gitlab
+func (a *API) handleGitLabWebhook(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
+	}
+
+	if a.cicdStore == nil {
+		writeError(w, http.StatusServiceUnavailable, "CI/CD store not available")
+		return
+	}
+
+	var ev cicd.GitLabPipelineEvent
+	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON: "+err.Error())
+		return
+	}
+
+	// GitLab fans out many hook kinds (push, merge_request, job, pipeline...)
+	// to the same URL; only pipeline events become deploys.
+	if ev.ObjectKind != "pipeline" {
+		writeJSON(w, http.StatusOK, map[string]string{
+			"status":      "ignored",
+			"event":       r.Header.Get("X-Gitlab-Event"),
+			"object_kind": ev.ObjectKind,
+		})
+		return
+	}
+
+	pipeline := cicd.ParseGitLabPipeline(ev)
+	if err := a.cicdStore.SavePipeline(pipeline); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	if pipeline.Status == "success" {
+		a.createDeployFromPipeline(r, pipeline)
+	}
+
+	a.auditLog(r.Context(), "gitlab.webhook.processed", "pipeline:"+pipeline.ID, map[string]any{
+		"repo":   pipeline.Repo,
+		"status": pipeline.Status,
+	})
+	writeJSON(w, http.StatusOK, map[string]string{"status": "processed", "pipeline_id": pipeline.ID})
+}
+
 // createDeployFromPipeline creates a deploy event when a pipeline succeeds.
 func (a *API) createDeployFromPipeline(r *http.Request, p cicd.Pipeline) {
 	if a.dp != nil {

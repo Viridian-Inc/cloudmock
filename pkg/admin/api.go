@@ -3937,6 +3937,7 @@ func (a *API) SetCICDStore(s cicd.Store) {
 	a.mux.HandleFunc("/api/pipelines/", a.handlePipelineByID)
 	a.mux.HandleFunc("/api/ci/summary", a.handleCISummary)
 	a.mux.HandleFunc("/api/webhooks/github", a.handleGitHubWebhook)
+	a.mux.HandleFunc("/api/webhooks/gitlab", a.handleGitLabWebhook)
 }
 
 // SetDynamoStore configures DynamoDB-backed persistence for dashboards,

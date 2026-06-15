@@ -67,6 +67,50 @@ type ChannelRef struct {
 	Config map[string]string `json:"config"` // webhook_url, routing_key, etc.
 }
 
+// MaintenanceWindow suppresses notifications during a scheduled time range.
+// An empty Services or Severities slice means "all". This is a routing-layer
+// suppression, distinct from pkg/monitor's per-monitor MutedUntil.
+type MaintenanceWindow struct {
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Start      time.Time `json:"start"`
+	End        time.Time `json:"end"`
+	Services   []string  `json:"services,omitempty"`
+	Severities []string  `json:"severities,omitempty"`
+}
+
+// suppresses reports whether this window is active at now and its scope covers
+// the notification.
+func (w MaintenanceWindow) suppresses(n Notification, now time.Time) bool {
+	if now.Before(w.Start) || now.After(w.End) {
+		return false
+	}
+	if len(w.Services) > 0 && !containsStr(w.Services, n.Service) {
+		return false
+	}
+	if len(w.Severities) > 0 && !containsStr(w.Severities, n.Severity) {
+		return false
+	}
+	return true
+}
+
+// Team owns one or more notification channels. Notifications for a service
+// owned by a team are also delivered to the team's channels (supplementing any
+// direct service→channel routes, which remain unchanged).
+type Team struct {
+	Name     string       `json:"name"`
+	Channels []ChannelRef `json:"channels"`
+}
+
+func containsStr(ss []string, v string) bool {
+	for _, s := range ss {
+		if s == v {
+			return true
+		}
+	}
+	return false
+}
+
 // ChannelSchema describes a channel type's configuration schema for the API.
 type ChannelSchema struct {
 	Type        string              `json:"type"`

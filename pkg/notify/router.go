@@ -15,18 +15,23 @@ import (
 // Router matches incoming notifications against routing rules and dispatches
 // them to the appropriate channels. It is safe for concurrent use.
 type Router struct {
-	mu       sync.RWMutex
-	routes   []Route
-	channels map[string]Channel // keyed by "type:name"
-	history  []DeliveryRecord
-	maxHist  int
+	mu          sync.RWMutex
+	routes      []Route
+	channels    map[string]Channel // keyed by "type:name"
+	history     []DeliveryRecord
+	maxHist     int
+	windows     []MaintenanceWindow
+	teams       map[string]Team   // team name → team
+	serviceTeam map[string]string // service → owning team name
 }
 
 // NewRouter creates a notification router.
 func NewRouter() *Router {
 	return &Router{
-		channels: make(map[string]Channel),
-		maxHist:  500,
+		channels:    make(map[string]Channel),
+		maxHist:     500,
+		teams:       make(map[string]Team),
+		serviceTeam: make(map[string]string),
 	}
 }
 
@@ -45,45 +50,143 @@ func (r *Router) Notify(ctx context.Context, n Notification) error {
 	r.mu.RLock()
 	routes := make([]Route, len(r.routes))
 	copy(routes, r.routes)
+	windows := make([]MaintenanceWindow, len(r.windows))
+	copy(windows, r.windows)
+	team, hasTeam := r.teams[r.serviceTeam[n.Service]]
 	r.mu.RUnlock()
 
+	// Maintenance-window suppression: if an active window covers this
+	// notification, record it as suppressed and dispatch to nothing.
+	now := time.Now()
+	for _, w := range windows {
+		if w.suppresses(n, now) {
+			r.recordDelivery(n, ChannelRef{Type: "suppressed", Name: w.Name}, "window:"+w.ID,
+				"suppressed", "maintenance window active")
+			return nil
+		}
+	}
+
 	var firstErr error
+	sent := make(map[string]bool) // channel keys already dispatched (for team dedup)
 
 	for _, route := range routes {
-		if !route.Enabled {
+		if !route.Enabled || !matchesRoute(route.Match, n) {
 			continue
 		}
-		if !matchesRoute(route.Match, n) {
-			continue
-		}
-
 		for _, ref := range route.Channels {
-			ch := r.resolveChannel(ref)
-			if ch == nil {
-				slog.Warn("notify: channel not found, building on-demand",
-					"type", ref.Type, "name", ref.Name)
-				ch = r.buildChannel(ref)
-				if ch == nil {
-					r.recordDelivery(n, ref, route.ID, "failed", "channel not configured")
-					continue
-				}
-			}
+			r.dispatch(ctx, n, ref, route.ID, &firstErr)
+			sent[ref.Type+":"+ref.Name] = true
+		}
+	}
 
-			err := ch.Send(ctx, n)
-			if err != nil {
-				slog.Warn("notify: channel delivery failed",
-					"type", ref.Type, "name", ref.Name, "error", err)
-				r.recordDelivery(n, ref, route.ID, "failed", err.Error())
-				if firstErr == nil {
-					firstErr = err
-				}
-			} else {
-				r.recordDelivery(n, ref, route.ID, "success", "")
+	// Team-tier routing: also deliver to the owning team's channels that a
+	// direct route didn't already cover.
+	if hasTeam {
+		for _, ref := range team.Channels {
+			if sent[ref.Type+":"+ref.Name] {
+				continue
 			}
+			r.dispatch(ctx, n, ref, "team:"+team.Name, &firstErr)
+			sent[ref.Type+":"+ref.Name] = true
 		}
 	}
 
 	return firstErr
+}
+
+// dispatch resolves a channel ref and sends the notification, recording the
+// delivery outcome. *firstErr captures the first delivery error.
+func (r *Router) dispatch(ctx context.Context, n Notification, ref ChannelRef, routeID string, firstErr *error) {
+	ch := r.resolveChannel(ref)
+	if ch == nil {
+		slog.Warn("notify: channel not found, building on-demand", "type", ref.Type, "name", ref.Name)
+		ch = r.buildChannel(ref)
+		if ch == nil {
+			r.recordDelivery(n, ref, routeID, "failed", "channel not configured")
+			return
+		}
+	}
+	if err := ch.Send(ctx, n); err != nil {
+		slog.Warn("notify: channel delivery failed", "type", ref.Type, "name", ref.Name, "error", err)
+		r.recordDelivery(n, ref, routeID, "failed", err.Error())
+		if *firstErr == nil {
+			*firstErr = err
+		}
+		return
+	}
+	r.recordDelivery(n, ref, routeID, "success", "")
+}
+
+// --- Maintenance windows ---
+
+// AddWindow registers a maintenance window, generating an ID if empty.
+func (r *Router) AddWindow(w MaintenanceWindow) MaintenanceWindow {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if w.ID == "" {
+		w.ID = generateID()
+	}
+	r.windows = append(r.windows, w)
+	return w
+}
+
+// RemoveWindow deletes a maintenance window by ID; reports whether it existed.
+func (r *Router) RemoveWindow(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for i, w := range r.windows {
+		if w.ID == id {
+			r.windows = append(r.windows[:i], r.windows[i+1:]...)
+			return true
+		}
+	}
+	return false
+}
+
+// ListWindows returns a copy of the configured maintenance windows.
+func (r *Router) ListWindows() []MaintenanceWindow {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]MaintenanceWindow, len(r.windows))
+	copy(out, r.windows)
+	return out
+}
+
+// LoadWindows replaces all maintenance windows (from config).
+func (r *Router) LoadWindows(ws []MaintenanceWindow) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.windows = make([]MaintenanceWindow, len(ws))
+	for i, w := range ws {
+		if w.ID == "" {
+			w.ID = generateID()
+		}
+		r.windows[i] = w
+	}
+}
+
+// --- Team-tier routing ---
+
+// SetTeam registers/updates a team and the services it owns. Services map to
+// the team's channels in addition to any direct service→channel routes.
+func (r *Router) SetTeam(team Team, services []string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.teams[team.Name] = team
+	for _, s := range services {
+		r.serviceTeam[s] = team.Name
+	}
+}
+
+// ListTeams returns the configured teams.
+func (r *Router) ListTeams() []Team {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	out := make([]Team, 0, len(r.teams))
+	for _, t := range r.teams {
+		out = append(out, t)
+	}
+	return out
 }
 
 // AddRoute adds a routing rule. If the ID is empty, one is generated.

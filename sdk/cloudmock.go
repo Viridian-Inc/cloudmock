@@ -63,6 +63,7 @@ type CloudMock struct {
 	cfg          aws.Config
 	chaosEngine  *gateway.ChaosEngine
 	traceStore   *gateway.TraceStore
+	closers      []func() // teardown hooks run by Close (e.g. stop background goroutines)
 }
 
 // New creates a new in-process CloudMock instance. By default it uses a
@@ -96,7 +97,8 @@ func New(opts ...Option) *CloudMock {
 	// Register core services — these cover the vast majority of test use cases.
 	registry.Register(s3svc.NewWithBus(bus))
 	registry.Register(stssvc.New(c.AccountID))
-	registry.Register(dynamodbsvc.New(c.AccountID, c.Region))
+	ddb := dynamodbsvc.New(c.AccountID, c.Region)
+	registry.Register(ddb)
 	registry.Register(sqssvc.New(c.AccountID, c.Region))
 
 	// Build the gateway handler.
@@ -151,6 +153,7 @@ func New(opts ...Option) *CloudMock {
 		cfg:         awsConfig,
 		chaosEngine: chaosEngine,
 		traceStore:  traceStore,
+		closers:     []func(){ddb.Close},
 	}
 }
 
@@ -164,7 +167,11 @@ func (cm *CloudMock) TraceStore() *gateway.TraceStore {
 	return cm.traceStore
 }
 
-// Close releases resources held by this CloudMock instance.
+// Close releases resources held by this CloudMock instance, including stopping
+// background goroutines such as the DynamoDB TTL reaper. Safe to call multiple
+// times; the underlying service closers are idempotent.
 func (cm *CloudMock) Close() {
-	// Currently a no-op — reserved for future cleanup (DynamoDB TTL reapers, etc.)
+	for _, c := range cm.closers {
+		c()
+	}
 }

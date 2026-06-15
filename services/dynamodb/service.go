@@ -3,6 +3,7 @@ package dynamodb
 import (
 	"net/http"
 	"os"
+	"sync"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/rustddb"
 	"github.com/Viridian-Inc/cloudmock/pkg/schema"
@@ -14,6 +15,18 @@ type DynamoDBService struct {
 	store     *TableStore
 	rustStore *rustddb.Store // nil unless CLOUDMOCK_RUST_DDB=true
 	ttlDone   chan struct{}
+	closeOnce sync.Once
+}
+
+// Close stops the background TTL reaper goroutine started in New. It is safe to
+// call multiple times. Long-lived servers never need this, but in-process
+// embeddings (e.g. the SDK) call it on teardown to avoid leaking the goroutine.
+func (s *DynamoDBService) Close() {
+	s.closeOnce.Do(func() {
+		if s.ttlDone != nil {
+			close(s.ttlDone)
+		}
+	})
 }
 
 // New returns a new DynamoDBService for the given AWS account ID and region.

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"google.golang.org/grpc"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/account"
 	"github.com/Viridian-Inc/cloudmock/pkg/admin"
@@ -2135,6 +2137,23 @@ func main() {
 				slog.Error("OTLP server exited", "error", err)
 			}
 		}()
+
+		// OTLP/gRPC ingestion server (port 4317) — same pipeline as OTLP/HTTP.
+		if cfg.OTLP.GRPCPort > 0 {
+			grpcAddr := fmt.Sprintf(":%d", cfg.OTLP.GRPCPort)
+			if lis, lerr := net.Listen("tcp", grpcAddr); lerr != nil {
+				slog.Error("OTLP/gRPC listen failed", "addr", grpcAddr, "error", lerr)
+			} else {
+				grpcSrv := grpc.NewServer()
+				otlpHandler.RegisterGRPC(grpcSrv)
+				go func() {
+					slog.Info("cloudmock OTLP/gRPC server starting", "addr", grpcAddr)
+					if err := grpcSrv.Serve(lis); err != nil {
+						slog.Error("OTLP/gRPC server exited", "error", err)
+					}
+				}()
+			}
+		}
 	}
 
 	// Dashboard — serves SPA + admin API on a single origin (no CORS needed)

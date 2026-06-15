@@ -304,8 +304,9 @@ type RUMConfig struct {
 
 // OTLPConfig holds OTLP ingestion endpoint configuration.
 type OTLPConfig struct {
-	Enabled bool `yaml:"enabled" json:"enabled"`
-	Port    int  `yaml:"port" json:"port"`
+	Enabled  bool `yaml:"enabled" json:"enabled"`
+	Port     int  `yaml:"port" json:"port"`           // OTLP/HTTP port
+	GRPCPort int  `yaml:"grpc_port" json:"grpc_port"` // OTLP/gRPC port (0 = disabled)
 }
 
 // AccountConfig defines a pre-provisioned AWS account for multi-account support.
@@ -474,8 +475,9 @@ func Default() *Config {
 			MaxEvents:  10000,
 		},
 		OTLP: OTLPConfig{
-			Enabled: true,
-			Port:    4318,
+			Enabled:  true,
+			Port:     4318,
+			GRPCPort: 4317,
 		},
 		Billing: BillingConfig{
 			FreeRequestLimit: 1000,
@@ -575,6 +577,11 @@ func (c *Config) ApplyEnv() {
 	}
 	if v := os.Getenv("CLOUDMOCK_DYNAMODB_TENANT_ID"); v != "" {
 		c.DataPlane.DynamoDB.TenantID = v
+	}
+	if v := os.Getenv("CLOUDMOCK_OTLP_GRPC_PORT"); v != "" {
+		if p, err := strconv.Atoi(v); err == nil {
+			c.OTLP.GRPCPort = p
+		}
 	}
 	if v := os.Getenv("CLOUDMOCK_OTLP_PORT"); v != "" {
 		if p, err := strconv.Atoi(v); err == nil {

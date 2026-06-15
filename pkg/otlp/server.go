@@ -85,6 +85,15 @@ func (s *Server) handleTraces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	count := s.ingestTraces(req)
+	s.log.Info("ingested traces", "spans", count)
+	s.writeExportResponse(w)
+}
+
+// ingestTraces converts an OTLP trace request and writes the resulting spans,
+// request entries, per-span metrics, and bus events. Returns the span count.
+// Shared by the OTLP/HTTP and OTLP/gRPC servers.
+func (s *Server) ingestTraces(req ExportTraceRequest) int {
 	spans, requestEntries := s.convertTraces(req)
 
 	ctx := context.Background()
@@ -131,8 +140,7 @@ func (s *Server) handleTraces(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s.log.Info("ingested traces", "spans", len(spans))
-	s.writeExportResponse(w)
+	return len(spans)
 }
 
 func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {

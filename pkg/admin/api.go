@@ -2962,7 +2962,27 @@ type ExplainContext struct {
 	ServiceMetrics any              `json:"service_metrics,omitempty"`
 	Topology       *TopologyResponseV2      `json:"topology_context,omitempty"`
 	Analysis       ExplainAnalysis          `json:"analysis"`
+	Structured     ExplainStructured        `json:"structured"`
 	Narrative      string                   `json:"narrative"`
+}
+
+// ExplainStructured is a deterministic, machine-readable summary derived from
+// the explain analysis: probable cause, affected services, related deploys, and
+// a suggested fix. (No external LLM — purely rule-based over the gathered data.)
+type ExplainStructured struct {
+	ProbableCause    string          `json:"probable_cause"`
+	AffectedServices []string        `json:"affected_services"`
+	RelatedDeploys   []RelatedDeploy `json:"related_deploys,omitempty"`
+	SuggestedFix     string          `json:"suggested_fix,omitempty"`
+}
+
+// RelatedDeploy is a deploy that occurred near the request's timestamp.
+type RelatedDeploy struct {
+	Service   string `json:"service"`
+	Author    string `json:"author"`
+	Commit    string `json:"commit"`
+	Message   string `json:"message"`
+	Timestamp string `json:"timestamp"`
 }
 
 // ExplainAnalysis contains pre-computed analysis hints.
@@ -3093,6 +3113,7 @@ func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check for recent deploys near the request time
+	var relatedDeploys []RelatedDeploy
 	a.deploysMu.RLock()
 	for _, d := range a.deploys {
 		deployTime, err := time.Parse(time.RFC3339, d.Timestamp)
@@ -3104,13 +3125,75 @@ func (a *API) handleExplainRequest(w http.ResponseWriter, r *http.Request) {
 			analysis.Anomalies = append(analysis.Anomalies,
 				fmt.Sprintf("Deploy detected near this request: %s by %s (%s) — commit %s",
 					d.Service, d.Author, d.Message, d.Commit))
+			relatedDeploys = append(relatedDeploys, RelatedDeploy{
+				Service: d.Service, Author: d.Author, Commit: d.Commit,
+				Message: d.Message, Timestamp: d.Timestamp,
+			})
 		}
 	}
 	a.deploysMu.RUnlock()
 
 	ctx.Analysis = analysis
+	ctx.Structured = buildExplainStructured(entry, &ctx, &analysis, relatedDeploys)
 	ctx.Narrative = buildNarrative(entry, &ctx, &analysis)
 	writeJSON(w, http.StatusOK, ctx)
+}
+
+// buildExplainStructured derives a deterministic structured summary (probable
+// cause, affected services, related deploys, suggested fix) from the gathered
+// explain data using rule-based heuristics — most specific cause first.
+func buildExplainStructured(entry *gateway.RequestEntry, ctx *ExplainContext, a *ExplainAnalysis, deploys []RelatedDeploy) ExplainStructured {
+	s := ExplainStructured{RelatedDeploys: deploys}
+
+	// Affected services: the request's own service plus every service in its
+	// trace timeline (deduped, request-first).
+	seen := map[string]bool{}
+	add := func(svc string) {
+		if svc != "" && !seen[svc] {
+			seen[svc] = true
+			s.AffectedServices = append(s.AffectedServices, svc)
+		}
+	}
+	add(entry.Service)
+	for _, sp := range ctx.Timeline {
+		add(sp.Service)
+	}
+
+	switch {
+	case a.IsError && len(deploys) > 0:
+		d := deploys[0]
+		s.ProbableCause = fmt.Sprintf("Failure coincides with a recent deploy of %s (commit %s by %s).",
+			d.Service, shortCommit(d.Commit), d.Author)
+		s.SuggestedFix = fmt.Sprintf("Review or roll back the %s deploy (commit %s) and re-test this call.",
+			d.Service, shortCommit(d.Commit))
+	case a.IsError && a.ErrorRate > 0.5:
+		s.ProbableCause = fmt.Sprintf("%s is failing broadly (%.0f%% recent error rate) — likely a service-wide issue, not request-specific.",
+			entry.Service, a.ErrorRate*100)
+		s.SuggestedFix = fmt.Sprintf("Investigate %s health and its dependencies; the high error rate points to an outage or bad config.", entry.Service)
+	case a.IsError:
+		s.ProbableCause = fmt.Sprintf("Request returned HTTP %d on %s/%s; the service error rate is low (%.0f%%), so this failure is unusual.",
+			entry.StatusCode, entry.Service, entry.Action, a.ErrorRate*100)
+		s.SuggestedFix = "Inspect the request inputs and response body; reproduce with the same parameters to isolate the failing condition."
+	case a.IsSlow && a.SlowestSpan != "":
+		s.ProbableCause = fmt.Sprintf("Latency (%.0fms, %.1fx the p50) is dominated by %s.",
+			entry.LatencyMs, a.LatencyRatio, a.SlowestSpan)
+		s.SuggestedFix = fmt.Sprintf("Optimize %s — check for full scans, missing indexes, or downstream slowness.", a.SlowestSpan)
+	case a.IsSlow:
+		s.ProbableCause = fmt.Sprintf("Request latency (%.0fms) is %.1fx the p50 (%.0fms).",
+			entry.LatencyMs, a.LatencyRatio, a.P50Ms)
+		s.SuggestedFix = "Profile the call path and compare against the faster similar requests to find what changed."
+	default:
+		s.ProbableCause = fmt.Sprintf("%s/%s completed normally (HTTP %d, %.0fms) with no anomalies detected.",
+			entry.Service, entry.Action, entry.StatusCode, entry.LatencyMs)
+	}
+	return s
+}
+
+func shortCommit(c string) string {
+	if len(c) > 8 {
+		return c[:8]
+	}
+	return c
 }
 
 // serviceDescription maps AWS service names to human-readable descriptions.

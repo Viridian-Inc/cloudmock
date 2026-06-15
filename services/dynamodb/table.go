@@ -73,17 +73,11 @@ type Table struct {
 	cachedHashKey  string
 	cachedRangeKey string
 
-	// --- New partition-based storage ---
+	// --- Partition-based storage (authoritative) ---
 	partitions map[string]*Partition  // pkValue → partition
 	gsiStores  map[string]*IndexStore // indexName → index store
 	lsiStores  map[string]*IndexStore // indexName → index store
 	count      atomic.Int64
-
-	// --- Backward-compat shims for store.go / handlers.go (Task 4 removes these) ---
-	Items     []Item            // Deprecated: kept for store.go compatibility
-	ItemCount int64             // Deprecated: kept for handlers.go compatibility
-	GSIItems  map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
-	LSIItems  map[string][]Item // Deprecated: kept for handlers.go / store.go compatibility
 }
 
 // initPartitions initializes the partition-based storage for a table.
@@ -178,9 +172,6 @@ func (t *Table) indexItem(item Item) {
 			store.remove(item, hk)
 			store.put(item, hk)
 		}
-		// Also maintain legacy GSIItems for backward compat.
-		t.removeFromIndex(t.GSIItems, gsi.IndexName, gsi.KeySchema, item)
-		t.GSIItems[gsi.IndexName] = append(t.GSIItems[gsi.IndexName], item)
 	}
 	for _, lsi := range t.LSIs {
 		hk := gsiHashKeyName(lsi.KeySchema)
@@ -200,8 +191,6 @@ func (t *Table) indexItem(item Item) {
 			store.remove(item, hk)
 			store.put(item, hk)
 		}
-		t.removeFromIndex(t.LSIItems, lsi.IndexName, lsi.KeySchema, item)
-		t.LSIItems[lsi.IndexName] = append(t.LSIItems[lsi.IndexName], item)
 	}
 }
 
@@ -212,31 +201,12 @@ func (t *Table) deindexItem(item Item) {
 		if store, ok := t.gsiStores[gsi.IndexName]; ok {
 			store.remove(item, hk)
 		}
-		t.removeFromIndex(t.GSIItems, gsi.IndexName, gsi.KeySchema, item)
 	}
 	for _, lsi := range t.LSIs {
 		hk := gsiHashKeyName(lsi.KeySchema)
 		if store, ok := t.lsiStores[lsi.IndexName]; ok {
 			store.remove(item, hk)
 		}
-		t.removeFromIndex(t.LSIItems, lsi.IndexName, lsi.KeySchema, item)
-	}
-}
-
-// removeFromIndex removes an item from a specific legacy index by matching key schema.
-func (t *Table) removeFromIndex(indexItems map[string][]Item, indexName string, ks []KeySchemaElement, item Item) {
-	items := indexItems[indexName]
-	hk := gsiHashKeyName(ks)
-	rk := gsiRangeKeyName(ks)
-	for i, existing := range items {
-		if !avEqual(item[hk], existing[hk]) {
-			continue
-		}
-		if rk != "" && !avEqual(item[rk], existing[rk]) {
-			continue
-		}
-		indexItems[indexName] = append(items[:i], items[i+1:]...)
-		return
 	}
 }
 

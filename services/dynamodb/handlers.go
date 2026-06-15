@@ -375,7 +375,7 @@ func tableToDescription(t *Table, arn string) tableDescription {
 		KeySchema:            t.KeySchema,
 		AttributeDefinitions: t.AttributeDefinitions,
 		CreationDateTime:     t.CreationDateTime,
-		ItemCount:            t.ItemCount,
+		ItemCount:            t.itemCount(),
 		TableArn:             arn,
 		// Always report WarmThroughput as ACTIVE — CloudMock has no async warm-up.
 		// This prevents the Terraform AWS provider v6 waiter from timing out when
@@ -389,7 +389,10 @@ func tableToDescription(t *Table, arn string) tableDescription {
 		desc.ProvisionedThroughput = t.ProvisionedThroughput
 	}
 	for _, gsi := range t.GSIs {
-		itemCount := int64(len(t.GSIItems[gsi.IndexName]))
+		var itemCount int64
+		if st, ok := t.gsiStores[gsi.IndexName]; ok {
+			itemCount = int64(st.itemCount())
+		}
 		desc.GlobalSecondaryIndexes = append(desc.GlobalSecondaryIndexes, gsiDescription{
 			IndexName:             gsi.IndexName,
 			KeySchema:             gsi.KeySchema,
@@ -402,7 +405,10 @@ func tableToDescription(t *Table, arn string) tableDescription {
 		})
 	}
 	for _, lsi := range t.LSIs {
-		itemCount := int64(len(t.LSIItems[lsi.IndexName]))
+		var itemCount int64
+		if st, ok := t.lsiStores[lsi.IndexName]; ok {
+			itemCount = int64(st.itemCount())
+		}
 		desc.LocalSecondaryIndexes = append(desc.LocalSecondaryIndexes, lsiDescription{
 			IndexName:      lsi.IndexName,
 			KeySchema:      lsi.KeySchema,

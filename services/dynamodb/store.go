@@ -43,15 +43,6 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		billingMode = "PROVISIONED"
 	}
 
-	gsiItems := make(map[string][]Item)
-	for _, gsi := range gsis {
-		gsiItems[gsi.IndexName] = nil
-	}
-	lsiItems := make(map[string][]Item)
-	for _, lsi := range lsis {
-		lsiItems[lsi.IndexName] = nil
-	}
-
 	table := &Table{
 		Name:                  name,
 		KeySchema:             keySchema,
@@ -62,8 +53,6 @@ func (s *TableStore) CreateTable(name string, keySchema []KeySchemaElement, attr
 		ProvisionedThroughput: pt,
 		GSIs:                  gsis,
 		LSIs:                  lsis,
-		GSIItems:              gsiItems,
-		LSIItems:              lsiItems,
 	}
 
 	table.initPartitions()
@@ -284,7 +273,6 @@ func (s *TableStore) PutItem(tableName string, item Item, condExpr ...string) *s
 		table.deindexItem(old)
 	}
 	table.indexItem(item)
-	table.ItemCount = table.itemCount()
 	table.mu.Unlock()
 
 	if table.Stream != nil {
@@ -416,7 +404,6 @@ func (s *TableStore) DeleteItem(tableName string, key Item, condExpr ...string) 
 			delete(table.partitions, pkVal)
 		}
 		table.deindexItem(old)
-		table.ItemCount = table.itemCount()
 		table.mu.Unlock()
 
 		if table.Stream != nil {
@@ -431,7 +418,6 @@ func (s *TableStore) deleteFromTable(table *Table, key Item) *service.AWSError {
 	old := table.deleteItem(key)
 	if old != nil {
 		table.deindexItem(old)
-		table.ItemCount = table.itemCount() // sync compat field
 		if table.Stream != nil {
 			table.Stream.appendRecord("REMOVE", copyItem(old), nil)
 		}
@@ -478,7 +464,6 @@ func (s *TableStore) updateInTable(table *Table, key Item, updateExpr string, ex
 	// Insert/replace using partition store.
 	table.putItem(target)
 	table.indexItem(target)
-	table.ItemCount = table.itemCount() // sync compat field
 
 	if table.Stream != nil {
 		if found {
@@ -505,7 +490,6 @@ func (s *TableStore) putInTable(table *Table, item Item) {
 		table.deindexItem(old)
 	}
 	table.indexItem(item)
-	table.ItemCount = table.itemCount() // sync compat field
 
 	if table.Stream != nil {
 		if old != nil {

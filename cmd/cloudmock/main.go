@@ -11,7 +11,10 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 	"time"
 
@@ -131,10 +134,61 @@ func cmdStart(args []string) {
 	cmd.Stderr = os.Stderr
 	cmd.Env = os.Environ()
 
-	if err := cmd.Run(); err != nil {
+	if err := cmd.Start(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
+
+	// Record the PID so `cloudmock stop` (possibly from another terminal) can
+	// signal this gateway. Cleaned up when the gateway exits.
+	pidPath := pidFilePath()
+	if err := writePidFile(pidPath, cmd.Process.Pid); err != nil {
+		fmt.Fprintf(os.Stderr, "warning: could not write pidfile %s: %v\n", pidPath, err)
+	}
+
+	waitErr := cmd.Wait()
+	os.Remove(pidPath)
+	if waitErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", waitErr)
+		os.Exit(1)
+	}
+}
+
+// pidFilePath returns the path used to record the running gateway's PID.
+func pidFilePath() string {
+	if home := os.Getenv("HOME"); home != "" {
+		return filepath.Join(home, ".cloudmock", "cloudmock.pid")
+	}
+	return filepath.Join(os.TempDir(), "cloudmock-gateway.pid")
+}
+
+// writePidFile writes pid to path, creating the parent directory if needed.
+func writePidFile(path string, pid int) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(path, []byte(strconv.Itoa(pid)), 0o644)
+}
+
+// stopGateway reads the pidfile, sends SIGTERM to the recorded process, and
+// removes the pidfile. Returns the signaled PID. A missing pidfile yields an
+// os.IsNotExist error so callers can message appropriately.
+func stopGateway(pidPath string) (int, error) {
+	data, err := os.ReadFile(pidPath)
+	if err != nil {
+		return 0, err
+	}
+	pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+	if err != nil {
+		return 0, fmt.Errorf("invalid pidfile contents %q: %w", strings.TrimSpace(string(data)), err)
+	}
+	proc, _ := os.FindProcess(pid) // always non-nil on Unix
+	if err := proc.Signal(syscall.SIGTERM); err != nil {
+		os.Remove(pidPath) // process is gone — pidfile is stale
+		return pid, fmt.Errorf("process %d not running (stale pidfile removed): %w", pid, err)
+	}
+	os.Remove(pidPath)
+	return pid, nil
 }
 
 func findGatewayBinary() string {
@@ -152,9 +206,18 @@ func findGatewayBinary() string {
 }
 
 func cmdStop() {
-	// For now, print instructions. A full implementation would track PIDs or use docker-compose.
-	fmt.Println("To stop cloudmock, press Ctrl+C in the terminal where it is running,")
-	fmt.Println("or kill the gateway process.")
+	pidPath := pidFilePath()
+	pid, err := stopGateway(pidPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No running cloudmock gateway found (no pidfile).")
+			fmt.Println("If it is running in another terminal, press Ctrl+C there.")
+			return
+		}
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	fmt.Printf("Stopped cloudmock gateway (sent SIGTERM to pid %d).\n", pid)
 }
 
 func cmdStatus(adminAddr string) {

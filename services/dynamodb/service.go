@@ -94,6 +94,12 @@ func (s *DynamoDBService) GetTableNames() []string {
 	return s.store.ListTables()
 }
 
+// TableKeySchema reports a running table's key schema and GSIs for IaC drift
+// detection. See (*TableStore).TableKeySchema.
+func (s *DynamoDBService) TableKeySchema(name string) (hashKey, rangeKey string, gsis map[string][2]string, ok bool) {
+	return s.store.TableKeySchema(name)
+}
+
 // ResourceSchemas returns the schema for DynamoDB table resources.
 func (s *DynamoDBService) ResourceSchemas() []schema.ResourceSchema {
 	return []schema.ResourceSchema{

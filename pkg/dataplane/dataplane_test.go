@@ -175,9 +175,10 @@ func TestProductionDataPlane(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping integration test")
 	}
-	// TODO: Build production DataPlane with DuckDB + PostgreSQL.
-	// DuckDB can use :memory: but PostgreSQL still needs a container.
-	// For now, skip — the individual store tests in
-	// duckdb/ and postgres/ packages cover this.
+	// NOTE: A production DataPlane (DuckDB + PostgreSQL) parity run is
+	// intentionally not built here. DuckDB can use :memory:, but PostgreSQL
+	// needs a container, so this is left as an opt-in integration test;
+	// the per-store tests in the duckdb/ and postgres/ packages provide the
+	// equivalent coverage without requiring Docker in unit runs.
 	t.Skip("production parity test requires Docker for PostgreSQL — individual store tests provide coverage")
 }

@@ -208,6 +208,28 @@ func (s *TableStore) ListTables() []string {
 	return names
 }
 
+// TableKeySchema reports a running table's hash key, optional range key (""
+// when the table has no sort key), and a map of GSI name → [hashKey, rangeKey],
+// for IaC drift detection. ok is false if no table with the given name exists.
+func (s *TableStore) TableKeySchema(name string) (hashKey, rangeKey string, gsis map[string][2]string, ok bool) {
+	v, found := s.tables.Load(name)
+	if !found {
+		return "", "", nil, false
+	}
+	t := v.(*Table)
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	hashKey = gsiHashKeyName(t.KeySchema)
+	rangeKey = gsiRangeKeyName(t.KeySchema)
+	if len(t.GSIs) > 0 {
+		gsis = make(map[string][2]string, len(t.GSIs))
+		for _, g := range t.GSIs {
+			gsis[g.IndexName] = [2]string{gsiHashKeyName(g.KeySchema), gsiRangeKeyName(g.KeySchema)}
+		}
+	}
+	return hashKey, rangeKey, gsis, true
+}
+
 // acquireTable looks up a table from the sync.Map and returns it.
 // The caller is responsible for acquiring the table-level lock.
 func (s *TableStore) acquireTable(name string) (*Table, *service.AWSError) {

@@ -37,6 +37,50 @@ func makeItem(pk, sk string) Item {
 	}
 }
 
+func TestStore_TableKeySchema(t *testing.T) {
+	store := newTestStore()
+	_, err := store.CreateTable(
+		"orders",
+		[]KeySchemaElement{
+			{AttributeName: "pk", KeyType: "HASH"},
+			{AttributeName: "sk", KeyType: "RANGE"},
+		},
+		[]AttributeDefinition{
+			{AttributeName: "pk", AttributeType: "S"},
+			{AttributeName: "sk", AttributeType: "S"},
+			{AttributeName: "status", AttributeType: "S"},
+			{AttributeName: "createdAt", AttributeType: "S"},
+		},
+		"PAY_PER_REQUEST", nil,
+		[]GSI{{
+			IndexName: "by-status",
+			KeySchema: []KeySchemaElement{
+				{AttributeName: "status", KeyType: "HASH"},
+				{AttributeName: "createdAt", KeyType: "RANGE"},
+			},
+		}},
+		nil, nil,
+	)
+	if err != nil {
+		t.Fatalf("CreateTable: %v", err)
+	}
+
+	hk, rk, gsis, ok := store.TableKeySchema("orders")
+	if !ok {
+		t.Fatal("TableKeySchema(orders): ok = false, want true")
+	}
+	if hk != "pk" || rk != "sk" {
+		t.Errorf("keys = %q/%q, want pk/sk", hk, rk)
+	}
+	if got, want := gsis["by-status"], [2]string{"status", "createdAt"}; got != want {
+		t.Errorf("GSI by-status = %v, want %v", got, want)
+	}
+
+	if _, _, _, ok := store.TableKeySchema("nope"); ok {
+		t.Error("TableKeySchema(nope): ok = true, want false for missing table")
+	}
+}
+
 func TestStore_CreateAndDescribe(t *testing.T) {
 	store := newTestStore()
 	createTestTable(t, store, "Users")

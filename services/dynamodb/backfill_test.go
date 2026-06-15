@@ -1,6 +1,7 @@
 package dynamodb_test
 
 import (
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -32,7 +33,7 @@ func TestDDB_ExecuteStatement_Insert(t *testing.T) {
 		t.Fatalf("ExecuteStatement INSERT: %d %s", w.Code, w.Body.String())
 	}
 
-	// SELECT via PartiQL
+	// SELECT via PartiQL — must return the item we just inserted.
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, ddbReq(t, "ExecuteStatement", map[string]any{
 		"Statement": `SELECT * FROM "partiql-test" WHERE pk = 'user-1'`,
@@ -40,6 +41,97 @@ func TestDDB_ExecuteStatement_Insert(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("ExecuteStatement SELECT: %d %s", w.Code, w.Body.String())
 	}
+	items := executeStatementItems(t, w)
+	if len(items) != 1 {
+		t.Fatalf("SELECT returned %d items, want 1: %s", len(items), w.Body.String())
+	}
+	if got := attrS(items[0], "pk"); got != "user-1" {
+		t.Errorf("pk = %q, want user-1", got)
+	}
+	if got := attrS(items[0], "name"); got != "Alice" {
+		t.Errorf("name = %q, want Alice", got)
+	}
+
+	// SELECT with a non-matching condition returns no items.
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "ExecuteStatement", map[string]any{
+		"Statement": `SELECT * FROM "partiql-test" WHERE pk = 'nobody'`,
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ExecuteStatement SELECT(no match): %d %s", w.Code, w.Body.String())
+	}
+	if items := executeStatementItems(t, w); len(items) != 0 {
+		t.Errorf("non-matching SELECT returned %d items, want 0", len(items))
+	}
+}
+
+func TestDDB_ExecuteStatement_Parameters(t *testing.T) {
+	handler := newDDBGateway(t)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "CreateTable", map[string]any{
+		"TableName":            "pq-params",
+		"KeySchema":            []map[string]string{{"AttributeName": "pk", "KeyType": "HASH"}},
+		"AttributeDefinitions": []map[string]string{{"AttributeName": "pk", "AttributeType": "S"}},
+		"BillingMode":          "PAY_PER_REQUEST",
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("CreateTable: %d %s", w.Code, w.Body.String())
+	}
+
+	// INSERT using a ? placeholder bound to a typed Parameter.
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "ExecuteStatement", map[string]any{
+		"Statement":  `INSERT INTO "pq-params" VALUE {'pk': ?}`,
+		"Parameters": []any{map[string]any{"S": "p-1"}},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ExecuteStatement INSERT(param): %d %s", w.Code, w.Body.String())
+	}
+
+	w = httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "ExecuteStatement", map[string]any{
+		"Statement":  `SELECT * FROM "pq-params" WHERE pk = ?`,
+		"Parameters": []any{map[string]any{"S": "p-1"}},
+	}))
+	if w.Code != http.StatusOK {
+		t.Fatalf("ExecuteStatement SELECT(param): %d %s", w.Code, w.Body.String())
+	}
+	if items := executeStatementItems(t, w); len(items) != 1 || attrS(items[0], "pk") != "p-1" {
+		t.Errorf("parameterized SELECT mismatch: %s", w.Body.String())
+	}
+}
+
+func TestDDB_ExecuteStatement_Unsupported(t *testing.T) {
+	handler := newDDBGateway(t)
+	w := httptest.NewRecorder()
+	handler.ServeHTTP(w, ddbReq(t, "ExecuteStatement", map[string]any{
+		"Statement": `UPDATE "x" SET a = 1 WHERE pk = 'y'`,
+	}))
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("unsupported statement: status %d, want 400; %s", w.Code, w.Body.String())
+	}
+}
+
+// executeStatementItems parses the Items array from an ExecuteStatement response.
+func executeStatementItems(t *testing.T, w *httptest.ResponseRecorder) []map[string]any {
+	t.Helper()
+	var resp struct {
+		Items []map[string]any `json:"Items"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse ExecuteStatement response: %v (%s)", err, w.Body.String())
+	}
+	return resp.Items
+}
+
+// attrS returns the string ("S") value of an attribute in a typed item.
+func attrS(item map[string]any, attr string) string {
+	av, ok := item[attr].(map[string]any)
+	if !ok {
+		return ""
+	}
+	s, _ := av["S"].(string)
+	return s
 }
 
 // ---- Backups ----

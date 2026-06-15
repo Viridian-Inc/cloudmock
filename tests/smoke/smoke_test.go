@@ -97,7 +97,8 @@ func TestSmoke_S3_BucketAndObjectCRUD(t *testing.T) {
 }
 
 func TestSmoke_SQS_SendReceive(t *testing.T) {
-	t.Skip("AWS SDK v2 SQS uses JSON protocol; cloudmock SQS returns XML. TODO: add JSON support to SQS service.")
+	// SQS now speaks the AWS SDK v2 JSON protocol (X-Amz-Target dispatch in
+	// services/sqs/json_handlers.go), so this end-to-end flow works.
 	cfg := cloudmockConfig(t)
 	client := sqs.NewFromConfig(cfg, func(o *sqs.Options) {
 		o.BaseEndpoint = aws.String(endpoint)

@@ -161,9 +161,31 @@ func TestEC_DescribeCacheClusters_NotFound(t *testing.T) {
 }
 
 func TestEC_ModifyCacheCluster(t *testing.T) {
-	// SKIP: ModifyCacheCluster calls ForceState while holding store mutex,
-	// causing a deadlock when the lifecycle callback tries to re-acquire it.
-	t.Skip("skipping due to pre-existing deadlock in store.ModifyCacheCluster + lifecycle.ForceState")
+	// Regression: ModifyCacheCluster used to call ForceState while holding the
+	// store mutex, deadlocking when the lifecycle callback re-acquired it. The
+	// store now unlocks before ForceState, so this must complete and report the
+	// modified node type with a "modifying" status.
+	h := newECGateway(t)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action":         "CreateCacheCluster",
+		"CacheClusterId": "mod-cluster",
+		"Engine":         "redis",
+		"CacheNodeType":  "cache.t3.micro",
+		"NumCacheNodes":  "1",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, ecBody(t, w))
+
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action":         "ModifyCacheCluster",
+		"CacheClusterId": "mod-cluster",
+		"CacheNodeType":  "cache.t3.large",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, ecBody(t, w))
+	body := ecBody(t, w)
+	assert.Contains(t, body, "cache.t3.large")
+	assert.Contains(t, body, "modifying")
 }
 
 func TestEC_ModifyCacheCluster_NotFound(t *testing.T) {
@@ -278,8 +300,29 @@ func TestEC_DescribeReplicationGroups_NotFound(t *testing.T) {
 }
 
 func TestEC_ModifyReplicationGroup(t *testing.T) {
-	// SKIP: Same deadlock as ModifyCacheCluster - ForceState called under store mutex.
-	t.Skip("skipping due to pre-existing deadlock in store.ModifyReplicationGroup + lifecycle.ForceState")
+	// Regression: ModifyReplicationGroup used to call ForceState while holding
+	// the store mutex (deadlock). The store now unlocks before ForceState.
+	h := newECGateway(t)
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action":                      "CreateReplicationGroup",
+		"ReplicationGroupId":          "mod-rg",
+		"ReplicationGroupDescription": "before",
+		"CacheNodeType":               "cache.t3.micro",
+		"NumCacheClusters":            "2",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, ecBody(t, w))
+
+	w = httptest.NewRecorder()
+	h.ServeHTTP(w, ecReq(t, map[string]string{
+		"Action":             "ModifyReplicationGroup",
+		"ReplicationGroupId": "mod-rg",
+		"CacheNodeType":      "cache.t3.large",
+	}))
+	require.Equal(t, http.StatusOK, w.Code, ecBody(t, w))
+	body := ecBody(t, w)
+	assert.Contains(t, body, "mod-rg")
+	assert.Contains(t, body, "modifying")
 }
 
 func TestEC_DeleteReplicationGroup(t *testing.T) {

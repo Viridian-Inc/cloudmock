@@ -167,9 +167,28 @@ func TestEKS_DeleteCluster_NotFound(t *testing.T) {
 }
 
 func TestEKS_UpdateClusterConfig(t *testing.T) {
-	// SKIP: UpdateClusterConfig calls ForceState while holding store mutex,
-	// causing a deadlock when the lifecycle callback tries to re-acquire it.
-	t.Skip("skipping due to pre-existing deadlock in store.UpdateClusterConfig + lifecycle.ForceState")
+	// Regression: UpdateClusterConfig used to call ForceState while holding the
+	// store mutex, deadlocking when the lifecycle callback re-acquired it. The
+	// store now releases s.mu before ForceState (store.go), so this exercises
+	// the full update path and must complete without deadlocking.
+	h := newEKSGateway(t)
+	createCluster(t, h, "upd-cluster")
+
+	w := httptest.NewRecorder()
+	h.ServeHTTP(w, eksReq(t, http.MethodPost, "/clusters/upd-cluster/update-config", map[string]any{
+		"version": "1.30",
+		"resourcesVpcConfig": map[string]any{
+			"subnetIds":        []string{"subnet-9", "subnet-10"},
+			"securityGroupIds": []string{"sg-1"},
+		},
+	}))
+	require.Equal(t, http.StatusOK, w.Code, eksBody(t, w))
+
+	m := eksJSON(t, w)
+	update := m["update"].(map[string]any)
+	assert.Equal(t, "ConfigUpdate", update["type"])
+	cluster := m["cluster"].(map[string]any)
+	assert.Equal(t, "UPDATING", cluster["status"])
 }
 
 // ---- Nodegroup ----

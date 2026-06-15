@@ -1,6 +1,7 @@
 package scm
 
 import (
+	"bytes"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -84,10 +85,121 @@ func (g *GitHubProvider) GetFileContent(repo, path, ref string) (string, error) 
 	return content, nil
 }
 
-// GetBlame retrieves blame information for a range of lines in a file.
-// GitHub REST API does not have a direct blame endpoint, so we use the
-// commits API to find who last modified the specific lines.
+// GetBlame retrieves blame information for a range of lines in a file. It
+// prefers GitHub's GraphQL blame API for precise per-line attribution and
+// falls back to the REST commits approximation (all lines attributed to the
+// most recent commit) when GraphQL is unavailable — no token, an API error,
+// or an empty result.
 func (g *GitHubProvider) GetBlame(repo, path string, startLine, endLine int) ([]BlameLine, error) {
+	if lines, err := g.getBlameGraphQL(repo, path, startLine, endLine); err == nil {
+		return lines, nil
+	}
+	return g.getBlameREST(repo, path, startLine, endLine)
+}
+
+// getBlameGraphQL queries GitHub's GraphQL blame API and maps the returned
+// ranges to per-line BlameLine entries for [startLine, endLine].
+func (g *GitHubProvider) getBlameGraphQL(repo, path string, startLine, endLine int) ([]BlameLine, error) {
+	owner, name, ok := strings.Cut(repo, "/")
+	if !ok || owner == "" || name == "" {
+		return nil, fmt.Errorf("invalid repo %q (want owner/name)", repo)
+	}
+	const query = `query($owner:String!,$name:String!,$path:String!){` +
+		`repository(owner:$owner,name:$name){defaultBranchRef{target{... on Commit{` +
+		`blame(path:$path){ranges{startingLine endingLine commit{` +
+		`oid message committedDate author{name}}}}}}}}}`
+
+	body, err := g.doGraphQL(query, map[string]any{"owner": owner, "name": name, "path": path})
+	if err != nil {
+		return nil, err
+	}
+
+	var resp struct {
+		Data struct {
+			Repository struct {
+				DefaultBranchRef struct {
+					Target struct {
+						Blame struct {
+							Ranges []struct {
+								StartingLine int `json:"startingLine"`
+								EndingLine   int `json:"endingLine"`
+								Commit       struct {
+									OID           string    `json:"oid"`
+									Message       string    `json:"message"`
+									CommittedDate time.Time `json:"committedDate"`
+									Author        struct {
+										Name string `json:"name"`
+									} `json:"author"`
+								} `json:"commit"`
+							} `json:"ranges"`
+						} `json:"blame"`
+					} `json:"target"`
+				} `json:"defaultBranchRef"`
+			} `json:"repository"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil, fmt.Errorf("parse graphql blame: %w", err)
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("graphql blame error: %s", resp.Errors[0].Message)
+	}
+
+	ranges := resp.Data.Repository.DefaultBranchRef.Target.Blame.Ranges
+	if len(ranges) == 0 {
+		return nil, fmt.Errorf("no blame ranges for %s/%s", repo, path)
+	}
+
+	lines := make([]BlameLine, 0, endLine-startLine+1)
+	for i := startLine; i <= endLine; i++ {
+		bl := BlameLine{Line: i}
+		for _, r := range ranges {
+			if i >= r.StartingLine && i <= r.EndingLine {
+				bl.CommitHash = r.Commit.OID
+				bl.Author = r.Commit.Author.Name
+				bl.Date = r.Commit.CommittedDate
+				bl.Message = firstLine(r.Commit.Message)
+				break
+			}
+		}
+		lines = append(lines, bl)
+	}
+	return lines, nil
+}
+
+// doGraphQL performs an authenticated POST to GitHub's GraphQL endpoint.
+func (g *GitHubProvider) doGraphQL(query string, variables map[string]any) ([]byte, error) {
+	payload, err := json.Marshal(map[string]any{"query": query, "variables": variables})
+	if err != nil {
+		return nil, err
+	}
+	req, err := http.NewRequest("POST", githubAPI+"/graphql", bytes.NewReader(payload))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	if g.token != "" {
+		req.Header.Set("Authorization", "Bearer "+g.token)
+	}
+	resp, err := g.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("github graphql %d: %s", resp.StatusCode, string(body))
+	}
+	return io.ReadAll(resp.Body)
+}
+
+// getBlameREST is the fallback: it uses the commits API to find who last
+// modified the file and attributes all requested lines to the most recent
+// commit (GitHub REST has no direct per-line blame endpoint).
+func (g *GitHubProvider) getBlameREST(repo, path string, startLine, endLine int) ([]BlameLine, error) {
 	// Get commits that touched this file
 	url := fmt.Sprintf("%s/repos/%s/commits?path=%s&per_page=100", githubAPI, repo, path)
 	body, err := g.doRequest("GET", url)
@@ -109,9 +221,8 @@ func (g *GitHubProvider) GetBlame(repo, path string, startLine, endLine int) ([]
 		return nil, fmt.Errorf("parse commits response: %w", err)
 	}
 
-	// Build blame lines from the most recent commit touching the file.
-	// In a full implementation we'd use the GraphQL API for precise blame,
-	// but for v1 we attribute all requested lines to the most recent commit.
+	// Fallback attribution: assign all requested lines to the most recent
+	// commit touching the file. Per-line precision comes from getBlameGraphQL.
 	lines := make([]BlameLine, 0, endLine-startLine+1)
 	for i := startLine; i <= endLine; i++ {
 		bl := BlameLine{Line: i}

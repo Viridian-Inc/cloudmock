@@ -7,9 +7,10 @@ import { Domains } from './domains';
 import { Account } from './account';
 import { Webhooks } from './webhooks';
 import { Audit } from './audit';
+import { LocalData } from './local-data';
 import './settings.css';
 
-type Tab = 'connections' | 'routing' | 'domains' | 'webhooks' | 'config' | 'appearance' | 'audit' | 'account';
+type Tab = 'connections' | 'routing' | 'domains' | 'webhooks' | 'config' | 'appearance' | 'audit' | 'account' | 'local-data';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'connections', label: 'Connections' },
@@ -20,6 +21,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'appearance', label: 'Appearance' },
   { id: 'audit', label: 'Audit' },
   { id: 'account', label: 'Account' },
+  { id: 'local-data', label: 'Local Data' },
 ];
 
 const TAB_IDS = new Set<Tab>(TABS.map((t) => t.id));
@@ -51,6 +53,7 @@ export function SettingsView() {
         {activeTab === 'appearance' && <Appearance />}
         {activeTab === 'audit' && <Audit />}
         {activeTab === 'account' && <Account />}
+        {activeTab === 'local-data' && <LocalData />}
       </div>
     </div>
   );

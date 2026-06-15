@@ -99,6 +99,67 @@
   margin-top: 20px;
 }
 
+/* Destructive action button (e.g. delete all local data) */
+.settings-btn-danger {
+  border-color: rgba(255, 78, 94, 0.4);
+  color: var(--error);
+}
+
+.settings-btn-danger:hover:not(:disabled) {
+  background: rgba(255, 78, 94, 0.12);
+  border-color: var(--error);
+}
+
+.settings-btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Confirmation modal (shared by destructive settings actions) */
+.settings-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+}
+
+.settings-modal {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  width: 460px;
+  max-width: calc(100vw - 32px);
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+}
+
+.settings-modal-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.settings-modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.settings-modal-body {
+  padding: 20px;
+}
+
+.settings-modal-footer {
+  padding: 16px 20px;
+  border-top: 1px solid var(--border-subtle);
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 /* Placeholder / loading */
 .settings-placeholder {
   color: var(--text-tertiary);

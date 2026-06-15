@@ -161,6 +161,7 @@ type API struct {
 	marketplace        *marketplace.Registry
 	persistDir         string       // if set, dashboards/views/deploys are persisted here
 	dynamoStore        *DynamoStore // if set, dashboards/views/deploys use DynamoDB
+	localData          *LocalData   // on-disk persistence footprint for /api/local-data
 	platform           *PlatformStore
 	platformApps       *platformstore.AppStore
 	platformKeys       *platformstore.APIKeyStore
@@ -367,6 +368,8 @@ func New(cfg *config.Config, registry *routing.Registry, log *gateway.RequestLog
 	a.mux.HandleFunc("/api/state/export", a.handleStateExport)
 	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
 	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
+	a.mux.HandleFunc("/api/local-data", a.handleLocalDataInfo)
+	a.mux.HandleFunc("/api/local-data/delete", a.handleLocalDataDelete)
 
 	// CloudTrail replay endpoint
 	a.mux.HandleFunc("/api/cloudtrail/replay", a.handleCloudTrailReplay)
@@ -528,6 +531,8 @@ func NewWithDataPlane(cfg *config.Config, registry *routing.Registry, dp *datapl
 	a.mux.HandleFunc("/api/state/export", a.handleStateExport)
 	a.mux.HandleFunc("/api/state/import", a.handleStateImport)
 	a.mux.HandleFunc("/api/state/reset", a.handleStateReset)
+	a.mux.HandleFunc("/api/local-data", a.handleLocalDataInfo)
+	a.mux.HandleFunc("/api/local-data/delete", a.handleLocalDataDelete)
 
 	// CloudTrail replay endpoint
 	a.mux.HandleFunc("/api/cloudtrail/replay", a.handleCloudTrailReplay)

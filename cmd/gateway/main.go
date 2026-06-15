@@ -344,6 +344,32 @@ func writeStateAtomic(path string, data []byte) error {
 	return os.Rename(tmp, path)
 }
 
+// sanitizeProjectName reduces a user-supplied project/database name to a
+// single safe path segment (no directory traversal, only [A-Za-z0-9._-]).
+// Returns "" for an empty or unusable name.
+func sanitizeProjectName(name string) string {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return ""
+	}
+	// Collapse any path components so "../x" or "a/b" can't escape the
+	// projects directory.
+	name = filepath.Base(name)
+	if name == "." || name == ".." || name == string(filepath.Separator) {
+		return ""
+	}
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+			b.WriteRune(r)
+		default:
+			b.WriteRune('-')
+		}
+	}
+	return b.String()
+}
+
 func main() {
 	// Initialize structured logging. JSON in production, text for local dev.
 	logFormat := os.Getenv("CLOUDMOCK_LOG_FORMAT")
@@ -364,6 +390,7 @@ func main() {
 	iacEnv := flag.String("iac-env", "dev", "environment name for IaC resource name resolution (e.g., dev, stage, prod)")
 	stateFile := flag.String("state", "", "path to cloudmock state JSON file for snapshot restore/save (env: CLOUDMOCK_STATE)")
 	stateInterval := flag.Duration("state-interval", 5*time.Second, "disk mode: how often to persist state to -state; 0 = only on graceful shutdown (env: CLOUDMOCK_STATE_INTERVAL)")
+	projectName := flag.String("project", "", "named project/database for persistent storage; roots all on-disk data under ~/.cloudmock/projects/<name>/ and enables disk persistence by default (env: CLOUDMOCK_PROJECT)")
 	flag.Parse()
 
 	// Allow env var override for state file.
@@ -378,6 +405,31 @@ func main() {
 		} else {
 			slog.Warn("invalid CLOUDMOCK_STATE_INTERVAL; ignoring", "value", v, "error", perr)
 		}
+	}
+
+	// Resolve the named project (flag --project, env CLOUDMOCK_PROJECT). A
+	// named project roots ALL on-disk persistence under
+	// ~/.cloudmock/projects/<name>/ and enables disk persistence by default.
+	// The shared plugins/ directory stays at ~/.cloudmock/plugins/ (binaries,
+	// not project data) so it survives a "wipe local data".
+	if *projectName == "" {
+		*projectName = os.Getenv("CLOUDMOCK_PROJECT")
+	}
+	*projectName = sanitizeProjectName(*projectName)
+
+	cloudmockHome := filepath.Join(os.Getenv("HOME"), ".cloudmock")
+	dataDir := cloudmockHome
+	if *projectName != "" {
+		dataDir = filepath.Join(cloudmockHome, "projects", *projectName)
+		if err := os.MkdirAll(dataDir, 0o755); err != nil {
+			slog.Error("failed to create project data directory", "dir", dataDir, "error", err)
+		}
+		// Naming a project turns on disk mode: persist to its own state file
+		// unless an explicit -state path (or CLOUDMOCK_STATE) was given.
+		if *stateFile == "" {
+			*stateFile = filepath.Join(dataDir, "state.json")
+		}
+		slog.Info("named project", "project", *projectName, "data_dir", dataDir, "state", *stateFile)
 	}
 
 	// Auto-detect state/seed file from .cloudmock/ in the working
@@ -1126,8 +1178,9 @@ func main() {
 		dp.Requests = tenantscope.NewRequestReader(dp.Requests)
 	}
 
-	// Base directory for file-backed stores.
-	baseDir := filepath.Join(os.Getenv("HOME"), ".cloudmock")
+	// Base directory for file-backed stores. With a named project this is
+	// ~/.cloudmock/projects/<name>/, otherwise ~/.cloudmock (see dataDir).
+	baseDir := dataDir
 
 	// Chaos engine for fault injection — file-backed.
 	// In minimal profile, skip disk I/O for chaos rules (no rules by default).
@@ -1180,6 +1233,20 @@ func main() {
 	} else {
 		adminAPI.SetPersistDir(baseDir)
 	}
+	// Tell the admin API about this instance's on-disk footprint so the
+	// /api/local-data endpoints can report and wipe it. The subdir list is
+	// the set of data directories cloudmock manages under baseDir; plugins/
+	// is intentionally excluded so a wipe never deletes plugin binaries.
+	adminAPI.SetLocalData(admin.LocalData{
+		Project:   *projectName,
+		Dir:       baseDir,
+		StateFile: *stateFile,
+		Subdirs: []string{
+			"chaos", "rum", "replay", "uptime", "errors", "logs",
+			"incidents", "monitors", "alerts", "traffic", "annotations",
+			"cicd", "synthetics", "dashboards", "views", "deploys",
+		},
+	})
 	// Also set the direct request log/stats for topology edge enrichment
 	adminAPI.SetRequestLog(requestLog, requestStats)
 

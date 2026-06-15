@@ -139,3 +139,30 @@ export function resetService(name?: string): Promise<void> {
   const path = name ? `/api/reset?service=${encodeURIComponent(name)}` : '/api/reset';
   return api<void>(path, { method: 'POST' });
 }
+
+/** On-disk persistence footprint of the running cloudmock instance. */
+export interface LocalDataInfo {
+  project: string;
+  dir: string;
+  stateFile: string;
+  persistent: boolean;
+  onDisk: boolean;
+}
+
+/** Result of wiping all locally-stored on-disk data. */
+export interface LocalDataDeleteResult {
+  status: string;
+  project: string;
+  dir: string;
+  removed: string[];
+  reset_services: string[];
+  failures?: string[];
+}
+
+export function getLocalDataInfo(): Promise<LocalDataInfo> {
+  return api<LocalDataInfo>('/api/local-data');
+}
+
+export function deleteLocalData(): Promise<LocalDataDeleteResult> {
+  return api<LocalDataDeleteResult>('/api/local-data/delete', { method: 'POST' });
+}

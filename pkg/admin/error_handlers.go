@@ -52,6 +52,12 @@ func (a *API) handleErrorByID(w http.ResponseWriter, r *http.Request) {
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/errors/")
 
+	// GET /api/errors/deploys — error groups correlated to deploys by Release.
+	if path == "deploys" {
+		a.handleErrorDeployCorrelation(w, r)
+		return
+	}
+
 	// PUT /api/errors/:id/status
 	if strings.HasSuffix(path, "/status") {
 		if r.Method != http.MethodPut {

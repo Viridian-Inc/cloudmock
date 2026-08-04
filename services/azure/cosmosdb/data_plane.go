@@ -1166,7 +1166,6 @@ func applyCosmosPatchOperation(doc map[string]any, op map[string]any) bool {
 	default:
 		return false
 	}
-	return true
 }
 
 func cosmosPatchGet(doc map[string]any, path string) (any, bool) {

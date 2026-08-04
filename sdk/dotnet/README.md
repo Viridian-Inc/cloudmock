@@ -102,4 +102,4 @@ using var server = new CloudMockServer(port: 4566, region: "us-west-2");
 
 ## License
 
-BSL-1.1 — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](../../LICENSE).

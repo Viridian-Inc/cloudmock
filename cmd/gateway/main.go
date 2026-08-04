@@ -24,101 +24,126 @@ import (
 
 	"github.com/Viridian-Inc/cloudmock/pkg/account"
 	"github.com/Viridian-Inc/cloudmock/pkg/admin"
+	annotationspkg "github.com/Viridian-Inc/cloudmock/pkg/annotations"
+	anomalypkg "github.com/Viridian-Inc/cloudmock/pkg/anomaly"
+	"github.com/Viridian-Inc/cloudmock/pkg/audit"
+	auditdynamo "github.com/Viridian-Inc/cloudmock/pkg/audit/dynamostore"
+	auditmemory "github.com/Viridian-Inc/cloudmock/pkg/audit/memory"
+	auditpg "github.com/Viridian-Inc/cloudmock/pkg/audit/postgres"
 	"github.com/Viridian-Inc/cloudmock/pkg/auth"
-	awscfg "github.com/aws/aws-sdk-go-v2/config"
-	awsddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	ddbstore "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
-	authmemory "github.com/Viridian-Inc/cloudmock/pkg/auth/memory"
 	authdynamo "github.com/Viridian-Inc/cloudmock/pkg/auth/dynamostore"
+	authmemory "github.com/Viridian-Inc/cloudmock/pkg/auth/memory"
 	authpg "github.com/Viridian-Inc/cloudmock/pkg/auth/postgres"
-	"github.com/Viridian-Inc/cloudmock/pkg/ratelimit"
+	cicdfilestore "github.com/Viridian-Inc/cloudmock/pkg/cicd/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/config"
+	"github.com/Viridian-Inc/cloudmock/pkg/cost"
+	"github.com/Viridian-Inc/cloudmock/pkg/dashboard"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	duckImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/duckdb"
+	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
+	pgImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
+	promImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/prometheus"
+	"github.com/Viridian-Inc/cloudmock/pkg/dns"
+	ddbstore "github.com/Viridian-Inc/cloudmock/pkg/dynamostore"
+	"github.com/Viridian-Inc/cloudmock/pkg/edge"
+	errsfilestore "github.com/Viridian-Inc/cloudmock/pkg/errors/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
+	"github.com/Viridian-Inc/cloudmock/pkg/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
+	"github.com/Viridian-Inc/cloudmock/pkg/iac"
+	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
+	"github.com/Viridian-Inc/cloudmock/pkg/incident"
+	incdynamo "github.com/Viridian-Inc/cloudmock/pkg/incident/dynamostore"
+	incfilestore "github.com/Viridian-Inc/cloudmock/pkg/incident/filestore"
+	incmemory "github.com/Viridian-Inc/cloudmock/pkg/incident/memory"
+	incpg "github.com/Viridian-Inc/cloudmock/pkg/incident/postgres"
+	"github.com/Viridian-Inc/cloudmock/pkg/integration"
+	logsfilestore "github.com/Viridian-Inc/cloudmock/pkg/logstore/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/marketplace"
+	"github.com/Viridian-Inc/cloudmock/pkg/monitor"
+	mondynamo "github.com/Viridian-Inc/cloudmock/pkg/monitor/dynamostore"
+	monfilestore "github.com/Viridian-Inc/cloudmock/pkg/monitor/filestore"
+	notifypkg "github.com/Viridian-Inc/cloudmock/pkg/notify"
+	"github.com/Viridian-Inc/cloudmock/pkg/otlp"
 	platformstore "github.com/Viridian-Inc/cloudmock/pkg/platform/store"
+	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
+	"github.com/Viridian-Inc/cloudmock/pkg/profiling"
+	"github.com/Viridian-Inc/cloudmock/pkg/ratelimit"
+	"github.com/Viridian-Inc/cloudmock/pkg/regression"
+	regdynamo "github.com/Viridian-Inc/cloudmock/pkg/regression/dynamostore"
+	regmemory "github.com/Viridian-Inc/cloudmock/pkg/regression/memory"
+	regpg "github.com/Viridian-Inc/cloudmock/pkg/regression/postgres"
+	replayfilestore "github.com/Viridian-Inc/cloudmock/pkg/replay/filestore"
+	"github.com/Viridian-Inc/cloudmock/pkg/report"
+	"github.com/Viridian-Inc/cloudmock/pkg/routing"
+	rumpkg "github.com/Viridian-Inc/cloudmock/pkg/rum"
+	rumdynamo "github.com/Viridian-Inc/cloudmock/pkg/rum/dynamostore"
+	rumfilestore "github.com/Viridian-Inc/cloudmock/pkg/rum/filestore"
 	saasclerk "github.com/Viridian-Inc/cloudmock/pkg/saas/clerk"
 	"github.com/Viridian-Inc/cloudmock/pkg/saas/provisioning"
 	"github.com/Viridian-Inc/cloudmock/pkg/saas/quota"
 	saasstripe "github.com/Viridian-Inc/cloudmock/pkg/saas/stripe"
 	"github.com/Viridian-Inc/cloudmock/pkg/saas/tenant"
 	tenantdynamo "github.com/Viridian-Inc/cloudmock/pkg/saas/tenant/dynamostore"
-	"github.com/Viridian-Inc/cloudmock/pkg/audit"
-	auditmemory "github.com/Viridian-Inc/cloudmock/pkg/audit/memory"
-	auditdynamo "github.com/Viridian-Inc/cloudmock/pkg/audit/dynamostore"
-	auditpg "github.com/Viridian-Inc/cloudmock/pkg/audit/postgres"
-	"github.com/Viridian-Inc/cloudmock/pkg/config"
-	"github.com/Viridian-Inc/cloudmock/pkg/cost"
-	"github.com/Viridian-Inc/cloudmock/pkg/dashboard"
-	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
+	"github.com/Viridian-Inc/cloudmock/pkg/security"
+	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	snapshotpkg "github.com/Viridian-Inc/cloudmock/pkg/snapshot"
+	"github.com/Viridian-Inc/cloudmock/pkg/synthetics"
 	"github.com/Viridian-Inc/cloudmock/pkg/tenantscope"
 	"github.com/Viridian-Inc/cloudmock/pkg/tracecompare"
-	duckImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/duckdb"
-	"github.com/Viridian-Inc/cloudmock/pkg/dataplane/memory"
-	pgImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/postgres"
-	promImpl "github.com/Viridian-Inc/cloudmock/pkg/dataplane/prometheus"
-	"github.com/Viridian-Inc/cloudmock/pkg/dns"
-	"github.com/Viridian-Inc/cloudmock/pkg/edge"
-	"github.com/Viridian-Inc/cloudmock/pkg/eventbus"
-	"github.com/Viridian-Inc/cloudmock/pkg/profiling"
-	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
-	"github.com/Viridian-Inc/cloudmock/pkg/incident"
-	incfilestore "github.com/Viridian-Inc/cloudmock/pkg/incident/filestore"
-	incdynamo "github.com/Viridian-Inc/cloudmock/pkg/incident/dynamostore"
-	incmemory "github.com/Viridian-Inc/cloudmock/pkg/incident/memory"
-	"github.com/Viridian-Inc/cloudmock/pkg/otlp"
-	incpg "github.com/Viridian-Inc/cloudmock/pkg/incident/postgres"
-	"github.com/Viridian-Inc/cloudmock/pkg/monitor"
-	notifypkg "github.com/Viridian-Inc/cloudmock/pkg/notify"
-	mondynamo "github.com/Viridian-Inc/cloudmock/pkg/monitor/dynamostore"
-	monfilestore "github.com/Viridian-Inc/cloudmock/pkg/monitor/filestore"
-	"github.com/Viridian-Inc/cloudmock/pkg/regression"
-	"github.com/Viridian-Inc/cloudmock/pkg/report"
+	trafficpkg "github.com/Viridian-Inc/cloudmock/pkg/traffic"
+	trafficdynamo "github.com/Viridian-Inc/cloudmock/pkg/traffic/dynamostore"
+	trafficfilestore "github.com/Viridian-Inc/cloudmock/pkg/traffic/filestore"
+	uptimepkg "github.com/Viridian-Inc/cloudmock/pkg/uptime"
+	uptimefilestore "github.com/Viridian-Inc/cloudmock/pkg/uptime/filestore"
 	"github.com/Viridian-Inc/cloudmock/pkg/webhook"
 	whdynamo "github.com/Viridian-Inc/cloudmock/pkg/webhook/dynamostore"
 	whmemory "github.com/Viridian-Inc/cloudmock/pkg/webhook/memory"
 	whpg "github.com/Viridian-Inc/cloudmock/pkg/webhook/postgres"
-	regdynamo "github.com/Viridian-Inc/cloudmock/pkg/regression/dynamostore"
-	regmemory "github.com/Viridian-Inc/cloudmock/pkg/regression/memory"
-	regpg "github.com/Viridian-Inc/cloudmock/pkg/regression/postgres"
-	errsfilestore "github.com/Viridian-Inc/cloudmock/pkg/errors/filestore"
-	logsfilestore "github.com/Viridian-Inc/cloudmock/pkg/logstore/filestore"
-	annotationspkg "github.com/Viridian-Inc/cloudmock/pkg/annotations"
-	anomalypkg "github.com/Viridian-Inc/cloudmock/pkg/anomaly"
-	cicdfilestore "github.com/Viridian-Inc/cloudmock/pkg/cicd/filestore"
-	replayfilestore "github.com/Viridian-Inc/cloudmock/pkg/replay/filestore"
-	"github.com/Viridian-Inc/cloudmock/pkg/filestore"
-	rumpkg "github.com/Viridian-Inc/cloudmock/pkg/rum"
-	rumdynamo "github.com/Viridian-Inc/cloudmock/pkg/rum/dynamostore"
-	rumfilestore "github.com/Viridian-Inc/cloudmock/pkg/rum/filestore"
-	uptimepkg "github.com/Viridian-Inc/cloudmock/pkg/uptime"
-	uptimefilestore "github.com/Viridian-Inc/cloudmock/pkg/uptime/filestore"
-	"github.com/Viridian-Inc/cloudmock/pkg/marketplace"
-	"github.com/Viridian-Inc/cloudmock/pkg/security"
-	"github.com/Viridian-Inc/cloudmock/pkg/synthetics"
 	"github.com/Viridian-Inc/cloudmock/pkg/worker"
-	"github.com/Viridian-Inc/cloudmock/pkg/iac"
-	iampkg "github.com/Viridian-Inc/cloudmock/pkg/iam"
-	trafficpkg "github.com/Viridian-Inc/cloudmock/pkg/traffic"
-	trafficfilestore "github.com/Viridian-Inc/cloudmock/pkg/traffic/filestore"
-	trafficdynamo "github.com/Viridian-Inc/cloudmock/pkg/traffic/dynamostore"
-	"github.com/Viridian-Inc/cloudmock/pkg/integration"
-	"github.com/Viridian-Inc/cloudmock/pkg/plugin"
 	argoplugin "github.com/Viridian-Inc/cloudmock/plugins/argocd"
 	flyioplugin "github.com/Viridian-Inc/cloudmock/plugins/flyio"
 	k8splugin "github.com/Viridian-Inc/cloudmock/plugins/kubernetes"
-	"github.com/Viridian-Inc/cloudmock/pkg/routing"
-	"github.com/Viridian-Inc/cloudmock/pkg/service"
-	snapshotpkg "github.com/Viridian-Inc/cloudmock/pkg/snapshot"
 	apigwsvc "github.com/Viridian-Inc/cloudmock/services/apigateway"
-	ec2svc "github.com/Viridian-Inc/cloudmock/services/ec2"
+	azapimanagement "github.com/Viridian-Inc/cloudmock/services/azure/apimanagement"
+	azappconfiguration "github.com/Viridian-Inc/cloudmock/services/azure/appconfiguration"
+	azappservice "github.com/Viridian-Inc/cloudmock/services/azure/appservice"
+	azauthorization "github.com/Viridian-Inc/cloudmock/services/azure/authorization"
+	azcdn "github.com/Viridian-Inc/cloudmock/services/azure/cdn"
+	azcompute "github.com/Viridian-Inc/cloudmock/services/azure/compute"
+	azcontainerapps "github.com/Viridian-Inc/cloudmock/services/azure/containerapps"
+	azcontainerinstance "github.com/Viridian-Inc/cloudmock/services/azure/containerinstance"
+	azcontainerregistry "github.com/Viridian-Inc/cloudmock/services/azure/containerregistry"
+	azcontainerservice "github.com/Viridian-Inc/cloudmock/services/azure/containerservice"
+	azcosmosdb "github.com/Viridian-Inc/cloudmock/services/azure/cosmosdb"
+	azdns "github.com/Viridian-Inc/cloudmock/services/azure/dns"
+	azeventgrid "github.com/Viridian-Inc/cloudmock/services/azure/eventgrid"
+	azeventhub "github.com/Viridian-Inc/cloudmock/services/azure/eventhub"
+	azkeyvault "github.com/Viridian-Inc/cloudmock/services/azure/keyvault"
+	azloganalytics "github.com/Viridian-Inc/cloudmock/services/azure/loganalytics"
+	azmanagedidentity "github.com/Viridian-Inc/cloudmock/services/azure/managedidentity"
+	azmonitor "github.com/Viridian-Inc/cloudmock/services/azure/monitor"
+	aznetwork "github.com/Viridian-Inc/cloudmock/services/azure/network"
+	azpostgresql "github.com/Viridian-Inc/cloudmock/services/azure/postgresql"
+	azredis "github.com/Viridian-Inc/cloudmock/services/azure/redis"
+	azresources "github.com/Viridian-Inc/cloudmock/services/azure/resources"
+	azservicebus "github.com/Viridian-Inc/cloudmock/services/azure/servicebus"
+	azsql "github.com/Viridian-Inc/cloudmock/services/azure/sql"
+	azstorage "github.com/Viridian-Inc/cloudmock/services/azure/storage"
 	cfnsvc "github.com/Viridian-Inc/cloudmock/services/cloudformation"
 	cwsvc "github.com/Viridian-Inc/cloudmock/services/cloudwatch"
 	logssvc "github.com/Viridian-Inc/cloudmock/services/cloudwatchlogs"
 	cognitosvc "github.com/Viridian-Inc/cloudmock/services/cognito"
 	dynamodbsvc "github.com/Viridian-Inc/cloudmock/services/dynamodb"
-	ebsvc "github.com/Viridian-Inc/cloudmock/services/eventbridge"
+	ec2svc "github.com/Viridian-Inc/cloudmock/services/ec2"
 	ecrsvc "github.com/Viridian-Inc/cloudmock/services/ecr"
 	ecssvc "github.com/Viridian-Inc/cloudmock/services/ecs"
+	ebsvc "github.com/Viridian-Inc/cloudmock/services/eventbridge"
 	firehosesvc "github.com/Viridian-Inc/cloudmock/services/firehose"
+	iamsvc "github.com/Viridian-Inc/cloudmock/services/iam"
 	kinesissvc "github.com/Viridian-Inc/cloudmock/services/kinesis"
 	kmssvc "github.com/Viridian-Inc/cloudmock/services/kms"
+	lambdasvc "github.com/Viridian-Inc/cloudmock/services/lambda"
 	rdssvc "github.com/Viridian-Inc/cloudmock/services/rds"
 	r53svc "github.com/Viridian-Inc/cloudmock/services/route53"
 	s3svc "github.com/Viridian-Inc/cloudmock/services/s3"
@@ -127,10 +152,10 @@ import (
 	snssvc "github.com/Viridian-Inc/cloudmock/services/sns"
 	sqssvc "github.com/Viridian-Inc/cloudmock/services/sqs"
 	ssmsvc "github.com/Viridian-Inc/cloudmock/services/ssm"
-	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
-	iamsvc "github.com/Viridian-Inc/cloudmock/services/iam"
-	lambdasvc "github.com/Viridian-Inc/cloudmock/services/lambda"
 	sfnsvc "github.com/Viridian-Inc/cloudmock/services/stepfunctions"
+	stssvc "github.com/Viridian-Inc/cloudmock/services/sts"
+	awscfg "github.com/aws/aws-sdk-go-v2/config"
+	awsddb "github.com/aws/aws-sdk-go-v2/service/dynamodb"
 
 	// Promoted Tier 1 services (formerly Tier 2 stubs)
 	accountsvc "github.com/Viridian-Inc/cloudmock/services/account"
@@ -156,10 +181,13 @@ import (
 	codeconnectionssvc "github.com/Viridian-Inc/cloudmock/services/codeconnections"
 	codedeploysvc "github.com/Viridian-Inc/cloudmock/services/codedeploy"
 	codepipelinesvc "github.com/Viridian-Inc/cloudmock/services/codepipeline"
+	comprehendsvc "github.com/Viridian-Inc/cloudmock/services/comprehend"
 	configsvc "github.com/Viridian-Inc/cloudmock/services/config"
 	daxsvc "github.com/Viridian-Inc/cloudmock/services/dax"
 	dmssvc "github.com/Viridian-Inc/cloudmock/services/dms"
 	docdbsvc "github.com/Viridian-Inc/cloudmock/services/docdb"
+	ecrpublicsvc "github.com/Viridian-Inc/cloudmock/services/ecrpublic"
+	efssvc "github.com/Viridian-Inc/cloudmock/services/efs"
 	ekssvcsvc "github.com/Viridian-Inc/cloudmock/services/eks"
 	elasticachesvc "github.com/Viridian-Inc/cloudmock/services/elasticache"
 	ebsvc2 "github.com/Viridian-Inc/cloudmock/services/elasticbeanstalk"
@@ -168,14 +196,19 @@ import (
 	essvc "github.com/Viridian-Inc/cloudmock/services/es"
 	fissvc "github.com/Viridian-Inc/cloudmock/services/fis"
 	glaciersvc "github.com/Viridian-Inc/cloudmock/services/glacier"
+	globalacceleratorsvc "github.com/Viridian-Inc/cloudmock/services/globalaccelerator"
 	gluesvc "github.com/Viridian-Inc/cloudmock/services/glue"
+	guarddutysvc "github.com/Viridian-Inc/cloudmock/services/guardduty"
 	identitystoresvc "github.com/Viridian-Inc/cloudmock/services/identitystore"
+	inspector2svc "github.com/Viridian-Inc/cloudmock/services/inspector2"
 	iotsvc "github.com/Viridian-Inc/cloudmock/services/iot"
 	iotdatasvc "github.com/Viridian-Inc/cloudmock/services/iotdata"
 	iotwirelesssvc "github.com/Viridian-Inc/cloudmock/services/iotwireless"
 	kafkasvc "github.com/Viridian-Inc/cloudmock/services/kafka"
+	keyspacessvc "github.com/Viridian-Inc/cloudmock/services/keyspaces"
 	kinesisanalyticssvc "github.com/Viridian-Inc/cloudmock/services/kinesisanalytics"
 	lakeformationsvc "github.com/Viridian-Inc/cloudmock/services/lakeformation"
+	lexmodelssvc "github.com/Viridian-Inc/cloudmock/services/lexmodels"
 	managedblockchain "github.com/Viridian-Inc/cloudmock/services/managedblockchain"
 	mediaconvertsvc "github.com/Viridian-Inc/cloudmock/services/mediaconvert"
 	memorydbsvc "github.com/Viridian-Inc/cloudmock/services/memorydb"
@@ -185,14 +218,19 @@ import (
 	organizationssvc "github.com/Viridian-Inc/cloudmock/services/organizations"
 	pinpointsvc "github.com/Viridian-Inc/cloudmock/services/pinpoint"
 	pipessvc "github.com/Viridian-Inc/cloudmock/services/pipes"
+	pollysvc "github.com/Viridian-Inc/cloudmock/services/polly"
+	quicksightsvc "github.com/Viridian-Inc/cloudmock/services/quicksight"
 	ramsvc "github.com/Viridian-Inc/cloudmock/services/ram"
 	redshiftsvc "github.com/Viridian-Inc/cloudmock/services/redshift"
+	rekognitionsvc "github.com/Viridian-Inc/cloudmock/services/rekognition"
 	resourcegroupssvc "github.com/Viridian-Inc/cloudmock/services/resourcegroups"
 	route53resolversvc "github.com/Viridian-Inc/cloudmock/services/route53resolver"
 	s3tablessvc "github.com/Viridian-Inc/cloudmock/services/s3tables"
 	sagemakersvc "github.com/Viridian-Inc/cloudmock/services/sagemaker"
 	schedulersvc "github.com/Viridian-Inc/cloudmock/services/scheduler"
+	securityhubsvc "github.com/Viridian-Inc/cloudmock/services/securityhub"
 	serverlessreposvc "github.com/Viridian-Inc/cloudmock/services/serverlessrepo"
+	servicecatalogsvc "github.com/Viridian-Inc/cloudmock/services/servicecatalog"
 	servicediscoverysvc "github.com/Viridian-Inc/cloudmock/services/servicediscovery"
 	shieldsvc "github.com/Viridian-Inc/cloudmock/services/shield"
 	ssoadminsvc "github.com/Viridian-Inc/cloudmock/services/ssoadmin"
@@ -203,19 +241,6 @@ import (
 	timestreamwritesvc "github.com/Viridian-Inc/cloudmock/services/timestreamwrite"
 	transcribesvc "github.com/Viridian-Inc/cloudmock/services/transcribe"
 	transfersvc "github.com/Viridian-Inc/cloudmock/services/transfer"
-	comprehendsvc "github.com/Viridian-Inc/cloudmock/services/comprehend"
-	ecrpublicsvc "github.com/Viridian-Inc/cloudmock/services/ecrpublic"
-	efssvc "github.com/Viridian-Inc/cloudmock/services/efs"
-	globalacceleratorsvc "github.com/Viridian-Inc/cloudmock/services/globalaccelerator"
-	guarddutysvc "github.com/Viridian-Inc/cloudmock/services/guardduty"
-	inspector2svc "github.com/Viridian-Inc/cloudmock/services/inspector2"
-	keyspacessvc "github.com/Viridian-Inc/cloudmock/services/keyspaces"
-	lexmodelssvc "github.com/Viridian-Inc/cloudmock/services/lexmodels"
-	pollysvc "github.com/Viridian-Inc/cloudmock/services/polly"
-	quicksightsvc "github.com/Viridian-Inc/cloudmock/services/quicksight"
-	rekognitionsvc "github.com/Viridian-Inc/cloudmock/services/rekognition"
-	securityhubsvc "github.com/Viridian-Inc/cloudmock/services/securityhub"
-	servicecatalogsvc "github.com/Viridian-Inc/cloudmock/services/servicecatalog"
 	translatesvc "github.com/Viridian-Inc/cloudmock/services/translate"
 	verifiedpermissionssvc "github.com/Viridian-Inc/cloudmock/services/verifiedpermissions"
 	wafregionalsvc "github.com/Viridian-Inc/cloudmock/services/wafregional"
@@ -516,6 +541,157 @@ func main() {
 
 	// Service registry
 	registry := routing.NewRegistry()
+	// Azure ARM bootstrap services.
+	azureResourcesService := azresources.New()
+	azureAPIManagementService := azapimanagement.New()
+	azureAppConfigurationService := azappconfiguration.New()
+	azureContainerAppsService := azcontainerapps.New()
+	azureAppService := azappservice.New()
+	azureAuthorizationService := azauthorization.New()
+	azureCDNService := azcdn.New()
+	azureComputeService := azcompute.New()
+	azureContainerInstanceService := azcontainerinstance.New()
+	azureContainerRegistryService := azcontainerregistry.New()
+	azureContainerService := azcontainerservice.New()
+	azureCosmosDBService := azcosmosdb.New()
+	azureDNSService := azdns.New()
+	azureEventGridService := azeventgrid.New()
+	azureEventHubService := azeventhub.New()
+	azureKeyVaultService := azkeyvault.New()
+	azureLogAnalyticsService := azloganalytics.New()
+	azureManagedIdentityService := azmanagedidentity.New()
+	azureMonitorService := azmonitor.New()
+	azureNetworkService := aznetwork.New()
+	azurePostgreSQLService := azpostgresql.New()
+	azureRedisService := azredis.New()
+	azureServiceBusService := azservicebus.New()
+	azureSQLService := azsql.New()
+	azureStorageService := azstorage.New()
+	azureResourcesService.SetTemplateProvisioner(azureStorageService)
+	azureResourcesService.SetTemplateProvisioner(azureAPIManagementService)
+	azureResourcesService.SetTemplateProvisioner(azureAppConfigurationService)
+	azureResourcesService.SetTemplateProvisioner(azureContainerAppsService)
+	azureResourcesService.SetTemplateProvisioner(azureCDNService)
+	azureResourcesService.SetTemplateProvisioner(azureKeyVaultService)
+	azureResourcesService.SetTemplateProvisioner(azureComputeService)
+	azureResourcesService.SetTemplateProvisioner(azureContainerInstanceService)
+	azureResourcesService.SetTemplateProvisioner(azureContainerRegistryService)
+	azureResourcesService.SetTemplateProvisioner(azureContainerService)
+	azureResourcesService.SetTemplateProvisioner(azureCosmosDBService)
+	azureResourcesService.SetTemplateProvisioner(azureDNSService)
+	azureResourcesService.SetTemplateProvisioner(azureAppService)
+	azureResourcesService.SetTemplateProvisioner(azureEventGridService)
+	azureResourcesService.SetTemplateProvisioner(azureEventHubService)
+	azureResourcesService.SetTemplateProvisioner(azureLogAnalyticsService)
+	azureResourcesService.SetTemplateProvisioner(azureManagedIdentityService)
+	azureResourcesService.SetTemplateProvisioner(azureMonitorService)
+	azureResourcesService.SetTemplateProvisioner(azureNetworkService)
+	azureResourcesService.SetTemplateProvisioner(azurePostgreSQLService)
+	azureResourcesService.SetTemplateProvisioner(azureRedisService)
+	azureResourcesService.SetTemplateProvisioner(azureServiceBusService)
+	azureResourcesService.SetTemplateProvisioner(azureSQLService)
+	for _, key := range azureResourcesService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureResourcesService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureAPIManagementService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureAPIManagementService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureAppConfigurationService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureAppConfigurationService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureContainerAppsService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureContainerAppsService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureAppService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureAppService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureAuthorizationService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureAuthorizationService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureCDNService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureCDNService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureKeyVaultService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureKeyVaultService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureManagedIdentityService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureManagedIdentityService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureStorageService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureStorageService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureComputeService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureComputeService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureContainerInstanceService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureContainerInstanceService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureContainerRegistryService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureContainerRegistryService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureContainerService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureContainerService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureCosmosDBService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureCosmosDBService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureDNSService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureDNSService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureEventGridService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureEventGridService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureEventHubService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureEventHubService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureLogAnalyticsService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureLogAnalyticsService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureNetworkService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureNetworkService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureMonitorService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureMonitorService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azurePostgreSQLService.ServiceKeys() {
+		registry.RegisterVersioned(key, azurePostgreSQLService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureRedisService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureRedisService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureServiceBusService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureServiceBusService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	for _, key := range azureSQLService.ServiceKeys() {
+		registry.RegisterVersioned(key, azureSQLService)
+		registry.SetDefaultVersion(key.Provider, key.Service, key.APIVersion)
+	}
+	registry.SetDefaultVersion(routing.ProviderAzure, "Microsoft.KeyVault/vaults", "2024-11-01")
+	registry.SetDefaultVersion(routing.ProviderAzure, "Microsoft.KeyVault/secrets", "2025-07-01")
 
 	// Determine which Tier 1 services to eagerly initialize based on profile.
 	// "minimal"  — only the 8 core services used by almost every app.
@@ -1041,96 +1217,96 @@ func main() {
 	}
 
 	if !testMode {
-	switch mode {
-	case "local":
-		requestLog = gateway.NewRequestLog(1000)
-		requestStats = gateway.NewRequestStats()
-		traceStore = gateway.NewTraceStore(500)
-		sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
+		switch mode {
+		case "local":
+			requestLog = gateway.NewRequestLog(1000)
+			requestStats = gateway.NewRequestStats()
+			traceStore = gateway.NewTraceStore(500)
+			sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
 
-		dp = &dataplane.DataPlane{
-			Traces:   memory.NewTraceStore(traceStore),
-			TraceW:   memory.NewTraceStore(traceStore),
-			Requests: memory.NewRequestStore(requestLog),
-			RequestW: memory.NewRequestStore(requestLog),
-			Metrics:  memory.NewMetricStore(requestStats, requestLog),
-			MetricW:  memory.NewMetricStore(requestStats, requestLog),
-			SLO:      memory.NewSLOStore(sloEngine),
-			Config:      memory.NewConfigStore(cfg),
-			Topology:    memory.NewTopologyStore(),
-			Preferences: memory.NewPreferenceStore(),
-			Mode:        "local",
-		}
-	case "production":
-		var err error
-		duckPath := cfg.DataPlane.DuckDB.Path
-		if duckPath == "" {
-			duckPath = "cloudmock.duckdb"
-		}
-		duckClient, err = duckImpl.NewClient(duckPath)
-		if err != nil {
-			log.Fatalf("duckdb: %v", err)
-		}
-		if err := duckClient.InitSchema(); err != nil {
-			log.Fatalf("duckdb schema: %v", err)
-		}
+			dp = &dataplane.DataPlane{
+				Traces:      memory.NewTraceStore(traceStore),
+				TraceW:      memory.NewTraceStore(traceStore),
+				Requests:    memory.NewRequestStore(requestLog),
+				RequestW:    memory.NewRequestStore(requestLog),
+				Metrics:     memory.NewMetricStore(requestStats, requestLog),
+				MetricW:     memory.NewMetricStore(requestStats, requestLog),
+				SLO:         memory.NewSLOStore(sloEngine),
+				Config:      memory.NewConfigStore(cfg),
+				Topology:    memory.NewTopologyStore(),
+				Preferences: memory.NewPreferenceStore(),
+				Mode:        "local",
+			}
+		case "production":
+			var err error
+			duckPath := cfg.DataPlane.DuckDB.Path
+			if duckPath == "" {
+				duckPath = "cloudmock.duckdb"
+			}
+			duckClient, err = duckImpl.NewClient(duckPath)
+			if err != nil {
+				log.Fatalf("duckdb: %v", err)
+			}
+			if err := duckClient.InitSchema(); err != nil {
+				log.Fatalf("duckdb schema: %v", err)
+			}
 
-		pgPool, err = pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
-		if err != nil {
-			log.Fatalf("postgres: %v", err)
-		}
+			pgPool, err = pgImpl.NewPool(ctx, cfg.DataPlane.PostgreSQL)
+			if err != nil {
+				log.Fatalf("postgres: %v", err)
+			}
 
-		promClient, err = promImpl.NewClient(cfg.DataPlane.Prometheus)
-		if err != nil {
-			log.Fatalf("prometheus: %v", err)
-		}
+			promClient, err = promImpl.NewClient(cfg.DataPlane.Prometheus)
+			if err != nil {
+				log.Fatalf("prometheus: %v", err)
+			}
 
-		otelShutdown, err = dataplane.InitTracer(ctx, cfg.DataPlane.OTel)
-		if err != nil {
-			log.Fatalf("otel: %v", err)
-		}
+			otelShutdown, err = dataplane.InitTracer(ctx, cfg.DataPlane.OTel)
+			if err != nil {
+				log.Fatalf("otel: %v", err)
+			}
 
-		duckTraces := duckImpl.NewTraceStore(duckClient)
-		duckRequests := duckImpl.NewRequestStore(duckClient)
+			duckTraces := duckImpl.NewTraceStore(duckClient)
+			duckRequests := duckImpl.NewRequestStore(duckClient)
 
-		dp = &dataplane.DataPlane{
-			Traces:   duckTraces,
-			TraceW:   duckTraces,
-			Requests: duckRequests,
-			RequestW: duckRequests,
-			Metrics:  promImpl.NewMetricReader(promClient),
-			MetricW:  promImpl.NewMetricWriter(),
-			SLO:      pgImpl.NewSLOStore(pgPool),
-			Config:      pgImpl.NewConfigStore(pgPool),
-			Topology:    pgImpl.NewTopologyStore(pgPool),
-			Preferences: pgImpl.NewPreferenceStore(pgPool),
-			Mode:        "production",
-		}
-	case "dynamodb":
-		// DynamoDB mode: in-memory data plane for observability (traces,
-		// requests, metrics) with DynamoDB-backed feature stores (monitors,
-		// incidents, webhooks, etc.) for multi-tenant persistence.
-		requestLog = gateway.NewRequestLog(1000)
-		requestStats = gateway.NewRequestStats()
-		traceStore = gateway.NewTraceStore(500)
-		sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
+			dp = &dataplane.DataPlane{
+				Traces:      duckTraces,
+				TraceW:      duckTraces,
+				Requests:    duckRequests,
+				RequestW:    duckRequests,
+				Metrics:     promImpl.NewMetricReader(promClient),
+				MetricW:     promImpl.NewMetricWriter(),
+				SLO:         pgImpl.NewSLOStore(pgPool),
+				Config:      pgImpl.NewConfigStore(pgPool),
+				Topology:    pgImpl.NewTopologyStore(pgPool),
+				Preferences: pgImpl.NewPreferenceStore(pgPool),
+				Mode:        "production",
+			}
+		case "dynamodb":
+			// DynamoDB mode: in-memory data plane for observability (traces,
+			// requests, metrics) with DynamoDB-backed feature stores (monitors,
+			// incidents, webhooks, etc.) for multi-tenant persistence.
+			requestLog = gateway.NewRequestLog(1000)
+			requestStats = gateway.NewRequestStats()
+			traceStore = gateway.NewTraceStore(500)
+			sloEngine = gateway.NewSLOEngine(cfg.SLO.Rules)
 
-		dp = &dataplane.DataPlane{
-			Traces:      memory.NewTraceStore(traceStore),
-			TraceW:      memory.NewTraceStore(traceStore),
-			Requests:    memory.NewRequestStore(requestLog),
-			RequestW:    memory.NewRequestStore(requestLog),
-			Metrics:     memory.NewMetricStore(requestStats, requestLog),
-			MetricW:     memory.NewMetricStore(requestStats, requestLog),
-			SLO:         memory.NewSLOStore(sloEngine),
-			Config:      memory.NewConfigStore(cfg),
-			Topology:    memory.NewTopologyStore(),
-			Preferences: memory.NewPreferenceStore(),
-			Mode:        "dynamodb",
+			dp = &dataplane.DataPlane{
+				Traces:      memory.NewTraceStore(traceStore),
+				TraceW:      memory.NewTraceStore(traceStore),
+				Requests:    memory.NewRequestStore(requestLog),
+				RequestW:    memory.NewRequestStore(requestLog),
+				Metrics:     memory.NewMetricStore(requestStats, requestLog),
+				MetricW:     memory.NewMetricStore(requestStats, requestLog),
+				SLO:         memory.NewSLOStore(sloEngine),
+				Config:      memory.NewConfigStore(cfg),
+				Topology:    memory.NewTopologyStore(),
+				Preferences: memory.NewPreferenceStore(),
+				Mode:        "dynamodb",
+			}
+		default:
+			log.Fatalf("unknown dataplane mode: %q", mode)
 		}
-	default:
-		log.Fatalf("unknown dataplane mode: %q", mode)
-	}
 	} // end if !testMode
 
 	// DynamoDB store — initialized when mode is "dynamodb". Used by feature
@@ -1993,26 +2169,26 @@ func main() {
 		}
 		handler = gateway.TestModeHandler(rootID, cfg.Region, cfg.AccountID, registry)
 	} else {
-	handler = gw
-	// Wrap with chaos middleware for fault injection
-	handler = gateway.ChaosMiddleware(handler, chaosEngine)
-	// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
-	corsEnabled = os.Getenv("CLOUDMOCK_CORS")
-	if corsEnabled != "false" && corsEnabled != "0" {
-		handler = gateway.CORSMiddleware(handler)
-	}
-	if cfg.RateLimit.Enabled {
-		limiter := ratelimit.New(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
-		handler = limiter.Middleware(handler)
-	}
-	// Apply SaaS auth → quota enforcement chain.
-	// Clerk auth extracts tenant ID from JWT, quota enforces per-tenant limits.
-	if quotaMiddleware != nil {
-		handler = quotaMiddleware.Handler(handler)
-	}
-	if clerkAuth != nil {
-		handler = clerkAuth.Handler(handler)
-	}
+		handler = gw
+		// Wrap with chaos middleware for fault injection
+		handler = gateway.ChaosMiddleware(handler, chaosEngine)
+		// Enable CORS by default (disable with CLOUDMOCK_CORS=false)
+		corsEnabled = os.Getenv("CLOUDMOCK_CORS")
+		if corsEnabled != "false" && corsEnabled != "0" {
+			handler = gateway.CORSMiddleware(handler)
+		}
+		if cfg.RateLimit.Enabled {
+			limiter := ratelimit.New(cfg.RateLimit.RequestsPerSecond, cfg.RateLimit.Burst)
+			handler = limiter.Middleware(handler)
+		}
+		// Apply SaaS auth → quota enforcement chain.
+		// Clerk auth extracts tenant ID from JWT, quota enforces per-tenant limits.
+		if quotaMiddleware != nil {
+			handler = quotaMiddleware.Handler(handler)
+		}
+		if clerkAuth != nil {
+			handler = clerkAuth.Handler(handler)
+		}
 	} // end if !testMode (middleware chain)
 
 	// In test mode, handler is already the TestModeHandler — use it directly.
@@ -2021,101 +2197,101 @@ func main() {
 	if testMode {
 		loggedGW = handler
 	} else {
-	// HIPAA/compliance redaction — redact sensitive headers and body fields before storage.
-	var redaction *gateway.RedactionConfig
-	if cfg.Compliance.RedactEnabled || cfg.SaaS.Enabled {
-		redaction = gateway.DefaultRedactionConfig()
-		if len(cfg.Compliance.RedactHeaders) > 0 {
-			redaction.RedactHeaders = append(redaction.RedactHeaders, cfg.Compliance.RedactHeaders...)
-		}
-		if len(cfg.Compliance.RedactFields) > 0 {
-			redaction.RedactBodyFields = append(redaction.RedactBodyFields, cfg.Compliance.RedactFields...)
-		}
-		slog.Info("compliance: field redaction enabled",
-			"redacted_headers", len(redaction.RedactHeaders),
-			"redacted_body_fields", len(redaction.RedactBodyFields),
-		)
-	}
-	loggedGW = gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
-		Broadcaster:   adminAPI.Broadcaster(),
-		TraceStore:    traceStore,
-		SLOEngine:     sloEngine,
-		DataPlane:     dp,
-		Redaction:     redaction,
-		CaptureStacks: os.Getenv("CLOUDMOCK_CAPTURE_STACKS") == "true",
-		OnRequest: func(service string, latencyMs float64, statusCode int) {
-			// Feed latency and error rate into anomaly detector baselines.
-			anomalyDetector.UpdateBaseline(service, "latency_p50", latencyMs)
-			errorVal := 0.0
-			if statusCode >= 500 {
-				errorVal = 1.0
+		// HIPAA/compliance redaction — redact sensitive headers and body fields before storage.
+		var redaction *gateway.RedactionConfig
+		if cfg.Compliance.RedactEnabled || cfg.SaaS.Enabled {
+			redaction = gateway.DefaultRedactionConfig()
+			if len(cfg.Compliance.RedactHeaders) > 0 {
+				redaction.RedactHeaders = append(redaction.RedactHeaders, cfg.Compliance.RedactHeaders...)
 			}
-			anomalyDetector.UpdateBaseline(service, "error_rate", errorVal)
-
-			// Check for anomalies and notify if detected.
-			if anom := anomalyDetector.Check(service, "latency_p50", latencyMs); anom != nil {
-				if anom.Severity == "critical" || anom.Severity == "warning" {
-					go func() {
-						if nr := adminAPI.NotifyRouter(); nr != nil {
-							nr.Notify(rootCtx, notifypkg.Notification{
-								Title:     anom.Description,
-								Severity:  anom.Severity,
-								Service:   anom.Service,
-								Type:      "anomaly",
-								Timestamp: anom.DetectedAt,
-								Fields: map[string]string{
-									"Metric":    anom.Metric,
-									"Observed":  fmt.Sprintf("%.2f", anom.Observed),
-									"Expected":  fmt.Sprintf("%.2f", anom.Expected),
-									"Deviation": fmt.Sprintf("%.1f sigma", anom.Deviation),
-								},
-							})
-						}
-					}()
+			if len(cfg.Compliance.RedactFields) > 0 {
+				redaction.RedactBodyFields = append(redaction.RedactBodyFields, cfg.Compliance.RedactFields...)
+			}
+			slog.Info("compliance: field redaction enabled",
+				"redacted_headers", len(redaction.RedactHeaders),
+				"redacted_body_fields", len(redaction.RedactBodyFields),
+			)
+		}
+		loggedGW = gateway.LoggingMiddlewareWithOpts(handler, requestLog, requestStats, gateway.LoggingMiddlewareOpts{
+			Broadcaster:   adminAPI.Broadcaster(),
+			TraceStore:    traceStore,
+			SLOEngine:     sloEngine,
+			DataPlane:     dp,
+			Redaction:     redaction,
+			CaptureStacks: os.Getenv("CLOUDMOCK_CAPTURE_STACKS") == "true",
+			OnRequest: func(service string, latencyMs float64, statusCode int) {
+				// Feed latency and error rate into anomaly detector baselines.
+				anomalyDetector.UpdateBaseline(service, "latency_p50", latencyMs)
+				errorVal := 0.0
+				if statusCode >= 500 {
+					errorVal = 1.0
 				}
-			}
-		},
-	})
+				anomalyDetector.UpdateBaseline(service, "error_rate", errorVal)
+
+				// Check for anomalies and notify if detected.
+				if anom := anomalyDetector.Check(service, "latency_p50", latencyMs); anom != nil {
+					if anom.Severity == "critical" || anom.Severity == "warning" {
+						go func() {
+							if nr := adminAPI.NotifyRouter(); nr != nil {
+								nr.Notify(rootCtx, notifypkg.Notification{
+									Title:     anom.Description,
+									Severity:  anom.Severity,
+									Service:   anom.Service,
+									Type:      "anomaly",
+									Timestamp: anom.DetectedAt,
+									Fields: map[string]string{
+										"Metric":    anom.Metric,
+										"Observed":  fmt.Sprintf("%.2f", anom.Observed),
+										"Expected":  fmt.Sprintf("%.2f", anom.Expected),
+										"Deviation": fmt.Sprintf("%.1f sigma", anom.Deviation),
+									},
+								})
+							}
+						}()
+					}
+				}
+			},
+		})
 	} // end if !testMode
 
 	var adminServer *http.Server
 	if !testMode {
-	var adminHandler http.Handler = adminAPI
-	if cfg.Auth.Enabled {
-		adminHandler = auth.Middleware([]byte(cfg.Auth.Secret))(adminHandler)
-	}
-	if cfg.AdminAuth.Enabled && cfg.AdminAuth.APIKey != "" {
-		adminHandler = admin.AdminAuthMiddleware(adminHandler, cfg.AdminAuth.APIKey)
-	}
-	if corsEnabled != "false" && corsEnabled != "0" {
-		adminHandler = gateway.CORSMiddleware(adminHandler)
-	}
-	adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
-	adminServer = &http.Server{
-		Addr:              adminAddr,
-		Handler:           adminHandler,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      60 * time.Second,
-		IdleTimeout:       120 * time.Second,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-	go func() {
-		slog.Info("cloudmock admin API starting", "addr", adminAddr)
-		if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("admin API exited", "error", err)
+		var adminHandler http.Handler = adminAPI
+		if cfg.Auth.Enabled {
+			adminHandler = auth.Middleware([]byte(cfg.Auth.Secret))(adminHandler)
 		}
-	}()
+		if cfg.AdminAuth.Enabled && cfg.AdminAuth.APIKey != "" {
+			adminHandler = admin.AdminAuthMiddleware(adminHandler, cfg.AdminAuth.APIKey)
+		}
+		if corsEnabled != "false" && corsEnabled != "0" {
+			adminHandler = gateway.CORSMiddleware(adminHandler)
+		}
+		adminAddr := fmt.Sprintf(":%d", cfg.Admin.Port)
+		adminServer = &http.Server{
+			Addr:              adminAddr,
+			Handler:           adminHandler,
+			ReadTimeout:       30 * time.Second,
+			WriteTimeout:      60 * time.Second,
+			IdleTimeout:       120 * time.Second,
+			ReadHeaderTimeout: 10 * time.Second,
+		}
+		go func() {
+			slog.Info("cloudmock admin API starting", "addr", adminAddr)
+			if err := adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				slog.Error("admin API exited", "error", err)
+			}
+		}()
 
-	// Source server: accepts TCP connections from @cloudmock/node SDK
-	// SDK-captured HTTP requests (e.g. BFF inbound traffic) are injected into RequestLog
-	sourceServer := admin.NewSourceServer(requestLog, requestStats, adminAPI.Broadcaster())
-	adminAPI.SetSourceServer(sourceServer)
-	sourceAddr := ":4580"
-	go func() {
-		if err := sourceServer.ListenAndServe(sourceAddr); err != nil {
-			slog.Error("source server exited", "error", err)
-		}
-	}()
+		// Source server: accepts TCP connections from @cloudmock/node SDK
+		// SDK-captured HTTP requests (e.g. BFF inbound traffic) are injected into RequestLog
+		sourceServer := admin.NewSourceServer(requestLog, requestStats, adminAPI.Broadcaster())
+		adminAPI.SetSourceServer(sourceServer)
+		sourceAddr := ":4580"
+		go func() {
+			if err := sourceServer.ListenAndServe(sourceAddr); err != nil {
+				slog.Error("source server exited", "error", err)
+			}
+		}()
 	} // end if !testMode
 
 	// OTLP/HTTP ingestion server — accepts OpenTelemetry traces, metrics, and logs.

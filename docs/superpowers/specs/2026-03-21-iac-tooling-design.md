@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-21
 **Status:** Draft
-**License:** Apache 2.0
+**License:** MIT
 
 ## Overview
 

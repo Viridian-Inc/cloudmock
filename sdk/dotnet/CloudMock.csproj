@@ -4,5 +4,6 @@
     <PackageId>CloudMock</PackageId>
     <Version>1.0.0</Version>
     <Description>Local AWS emulation for .NET tests</Description>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
 </Project>

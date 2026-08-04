@@ -1,6 +1,7 @@
 {
   "name": "worker",
   "version": "1.0.0",
+  "license": "MIT",
   "main": "index.js",
   "dependencies": {
     "@aws-sdk/client-s3": "^3.0.0",

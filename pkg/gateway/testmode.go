@@ -45,8 +45,10 @@ func TestModeHandler(cfg *service.CallerIdentity, region, accountID string, regi
 			return
 		}
 
-		// Detect service from Authorization header credential scope.
-		svcName := routing.DetectService(r)
+		// Detect provider/service/action/API version.
+		target := routing.DetectTarget(r)
+		svcName := target.Service
+		action := target.Action
 		if svcName == "" {
 			w.Header().Set("Content-Type", "text/xml")
 			w.WriteHeader(http.StatusBadRequest)
@@ -54,7 +56,16 @@ func TestModeHandler(cfg *service.CallerIdentity, region, accountID string, regi
 			return
 		}
 
-		svc, ok := services[svcName]
+		var svc service.Service
+		var ok bool
+		if target.Provider == routing.ProviderAWS && target.APIVersion == "" {
+			svc, ok = services[svcName]
+		}
+		if !ok {
+			var lookupErr error
+			svc, lookupErr = registry.LookupTarget(target)
+			ok = lookupErr == nil
+		}
 		if !ok {
 			w.Header().Set("Content-Type", "text/xml")
 			w.WriteHeader(http.StatusServiceUnavailable)
@@ -76,9 +87,6 @@ func TestModeHandler(cfg *service.CallerIdentity, region, accountID string, regi
 				bodyBufPool.Put(bufp)
 			}()
 		}
-
-		// Detect action inline — avoids second header lookup.
-		action := routing.DetectAction(r)
 
 		// Build params only when query string exists.
 		var params map[string]string

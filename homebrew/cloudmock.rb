@@ -2,7 +2,7 @@ class Cloudmock < Formula
   desc "Local AWS emulation. 98 services. One binary."
   homepage "https://cloudmock.io"
   version "1.9.0"
-  license "Apache-2.0"
+  license "MIT"
 
   on_macos do
     on_arm do

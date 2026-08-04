@@ -53,26 +53,45 @@ func FastTestModeServer(identity *service.CallerIdentity, region, accountID stri
 			return
 		}
 
-		// Detect service from Authorization header credential scope.
-		auth := string(ctx.Request.Header.Peek("Authorization"))
-		svcName := serviceFromAuthFast(auth)
-		if svcName == "" {
-			// Try X-Amz-Target
-			target := string(ctx.Request.Header.Peek("X-Amz-Target"))
-			if target != "" {
-				svcName = serviceFromTargetFast(target)
-			}
+		// Build a lightweight *http.Request for target detection and services
+		// that need RawRequest.
+		stdReq := stdReqPool.Get().(*http.Request)
+		stdReq.Method = string(ctx.Method())
+		stdReq.URL.Scheme = "http"
+		stdReq.URL.Host = string(ctx.Host())
+		stdReq.URL.Path = path
+		stdReq.URL.RawQuery = string(ctx.QueryArgs().QueryString())
+		stdReq.Host = string(ctx.Host())
+		for k := range stdReq.Header {
+			delete(stdReq.Header, k)
 		}
+		ctx.Request.Header.VisitAll(func(key, value []byte) {
+			stdReq.Header.Set(string(key), string(value))
+		})
 
+		target := routing.DetectTarget(stdReq)
+		svcName := target.Service
+		action := target.Action
 		if svcName == "" {
+			stdReqPool.Put(stdReq)
 			ctx.SetStatusCode(400)
 			ctx.SetContentType("text/xml")
 			ctx.WriteString(`<ErrorResponse><Error><Code>MissingAuthenticationToken</Code><Message>No service detected</Message></Error></ErrorResponse>`)
 			return
 		}
 
-		svc, ok := services[svcName]
+		var svc service.Service
+		var ok bool
+		if target.Provider == routing.ProviderAWS && target.APIVersion == "" {
+			svc, ok = services[svcName]
+		}
 		if !ok {
+			var lookupErr error
+			svc, lookupErr = registry.LookupTarget(target)
+			ok = lookupErr == nil
+		}
+		if !ok {
+			stdReqPool.Put(stdReq)
 			ctx.SetStatusCode(503)
 			ctx.SetContentType("text/xml")
 			ctx.WriteString(`<ErrorResponse><Error><Code>ServiceUnavailable</Code><Message>Service not registered</Message></Error></ErrorResponse>`)
@@ -82,20 +101,6 @@ func FastTestModeServer(identity *service.CallerIdentity, region, accountID stri
 		// Get request body — fasthttp gives us a []byte directly, no allocation.
 		body := ctx.Request.Body()
 
-		// Detect action.
-		action := ""
-		if target := ctx.Request.Header.Peek("X-Amz-Target"); len(target) > 0 {
-			for i := len(target) - 1; i >= 0; i-- {
-				if target[i] == '.' {
-					action = string(target[i+1:])
-					break
-				}
-			}
-		}
-		if action == "" {
-			action = string(ctx.QueryArgs().Peek("Action"))
-		}
-
 		// Build params from query string.
 		var params map[string]string
 		if ctx.QueryArgs().Len() > 0 {
@@ -104,20 +109,6 @@ func FastTestModeServer(identity *service.CallerIdentity, region, accountID stri
 				params[string(key)] = string(value)
 			})
 		}
-
-		// Build a lightweight *http.Request for services that need RawRequest.
-		stdReq := stdReqPool.Get().(*http.Request)
-		stdReq.Method = string(ctx.Method())
-		stdReq.URL.Path = path
-		stdReq.URL.RawQuery = string(ctx.QueryArgs().QueryString())
-		stdReq.Host = string(ctx.Host())
-		// Copy essential headers.
-		for k := range stdReq.Header {
-			delete(stdReq.Header, k)
-		}
-		ctx.Request.Header.VisitAll(func(key, value []byte) {
-			stdReq.Header.Set(string(key), string(value))
-		})
 
 		// Use pooled RequestContext.
 		reqCtx := fastCtxPool.Get().(*service.RequestContext)
@@ -222,8 +213,8 @@ func FastTestModeServer(identity *service.CallerIdentity, region, accountID stri
 	}
 
 	return &fasthttp.Server{
-		Handler:               handler,
-		Name:                  "cloudmock",
+		Handler:           handler,
+		Name:              "cloudmock",
 		ReduceMemoryUsage: false,
 	}
 }

@@ -1,8 +1,8 @@
 package gateway
 
 import (
-	gojson "github.com/goccy/go-json"
 	"fmt"
+	gojson "github.com/goccy/go-json"
 	"net/http"
 	"time"
 
@@ -113,7 +113,7 @@ func (g *Gateway) handleServices(w http.ResponseWriter, r *http.Request) {
 
 // handleRequest is the unified entry point for all incoming requests.
 // It first attempts path-based plugin routing (for k8s, ArgoCD, etc.),
-// then falls back to AWS service detection via the legacy registry.
+// then falls back to provider-aware cloud API routing via the registry.
 func (g *Gateway) handleRequest(w http.ResponseWriter, r *http.Request) {
 	// 1. Try path-based plugin routing first (for non-AWS protocols like k8s, ArgoCD).
 	if g.plugins != nil {
@@ -123,7 +123,7 @@ func (g *Gateway) handleRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// 2. AWS-style routing: detect service from headers/credentials.
+	// 2. Cloud API routing: detect provider/service/action from the request.
 	g.handleAWSRequest(w, r)
 }
 
@@ -190,8 +190,10 @@ func (g *Gateway) handlePluginRequest(w http.ResponseWriter, r *http.Request, p 
 }
 
 func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
-	// 1. Detect the target service.
-	svcName := routing.DetectService(r)
+	// 1. Detect the target provider/service/action/API version.
+	target := routing.DetectTarget(r)
+	svcName := target.Service
+	action := target.Action
 	if svcName == "" {
 		// If plugin manager is available, try name-based plugin lookup as last resort.
 		awsErr := service.NewAWSError(
@@ -224,7 +226,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	var identity *service.CallerIdentity
 	if g.rootIdentity != nil {
 		identity = g.rootIdentity
-	} else if isUnauthenticatedAction(svcName, routing.DetectAction(r)) {
+	} else if isUnauthenticatedAction(svcName, action) {
 		// Some Cognito operations (SignUp, InitiateAuth, etc.) are client-side
 		// calls that do not carry an Authorization header. Allow them through
 		// with a synthetic root identity.
@@ -266,7 +268,7 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	// Fall back to legacy registry if account registry didn't resolve.
 	if svc == nil {
 		var lookupErr error
-		svc, lookupErr = g.registry.Lookup(svcName)
+		svc, lookupErr = g.registry.LookupTarget(target)
 		if lookupErr != nil {
 			awsErr := service.NewAWSError(
 				"ServiceUnavailable",
@@ -279,8 +281,6 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 6. Build RequestContext.
-	action := routing.DetectAction(r)
-
 	// Only allocate the params map when there are query parameters to parse.
 	// S3 REST-XML requests rarely carry dispatch params, so this is a common fast path.
 	var params map[string]string
@@ -323,10 +323,10 @@ func (g *Gateway) handleAWSRequest(w http.ResponseWriter, r *http.Request) {
 	// Skip event construction entirely when nobody is listening.
 	if g.bus != nil && g.bus.HasSubscribers() {
 		detail := map[string]any{
-			"eventSource":    svcName + ".amazonaws.com",
-			"eventName":      action,
+			"eventSource":     svcName + ".amazonaws.com",
+			"eventName":       action,
 			"sourceIPAddress": r.RemoteAddr,
-			"userAgent":      r.UserAgent(),
+			"userAgent":       r.UserAgent(),
 		}
 		if svcErr != nil {
 			if awsErr, ok := svcErr.(*service.AWSError); ok {

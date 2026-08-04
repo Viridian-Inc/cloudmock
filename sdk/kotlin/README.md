@@ -122,4 +122,4 @@ For Android telemetry (OTel, RUM, BLE mesh), use `io.cloudmock.CloudMock.initial
 
 ## License
 
-BSL-1.1 — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](../../LICENSE).

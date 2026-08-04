@@ -58,9 +58,9 @@ dist/
 vendor/
 ```
 
-- [ ] **Step 2: Create Apache 2.0 LICENSE file**
+- [ ] **Step 2: Create MIT LICENSE file**
 
-Create `LICENSE` with standard Apache 2.0 text.
+Create `LICENSE` with standard MIT text.
 
 - [ ] **Step 3: Create Makefile**
 

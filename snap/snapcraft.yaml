@@ -13,7 +13,7 @@ description: |
 
 grade: stable
 confinement: strict
-license: Proprietary
+license: MIT
 title: CloudMock
 contact: eng@viri.app
 issues: https://github.com/Viridian-Inc/cloudmock/issues

@@ -80,7 +80,7 @@ open http://localhost:4500
 - Gateway: Go
 - DevTools: Tauri v2 + Preact + TypeScript
 - Storage: PostgreSQL / DuckDB / in-memory
-- License: Apache 2.0
+- License: MIT
 
 GitHub: [link when public]
 

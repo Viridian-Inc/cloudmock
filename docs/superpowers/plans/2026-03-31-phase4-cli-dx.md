@@ -108,7 +108,7 @@ git commit -m "feat: add cmk CLI wrapper (like awslocal for LocalStack)"
   "description": "Local AWS emulation. 25 services. One command.",
   "bin": { "cloudmock": "bin/cloudmock.mjs" },
   "files": ["bin/"],
-  "license": "Apache-2.0",
+  "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/Viridian-Inc/cloudmock" },
   "keywords": ["aws", "mock", "local", "development", "testing", "s3", "dynamodb", "lambda"]
 }
@@ -154,7 +154,7 @@ class Cloudmock < Formula
   desc "Local AWS emulation. 25 services. One binary."
   homepage "https://cloudmock.io"
   version "1.0.0"
-  license "Apache-2.0"
+  license "MIT"
 
   on_macos do
     on_arm do
@@ -226,7 +226,7 @@ Read `README.md` to understand current structure and content.
 7. **Configuration basics** — profiles, ports, persistence (3-4 lines)
 8. **Links**: [Documentation](https://cloudmock.io/docs) | [Comparison](https://cloudmock.io/docs/reference/comparison)
 9. **Contributing**
-10. **License** (Apache-2.0)
+10. **License** (MIT)
 
 Rules: No emoji. No AI fluff. No "awesome" or "blazing fast". Technical, direct, copy-paste ready. Every command must actually work.
 

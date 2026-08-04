@@ -110,4 +110,4 @@ mock.start
 
 ## License
 
-BSL-1.1 — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](../../LICENSE).

@@ -2,6 +2,7 @@ from setuptools import setup, find_packages
 setup(
     name="c7n-cloudmock",
     version="0.1.0",
+    license="MIT",
     packages=find_packages(),
     install_requires=["c7n"],
     entry_points={

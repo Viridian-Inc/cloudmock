@@ -12,7 +12,7 @@ CloudMock is a local AWS emulator that runs 100 AWS services on a developer's ma
 
 **Target first-year revenue:** $300K ARR ($180K Platform + $120K Cloud).
 
-**Competitive advantage:** CloudMock is 110x faster than LocalStack, fully open-source (BSL), and the only product that unifies local AWS emulation with production AWS observability in one UI. Datadog charges $270/mo for 5 hosts. CloudMock Cloud: $60/mo.
+**Competitive advantage:** CloudMock is 110x faster than LocalStack, fully open-source (MIT), and the only product that unifies local AWS emulation with production AWS observability in one UI. Datadog charges $270/mo for 5 hosts. CloudMock Cloud: $60/mo.
 
 ---
 
@@ -42,7 +42,7 @@ Every team building on AWS faces the same pain:
 | **LocalStack** | 80+ (10 free) | 200ms/op | $35-350/mo | Partial (free tier limited) |
 | **Moto** | 100+ | 50ms/op | Free | Yes (Python only) |
 | **Real AWS** | All | Network latency | Pay per use | No |
-| **CloudMock** | 100 | 0.02-0.24ms/op | Free local, $0.50/10K hosted | Yes (BSL) |
+| **CloudMock** | 100 | 0.02-0.24ms/op | Free local, $0.50/10K hosted | Yes (MIT) |
 
 **LocalStack's weakness:** The free tier is crippled (10 services). Pro costs $35/mo per dev. Teams of 10 pay $350/mo for basic emulation. Enterprise starts at $2,400/mo.
 
@@ -56,7 +56,7 @@ Every team building on AWS faces the same pain:
 
 ### Three-Layer Product
 
-**Layer 1: Open-Source CLI (free, BSL)**
+**Layer 1: Open-Source CLI (free, MIT)**
 - 100 AWS services, single binary, 65ms startup
 - Built-in devtools (topology, traces, chaos, resource browsers)
 - State snapshots, IaC support (Terraform/CDK/Pulumi)

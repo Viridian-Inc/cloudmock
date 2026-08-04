@@ -141,7 +141,7 @@ func ProviderInfo() tfbridge.ProviderInfo {
 		Repository:  "https://github.com/Viridian-Inc/cloudmock",
 		Description: "A Pulumi provider for cloudmock — local AWS service emulation.",
 		Keywords:    []string{"pulumi", "cloudmock", "aws", "mock", "testing"},
-		License:     "Apache-2.0",
+		License:     "MIT",
 		Homepage:    "https://github.com/Viridian-Inc/cloudmock",
 
 		Config: map[string]*tfbridge.SchemaInfo{

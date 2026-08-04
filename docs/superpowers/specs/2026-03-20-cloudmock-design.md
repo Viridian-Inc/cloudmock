@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-20
 **Status:** Draft
-**License:** Apache 2.0
+**License:** MIT
 
 ## Overview
 
@@ -19,7 +19,7 @@ cloudmock is designed to be a complete LocalStack replacement for any AWS user â
 - Docker-first distribution with Docker Compose orchestration
 - Web dashboard for resource inspection, request logging, and IAM debugging
 - CLI for service management, state control, and configuration
-- Apache 2.0 open source
+- MIT open source
 
 ## Architecture
 
@@ -672,7 +672,7 @@ cloudmock/
   cloudmock.yml             # Default configuration
   Makefile                  # Build targets
   docs/                     # Documentation
-  LICENSE                   # Apache 2.0
+  LICENSE                   # MIT
   README.md
 ```
 

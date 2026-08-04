@@ -279,4 +279,4 @@ def aws():
 - **Test isolation model**: Moto resets state per decorator; CloudMock resets per context manager scope. Use `scope="function"` in pytest for equivalent per-test isolation.
 - **Service decorator specificity**: Moto lets you use `@mock_s3` to mock only S3. CloudMock runs all 100 services always — there's no per-service activation.
 - **Lambda execution**: Moto can execute simple Lambda handlers in-process. CloudMock stores Lambda configuration but does not execute handlers.
-- **License**: CloudMock uses BSL-1.1 (free for dev/test, commercial production hosting requires a license). Moto uses Apache 2.0.
+- **License**: CloudMock uses MIT. Moto uses Apache 2.0.

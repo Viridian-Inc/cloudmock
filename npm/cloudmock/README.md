@@ -146,4 +146,4 @@ cloudmock contract \
 
 - [Documentation](https://cloudmock.app/docs)
 - [GitHub](https://github.com/Viridian-Inc/cloudmock)
-- [License](https://github.com/Viridian-Inc/cloudmock/blob/main/LICENSE) (Apache-2.0)
+- [License](https://github.com/Viridian-Inc/cloudmock/blob/main/LICENSE) (MIT)

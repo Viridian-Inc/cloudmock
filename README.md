@@ -39,7 +39,7 @@ Open DevTools at [http://localhost:4500](http://localhost:4500)
 - **Language-agnostic** — works with any OpenTelemetry SDK (Go, Python, Java, Node, Rust, ...)
 - **Built-in DevTools** — topology maps, request tracing, chaos engineering
 - **State snapshots** — export state to JSON, commit to git, restore on startup — everyone shares the same baseline
-- **Free for local dev and internal use** — source-available, no account required
+- **MIT licensed** — free to use, modify, distribute, and embed
 
 ## Usage
 
@@ -294,7 +294,7 @@ curl -X POST http://localhost:4599/api/cloudtrail/replay -d @trail.json
 | DevTools UI | Built-in | Pro only | No |
 | In-process mode | Go SDK | No | Python only |
 | Language | Go (single binary) | Python | Python |
-| License | BSL 1.1 | Apache 2.0 | Apache 2.0 |
+| License | MIT | Apache 2.0 | Apache 2.0 |
 
 ## Documentation
 
@@ -307,6 +307,6 @@ Full docs at **[cloudmock.app](https://cloudmock.app)**
 
 ## License
 
-Business Source License 1.1. Free for local development and internal use. See [LICENSE](LICENSE).
+CloudMock is licensed under the MIT License. See [LICENSE](LICENSE).
 
 Copyright 2026 Viridian Inc.

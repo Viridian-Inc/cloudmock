@@ -300,7 +300,7 @@ LocalStack boots with `SERVICES=s3,dynamodb,sqs` to keep startup fast. CloudMock
 
 ### License
 
-CloudMock is BSL-1.1: **free for local development, testing, and internal use**. Commercial use that involves hosting CloudMock as a service to third parties requires a license. Most teams (using CloudMock as a dev/CI dependency) are in the free tier with no action required. See [cloudmock.app/license](/license/) for details.
+CloudMock is MIT licensed: free to use, modify, distribute, and embed. See [LICENSE](https://github.com/Viridian-Inc/cloudmock/blob/main/LICENSE) for details.
 
 ## Reference — concept mapping
 

@@ -248,7 +248,7 @@ Ready. Point your AWS SDK at http://localhost:4566
 6. Screenshots -- topology, activity, traces (2-3 images)
 7. Link to docs
 8. Contributing
-9. License (Apache-2.0)
+9. License (MIT)
 
 No AI-generated fluff. No excessive emoji. Technical, direct, developer-friendly.
 
@@ -442,7 +442,7 @@ Paid tier where developers get a hosted cloudmock instance with a stable endpoin
 - [x] All TypeScript tests green (269/269)
 - [x] Zero TypeScript errors (`npx tsc --noEmit`)
 - [x] Zero Go build errors (`go build ./cmd/gateway/`)
-- [x] LICENSE file present (Apache-2.0)
+- [x] LICENSE file present (MIT)
 - [x] CHANGELOG for v1.0.0
 
 ---

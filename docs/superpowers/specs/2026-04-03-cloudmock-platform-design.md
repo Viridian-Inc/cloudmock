@@ -2,13 +2,13 @@
 
 ## Overview
 
-A separate public repo (`cloudmock-platform`) that provides a hosted, API-first cloud testing platform built on CloudMock. Customers create isolated AWS emulation environments ("apps"), access them via API keys, and pay per request. The platform is HIPAA-compliant, source-available under BSL, and designed for teams that need shared cloud testing infrastructure without managing their own CloudMock instances.
+A separate public repo (`cloudmock-platform`) that provides a hosted, API-first cloud testing platform built on CloudMock. Customers create isolated AWS emulation environments ("apps"), access them via API keys, and pay per request. The platform is HIPAA-compliant, open source under MIT, and designed for teams that need shared cloud testing infrastructure without managing their own CloudMock instances.
 
 **Goal:** Let any developer `export AWS_ENDPOINT_URL=https://abc123.cloudmock.io` and start testing against 100 AWS services with zero setup, usage-based billing, and enterprise-grade compliance.
 
 ## Architecture
 
-Two public BSL repos:
+Two public MIT repos:
 - `cloudmock` (existing) -- the Go emulator, 100 AWS services, devtools, `pkg/saas/*` shared libraries
 - `cloudmock-platform` (new) -- Next.js dashboard + Go API service
 
@@ -130,7 +130,7 @@ cloudmock-platform/
 ├── docker-compose.yml              # Local dev
 ├── fly.toml
 ├── vercel.json
-└── LICENSE                         # BSL 1.1
+└── LICENSE                         # MIT
 ```
 
 ## Data Model

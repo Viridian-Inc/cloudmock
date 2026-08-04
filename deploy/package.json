@@ -1,6 +1,7 @@
 {
   "name": "cloudmock-deploy",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "Deploy CloudMock gateway to AWS (ECS Fargate + ALB)",
   "main": "index.ts",
   "scripts": {

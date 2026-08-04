@@ -102,4 +102,4 @@ For iOS/macOS telemetry (OTel, RUM, BLE mesh), use `CloudMock.initialize(config:
 
 ## License
 
-BSL-1.1 — see [LICENSE](../../LICENSE).
+MIT — see [LICENSE](../../LICENSE).

@@ -177,4 +177,4 @@ main().catch(console.error);
 
 ## License
 
-[BSL-1.1](../../LICENSE)
+[MIT](../../LICENSE)

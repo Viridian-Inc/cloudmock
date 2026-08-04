@@ -93,6 +93,10 @@ func serviceFromCredential(cred string) string {
 // It checks X-Amz-Target (part after the dot) first, then the ?Action= query parameter.
 // Returns empty string if not detected.
 func DetectAction(r *http.Request) string {
+	if action := r.Header.Get("X-Cloudmock-Action"); action != "" {
+		return action
+	}
+
 	// Check X-Amz-Target first — fast path, no allocation.
 	if target := r.Header.Get("X-Amz-Target"); target != "" {
 		if dot := strings.LastIndex(target, "."); dot >= 0 {
@@ -170,18 +174,18 @@ func serviceFromAuthorization(auth string) string {
 // TargetToService maps the lowercased X-Amz-Target service prefix to the
 // canonical CloudMock service name.
 var TargetToService = map[string]string{
-	"dynamodb":                              "dynamodb",
-	"dax":                                   "dynamodb",
-	"amazonsqs":                             "sqs",
-	"amazonses":                             "ses",
-	"amazonsns":                             "sns",
-	"awskms":                                "kms",
-	"amazonkinesis":                         "kinesis",
-	"tagging":                               "tagging",
-	"logs":                                  "logs",
-	"awslambda":                             "lambda",
-	"awscognitoidentityproviderservice":     "cognito-idp",
-	"secretsmanager":                        "secretsmanager",
+	"dynamodb":                          "dynamodb",
+	"dax":                               "dynamodb",
+	"amazonsqs":                         "sqs",
+	"amazonses":                         "ses",
+	"amazonsns":                         "sns",
+	"awskms":                            "kms",
+	"amazonkinesis":                     "kinesis",
+	"tagging":                           "tagging",
+	"logs":                              "logs",
+	"awslambda":                         "lambda",
+	"awscognitoidentityproviderservice": "cognito-idp",
+	"secretsmanager":                    "secretsmanager",
 }
 
 // serviceFromTarget extracts the service name from an X-Amz-Target value like

@@ -1,28 +1,28 @@
 class Cloudmock < Formula
   desc "Local AWS emulation. 98 services. One binary."
   homepage "https://cloudmock.io"
-  version "1.9.0"
+  version "1.10.0"
   license "MIT"
 
   on_macos do
     on_arm do
       url "https://github.com/Viridian-Inc/cloudmock/releases/download/v#{version}/cloudmock-darwin-arm64"
-      sha256 "04e7126cb0adc98437fb485f812592f8c8b2ceb0107df18414d88c6e7ed601ae"
+      sha256 "c13c1ed2808301ded69b003ef6582d0163912ee246de8d1a769e4512719e21bf"
     end
     on_intel do
       url "https://github.com/Viridian-Inc/cloudmock/releases/download/v#{version}/cloudmock-darwin-amd64"
-      sha256 "b4b81da957b09db35c57470a740ab20bf934acab0ba2e3af31bf7356b0b8c732"
+      sha256 "88c68c67ff4fcc01dea45a32feb4dba9dd3fa49e10a2518c6e4379e61d141980"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/Viridian-Inc/cloudmock/releases/download/v#{version}/cloudmock-linux-arm64"
-      sha256 "91af2a93dde2e952397826677c5da0fa474bb592528c568f649165594a480110"
+      sha256 "cc9a35f61d1bc8ab3361765f6078248cc71f3e8bc0dbc47c808a527758fdffa4"
     end
     on_intel do
       url "https://github.com/Viridian-Inc/cloudmock/releases/download/v#{version}/cloudmock-linux-amd64"
-      sha256 "bee979943d54fad91c37f609d0ae8e20c3b728d1d22967aa3e74ad7e7f74c174"
+      sha256 "bc8dcfb25f54a104993ed1d96ab3b2df803f43ab2cd1cc49ff1351b8f2fac33d"
     end
   end
 

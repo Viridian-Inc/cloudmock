@@ -1,7 +1,7 @@
 package s3
 
 import (
-	"crypto/md5"  //nolint:gosec // MD5 is used for ETags per the S3 specification, not security
+	"crypto/md5" //nolint:gosec // MD5 is used for ETags per the S3 specification, not security
 	"encoding/hex"
 	"net/http"
 	"sort"
@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
+	"github.com/google/uuid"
 )
 
 // Object holds the data and metadata for a single S3 object.
@@ -34,6 +34,7 @@ type ObjectVersion struct {
 	ETag           string
 	Size           int64
 	LastModified   time.Time
+	Metadata       map[string]string
 	IsLatest       bool
 	IsDeleteMarker bool
 }
@@ -41,8 +42,8 @@ type ObjectVersion struct {
 // ObjectStore is an in-memory store for objects within a single S3 bucket.
 type ObjectStore struct {
 	mu       sync.RWMutex
-	objects  map[string]*Object           // key → current (latest non-deleted) object
-	versions map[string][]*ObjectVersion  // key → ordered list of versions (index 0 = newest)
+	objects  map[string]*Object          // key → current (latest non-deleted) object
+	versions map[string][]*ObjectVersion // key → ordered list of versions (index 0 = newest)
 }
 
 // NewObjectStore returns an empty ObjectStore.
@@ -114,6 +115,7 @@ func (os *ObjectStore) PutObjectVersioned(key string, body []byte, contentType s
 		ETag:         etag,
 		Size:         int64(len(body)),
 		LastModified: now,
+		Metadata:     metadata,
 		IsLatest:     true,
 	}
 
@@ -166,6 +168,7 @@ func (os *ObjectStore) GetObjectVersion(key, versionId string) (*Object, error) 
 				ETag:         v.ETag,
 				Size:         v.Size,
 				LastModified: v.LastModified,
+				Metadata:     v.Metadata,
 				VersionId:    v.VersionId,
 			}, nil
 		}
@@ -180,6 +183,75 @@ func (os *ObjectStore) DeleteObject(key string) {
 	os.mu.Lock()
 	delete(os.objects, key)
 	os.mu.Unlock()
+}
+
+// DeleteObjectVersion permanently removes one version without creating a delete
+// marker. It returns whether the removed version was a delete marker. Missing
+// versions are a no-op, matching S3's idempotent DELETE behavior.
+func (os *ObjectStore) DeleteObjectVersion(key, versionId string) bool {
+	os.mu.Lock()
+	defer os.mu.Unlock()
+
+	if versionId == "null" {
+		if current := os.objects[key]; current != nil && current.VersionId == "" {
+			os.restoreLatestObjectLocked(key)
+		}
+		return false
+	}
+
+	versions := os.versions[key]
+	for i, version := range versions {
+		if version.VersionId != versionId {
+			continue
+		}
+
+		copy(versions[i:], versions[i+1:])
+		versions[len(versions)-1] = nil
+		versions = versions[:len(versions)-1]
+		if len(versions) == 0 {
+			delete(os.versions, key)
+		} else {
+			os.versions[key] = versions
+		}
+
+		if i == 0 {
+			if len(versions) > 0 {
+				// Publish a new record instead of mutating a version that may
+				// already be held by a concurrent listing.
+				latest := *versions[0]
+				latest.IsLatest = true
+				versions[0] = &latest
+			}
+			// Suspended versioning may have a newer, unversioned current
+			// object. Removing historical data must not replace that object.
+			if current := os.objects[key]; current == nil || current.VersionId == versionId {
+				os.restoreLatestObjectLocked(key)
+			}
+		}
+		return version.IsDeleteMarker
+	}
+	return false
+}
+
+// restoreLatestObjectLocked updates the visible object after a permanent
+// deletion. The caller must hold os.mu.
+func (os *ObjectStore) restoreLatestObjectLocked(key string) {
+	delete(os.objects, key)
+	versions := os.versions[key]
+	if len(versions) == 0 || versions[0].IsDeleteMarker {
+		return
+	}
+	latest := versions[0]
+	os.objects[key] = &Object{
+		Key:          latest.Key,
+		Body:         latest.Body,
+		ContentType:  latest.ContentType,
+		ETag:         latest.ETag,
+		Size:         latest.Size,
+		LastModified: latest.LastModified,
+		Metadata:     latest.Metadata,
+		VersionId:    latest.VersionId,
+	}
 }
 
 // DeleteObjectVersioned creates a delete marker instead of actually removing data.
@@ -231,6 +303,21 @@ func (os *ObjectStore) Len() int {
 	n := len(os.objects)
 	os.mu.RUnlock()
 	return n
+}
+
+// isEmpty checks current objects and retained versions under the same lock.
+func (os *ObjectStore) isEmpty() bool {
+	os.mu.RLock()
+	defer os.mu.RUnlock()
+	if len(os.objects) > 0 {
+		return false
+	}
+	for _, versions := range os.versions {
+		if len(versions) > 0 {
+			return false
+		}
+	}
+	return true
 }
 
 // VersionCount returns the total number of versions across all keys.

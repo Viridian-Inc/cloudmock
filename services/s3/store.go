@@ -14,8 +14,8 @@ type Bucket struct {
 	Name             string
 	CreationDate     time.Time
 	Objects          *ObjectStore
-	VersioningStatus string // "", "Enabled", or "Suspended"
-	Policy           []byte // raw JSON policy, nil if unset
+	VersioningStatus string                       // "", "Enabled", or "Suspended"
+	Policy           []byte                       // raw JSON policy, nil if unset
 	Configs          map[string][]byte            // bucket-level configs: "tagging", "cors", "lifecycle", etc.
 	ObjectConfigs    map[string]map[string][]byte // objectKey -> configType -> data
 }
@@ -62,7 +62,7 @@ func (s *Store) DeleteBucket(name string) error {
 			"The specified bucket does not exist.", http.StatusNotFound)
 	}
 	b := value.(*Bucket)
-	if b.Objects.Len() > 0 {
+	if !b.Objects.isEmpty() {
 		return service.NewAWSError("BucketNotEmpty",
 			"The bucket you tried to delete is not empty.", http.StatusConflict)
 	}

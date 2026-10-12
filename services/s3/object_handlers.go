@@ -106,7 +106,8 @@ func handleGetObject(store *Store, ctx *service.RequestContext) (*service.Respon
 }
 
 // handleDeleteObject removes an object and returns 204.
-// If versioning is enabled, creates a delete marker instead of actually deleting.
+// An explicit versionId permanently removes that version. Otherwise, if
+// versioning is enabled, it creates a delete marker instead of removing data.
 func handleDeleteObject(store *Store, ctx *service.RequestContext) (*service.Response, error) {
 	bucket := extractBucketName(ctx)
 	key := extractObjectKey(ctx)
@@ -120,7 +121,13 @@ func handleDeleteObject(store *Store, ctx *service.RequestContext) (*service.Res
 		StatusCode: http.StatusNoContent,
 	}
 
-	if store.IsVersioningEnabled(bucket) {
+	if versionId := ctx.RawRequest.URL.Query().Get("versionId"); versionId != "" {
+		isDeleteMarker := objs.DeleteObjectVersion(key, versionId)
+		resp.Headers = map[string]string{
+			"x-amz-version-id":    versionId,
+			"x-amz-delete-marker": strconv.FormatBool(isDeleteMarker),
+		}
+	} else if store.IsVersioningEnabled(bucket) {
 		versionId := objs.DeleteObjectVersioned(key)
 		resp.Headers = map[string]string{
 			"x-amz-version-id":    versionId,

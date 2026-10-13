@@ -20,7 +20,7 @@ func Middleware(secret []byte) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Skip auth for public endpoints.
-			if r.URL.Path == "/api/health" || r.URL.Path == "/api/auth/login" || r.URL.Path == "/api/auth/register" {
+			if r.URL.Path == "/api/health" || r.URL.Path == "/api/auth/login" {
 				next.ServeHTTP(w, r)
 				return
 			}

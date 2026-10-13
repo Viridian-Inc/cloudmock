@@ -142,6 +142,11 @@ Base URL: `http://localhost:4599`
 | `POST` | `/api/auth/register` | Register a new user (admin only when auth enabled; body: `{email, password, name, role}`) |
 | `GET` | `/api/auth/me` | Get the current authenticated user |
 
+When JWT authentication is enabled, registration requires an administrator's
+`Authorization: Bearer <token>` header. Missing, invalid, or expired credentials
+return `401`; authenticated viewers and editors receive `403`. Successful user
+creation returns `201`. Login and health remain public through the JWT middleware.
+
 ## Users
 
 | Method | Path | Description |

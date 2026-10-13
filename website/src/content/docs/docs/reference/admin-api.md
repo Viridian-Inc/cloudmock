@@ -482,6 +482,22 @@ curl -X POST http://localhost:4599/api/auth/login \
   -d '{"email": "admin@example.com", "password": "secret"}'
 ```
 
+### POST /api/auth/register
+
+When JWT authentication is enabled, use the token returned by an administrator's
+login to create a user:
+
+```bash
+curl -X POST http://localhost:4599/api/auth/register \
+  -H "Authorization: Bearer $ADMIN_JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"email": "viewer@example.com", "password": "secret", "name": "Viewer", "role": "viewer"}'
+```
+
+Successful creation returns `201`. Missing, invalid, or expired JWT credentials
+return `401`; authenticated viewers and editors receive `403`. Login and health
+remain public through the JWT middleware.
+
 ---
 
 ## Users

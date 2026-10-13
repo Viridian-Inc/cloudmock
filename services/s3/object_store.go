@@ -360,7 +360,7 @@ func (os *ObjectStore) ListObjectVersions(prefix string) []*ObjectVersion {
 //   - prefix: only keys with this prefix are returned
 //   - delimiter: collapse keys that share a sub-prefix after the prefix into CommonPrefixes
 //   - maxKeys: maximum number of keys to return (0 → default 1000)
-//   - continuationToken: resume listing after this key (exclusive)
+//   - continuationToken: resume after this object key or common prefix (exclusive)
 func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, continuationToken string) *ListObjectsOutput {
 	if maxKeys <= 0 {
 		maxKeys = 1000
@@ -385,50 +385,50 @@ func (os *ObjectStore) ListObjects(prefix, delimiter string, maxKeys int, contin
 	out := &ListObjectsOutput{}
 	commonPrefixSet := make(map[string]struct{})
 	count := 0
+	lastEntry := ""
 
 	for _, k := range keys {
-		// Apply continuation token (start after this key).
-		if continuationToken != "" && k <= continuationToken {
-			continue
-		}
-
 		// Apply prefix filter.
 		if prefix != "" && !strings.HasPrefix(k, prefix) {
 			continue
 		}
 
-		// Apply delimiter grouping.
+		// Paginate logical results: a whole delimiter group counts as one
+		// entry, and its cursor must skip every child on the next page.
+		entry := k
+		isCommonPrefix := false
 		if delimiter != "" {
-			// Find the delimiter after the prefix portion.
 			rest := strings.TrimPrefix(k, prefix)
 			idx := strings.Index(rest, delimiter)
 			if idx >= 0 {
-				cp := prefix + rest[:idx+len(delimiter)]
-				if _, seen := commonPrefixSet[cp]; !seen {
-					commonPrefixSet[cp] = struct{}{}
-					out.CommonPrefixes = append(out.CommonPrefixes, cp)
-					count++
-					if count >= maxKeys {
-						out.IsTruncated = true
-						out.NextContinuationToken = k
-						break
-					}
+				entry = prefix + rest[:idx+len(delimiter)]
+				if _, seen := commonPrefixSet[entry]; seen {
+					continue
 				}
-				continue
+				commonPrefixSet[entry] = struct{}{}
+				isCommonPrefix = true
 			}
 		}
 
+		if continuationToken != "" && entry <= continuationToken {
+			continue
+		}
+
+		// A full page is truncated only if another distinct result exists.
+		// Save the last returned entry so the next request cannot skip one.
 		if count >= maxKeys {
 			out.IsTruncated = true
-			out.NextContinuationToken = k
+			out.NextContinuationToken = lastEntry
 			break
 		}
 
-		obj := snapshot[k]
-		if obj != nil {
-			out.Objects = append(out.Objects, obj)
+		if isCommonPrefix {
+			out.CommonPrefixes = append(out.CommonPrefixes, entry)
+		} else {
+			out.Objects = append(out.Objects, snapshot[k])
 		}
 		count++
+		lastEntry = entry
 	}
 
 	sort.Strings(out.CommonPrefixes)

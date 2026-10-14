@@ -46,37 +46,40 @@ runs:
   steps:
     - id: install
       shell: bash
+      env:
+        CM_INPUT_VERSION: ${{ inputs.version }}
       run: |
-        if [ "${{ inputs.version }}" = "latest" ]; then
+        if [ "$CM_INPUT_VERSION" = "latest" ]; then
           npm install -g cloudmock
         else
-          npm install -g cloudmock@${{ inputs.version }}
+          npm install -g "cloudmock@$CM_INPUT_VERSION"
         fi
         VERSION=$(npm list -g cloudmock --depth=0 2>/dev/null | grep cloudmock | sed 's/.*@//' || echo "unknown")
-        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
         echo "CloudMock $VERSION installed"
 
     - id: start
       shell: bash
+      env:
+        CLOUDMOCK_PROFILE: ${{ inputs.profile }}
+        CLOUDMOCK_IAM_MODE: ${{ inputs.iam-mode }}
+        CLOUDMOCK_GATEWAY_PORT: ${{ inputs.port }}
+        CLOUDMOCK_SERVICES: ${{ inputs.services }}
+        CLOUDMOCK_STATE: ${{ inputs.state }}
+        CLOUDMOCK_TEST_MODE: ${{ inputs.test-mode }}
+        CLOUDMOCK_IAC_DIR: ${{ inputs.iac }}
       run: |
-        IAC_FLAG=""
-        if [ -n "${{ inputs.iac }}" ]; then
-          IAC_FLAG="--iac ${{ inputs.iac }}"
+        args=()
+        if [ -n "$CLOUDMOCK_IAC_DIR" ]; then
+          args+=(--iac "$CLOUDMOCK_IAC_DIR")
         fi
-        CLOUDMOCK_PROFILE=${{ inputs.profile }} \
-        CLOUDMOCK_IAM_MODE=${{ inputs.iam-mode }} \
-        CLOUDMOCK_PORT=${{ inputs.port }} \
-        CLOUDMOCK_TEST_MODE=${{ inputs.test-mode }} \
-        nohup cloudmock $IAC_FLAG > /tmp/cloudmock.log 2>&1 &
-        echo $! > /tmp/cloudmock.pid
+        log_file="${RUNNER_TEMP:-/tmp}/cloudmock.log"
+        nohup cloudmock "${args[@]}" > "$log_file" 2>&1 &
+        echo $! > "${RUNNER_TEMP:-/tmp}/cloudmock.pid"
 
-        # Health check with 30s timeout.
-        # In test mode, admin API is disabled so probe the gateway directly.
-        if [ "${{ inputs.test-mode }}" = "true" ]; then
-          HEALTH_URL="http://localhost:${{ inputs.port }}"
-        else
-          HEALTH_URL="http://localhost:4599/api/health"
-        fi
+        # Probe the gateway endpoint that subsequent steps will use. An AWS
+        # error envelope is expected for an unauthenticated root request.
+        HEALTH_URL="http://localhost:$CLOUDMOCK_GATEWAY_PORT"
         echo -n "Waiting for CloudMock..."
         for i in $(seq 1 60); do
           if curl -so /dev/null -w '%{http_code}' "$HEALTH_URL" 2>/dev/null | grep -qE '^[2-4]'; then
@@ -85,18 +88,20 @@ runs:
           fi
           if [ $i -eq 60 ]; then
             echo " TIMEOUT"
-            cat /tmp/cloudmock.log
+            cat "$log_file"
             exit 1
           fi
           sleep 0.5
         done
 
-        echo "endpoint=http://localhost:${{ inputs.port }}" >> $GITHUB_OUTPUT
-        echo "admin-url=http://localhost:4599" >> $GITHUB_OUTPUT
+        echo "endpoint=http://localhost:$CLOUDMOCK_GATEWAY_PORT" >> "$GITHUB_OUTPUT"
+        echo "admin-url=http://localhost:4599" >> "$GITHUB_OUTPUT"
 
     - shell: bash
+      env:
+        CLOUDMOCK_GATEWAY_PORT: ${{ inputs.port }}
       run: |
-        echo "AWS_ENDPOINT_URL=http://localhost:${{ inputs.port }}" >> $GITHUB_ENV
-        echo "AWS_ACCESS_KEY_ID=test" >> $GITHUB_ENV
-        echo "AWS_SECRET_ACCESS_KEY=test" >> $GITHUB_ENV
-        echo "AWS_DEFAULT_REGION=us-east-1" >> $GITHUB_ENV
+        echo "AWS_ENDPOINT_URL=http://localhost:$CLOUDMOCK_GATEWAY_PORT" >> "$GITHUB_ENV"
+        echo "AWS_ACCESS_KEY_ID=test" >> "$GITHUB_ENV"
+        echo "AWS_SECRET_ACCESS_KEY=test" >> "$GITHUB_ENV"
+        echo "AWS_DEFAULT_REGION=us-east-1" >> "$GITHUB_ENV"

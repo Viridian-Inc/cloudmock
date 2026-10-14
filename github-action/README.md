@@ -16,8 +16,9 @@ steps:
 steps:
   - uses: viridian-inc/cloudmock-action@v1
     with:
-      profile: full           # all 99 services
-      state: fixtures/state.json  # pre-load state
+      services: 's3, sqs'         # explicit AWS service selection
+      port: '4567'               # also used by AWS_ENDPOINT_URL
+      state: 'fixtures/seed state.json'  # paths may contain spaces
   - run: npm test
 ```
 
@@ -43,6 +44,18 @@ steps:
 | `port` | `4566` | Gateway port |
 | `state` | | State file to load on startup |
 | `iam-mode` | `none` | IAM mode: `none`, `log`, `enforce` |
+
+An empty `services` input keeps the profile's default behavior. A nonempty list
+limits AWS endpoints to those services; surrounding spaces are ignored. Follow-up
+requests should use the emitted `endpoint` or `AWS_ENDPOINT_URL` so they reach the
+configured port.
+
+State is restored before the gateway begins serving requests. The repository
+action at `.github/actions/cloudmock` also supports `test-mode` (default `true`)
+and `iac`. Test mode loads the snapshot without saving changes back. Normal mode
+can update the state file during execution and shutdown, so use a copy when the
+original fixture must remain unchanged. State and IaC paths are passed as literal
+values, including spaces and shell metacharacters.
 
 ## Outputs
 

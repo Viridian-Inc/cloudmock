@@ -693,6 +693,36 @@ func main() {
 	registry.SetDefaultVersion(routing.ProviderAzure, "Microsoft.KeyVault/vaults", "2024-11-01")
 	registry.SetDefaultVersion(routing.ProviderAzure, "Microsoft.KeyVault/secrets", "2025-07-01")
 
+	// An explicit AWS service list limits availability independently of the
+	// profile's eager/lazy loading policy. Leave the default registry unchanged
+	// when no list is supplied; Azure's versioned services are configured separately.
+	selectedServices := strings.TrimSpace(os.Getenv("CLOUDMOCK_SERVICES"))
+	allowedServices := make(map[string]bool)
+	for _, name := range strings.Split(selectedServices, ",") {
+		name = strings.ToLower(strings.TrimSpace(name))
+		switch name {
+		case "cloudwatch":
+			name = "monitoring"
+		case "cloudwatch-logs":
+			name = "logs"
+		case "stepfunctions":
+			name = "states"
+		}
+		if name != "" {
+			allowedServices[name] = true
+		}
+	}
+	registerAWS := func(svc service.Service) {
+		if selectedServices == "" || allowedServices[svc.Name()] {
+			registry.Register(svc)
+		}
+	}
+	registerLazyAWS := func(name string, factory routing.ServiceFactory) {
+		if selectedServices == "" || allowedServices[name] {
+			registry.RegisterLazy(name, factory)
+		}
+	}
+
 	// Determine which Tier 1 services to eagerly initialize based on profile.
 	// "minimal"  — only the 8 core services used by almost every app.
 	// "standard" — all 97 Tier 1 services loaded eagerly.
@@ -708,22 +738,22 @@ func main() {
 	eagerAll := profile == "standard" || profile == "full"
 
 	// --- Always-eager: S3 with event bus support ---
-	registry.Register(s3svc.NewWithBus(bus))
+	registerAWS(s3svc.NewWithBus(bus))
 
 	stsService := stssvc.New(cfg.AccountID)
-	registry.Register(stsService)
+	registerAWS(stsService)
 
 	// IAM service — always eager, shares engine and store with the gateway auth layer.
-	registry.Register(iamsvc.New(cfg.AccountID, engine, store))
+	registerAWS(iamsvc.New(cfg.AccountID, engine, store))
 
 	// Tier 1 services that may be eager or lazy depending on profile.
 	registerOrDefer := func(name string, factory func() service.Service) service.Service {
 		if eagerAll || minimalSet[name] {
 			svc := factory()
-			registry.Register(svc)
+			registerAWS(svc)
 			return svc
 		}
-		registry.RegisterLazy(name, factory)
+		registerLazyAWS(name, factory)
 		return nil
 	}
 
@@ -736,18 +766,18 @@ func main() {
 	var sesService *sessvc.SESService
 	if eagerAll || minimalSet["ses"] {
 		sesService = sessvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(sesService)
+		registerAWS(sesService)
 	} else {
-		registry.RegisterLazy("ses", func() service.Service { return sessvc.New(cfg.AccountID, cfg.Region) })
+		registerLazyAWS("ses", func() service.Service { return sessvc.New(cfg.AccountID, cfg.Region) })
 	}
 
 	// SNS — needs a locator; wire it after all services are registered.
 	var snsService *snssvc.SNSService
 	if eagerAll || minimalSet["sns"] {
 		snsService = snssvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(snsService)
+		registerAWS(snsService)
 	} else {
-		registry.RegisterLazy("sns", func() service.Service {
+		registerLazyAWS("sns", func() service.Service {
 			svc := snssvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -758,9 +788,9 @@ func main() {
 	var ddbService *dynamodbsvc.DynamoDBService
 	if eagerAll || minimalSet["dynamodb"] {
 		ddbService = dynamodbsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(ddbService)
+		registerAWS(ddbService)
 	} else {
-		registry.RegisterLazy("dynamodb", func() service.Service {
+		registerLazyAWS("dynamodb", func() service.Service {
 			ddbService = dynamodbsvc.New(cfg.AccountID, cfg.Region)
 			return ddbService
 		})
@@ -770,9 +800,9 @@ func main() {
 	var cwService *cwsvc.CloudWatchService
 	if eagerAll || minimalSet["cloudwatch"] {
 		cwService = cwsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(cwService)
+		registerAWS(cwService)
 	} else {
-		registry.RegisterLazy("monitoring", func() service.Service {
+		registerLazyAWS("monitoring", func() service.Service {
 			svc := cwsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -789,9 +819,9 @@ func main() {
 	var ebService *ebsvc.EventBridgeService
 	if eagerAll || minimalSet["events"] {
 		ebService = ebsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(ebService)
+		registerAWS(ebService)
 	} else {
-		registry.RegisterLazy("events", func() service.Service {
+		registerLazyAWS("events", func() service.Service {
 			svc := ebsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -805,9 +835,9 @@ func main() {
 	var cfnService *cfnsvc.CloudFormationService
 	if eagerAll || minimalSet["cloudformation"] {
 		cfnService = cfnsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(cfnService)
+		registerAWS(cfnService)
 	} else {
-		registry.RegisterLazy("cloudformation", func() service.Service {
+		registerLazyAWS("cloudformation", func() service.Service {
 			svc := cfnsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -818,9 +848,9 @@ func main() {
 	var lambdaService *lambdasvc.LambdaService
 	if eagerAll || minimalSet["lambda"] {
 		lambdaService = lambdasvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(lambdaService)
+		registerAWS(lambdaService)
 	} else {
-		registry.RegisterLazy("lambda", func() service.Service {
+		registerLazyAWS("lambda", func() service.Service {
 			svc := lambdasvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -857,9 +887,9 @@ func main() {
 	var elbService *elbsvc.ELBService
 	if eagerAll {
 		elbService = elbsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(elbService)
+		registerAWS(elbService)
 	} else {
-		registry.RegisterLazy("elasticloadbalancing", func() service.Service {
+		registerLazyAWS("elasticloadbalancing", func() service.Service {
 			svc := elbsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -869,9 +899,9 @@ func main() {
 	var autoscalingService *autoscalingsvc.AutoScalingService
 	if eagerAll {
 		autoscalingService = autoscalingsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(autoscalingService)
+		registerAWS(autoscalingService)
 	} else {
-		registry.RegisterLazy("autoscaling", func() service.Service {
+		registerLazyAWS("autoscaling", func() service.Service {
 			svc := autoscalingsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -881,9 +911,9 @@ func main() {
 	var cloudfrontService *cloudfrontsvc.CloudFrontService
 	if eagerAll {
 		cloudfrontService = cloudfrontsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(cloudfrontService)
+		registerAWS(cloudfrontService)
 	} else {
-		registry.RegisterLazy("cloudfront", func() service.Service {
+		registerLazyAWS("cloudfront", func() service.Service {
 			svc := cloudfrontsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -893,9 +923,9 @@ func main() {
 	var elasticacheService *elasticachesvc.ElastiCacheService
 	if eagerAll {
 		elasticacheService = elasticachesvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(elasticacheService)
+		registerAWS(elasticacheService)
 	} else {
-		registry.RegisterLazy("elasticache", func() service.Service {
+		registerLazyAWS("elasticache", func() service.Service {
 			svc := elasticachesvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -905,9 +935,9 @@ func main() {
 	var eksService *ekssvcsvc.EKSService
 	if eagerAll {
 		eksService = ekssvcsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(eksService)
+		registerAWS(eksService)
 	} else {
-		registry.RegisterLazy("eks", func() service.Service {
+		registerLazyAWS("eks", func() service.Service {
 			svc := ekssvcsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -917,9 +947,9 @@ func main() {
 	var codebuildService *codebuildsvc.CodeBuildService
 	if eagerAll {
 		codebuildService = codebuildsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codebuildService)
+		registerAWS(codebuildService)
 	} else {
-		registry.RegisterLazy("codebuild", func() service.Service {
+		registerLazyAWS("codebuild", func() service.Service {
 			svc := codebuildsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -929,9 +959,9 @@ func main() {
 	var codepipelineService *codepipelinesvc.CodePipelineService
 	if eagerAll {
 		codepipelineService = codepipelinesvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codepipelineService)
+		registerAWS(codepipelineService)
 	} else {
-		registry.RegisterLazy("codepipeline", func() service.Service {
+		registerLazyAWS("codepipeline", func() service.Service {
 			svc := codepipelinesvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -941,9 +971,9 @@ func main() {
 	var codedeployService *codedeploysvc.CodeDeployService
 	if eagerAll {
 		codedeployService = codedeploysvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codedeployService)
+		registerAWS(codedeployService)
 	} else {
-		registry.RegisterLazy("codedeploy", func() service.Service {
+		registerLazyAWS("codedeploy", func() service.Service {
 			svc := codedeploysvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -953,9 +983,9 @@ func main() {
 	var codecommitService *codecommitsvc.CodeCommitService
 	if eagerAll {
 		codecommitService = codecommitsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codecommitService)
+		registerAWS(codecommitService)
 	} else {
-		registry.RegisterLazy("codecommit", func() service.Service {
+		registerLazyAWS("codecommit", func() service.Service {
 			svc := codecommitsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -965,9 +995,9 @@ func main() {
 	var codeconnectionsService *codeconnectionssvc.CodeConnectionsService
 	if eagerAll {
 		codeconnectionsService = codeconnectionssvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codeconnectionsService)
+		registerAWS(codeconnectionsService)
 	} else {
-		registry.RegisterLazy("codeconnections", func() service.Service {
+		registerLazyAWS("codeconnections", func() service.Service {
 			svc := codeconnectionssvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -977,9 +1007,9 @@ func main() {
 	var codeartifactService *codeartifactsvc.CodeArtifactService
 	if eagerAll {
 		codeartifactService = codeartifactsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(codeartifactService)
+		registerAWS(codeartifactService)
 	} else {
-		registry.RegisterLazy("codeartifact", func() service.Service {
+		registerLazyAWS("codeartifact", func() service.Service {
 			svc := codeartifactsvc.New(cfg.AccountID, cfg.Region)
 			svc.SetLocator(registry)
 			return svc
@@ -1030,9 +1060,9 @@ func main() {
 	var orgsService *organizationssvc.OrganizationsService
 	if eagerAll || minimalSet["organizations"] {
 		orgsService = organizationssvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(orgsService)
+		registerAWS(orgsService)
 	} else {
-		registry.RegisterLazy("organizations", func() service.Service {
+		registerLazyAWS("organizations", func() service.Service {
 			svc := organizationssvc.New(cfg.AccountID, cfg.Region)
 			orgsService = svc
 			return svc
@@ -1078,9 +1108,9 @@ func main() {
 	var daxService *daxsvc.DAXService
 	if eagerAll || minimalSet["dax"] {
 		daxService = daxsvc.New(cfg.AccountID, cfg.Region)
-		registry.Register(daxService)
+		registerAWS(daxService)
 	} else {
-		registry.RegisterLazy("dax", func() service.Service {
+		registerLazyAWS("dax", func() service.Service {
 			daxService = daxsvc.New(cfg.AccountID, cfg.Region)
 			return daxService
 		})
@@ -1173,6 +1203,20 @@ func main() {
 
 			// Store microservices for topology — will be set on adminAPI after it's created
 			iacMicroservices = iacResult.Microservices
+		}
+	}
+
+	// Restore snapshots after IaC provisioning and before either gateway mode
+	// starts serving. Test mode returns early below and must restore state too.
+	if *stateFile != "" {
+		if stateData, err := os.ReadFile(*stateFile); err == nil {
+			if err := snapshotpkg.Import(registry, stateData); err != nil {
+				slog.Error("failed to import state file", "path", *stateFile, "error", err)
+			} else {
+				slog.Info("state restored from snapshot", "path", *stateFile)
+			}
+		} else if !os.IsNotExist(err) {
+			slog.Error("failed to read state file", "path", *stateFile, "error", err)
 		}
 	}
 
@@ -2433,6 +2477,9 @@ func main() {
 
 	// DAX Data-Plane server on :8111
 	go func() {
+		if selectedServices != "" && (!allowedServices["dax"] || !allowedServices["dynamodb"]) {
+			return
+		}
 		daxPort := os.Getenv("CLOUDMOCK_DAX_PORT")
 		if daxPort == "" {
 			daxPort = "8111"
@@ -2552,19 +2599,6 @@ func main() {
 			rc := len(seed.Resources.DynamoDB) + len(seed.Resources.Cognito) + len(seed.Resources.S3) + len(seed.Resources.SQS)
 			slog.Info("auto-provisioned from seed file", "tables", len(seed.Resources.DynamoDB), "pools", len(seed.Resources.Cognito), "buckets", len(seed.Resources.S3), "queues", len(seed.Resources.SQS), "total", rc)
 		}()
-	}
-
-	// Restore state from snapshot file if provided and file exists.
-	if *stateFile != "" {
-		if stateData, err := os.ReadFile(*stateFile); err == nil {
-			if err := snapshotpkg.Import(registry, stateData); err != nil {
-				slog.Error("failed to import state file", "path", *stateFile, "error", err)
-			} else {
-				slog.Info("state restored from snapshot", "path", *stateFile)
-			}
-		} else if !os.IsNotExist(err) {
-			slog.Error("failed to read state file", "path", *stateFile, "error", err)
-		}
 	}
 
 	// Disk mode: periodically persist state to the snapshot file so dev

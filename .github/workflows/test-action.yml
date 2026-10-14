@@ -1,46 +1,47 @@
 name: Test CloudMock Action
+
 on:
   push:
-    paths: ['.github/actions/cloudmock/**']
+    paths:
+      - '.github/actions/cloudmock/**'
+      - 'github-action/**'
+      - '.github/workflows/test-action.yml'
+      - 'cmd/gateway/**'
+      - 'pkg/config/**'
+      - 'pkg/snapshot/**'
+      - 'go.mod'
+      - 'go.sum'
   pull_request:
-    paths: ['.github/actions/cloudmock/**']
+    paths:
+      - '.github/actions/cloudmock/**'
+      - 'github-action/**'
+      - '.github/workflows/test-action.yml'
+      - 'cmd/gateway/**'
+      - 'pkg/config/**'
+      - 'pkg/snapshot/**'
+      - 'go.mod'
+      - 'go.sum'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   test-action:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
+      GOFLAGS: -mod=mod
     steps:
       - uses: actions/checkout@v4
-
-      - uses: ./.github/actions/cloudmock
-        id: cloudmock
-
-      - name: Verify CloudMock is running
-        # The composite action defaults to test-mode=true which disables the
-        # admin API on :4599. Probe the gateway instead — an unauthenticated
-        # GET returns an AWS error envelope with a 4xx status, which is
-        # enough to confirm the process is up.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build gateway from this checkout
+        run: go build -o "$RUNNER_TEMP/cloudmock-action-gateway" ./cmd/gateway
+      - name: Test both action definitions and live gateway behavior
         env:
-          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
-        run: |
-          code=$(curl -s -o /dev/null -w "%{http_code}" "$CM_ENDPOINT/")
-          echo "gateway http code: $code"
-          [ "$code" != "000" ] || { echo "gateway unreachable"; exit 1; }
-
-      - name: Test S3
-        run: |
-          aws --endpoint http://localhost:4566 s3 mb s3://ci-test-bucket
-          aws --endpoint http://localhost:4566 s3 ls | grep ci-test-bucket
-
-      - name: Verify outputs
-        env:
-          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
-          CM_VERSION: ${{ steps.cloudmock.outputs.version }}
-        run: |
-          [ -n "$CM_ENDPOINT" ]
-          [ -n "$CM_VERSION" ]
-
-      - name: Verify env vars
-        run: |
-          [ "$AWS_ENDPOINT_URL" = "http://localhost:4566" ]
-          [ "$AWS_ACCESS_KEY_ID" = "test" ]
+          CLOUDMOCK_ACTION_TEST_BINARY: ${{ runner.temp }}/cloudmock-action-gateway
+        run: go test -v ./github-action -count=1 -timeout 180s

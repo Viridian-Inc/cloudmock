@@ -90,6 +90,11 @@ skipped, or missing fails the job; existing base-commit failures remain visible 
 the report. Pull-request and test-branch runs upload reports without publishing
 them back to the repository.
 
+External checks pin their upstream commits and adapt only test setup to use the
+CloudMock endpoint. They retain the upstream application code and assertions,
+and reject missing or skipped tests so a run cannot pass without exercising the
+selected Python and DynamoMQ tests.
+
 ## Outputs
 
 | Output | Description |

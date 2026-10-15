@@ -12,6 +12,7 @@ on:
       - 'services/**'
       - 'pkg/**'
       - 'benchmarks/**'
+      - 'tests/compat/**'
       - 'go.mod'
       - 'go.sum'
   pull_request:
@@ -22,6 +23,7 @@ on:
       - 'services/**'
       - 'pkg/**'
       - 'benchmarks/**'
+      - 'tests/compat/**'
       - 'go.mod'
       - 'go.sum'
 
@@ -322,28 +324,54 @@ jobs:
           jq -n --arg source_sha "$CM_SOURCE_SHA" --arg endpoint "$CM_ENDPOINT" \
             '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/compat-source.json"
 
+      - name: Test compatibility adapter guards
+        run: PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests/compat -v
+
       - name: Test serverless-test-samples (Python)
         env:
+          UPSTREAM_SHA: a801c92eda191dc1ed0caa4a866500775a861f0f
           AWS_ENDPOINT_URL: ${{ steps.cloudmock.outputs.endpoint }}
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          git clone --depth 1 https://github.com/aws-samples/serverless-test-samples.git "$RUNNER_TEMP/serverless-tests"
+          test -n "$AWS_ENDPOINT_URL"
+          git init "$RUNNER_TEMP/serverless-tests"
+          git -C "$RUNNER_TEMP/serverless-tests" remote add origin https://github.com/aws-samples/serverless-test-samples.git
+          git -C "$RUNNER_TEMP/serverless-tests" fetch --depth=1 origin "$UPSTREAM_SHA"
+          git -C "$RUNNER_TEMP/serverless-tests" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/serverless-tests" rev-parse HEAD)" = "$UPSTREAM_SHA"
+          echo "Testing serverless-test-samples source $UPSTREAM_SHA" | tee "$RUNNER_TEMP/python-upstream.log"
           cd "$RUNNER_TEMP/serverless-tests/python-test-samples/apigw-lambda-dynamodb"
-          pip install -q boto3 pytest
-          python -m pytest tests/unit/ -v --tb=short 2>&1 | tee "$RUNNER_TEMP/python-compat.log" | tail -20
+          python -m pip install -c "$GITHUB_WORKSPACE/tests/compat/python-constraints.txt" -r src/requirements.txt boto3 pytest pyyaml
+          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" prepare-python "$PWD"
+          python -m pytest -v --tb=short --junitxml="$RUNNER_TEMP/python-compat.xml" \
+            tests/unit/mock_test.py::TestSampleLambdaWithDynamoDB::test_lambda_handler_happy_path \
+            tests/unit/mock_test.py::TestSampleLambdaWithDynamoDB::test_lambda_handler_notfound_path \
+            2>&1 | tee "$RUNNER_TEMP/python-compat.log" | tail -20
+          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" verify-python "$RUNNER_TEMP/python-compat.xml"
 
       - name: Test DynamoMQ (Go)
         env:
+          UPSTREAM_SHA: e76c688ecd17e68405bddb942426be995fb0d225
           DYNAMODB_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_REGION: us-east-1
         run: |
-          git clone --depth 1 https://github.com/vvatanabe/dynamomq.git "$RUNNER_TEMP/dynamomq"
+          test -n "$DYNAMODB_ENDPOINT"
+          git init "$RUNNER_TEMP/dynamomq"
+          git -C "$RUNNER_TEMP/dynamomq" remote add origin https://github.com/vvatanabe/dynamomq.git
+          git -C "$RUNNER_TEMP/dynamomq" fetch --depth=1 origin "$UPSTREAM_SHA"
+          git -C "$RUNNER_TEMP/dynamomq" checkout --detach FETCH_HEAD
+          test "$(git -C "$RUNNER_TEMP/dynamomq" rev-parse HEAD)" = "$UPSTREAM_SHA"
+          echo "Testing DynamoMQ source $UPSTREAM_SHA" | tee "$RUNNER_TEMP/dynamomq-upstream.log"
+          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" prepare-dynamomq "$RUNNER_TEMP/dynamomq"
           cd "$RUNNER_TEMP/dynamomq"
-          go test -v -tags cloudmock -run TestCloudMock -timeout 60s ./... 2>&1 | tee "$RUNNER_TEMP/dynamomq-compat.log" | tail -20
+          gofmt -w client_test.go
+          go test -json -count=1 -run '^TestDynamoMQClient(SendMessage|ReceiveMessage|DeleteMessage)$' -timeout 60s . \
+            > "$RUNNER_TEMP/dynamomq-compat.jsonl" 2> "$RUNNER_TEMP/dynamomq-compat.log"
+          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" verify-dynamomq "$RUNNER_TEMP/dynamomq-compat.jsonl"
 
       - name: Upload source compatibility evidence
         if: always()
@@ -354,3 +382,6 @@ jobs:
             ${{ runner.temp }}/compat-source.json
             ${{ runner.temp }}/cloudmock.log
             ${{ runner.temp }}/*-compat.log
+            ${{ runner.temp }}/*-upstream.log
+            ${{ runner.temp }}/python-compat.xml
+            ${{ runner.temp }}/dynamomq-compat.jsonl

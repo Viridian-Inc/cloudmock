@@ -57,6 +57,47 @@ can update the state file during execution and shutdown, so use a copy when the
 original fixture must remain unchanged. State and IaC paths are passed as literal
 values, including spaces and shell metacharacters.
 
+## Testing this repository from source
+
+The repository action can build the checked-out gateway instead of installing
+the published npm package. Set up Go first, then opt into `source`:
+
+```yaml
+steps:
+  - uses: actions/checkout@v4
+  - uses: actions/setup-go@v5
+    with:
+      go-version-file: go.mod
+  - uses: ./.github/actions/cloudmock
+    id: cloudmock
+    with:
+      source: 'true'
+  - run: echo "Tested source $CM_SOURCE_SHA"
+    env:
+      CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
+```
+
+Source mode skips npm, builds `cmd/gateway` from the checkout, and places that
+binary first on the following steps' PATH. The `source-sha` output identifies the
+tested commit; `version` is `source-<sha>`. This option belongs to the repository
+action at `.github/actions/cloudmock`; the distributable action keeps its released
+package behavior. The default `source: 'false'` continues to use `version` from npm.
+
+The compatibility workflow uses source mode for SDK, Terraform, and external-repo
+checks. SDK reports include `source_sha` and compare operation results against a
+fresh run of the base commit. A previously passing operation becoming failed,
+skipped, or missing fails the job; existing base-commit failures remain visible in
+the report. Pull-request and test-branch runs upload reports without publishing
+them back to the repository.
+
+External checks pin their upstream commits and adapt only test setup to use the
+CloudMock endpoint. They retain the upstream application code and assertions,
+and reject missing or skipped tests so a run cannot pass without exercising the
+selected Python and DynamoMQ tests.
+The DynamoMQ check compares every selected test and subtest against a fresh base
+gateway, reports existing failures, and rejects newly failing cases even when
+their parent test already failed on the base commit.
+
 ## Outputs
 
 | Output | Description |

@@ -15,6 +15,7 @@ import (
 type CompatReport struct {
 	GeneratedAt  string                    `json:"generated_at"`
 	CloudMockVer string                    `json:"cloudmock_version"`
+	SourceSHA    string                    `json:"source_sha,omitempty"`
 	TotalOps     int                       `json:"total_ops"`
 	Passed       int                       `json:"passed"`
 	Failed       int                       `json:"failed"`
@@ -40,6 +41,57 @@ type OpCompat struct {
 	Status      string `json:"status"` // "pass", "fail", "skip"
 	CMStatus    int    `json:"cm_status,omitempty"`
 	ErrorDetail string `json:"error_detail,omitempty"`
+}
+
+// Regression identifies a previously passing operation that no longer passes.
+type Regression struct {
+	Service   string
+	Operation string
+	Status    string // current status, or "missing" when the operation was not run
+}
+
+// CompareToBaseline reports each baseline pass that is failed, skipped, or
+// missing from the current report. Existing baseline failures do not block the
+// run, and newly passing operations cannot mask a regression elsewhere.
+// Results are sorted by service and operation for stable diagnostics. A baseline
+// with no passing operations is rejected because it cannot detect regressions.
+func CompareToBaseline(report, baseline *CompatReport) ([]Regression, error) {
+	var regressions []Regression
+	priorPasses := 0
+	for serviceName, priorService := range baseline.Services {
+		if priorService == nil {
+			continue
+		}
+		current := make(map[string]string)
+		if svc := report.Services[serviceName]; svc != nil {
+			for _, op := range svc.Operations {
+				current[op.Name] = op.Status
+			}
+		}
+		for _, op := range priorService.Operations {
+			if op.Status != "pass" {
+				continue
+			}
+			priorPasses++
+			status, exists := current[op.Name]
+			if !exists {
+				status = "missing"
+			}
+			if status != "pass" {
+				regressions = append(regressions, Regression{Service: serviceName, Operation: op.Name, Status: status})
+			}
+		}
+	}
+	if priorPasses == 0 {
+		return nil, fmt.Errorf("baseline contains no passing operations; cannot check regressions")
+	}
+	sort.Slice(regressions, func(i, j int) bool {
+		if regressions[i].Service != regressions[j].Service {
+			return regressions[i].Service < regressions[j].Service
+		}
+		return regressions[i].Operation < regressions[j].Operation
+	})
+	return regressions, nil
 }
 
 // GenerateFromBenchmark creates a compat report from a benchmark results JSON file.

@@ -1,0 +1,7 @@
+# Direct dependencies for the pinned upstream Python sample and its tests.
+aws-lambda-powertools==3.26.0
+aws-xray-sdk==2.15.0
+fastjsonschema==2.21.2
+boto3==1.42.82
+pytest==9.0.2
+PyYAML==6.0.3

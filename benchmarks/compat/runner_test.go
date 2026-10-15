@@ -3,7 +3,10 @@ package compat_test
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Viridian-Inc/cloudmock/benchmarks/compat"
@@ -190,6 +193,7 @@ func TestWriteReport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GenerateFromBenchmark: %v", err)
 	}
+	report.SourceSHA = "d73dcdebc17df4bbca11e47170337f685c7a1fa9"
 
 	outPath := filepath.Join(t.TempDir(), "compat.json")
 	if err := compat.WriteReport(report, outPath); err != nil {
@@ -214,5 +218,157 @@ func TestWriteReport(t *testing.T) {
 	}
 	if len(readBack.Services) != len(report.Services) {
 		t.Errorf("Services count mismatch: want %d, got %d", len(report.Services), len(readBack.Services))
+	}
+	if readBack.SourceSHA != report.SourceSHA {
+		t.Errorf("SourceSHA mismatch: want %q, got %q", report.SourceSHA, readBack.SourceSHA)
+	}
+}
+
+func TestWriteReportWithoutSourceSHA(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "compat.json")
+	if err := compat.WriteReport(&compat.CompatReport{}, path); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		t.Fatal(err)
+	}
+	if _, exists := fields["source_sha"]; exists {
+		t.Fatal("report without source metadata must omit source_sha")
+	}
+}
+
+func TestCompareToBaseline(t *testing.T) {
+	baseline := &compat.CompatReport{Services: map[string]*compat.ServiceCompat{
+		"s3": {Operations: []compat.OpCompat{
+			{Name: "Unchanged", Status: "pass"},
+			{Name: "NewFailure", Status: "pass"},
+			{Name: "NewSkip", Status: "pass"},
+			{Name: "MissingOperation", Status: "pass"},
+			{Name: "ExistingFailure", Status: "fail"},
+			{Name: "ExistingSkip", Status: "skip"},
+		}},
+		"sqs": {Operations: []compat.OpCompat{{Name: "MissingService", Status: "pass"}}},
+	}}
+	report := &compat.CompatReport{Services: map[string]*compat.ServiceCompat{
+		"s3": {Operations: []compat.OpCompat{
+			{Name: "Unchanged", Status: "pass"},
+			{Name: "NewFailure", Status: "fail"},
+			{Name: "NewSkip", Status: "skip"},
+			{Name: "ExistingFailure", Status: "fail"},
+			{Name: "ExistingSkip", Status: "fail"},
+		}},
+	}}
+	want := []compat.Regression{
+		{Service: "s3", Operation: "MissingOperation", Status: "missing"},
+		{Service: "s3", Operation: "NewFailure", Status: "fail"},
+		{Service: "s3", Operation: "NewSkip", Status: "skip"},
+		{Service: "sqs", Operation: "MissingService", Status: "missing"},
+	}
+	if got, err := compat.CompareToBaseline(report, baseline); err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("regressions = %#v, want %#v; error=%v", got, want, err)
+	}
+	if got, err := compat.CompareToBaseline(baseline, baseline); err != nil || len(got) != 0 {
+		t.Fatalf("unchanged baseline must pass despite existing failures: %#v; error=%v", got, err)
+	}
+}
+
+func TestCompareToBaselineNewPassCannotMaskRegression(t *testing.T) {
+	baseline := &compat.CompatReport{Passed: 1, Failed: 1, Services: map[string]*compat.ServiceCompat{
+		"s3": {Operations: []compat.OpCompat{{Name: "GetObject", Status: "pass"}, {Name: "PutObject", Status: "fail"}}},
+	}}
+	report := &compat.CompatReport{Passed: 1, Failed: 1, Services: map[string]*compat.ServiceCompat{
+		"s3": {Operations: []compat.OpCompat{{Name: "GetObject", Status: "fail"}, {Name: "PutObject", Status: "pass"}}},
+	}}
+	want := []compat.Regression{{Service: "s3", Operation: "GetObject", Status: "fail"}}
+	if got, err := compat.CompareToBaseline(report, baseline); err != nil || !reflect.DeepEqual(got, want) {
+		t.Fatalf("equal aggregate counts masked regression: %#v; error=%v", got, err)
+	}
+}
+
+func TestCompareToBaselineRejectsNoPassingOperations(t *testing.T) {
+	for _, operations := range [][]compat.OpCompat{
+		nil,
+		{{Name: "Unavailable", Status: "fail"}, {Name: "Unsupported", Status: "skip"}},
+	} {
+		baseline := &compat.CompatReport{Passed: 100, Services: map[string]*compat.ServiceCompat{
+			"s3": {Operations: operations},
+		}}
+		// Operation evidence, rather than aggregate counters, determines whether
+		// the baseline is capable of detecting a regression.
+		if _, err := compat.CompareToBaseline(&compat.CompatReport{}, baseline); err == nil || !strings.Contains(err.Error(), "no passing operations") {
+			t.Fatalf("baseline with no passes accepted: %v", err)
+		}
+	}
+}
+
+func TestReportCLI(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "compat-report")
+	if output, err := exec.Command("go", "build", "-o", binary, "./cmd").CombinedOutput(); err != nil {
+		t.Fatalf("build report CLI: %v\n%s", err, output)
+	}
+	const sourceSHA = "d73dcdebc17df4bbca11e47170337f685c7a1fa9"
+	for _, tc := range []struct {
+		name       string
+		baseline   string
+		wantStatus int
+		wantLog    string
+	}{
+		{name: "report only preserves failures", wantStatus: 0},
+		{name: "existing failure is allowed", baseline: "fail", wantStatus: 0, wantLog: "No compatibility regressions"},
+		{name: "regression fails after writing report", baseline: "pass", wantStatus: 1, wantLog: "s3.GetObject: pass -> fail"},
+		{name: "baseline without passes fails", baseline: "no-pass", wantStatus: 1, wantLog: "baseline contains no passing operations"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			benchPath := buildBenchmarkFile(t, map[string]*harness.ServiceResult{"s3": makeService(map[string]harness.Grade{
+				"GetObject": harness.GradeFail,
+				"PutObject": harness.GradePass,
+			})})
+			outputPath := filepath.Join(t.TempDir(), "compat.json")
+			args := []string{"--input", benchPath, "--output", outputPath, "--source-sha", sourceSHA}
+			if tc.baseline != "" {
+				baseline := &compat.CompatReport{Services: map[string]*compat.ServiceCompat{
+					"s3": {Operations: []compat.OpCompat{{Name: "GetObject", Status: tc.baseline}, {Name: "PutObject", Status: "pass"}}},
+				}}
+				if tc.baseline == "no-pass" {
+					baseline.Services["s3"].Operations = []compat.OpCompat{{Name: "GetObject", Status: "fail"}, {Name: "PutObject", Status: "skip"}}
+				}
+				if err := compat.WriteReport(baseline, outputPath); err != nil {
+					t.Fatal(err)
+				}
+				// Loading the baseline before replacing it must preserve the gate.
+				args = append(args, "--baseline", outputPath)
+			}
+			output, err := exec.Command(binary, args...).CombinedOutput()
+			status := 0
+			if err != nil {
+				exit, ok := err.(*exec.ExitError)
+				if !ok {
+					t.Fatalf("run report CLI: %v", err)
+				}
+				status = exit.ExitCode()
+			}
+			if status != tc.wantStatus {
+				t.Fatalf("exit status %d, want %d:\n%s", status, tc.wantStatus, output)
+			}
+			if !strings.Contains(string(output), sourceSHA) || !strings.Contains(string(output), tc.wantLog) {
+				t.Errorf("CLI did not log tested SHA and gate result:\n%s", output)
+			}
+			data, err := os.ReadFile(outputPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var report compat.CompatReport
+			if err := json.Unmarshal(data, &report); err != nil {
+				t.Fatal(err)
+			}
+			if report.SourceSHA != sourceSHA || report.Failed != 1 || report.Passed != 1 {
+				t.Fatalf("current report missing after CLI exit: %+v", report)
+			}
+		})
 	}
 }

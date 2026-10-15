@@ -6,15 +6,39 @@ on:
   workflow_dispatch:
   push:
     paths:
+      - '.github/workflows/compat.yml'
+      - '.github/actions/cloudmock/**'
+      - 'cmd/**'
       - 'services/**'
-      - 'pkg/gateway/**'
-      - 'pkg/routing/**'
+      - 'pkg/**'
+      - 'benchmarks/**'
+      - 'go.mod'
+      - 'go.sum'
+  pull_request:
+    paths:
+      - '.github/workflows/compat.yml'
+      - '.github/actions/cloudmock/**'
+      - 'cmd/**'
+      - 'services/**'
+      - 'pkg/**'
+      - 'benchmarks/**'
+      - 'go.mod'
+      - 'go.sum'
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   sdk-compat:
-    name: SDK Compatibility (14 services)
+    name: SDK Source Compatibility
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
+    permissions:
+      contents: write
     env:
       GOPRIVATE: github.com/Viridian-Inc/cloudmock
       GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
@@ -29,41 +53,135 @@ jobs:
 
       - uses: ./.github/actions/cloudmock
         id: cloudmock
+        with:
+          source: 'true'
 
-      - name: Run benchmark harness (all services)
+      - name: Record tested source
+        env:
+          CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+        run: |
+          [[ "$CM_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "Testing gateway source $CM_SOURCE_SHA at $CM_ENDPOINT"
+          jq -n --arg source_sha "$CM_SOURCE_SHA" --arg endpoint "$CM_ENDPOINT" \
+            '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/compat-source.json"
+
+      - name: Measure base commit with the current benchmark client
+        env:
+          CM_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CM_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          base_ref="$CM_BASE_REF"
+          if [[ -z "$base_ref" || "$base_ref" =~ ^0+$ ]]; then
+            base_ref="$CM_DEFAULT_BRANCH"
+          fi
+          git fetch --no-tags --depth=1 origin "$base_ref"
+          baseline_sha=$(git rev-parse FETCH_HEAD)
+          baseline_checkout="$RUNNER_TEMP/compat-baseline-checkout"
+          baseline_pid=""
+          cleanup() {
+            if [[ -n "$baseline_pid" ]]; then
+              if kill -0 "$baseline_pid" 2>/dev/null; then
+                kill "$baseline_pid"
+              fi
+              # A terminated background process may return a signal exit code.
+              wait "$baseline_pid" 2>/dev/null || :
+            fi
+            if [[ -d "$baseline_checkout" ]]; then
+              git worktree remove --force "$baseline_checkout"
+            fi
+          }
+          trap cleanup EXIT
+          git worktree add --detach "$baseline_checkout" "$baseline_sha"
+          (
+            cd "$baseline_checkout"
+            go build -ldflags="-s -w -X main.version=source-$baseline_sha" \
+              -o "$RUNNER_TEMP/compat-baseline-gateway" ./cmd/gateway
+          )
+          echo "Testing baseline gateway source $baseline_sha at http://localhost:4567"
+          jq -n --arg source_sha "$baseline_sha" --arg endpoint "http://localhost:4567" \
+            '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/compat-baseline-source.json"
+          CLOUDMOCK_GATEWAY_PORT=4567 CLOUDMOCK_PROFILE=minimal \
+          CLOUDMOCK_SERVICES= CLOUDMOCK_STATE= CLOUDMOCK_IAC_DIR= \
+          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_IAM_MODE=none CLOUDMOCK_DATAPLANE_MODE=local \
+            "$RUNNER_TEMP/compat-baseline-gateway" > "$RUNNER_TEMP/compat-baseline.log" 2>&1 &
+          baseline_pid=$!
+          for i in $(seq 1 60); do
+            if ! kill -0 "$baseline_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/compat-baseline.log"
+              exit 1
+            fi
+            if curl --max-time 2 -so /dev/null -w '%{http_code}' http://localhost:4567/ | grep -qE '^[2-4]'; then
+              break
+            fi
+            if [[ "$i" -eq 60 ]]; then
+              cat "$RUNNER_TEMP/compat-baseline.log"
+              echo "Baseline gateway did not become ready" >&2
+              exit 1
+            fi
+            sleep 0.5
+          done
+          go run ./benchmarks/cmd/bench \
+            --target=cloudmock --endpoint=http://localhost:4567 --quick \
+            --output="$RUNNER_TEMP/compat-baseline-results" 2>&1 | tee "$RUNNER_TEMP/compat-baseline-benchmark.log"
+          go run ./benchmarks/compat/cmd/ \
+            --input "$RUNNER_TEMP/compat-baseline-results/results.json" \
+            --output "$RUNNER_TEMP/compat-baseline.json" --source-sha "$baseline_sha"
+
+      - name: Run benchmark harness against checked-out source
+        env:
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
         run: |
           go run ./benchmarks/cmd/bench \
-            --target=cloudmock \
-            --endpoint=http://localhost:4566 \
-            --quick \
-            --output=benchmarks/results/nightly
+            --target=cloudmock --endpoint="$CM_ENDPOINT" --quick \
+            --output=benchmarks/results/nightly 2>&1 | tee "$RUNNER_TEMP/compat-head-benchmark.log"
 
-      - name: Generate compat report
+      - name: Generate report and reject compatibility regressions
+        env:
+          CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
         run: |
           go run ./benchmarks/compat/cmd/ \
             --input benchmarks/results/nightly/results.json \
-            --output website/src/data/compat.json
+            --output "$RUNNER_TEMP/compat-head.json" \
+            --source-sha "$CM_SOURCE_SHA" \
+            --baseline "$RUNNER_TEMP/compat-baseline.json" 2>&1 | tee "$RUNNER_TEMP/compat-gate.log"
 
-      - name: Commit updated results
+      - name: Publish updated report
+        if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+        env:
+          CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
+          CM_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
+          cp "$RUNNER_TEMP/compat-head.json" website/src/data/compat.json
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add website/src/data/compat.json benchmarks/results/nightly/ || true
-          git diff --cached --quiet || git commit -m "compat: nightly $(date +%Y-%m-%d) [skip ci]"
-          git push || true
+          git add website/src/data/compat.json
+          if ! git diff --cached --quiet; then
+            git commit -m "compat: source $CM_SOURCE_SHA [skip ci]"
+            git push origin "HEAD:$CM_DEFAULT_BRANCH"
+          fi
 
-      - name: Upload results
+      - name: Upload source compatibility evidence
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: compat-results-${{ github.run_id }}
+          name: sdk-source-compat-${{ github.run_id }}
           path: |
-            website/src/data/compat.json
+            ${{ runner.temp }}/compat-source.json
+            ${{ runner.temp }}/compat-head.json
+            ${{ runner.temp }}/compat-baseline.json
+            ${{ runner.temp }}/compat-baseline-source.json
+            ${{ runner.temp }}/compat-baseline-results/
+            ${{ runner.temp }}/compat-*.log
+            ${{ runner.temp }}/cloudmock.log
             benchmarks/results/nightly/
 
   terraform-compat:
-    name: Terraform Compatibility
+    name: Terraform Source Compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     env:
       GOPRIVATE: github.com/Viridian-Inc/cloudmock
       GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
@@ -77,24 +195,40 @@ jobs:
           go-version-file: go.mod
 
       - uses: ./.github/actions/cloudmock
+        id: cloudmock
+        with:
+          source: 'true'
+
+      - name: Record tested source
+        env:
+          CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+        run: |
+          [[ "$CM_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "Testing gateway source $CM_SOURCE_SHA at $CM_ENDPOINT"
+          jq -n --arg source_sha "$CM_SOURCE_SHA" --arg endpoint "$CM_ENDPOINT" \
+            '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/compat-source.json"
 
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: '1.12'
 
-      - name: Test Terraform DynamoDB module
+      - name: Test Terraform resources
         working-directory: tests/terraform
         env:
+          TF_VAR_cloudmock_endpoint: ${{ steps.cloudmock.outputs.endpoint }}
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_DEFAULT_REGION: us-east-1
         run: |
-          # Create a minimal Terraform test
           cat > main.tf << 'EOF'
           terraform {
             required_providers {
               aws = { source = "hashicorp/aws", version = "~> 5.0" }
             }
+          }
+          variable "cloudmock_endpoint" {
+            type = string
           }
           provider "aws" {
             access_key                  = "test"
@@ -105,12 +239,12 @@ jobs:
             skip_requesting_account_id  = true
             s3_use_path_style           = true
             endpoints {
-              dynamodb = "http://localhost:4566"
-              s3       = "http://localhost:4566"
-              sqs      = "http://localhost:4566"
-              sns      = "http://localhost:4566"
-              iam      = "http://localhost:4566"
-              sts      = "http://localhost:4566"
+              dynamodb = var.cloudmock_endpoint
+              s3       = var.cloudmock_endpoint
+              sqs      = var.cloudmock_endpoint
+              sns      = var.cloudmock_endpoint
+              iam      = var.cloudmock_endpoint
+              sts      = var.cloudmock_endpoint
             }
           }
 
@@ -133,14 +267,26 @@ jobs:
           }
           EOF
 
-          terraform init -no-color
-          terraform apply -auto-approve -no-color
-          terraform destroy -auto-approve -no-color
+          terraform init -no-color 2>&1 | tee "$RUNNER_TEMP/terraform-init.log"
+          terraform apply -auto-approve -no-color 2>&1 | tee "$RUNNER_TEMP/terraform-apply.log"
+          terraform destroy -auto-approve -no-color 2>&1 | tee "$RUNNER_TEMP/terraform-destroy.log"
+
+      - name: Upload source compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraform-source-compat-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/compat-source.json
+            ${{ runner.temp }}/cloudmock.log
+            ${{ runner.temp }}/terraform-*.log
 
   open-source-compat:
-    name: Open Source Repos
+    name: Open Source Repos Against Source
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
     env:
       GOPRIVATE: github.com/Viridian-Inc/cloudmock
       GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
@@ -162,20 +308,49 @@ jobs:
           node-version: '22'
 
       - uses: ./.github/actions/cloudmock
+        id: cloudmock
+        with:
+          source: 'true'
+
+      - name: Record tested source
+        env:
+          CM_SOURCE_SHA: ${{ steps.cloudmock.outputs.source-sha }}
+          CM_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+        run: |
+          [[ "$CM_SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
+          echo "Testing gateway source $CM_SOURCE_SHA at $CM_ENDPOINT"
+          jq -n --arg source_sha "$CM_SOURCE_SHA" --arg endpoint "$CM_ENDPOINT" \
+            '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/compat-source.json"
 
       - name: Test serverless-test-samples (Python)
+        env:
+          AWS_ENDPOINT_URL: ${{ steps.cloudmock.outputs.endpoint }}
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          git clone --depth 1 https://github.com/aws-samples/serverless-test-samples.git /tmp/serverless-tests
-          cd /tmp/serverless-tests/python-test-samples/apigw-lambda-dynamodb
+          git clone --depth 1 https://github.com/aws-samples/serverless-test-samples.git "$RUNNER_TEMP/serverless-tests"
+          cd "$RUNNER_TEMP/serverless-tests/python-test-samples/apigw-lambda-dynamodb"
           pip install -q boto3 pytest
-          AWS_ENDPOINT_URL=http://localhost:4566 \
-          AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 \
-          python -m pytest tests/unit/ -v --tb=short 2>&1 | tail -20
+          python -m pytest tests/unit/ -v --tb=short 2>&1 | tee "$RUNNER_TEMP/python-compat.log" | tail -20
 
       - name: Test DynamoMQ (Go)
+        env:
+          DYNAMODB_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1
         run: |
-          git clone --depth 1 https://github.com/vvatanabe/dynamomq.git /tmp/dynamomq
-          cd /tmp/dynamomq
-          AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_REGION=us-east-1 \
-          DYNAMODB_ENDPOINT=http://localhost:4566 \
-          go test -v -tags cloudmock -run TestCloudMock -timeout 60s ./... 2>&1 | tail -20 || true
+          git clone --depth 1 https://github.com/vvatanabe/dynamomq.git "$RUNNER_TEMP/dynamomq"
+          cd "$RUNNER_TEMP/dynamomq"
+          go test -v -tags cloudmock -run TestCloudMock -timeout 60s ./... 2>&1 | tee "$RUNNER_TEMP/dynamomq-compat.log" | tail -20
+
+      - name: Upload source compatibility evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: open-source-compat-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/compat-source.json
+            ${{ runner.temp }}/cloudmock.log
+            ${{ runner.temp }}/*-compat.log

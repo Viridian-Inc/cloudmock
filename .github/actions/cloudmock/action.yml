@@ -5,6 +5,9 @@ branding:
   color: green
 
 inputs:
+  source:
+    description: Build the checked-out gateway instead of installing npm (requires Go)
+    default: 'false'
   version:
     description: CloudMock version to install (npm tag or semver)
     default: latest
@@ -31,6 +34,9 @@ inputs:
     default: ''
 
 outputs:
+  source-sha:
+    description: Checked-out commit used to build the gateway (source mode only)
+    value: ${{ steps.install.outputs.source-sha }}
   endpoint:
     description: CloudMock gateway endpoint URL
     value: ${{ steps.start.outputs.endpoint }}
@@ -48,15 +54,27 @@ runs:
       shell: bash
       env:
         CM_INPUT_VERSION: ${{ inputs.version }}
+        CM_BUILD_SOURCE: ${{ inputs.source }}
       run: |
-        if [ "$CM_INPUT_VERSION" = "latest" ]; then
-          npm install -g cloudmock
+        if [ "$CM_BUILD_SOURCE" = "true" ]; then
+          cd "$GITHUB_WORKSPACE"
+          source_sha=$(git rev-parse HEAD)
+          source_dir="$RUNNER_TEMP/cloudmock-source"
+          mkdir -p "$source_dir"
+          go build -ldflags="-s -w -X main.version=source-$source_sha" -o "$source_dir/cloudmock" ./cmd/gateway
+          printf '%s\n' "$source_dir" >> "$GITHUB_PATH"
+          printf 'source-sha=%s\nversion=source-%s\n' "$source_sha" "$source_sha" >> "$GITHUB_OUTPUT"
+          echo "Built CloudMock from source $source_sha at $source_dir/cloudmock"
         else
-          npm install -g "cloudmock@$CM_INPUT_VERSION"
+          if [ "$CM_INPUT_VERSION" = "latest" ]; then
+            npm install -g cloudmock
+          else
+            npm install -g "cloudmock@$CM_INPUT_VERSION"
+          fi
+          VERSION=$(npm list -g cloudmock --depth=0 2>/dev/null | grep cloudmock | sed 's/.*@//' || echo "unknown")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "CloudMock $VERSION installed"
         fi
-        VERSION=$(npm list -g cloudmock --depth=0 2>/dev/null | grep cloudmock | sed 's/.*@//' || echo "unknown")
-        echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-        echo "CloudMock $VERSION installed"
 
     - id: start
       shell: bash

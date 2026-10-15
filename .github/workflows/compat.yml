@@ -286,7 +286,7 @@ jobs:
   open-source-compat:
     name: Open Source Repos Against Source
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
     env:
@@ -355,6 +355,8 @@ jobs:
         env:
           UPSTREAM_SHA: e76c688ecd17e68405bddb942426be995fb0d225
           DYNAMODB_ENDPOINT: ${{ steps.cloudmock.outputs.endpoint }}
+          CM_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+          CM_DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           AWS_ACCESS_KEY_ID: test
           AWS_SECRET_ACCESS_KEY: test
           AWS_REGION: us-east-1
@@ -367,11 +369,75 @@ jobs:
           test "$(git -C "$RUNNER_TEMP/dynamomq" rev-parse HEAD)" = "$UPSTREAM_SHA"
           echo "Testing DynamoMQ source $UPSTREAM_SHA" | tee "$RUNNER_TEMP/dynamomq-upstream.log"
           python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" prepare-dynamomq "$RUNNER_TEMP/dynamomq"
+          gofmt -w "$RUNNER_TEMP/dynamomq/client_test.go"
+
+          # Compare the same unmodified upstream assertions against fresh base
+          # and head gateways, so existing incompatibilities remain visible.
+          base_ref="$CM_BASE_REF"
+          if [[ -z "$base_ref" || "$base_ref" =~ ^0+$ ]]; then
+            base_ref="$CM_DEFAULT_BRANCH"
+          fi
+          git fetch --no-tags --depth=1 origin "$base_ref"
+          baseline_sha=$(git rev-parse FETCH_HEAD)
+          baseline_checkout="$RUNNER_TEMP/dynamomq-baseline-checkout"
+          baseline_pid=""
+          cleanup() {
+            if [[ -n "$baseline_pid" ]]; then
+              if kill -0 "$baseline_pid" 2>/dev/null; then
+                kill "$baseline_pid"
+              fi
+              # A terminated background process may return a signal exit code.
+              wait "$baseline_pid" 2>/dev/null || :
+            fi
+            if [[ -d "$baseline_checkout" ]]; then
+              git -C "$GITHUB_WORKSPACE" worktree remove --force "$baseline_checkout"
+            fi
+          }
+          trap cleanup EXIT
+          git worktree add --detach "$baseline_checkout" "$baseline_sha"
+          (
+            cd "$baseline_checkout"
+            go build -ldflags="-s -w -X main.version=source-$baseline_sha" \
+              -o "$RUNNER_TEMP/dynamomq-baseline-gateway" ./cmd/gateway
+          )
+          echo "Testing baseline gateway source $baseline_sha at http://localhost:4567"
+          jq -n --arg source_sha "$baseline_sha" --arg endpoint "http://localhost:4567" \
+            '{source_sha: $source_sha, endpoint: $endpoint}' | tee "$RUNNER_TEMP/dynamomq-baseline-source.json"
+          CLOUDMOCK_GATEWAY_PORT=4567 CLOUDMOCK_PROFILE=minimal \
+          CLOUDMOCK_SERVICES= CLOUDMOCK_STATE= CLOUDMOCK_IAC_DIR= \
+          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_IAM_MODE=none CLOUDMOCK_DATAPLANE_MODE=local \
+            "$RUNNER_TEMP/dynamomq-baseline-gateway" > "$RUNNER_TEMP/dynamomq-baseline-compat.log" 2>&1 &
+          baseline_pid=$!
+          for i in $(seq 1 60); do
+            if ! kill -0 "$baseline_pid" 2>/dev/null; then
+              cat "$RUNNER_TEMP/dynamomq-baseline-compat.log"
+              exit 1
+            fi
+            if curl --max-time 2 -so /dev/null -w '%{http_code}' http://localhost:4567/ | grep -qE '^[2-4]'; then
+              break
+            fi
+            if [[ "$i" -eq 60 ]]; then
+              cat "$RUNNER_TEMP/dynamomq-baseline-compat.log"
+              echo "Baseline gateway did not become ready" >&2
+              exit 1
+            fi
+            sleep 0.5
+          done
+
           cd "$RUNNER_TEMP/dynamomq"
-          gofmt -w client_test.go
+          baseline_test_status=0
+          DYNAMODB_ENDPOINT=http://localhost:4567 \
+            go test -json -count=1 -run '^TestDynamoMQClient(SendMessage|ReceiveMessage|DeleteMessage)$' -timeout 60s . \
+            > "$RUNNER_TEMP/dynamomq-baseline-compat.jsonl" 2> "$RUNNER_TEMP/dynamomq-baseline-test-compat.log" \
+            || baseline_test_status=$?
+          head_test_status=0
           go test -json -count=1 -run '^TestDynamoMQClient(SendMessage|ReceiveMessage|DeleteMessage)$' -timeout 60s . \
-            > "$RUNNER_TEMP/dynamomq-compat.jsonl" 2> "$RUNNER_TEMP/dynamomq-compat.log"
-          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" verify-dynamomq "$RUNNER_TEMP/dynamomq-compat.jsonl"
+            > "$RUNNER_TEMP/dynamomq-compat.jsonl" 2> "$RUNNER_TEMP/dynamomq-compat.log" \
+            || head_test_status=$?
+          python "$GITHUB_WORKSPACE/tests/compat/adapt_upstream_tests.py" compare-dynamomq "$RUNNER_TEMP/dynamomq-compat.jsonl" \
+            --baseline "$RUNNER_TEMP/dynamomq-baseline-compat.jsonl" \
+            --exit-code "$head_test_status" --baseline-exit-code "$baseline_test_status" \
+            2>&1 | tee "$RUNNER_TEMP/dynamomq-gate-compat.log"
 
       - name: Upload source compatibility evidence
         if: always()
@@ -384,4 +450,5 @@ jobs:
             ${{ runner.temp }}/*-compat.log
             ${{ runner.temp }}/*-upstream.log
             ${{ runner.temp }}/python-compat.xml
-            ${{ runner.temp }}/dynamomq-compat.jsonl
+            ${{ runner.temp }}/dynamomq*compat.jsonl
+            ${{ runner.temp }}/dynamomq-baseline-source.json

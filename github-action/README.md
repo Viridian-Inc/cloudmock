@@ -94,6 +94,9 @@ External checks pin their upstream commits and adapt only test setup to use the
 CloudMock endpoint. They retain the upstream application code and assertions,
 and reject missing or skipped tests so a run cannot pass without exercising the
 selected Python and DynamoMQ tests.
+The DynamoMQ check compares every selected test and subtest against a fresh base
+gateway, reports existing failures, and rejects newly failing cases even when
+their parent test already failed on the base commit.
 
 ## Outputs
 

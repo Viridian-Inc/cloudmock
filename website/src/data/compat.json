@@ -1,23 +1,25 @@
 {
-  "generated_at": "2026-04-03T00:28:13Z",
-  "cloudmock_version": "1.3.0",
-  "total_ops": 222,
-  "passed": 156,
-  "failed": 0,
-  "skipped": 66,
-  "compat_pct": 100.0,
+  "generated_at": "2026-10-16T07:12:06Z",
+  "cloudmock_version": "",
+  "source_sha": "5989659ba7dfe3a8cf8253140d6ce9cd73c15d37",
+  "total_ops": 226,
+  "passed": 180,
+  "failed": 46,
+  "skipped": 0,
+  "compat_pct": 79.65,
   "services": {
     "account": {
       "service": "account",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListRegions",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Account: ListRegions, https response error StatusCode: 501, RequestID: , api error NotImplemented: Route not implemented"
         }
       ]
     },
@@ -25,13 +27,14 @@
       "service": "acm",
       "total_ops": 3,
       "passed": 2,
-      "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 66.67,
       "operations": [
         {
           "name": "DescribeCertificate",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error ACM: DescribeCertificate, https response error StatusCode: 400, RequestID: , ResourceNotFoundException: Could not find certificate arn:aws:acm:us-east-1:000000000000:certificate/bench-cert."
         },
         {
           "name": "ListCertificates",
@@ -49,7 +52,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListCertificateAuthorities",
@@ -61,43 +64,45 @@
       "service": "amplify",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "CreateApp",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Amplify: CreateApp, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         },
         {
           "name": "ListApps",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Amplify: ListApps, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
     "apigateway": {
       "service": "apigateway",
       "total_ops": 4,
-      "passed": 0,
+      "passed": 4,
       "failed": 0,
-      "skipped": 4,
-      "compat_pct": 0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateRestApi",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "DeleteRestApi",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "GetRestApi",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "GetRestApis",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -105,17 +110,19 @@
       "service": "appconfig",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListApplications",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppConfig: ListApplications, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListEnvironments",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppConfig: ListEnvironments, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -125,7 +132,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeScalableTargets",
@@ -137,17 +144,19 @@
       "service": "apprunner",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListAutoScalingConfigurations",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppRunner: ListAutoScalingConfigurations, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListServices",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppRunner: ListServices, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -155,17 +164,19 @@
       "service": "appsync",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "CreateGraphqlApi",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppSync: CreateGraphqlApi, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         },
         {
           "name": "ListGraphqlApis",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error AppSync: ListGraphqlApis, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -175,7 +186,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListQueryExecutions",
@@ -193,7 +204,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeAutoScalingGroups",
@@ -213,17 +224,19 @@
       "service": "backup",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListBackupPlans",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Backup: ListBackupPlans, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListBackupVaults",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Backup: ListBackupVaults, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -233,7 +246,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeComputeEnvironments",
@@ -249,17 +262,19 @@
       "service": "bedrock",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListCustomModels",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Bedrock: ListCustomModels, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListFoundationModels",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Bedrock: ListFoundationModels, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -269,7 +284,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "GetCostAndUsage",
@@ -281,23 +296,24 @@
       "service": "cloudcontrol",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListResources",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error CloudControl: ListResources, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
     "cloudformation": {
       "service": "cloudformation",
       "total_ops": 4,
-      "passed": 1,
+      "passed": 4,
       "failed": 0,
-      "skipped": 3,
-      "compat_pct": 100.0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateStack",
@@ -305,15 +321,15 @@
         },
         {
           "name": "DeleteStack",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "DescribeStacks",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "ListStacks",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -323,7 +339,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListDistributions",
@@ -337,7 +353,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateTrail",
@@ -356,22 +372,22 @@
     "cloudwatch": {
       "service": "cloudwatch",
       "total_ops": 3,
-      "passed": 0,
+      "passed": 3,
       "failed": 0,
-      "skipped": 3,
-      "compat_pct": 0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "GetMetricData",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "ListMetrics",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "PutMetricData",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -381,7 +397,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateLogGroup",
@@ -405,39 +421,41 @@
       "service": "codeartifact",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListDomains",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error codeartifact: ListDomains, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         },
         {
           "name": "ListRepositories",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error codeartifact: ListRepositories, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
     "codebuild": {
       "service": "codebuild",
       "total_ops": 3,
-      "passed": 0,
+      "passed": 3,
       "failed": 0,
-      "skipped": 3,
-      "compat_pct": 0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateProject",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "DeleteProject",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "ListProjects",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -447,7 +465,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateRepository",
@@ -465,7 +483,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListConnections",
@@ -483,7 +501,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateApplication",
@@ -501,7 +519,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreatePipeline",
@@ -527,7 +545,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateUserPool",
@@ -553,7 +571,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DeleteConfigRule",
@@ -573,17 +591,19 @@
       "service": "datasync",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListLocations",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error DataSync: ListLocations, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListTasks",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error DataSync: ListTasks, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -593,7 +613,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeClusters",
@@ -611,7 +631,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeEndpoints",
@@ -629,7 +649,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeDBClusters",
@@ -647,7 +667,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateTable",
@@ -679,13 +699,39 @@
         }
       ]
     },
+    "dynamodb-stress": {
+      "service": "dynamodb-stress",
+      "total_ops": 4,
+      "passed": 4,
+      "failed": 0,
+      "skipped": 0,
+      "compat_pct": 100,
+      "operations": [
+        {
+          "name": "BulkPutItem",
+          "status": "pass"
+        },
+        {
+          "name": "ConcurrentMixedOps",
+          "status": "pass"
+        },
+        {
+          "name": "GetItemAtScale",
+          "status": "pass"
+        },
+        {
+          "name": "QueryAtScale",
+          "status": "pass"
+        }
+      ]
+    },
     "ec2": {
       "service": "ec2",
       "total_ops": 4,
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeInstances",
@@ -711,7 +757,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeRepositories",
@@ -725,7 +771,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateCluster",
@@ -748,26 +794,26 @@
     "eks": {
       "service": "eks",
       "total_ops": 4,
-      "passed": 0,
+      "passed": 4,
       "failed": 0,
-      "skipped": 4,
-      "compat_pct": 0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateCluster",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "DeleteCluster",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "DescribeCluster",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "ListClusters",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -777,7 +823,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeCacheClusters",
@@ -795,7 +841,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateApplication",
@@ -817,7 +863,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeLoadBalancers",
@@ -829,17 +875,19 @@
       "service": "elasticmapreduce",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListClusters",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error EMR: ListClusters, https response error StatusCode: 200, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListSteps",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error EMR: ListSteps, https response error StatusCode: 200, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -847,23 +895,24 @@
       "service": "es",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListDomainNames",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Elasticsearch Service: ListDomainNames, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
     "eventbridge": {
       "service": "eventbridge",
       "total_ops": 4,
-      "passed": 3,
+      "passed": 4,
       "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateEventBus",
@@ -875,7 +924,7 @@
         },
         {
           "name": "PutEvents",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "PutRule",
@@ -889,7 +938,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateDeliveryStream",
@@ -911,7 +960,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListExperimentTemplates",
@@ -929,7 +978,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateVault",
@@ -947,7 +996,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "GetCrawlers",
@@ -969,7 +1018,7 @@
       "passed": 6,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateRole",
@@ -1003,7 +1052,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListGroups",
@@ -1019,17 +1068,19 @@
       "service": "iot",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "CreateThing",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error IoT: CreateThing, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         },
         {
           "name": "ListThings",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error IoT: ListThings, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1037,13 +1088,14 @@
       "service": "iot-data",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListRetainedMessages",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error IoT Data Plane: ListRetainedMessages, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1051,17 +1103,19 @@
       "service": "iotwireless",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListWirelessDevices",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error IoT Wireless: ListWirelessDevices, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListWirelessGateways",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error IoT Wireless: ListWirelessGateways, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1069,13 +1123,14 @@
       "service": "kafka",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListClustersV2",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Kafka: ListClustersV2, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1085,7 +1140,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateStream",
@@ -1111,7 +1166,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListApplications",
@@ -1125,7 +1180,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateKey",
@@ -1149,17 +1204,19 @@
       "service": "lakeformation",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListPermissions",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error LakeFormation: ListPermissions, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         },
         {
           "name": "ListResources",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error LakeFormation: ListResources, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         }
       ]
     },
@@ -1169,7 +1226,7 @@
       "passed": 4,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateFunction",
@@ -1195,7 +1252,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListNetworks",
@@ -1209,7 +1266,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListJobs",
@@ -1227,7 +1284,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeClusters",
@@ -1239,13 +1296,14 @@
       "service": "mq",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListBrokers",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error mq: ListBrokers, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1253,13 +1311,14 @@
       "service": "mwaa",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListEnvironments",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error MWAA: ListEnvironments, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1269,7 +1328,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeDBClusters",
@@ -1285,13 +1344,14 @@
       "service": "opensearch",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListDomainNames",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error OpenSearch: ListDomainNames, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1299,13 +1359,14 @@
       "service": "organizations",
       "total_ops": 2,
       "passed": 1,
-      "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 50,
       "operations": [
         {
           "name": "DescribeOrganization",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Organizations: DescribeOrganization, https response error StatusCode: 400, RequestID: , AWSOrganizationsNotInUseException: Your account is not a member of an organization."
         },
         {
           "name": "ListAccounts",
@@ -1317,13 +1378,14 @@
       "service": "pinpoint",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "GetApps",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Pinpoint: GetApps, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1331,13 +1393,14 @@
       "service": "pipes",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListPipes",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Pipes: ListPipes, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1345,13 +1408,14 @@
       "service": "ram",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "GetResourceShares",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error RAM: GetResourceShares, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         }
       ]
     },
@@ -1361,7 +1425,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateDBInstance",
@@ -1383,7 +1447,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeClusters",
@@ -1394,18 +1458,18 @@
     "rekognition": {
       "service": "rekognition",
       "total_ops": 2,
-      "passed": 0,
+      "passed": 2,
       "failed": 0,
-      "skipped": 2,
-      "compat_pct": 0,
+      "skipped": 0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateCollection",
-          "status": "skip"
+          "status": "pass"
         },
         {
           "name": "ListCollections",
-          "status": "skip"
+          "status": "pass"
         }
       ]
     },
@@ -1413,13 +1477,14 @@
       "service": "resource-groups",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListGroups",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Resource Groups: ListGroups, https response error StatusCode: 501, RequestID: , api error NotImplemented: Route not implemented"
         }
       ]
     },
@@ -1429,7 +1494,7 @@
       "passed": 3,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateHostedZone",
@@ -1451,7 +1516,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListResolverEndpoints",
@@ -1469,7 +1534,7 @@
       "passed": 7,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CopyObject",
@@ -1507,7 +1572,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListEndpoints",
@@ -1523,17 +1588,19 @@
       "service": "scheduler",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListScheduleGroups",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Scheduler: ListScheduleGroups, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         },
         {
           "name": "ListSchedules",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Scheduler: ListSchedules, https response error StatusCode: 400, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1543,7 +1610,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateSecret",
@@ -1561,7 +1628,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListApplications",
@@ -1575,7 +1642,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListNamespaces",
@@ -1593,7 +1660,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListIdentities",
@@ -1611,7 +1678,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListProtections",
@@ -1625,7 +1692,7 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateTopic",
@@ -1655,7 +1722,7 @@
       "passed": 5,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "CreateQueue",
@@ -1685,7 +1752,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeParameters",
@@ -1697,13 +1764,14 @@
       "service": "sso-admin",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListInstances",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error SSO Admin: ListInstances, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1711,13 +1779,14 @@
       "service": "stepfunctions",
       "total_ops": 2,
       "passed": 1,
-      "failed": 0,
-      "skipped": 1,
-      "compat_pct": 100.0,
+      "failed": 1,
+      "skipped": 0,
+      "compat_pct": 50,
       "operations": [
         {
           "name": "ListActivities",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error SFN: ListActivities, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action ListActivities is not valid for this web service."
         },
         {
           "name": "ListStateMachines",
@@ -1731,7 +1800,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "AssumeRole",
@@ -1749,7 +1818,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "DescribeTrustedAdvisorChecks",
@@ -1763,7 +1832,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListDomains",
@@ -1777,7 +1846,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "GetResources",
@@ -1789,17 +1858,19 @@
       "service": "textract",
       "total_ops": 2,
       "passed": 0,
-      "failed": 0,
-      "skipped": 2,
+      "failed": 2,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListAdapterVersions",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Textract: ListAdapterVersions, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action ListAdapterVersions is not valid for this web service."
         },
         {
           "name": "ListAdapters",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Textract: ListAdapters, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action ListAdapters is not valid for this web service."
         }
       ]
     },
@@ -1807,13 +1878,14 @@
       "service": "timestream-write",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "ListDatabases",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error Timestream Write: ListDatabases, exceeded maximum number of attempts, 3, operation error Timestream Write: DescribeEndpoints, exceeded maximum number of attempts, 3, https response error StatusCode: 503, RequestID: , deserialization failed, failed to decode response body, invalid character '\u003c' looking for beginning of value"
         }
       ]
     },
@@ -1823,7 +1895,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListTranscriptionJobs",
@@ -1837,7 +1909,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListServers",
@@ -1851,7 +1923,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListPolicyStores",
@@ -1865,7 +1937,7 @@
       "passed": 2,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListRules",
@@ -1883,7 +1955,7 @@
       "passed": 1,
       "failed": 0,
       "skipped": 0,
-      "compat_pct": 100.0,
+      "compat_pct": 100,
       "operations": [
         {
           "name": "ListWebACLs",
@@ -1895,13 +1967,14 @@
       "service": "xray",
       "total_ops": 1,
       "passed": 0,
-      "failed": 0,
-      "skipped": 1,
+      "failed": 1,
+      "skipped": 0,
       "compat_pct": 0,
       "operations": [
         {
           "name": "GetTraceSummaries",
-          "status": "skip"
+          "status": "fail",
+          "error_detail": "operation error XRay: GetTraceSummaries, https response error StatusCode: 400, RequestID: , api error InvalidAction: The action  is not valid for this web service."
         }
       ]
     }

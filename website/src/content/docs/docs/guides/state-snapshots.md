@@ -84,12 +84,16 @@ State is automatically saved when CloudMock receives SIGTERM (Ctrl+C). Next star
 |---------|-------------|-----------------|
 | S3 | Buckets, objects (key + body + content type) | Multipart uploads in progress |
 | DynamoDB | Tables (schema, GSIs, LSIs), items | Streams, TTL config |
-| SQS | Queues, attributes | In-flight messages, DLQ config |
+| SQS | Queues, attributes, redrive policies | Messages |
 | SNS | Topics, subscriptions | Pending confirmations |
 | Lambda | Function configs (name, runtime, handler, env) | Invocation logs |
 | IAM | Users, roles, policies, attachments | Access keys |
 | CloudWatch Logs | Log groups | Log events |
 | Route53 | Hosted zones | Records |
+
+SQS dead-letter targets are restored when both queues are in the snapshot,
+regardless of entry order, for standard and FIFO queues. Reimporting SQS state
+retains existing queues, their current attributes, and their messages.
 
 ## Admin API
 

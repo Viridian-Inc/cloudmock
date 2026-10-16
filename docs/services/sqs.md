@@ -78,4 +78,4 @@ for msg in messages:
 - Queue URLs follow the pattern `http://localhost:4566/{AccountId}/{QueueName}`.
 - `VisibilityTimeout` is enforced — messages that are not deleted within the timeout reappear in the queue.
 - FIFO queues are accepted at creation but do not enforce ordering or deduplication.
-- Dead-letter queue redrive is not implemented.
+- Configured dead-letter redrive works for standard and FIFO queues, including after snapshot restoration.

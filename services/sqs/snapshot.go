@@ -39,5 +39,15 @@ func (s *SQSService) ImportState(data json.RawMessage) error {
 		// CreateQueue is idempotent.
 		s.store.CreateQueue(qs.Name, qs.Attributes)
 	}
+
+	// Export order is arbitrary. Resolve redrive policies only after every
+	// target exists, including policies on queues retained by a repeated import.
+	s.store.mu.Lock()
+	defer s.store.mu.Unlock()
+	for _, qs := range state.Queues {
+		if q, ok := s.store.byName[qs.Name]; ok {
+			s.store.wireDLQLocked(q)
+		}
+	}
 	return nil
 }

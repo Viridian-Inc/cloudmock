@@ -51,6 +51,10 @@ make test-race
 make lint
 ```
 
+The CI performance gate fails when its benchmark command fails, including test
+errors, compilation errors, and timeouts. The `perfgate-results` artifact retains
+the command's output for diagnosis even when the gate fails.
+
 ## Project Structure
 
 ```

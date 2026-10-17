@@ -59,13 +59,16 @@ jobs:
           curl -sf http://localhost:4566/ || true
           echo "CloudMock started"
       - name: Run Performance Gate
+        shell: bash
         env:
           PERFGATE_ENDPOINT: http://localhost:4566
         run: |
-          go test ./benchmarks/ -tags perfgate -timeout 120s -v 2>&1 | tee perfgate-results.txt
+          gate_status=0
+          go test ./benchmarks/ -tags perfgate -timeout 120s -v 2>&1 | tee perfgate-results.txt || gate_status=$?
           echo ""
           echo "=== Performance Gate Summary ==="
-          grep -E "PASS|FAIL|p50=" perfgate-results.txt | tail -30
+          grep -E "PASS|FAIL|p50=" perfgate-results.txt | tail -30 || :
+          exit "$gate_status"
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4

@@ -86,6 +86,7 @@ print(response["Item"])
 
 ## Notes
 
+- Successful table and item responses include `X-Amz-Crc32` computed from the exact JSON response bytes for SDK checksum validation.
 - Secondary indexes (GSI/LSI) are accepted during `CreateTable` but queries on them fall back to a full scan.
 - `UpdateItem` supports `SET` and `REMOVE` update expressions.
 - `BatchWriteItem` processes all requests in a single call; there is no retry/unprocessed-items logic.

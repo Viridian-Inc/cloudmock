@@ -55,6 +55,13 @@ The CI performance gate fails when its benchmark command fails, including test
 errors, compilation errors, and timeouts. The `perfgate-results` artifact retains
 the command's output for diagnosis even when the gate fails.
 
+The results include the ten measured samples in execution order and the benchmark
+client's Go/runtime settings. A separate `perfgate-environment` artifact records
+timestamped CPU, cgroup, load, and gateway-process snapshots before and after the
+test step. These cumulative counters span compilation, setup, and all operations;
+they do not isolate one operation or the gateway's garbage collector. Unavailable
+optional diagnostics are marked in the artifact.
+
 ## Project Structure
 
 ```

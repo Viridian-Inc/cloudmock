@@ -147,11 +147,7 @@ func (s *DynamoDBService) HandleRequest(ctx *service.RequestContext) (*service.R
 	if s.rustStore != nil {
 		r := s.rustStore.Handle(ctx.Action, ctx.Body)
 		if r.Status != 0 {
-			return &service.Response{
-				StatusCode:     r.Status,
-				RawBody:        r.Body,
-				RawContentType: "application/x-amz-json-1.0",
-			}, nil
+			return jsonResponse(r.Status, r.Body), nil
 		}
 		// status=0 means Rust doesn't handle this action — fall through to Go.
 	}

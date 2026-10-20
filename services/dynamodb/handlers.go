@@ -1,7 +1,9 @@
 package dynamodb
 
 import (
+	"hash/crc32"
 	"net/http"
+	"strconv"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/service"
 	gojson "github.com/goccy/go-json"
@@ -330,10 +332,19 @@ type cancellationReason struct {
 // ---- helpers ----
 
 // emptyJSON is the pre-allocated response for operations that return {}.
-var emptyJSONResponse = &service.Response{
-	StatusCode:     http.StatusOK,
-	RawBody:        []byte("{}"),
-	RawContentType: "application/x-amz-json-1.0",
+var emptyJSONResponse = jsonResponse(http.StatusOK, []byte("{}"))
+
+// jsonResponse includes the checksum of the exact serialized bytes. DynamoDB
+// SDKs validate this header when closing a successfully decoded response body.
+func jsonResponse(statusCode int, raw []byte) *service.Response {
+	return &service.Response{
+		StatusCode:     statusCode,
+		RawBody:        raw,
+		RawContentType: "application/x-amz-json-1.0",
+		Headers: map[string]string{
+			"X-Amz-Crc32": strconv.FormatUint(uint64(crc32.ChecksumIEEE(raw)), 10),
+		},
+	}
 }
 
 func jsonOK(body any) (*service.Response, error) {
@@ -341,11 +352,7 @@ func jsonOK(body any) (*service.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &service.Response{
-		StatusCode:     http.StatusOK,
-		RawBody:        raw,
-		RawContentType: "application/x-amz-json-1.0",
-	}, nil
+	return jsonResponse(http.StatusOK, raw), nil
 }
 
 // jsonEmpty returns the pre-allocated {} response (for PutItem, DeleteItem, etc.)
@@ -557,11 +564,7 @@ func handleGetItem(ctx *service.RequestContext, store *TableStore) (*service.Res
 		if raw == nil {
 			return jsonEmpty()
 		}
-		return &service.Response{
-			StatusCode:     http.StatusOK,
-			RawBody:        raw,
-			RawContentType: "application/x-amz-json-1.0",
-		}, nil
+		return jsonResponse(http.StatusOK, raw), nil
 	}
 
 	item, awsErr := store.GetItem(req.TableName, req.Key, req.ProjectionExpression, req.ExpressionAttributeNames)

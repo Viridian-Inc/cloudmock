@@ -115,6 +115,11 @@ func runSuiteGate(t *testing.T, suite harness.Suite, endpoint string, b baseline
 			}
 			p50 := sorted[len(sorted)/2]
 
+			// Record diagnostics only after all timed runs have completed.
+			t.Logf("samples_ms=%v", times)
+			t.Logf("benchmark_client pid=%d go=%s os=%s arch=%s cpus=%d gomaxprocs=%d",
+				os.Getpid(), runtime.Version(), runtime.GOOS, runtime.GOARCH,
+				runtime.NumCPU(), runtime.GOMAXPROCS(0))
 			t.Logf("p50=%.2fms (threshold=%.2fms)", p50, th.MaxP50Ms)
 
 			assert.LessOrEqual(t, p50, th.MaxP50Ms,

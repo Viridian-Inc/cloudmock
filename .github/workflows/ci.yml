@@ -58,6 +58,8 @@ jobs:
           sleep 5
           curl -sf http://localhost:4566/ || true
           echo "CloudMock started"
+      - name: Record performance environment before
+        run: bash .github/scripts/perfgate-environment.sh before >> perfgate-environment.txt
       - name: Run Performance Gate
         shell: bash
         env:
@@ -69,9 +71,18 @@ jobs:
           echo "=== Performance Gate Summary ==="
           grep -E "PASS|FAIL|p50=" perfgate-results.txt | tail -30 || :
           exit "$gate_status"
+      - name: Record performance environment after
+        if: always()
+        run: bash .github/scripts/perfgate-environment.sh after >> perfgate-environment.txt
       - name: Upload results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: perfgate-results
           path: perfgate-results.txt
+      - name: Upload performance environment
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perfgate-environment
+          path: perfgate-environment.txt

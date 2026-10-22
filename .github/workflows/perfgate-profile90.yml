@@ -1,0 +1,89 @@
+name: Bounded performance diagnosis 90
+on:
+  push:
+    branches: [codex/perfgate-profile90]
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build isolated profiling binaries
+        shell: bash
+        run: |
+          mkdir diagnosis
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          source = Path('cmd/gateway/main.go').resolve()
+          text = source.read_text().replace('"os/signal"', '"os/signal"\n"runtime/pprof"')
+          marker = '\t\tfastServer := gateway.FastTestModeServer(rootID, cfg.Region, cfg.AccountID, registry)'
+          assert text.count(marker) == 1
+          text = text.replace(marker, marker + '''
+          profileFile, profileErr := os.Create("diagnosis/server.cpu.pprof")
+          if profileErr != nil { panic(profileErr) }
+          if profileErr = pprof.StartCPUProfile(profileFile); profileErr != nil { panic(profileErr) }
+          defer func() { pprof.StopCPUProfile(); profileFile.Close() }()
+          ''')
+          replacement = Path('diagnosis/profile-main.go').resolve()
+          replacement.write_text(text)
+          Path('diagnosis/overlay.json').write_text(json.dumps({'Replace': {str(source): str(replacement)}}))
+          PY
+          go build -overlay diagnosis/overlay.json -o diagnosis/gateway ./cmd/gateway/
+          go test -tags perfgate -c -o diagnosis/perfgate ./benchmarks/
+      - name: Capture one diagnostic invocation
+        shell: bash
+        run: |
+          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_PROFILE=full diagnosis/gateway > diagnosis/gateway.log 2>&1 &
+          server_pid=$!
+          trap 'kill -TERM "$server_pid" 2>/dev/null || :; wait "$server_pid" || :' EXIT
+          ready=0
+          for i in {1..60}; do
+            if curl --fail --silent http://localhost:4566/_cloudmock/health; then ready=1; break; fi
+            kill -0 "$server_pid"
+            sleep 1
+          done
+          test "$ready" = 1
+          bash .github/scripts/perfgate-environment.sh before > diagnosis/environment.txt
+          cat "/proc/$server_pid/stat" > diagnosis/server-before.stat
+          profile_status=0
+          PERFGATE_ENDPOINT=http://localhost:4566 /usr/bin/time -v diagnosis/perfgate \
+            '-test.run=^TestPerfGate_DynamoDB_Stress$/^dynamodb-stress$/^BulkPutItem$' \
+            -test.count=1 -test.timeout=120s -test.v \
+            -test.cpuprofile=diagnosis/client.cpu.pprof -test.trace=diagnosis/client.trace \
+            > diagnosis/results.txt 2>&1 || profile_status=$?
+          cat "/proc/$server_pid/stat" > diagnosis/server-after.stat
+          bash .github/scripts/perfgate-environment.sh after >> diagnosis/environment.txt
+          kill -TERM "$server_pid"
+          wait "$server_pid"
+          trap - EXIT
+          printf '%s\n' "$profile_status" > diagnosis/test-exit-status.txt
+          cat diagnosis/results.txt
+          exit "$profile_status"
+      - name: Summarize profiles
+        if: always()
+        shell: bash
+        run: |
+          go tool pprof -top -nodecount=80 diagnosis/gateway diagnosis/server.cpu.pprof > diagnosis/server-top.txt
+          go tool pprof -top -cum -nodecount=80 diagnosis/gateway diagnosis/server.cpu.pprof > diagnosis/server-cumulative.txt
+          go tool pprof -top -nodecount=80 diagnosis/perfgate diagnosis/client.cpu.pprof > diagnosis/client-top.txt
+          go tool pprof -top -cum -nodecount=80 diagnosis/perfgate diagnosis/client.cpu.pprof > diagnosis/client-cumulative.txt
+          for kind in net sync sched syscall; do
+            go tool trace -pprof="$kind" diagnosis/client.trace > "diagnosis/client-$kind.pprof"
+            go tool pprof -top "diagnosis/client-$kind.pprof" > "diagnosis/client-$kind.txt"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-diagnosis-90
+          path: diagnosis/

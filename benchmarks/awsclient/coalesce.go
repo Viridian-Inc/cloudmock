@@ -27,6 +27,7 @@ type coalescingClient struct {
 func (c *coalescingClient) Do(req *http.Request) (*http.Response, error) {
 	if req.Body == nil || req.Body == http.NoBody || req.ContentLength <= 0 ||
 		req.ContentLength > coalesceLimit || len(req.TransferEncoding) != 0 ||
+		req.Header.Get("Expect") != "" ||
 		!isJSONContentType(req.Header.Get("Content-Type")) {
 		return c.base.Do(req)
 	}

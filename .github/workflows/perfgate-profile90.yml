@@ -15,6 +15,8 @@ jobs:
       GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
@@ -23,14 +25,14 @@ jobs:
         run: |
           mkdir diagnosis
           python3 - <<'PY'
-          import json
+          import json, subprocess
           from pathlib import Path
           source = Path('cmd/gateway/main.go').resolve()
           text = source.read_text().replace('"os/signal"', '"os/signal"\n"runtime/pprof"')
           marker = '\t\tfastServer := gateway.FastTestModeServer(rootID, cfg.Region, cfg.AccountID, registry)'
           assert text.count(marker) == 1
           text = text.replace(marker, marker + '''
-          profileFile, profileErr := os.Create("diagnosis/server.cpu.pprof")
+          profileFile, profileErr := os.Create(os.Getenv("PROFILE_OUTPUT_DIR") + "/server.cpu.pprof")
           if profileErr != nil { panic(profileErr) }
           if profileErr = pprof.StartCPUProfile(profileFile); profileErr != nil { panic(profileErr) }
           defer func() { pprof.StopCPUProfile(); profileFile.Close() }()
@@ -38,49 +40,63 @@ jobs:
           replacement = Path('diagnosis/profile-main.go').resolve()
           replacement.write_text(text)
           Path('diagnosis/overlay.json').write_text(json.dumps({'Replace': {str(source): str(replacement)}}))
+          baseline = Path('diagnosis/baseline-client.go').resolve()
+          baseline.write_bytes(subprocess.check_output(['git', 'show', 'f02a24e6de5e4774c73960f40c218826ebd718b0:benchmarks/awsclient/client.go']))
+          client = Path('benchmarks/awsclient/client.go').resolve()
+          Path('diagnosis/baseline-overlay.json').write_text(json.dumps({'Replace': {str(client): str(baseline)}}))
           PY
           go build -overlay diagnosis/overlay.json -o diagnosis/gateway ./cmd/gateway/
-          go test -tags perfgate -c -o diagnosis/perfgate ./benchmarks/
-      - name: Capture one diagnostic invocation
+          go test -overlay diagnosis/baseline-overlay.json -tags perfgate -c -o diagnosis/perfgate-baseline ./benchmarks/
+          go test -tags perfgate -c -o diagnosis/perfgate-coalesced ./benchmarks/
+      - name: Capture one baseline and one coalesced invocation on the same runner
         shell: bash
         run: |
-          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_PROFILE=full diagnosis/gateway > diagnosis/gateway.log 2>&1 &
-          server_pid=$!
-          trap 'kill -TERM "$server_pid" 2>/dev/null || :; wait "$server_pid" || :' EXIT
-          ready=0
-          for i in {1..60}; do
-            if curl --fail --silent http://localhost:4566/_cloudmock/health; then ready=1; break; fi
-            kill -0 "$server_pid"
-            sleep 1
+          diagnostic_status=0
+          for variant in baseline coalesced; do
+            output="diagnosis/$variant"
+            mkdir "$output"
+            PROFILE_OUTPUT_DIR="$output" CLOUDMOCK_TEST_MODE=true CLOUDMOCK_PROFILE=full diagnosis/gateway > "$output/gateway.log" 2>&1 &
+            server_pid=$!
+            trap 'kill -TERM "$server_pid" 2>/dev/null || :; wait "$server_pid" || :' EXIT
+            ready=0
+            for i in {1..60}; do
+              if curl --fail --silent http://localhost:4566/_cloudmock/health; then ready=1; break; fi
+              kill -0 "$server_pid"
+              sleep 1
+            done
+            test "$ready" = 1
+            bash .github/scripts/perfgate-environment.sh before > "$output/environment.txt"
+            cat "/proc/$server_pid/stat" > "$output/server-before.stat"
+            profile_status=0
+            PERFGATE_ENDPOINT=http://localhost:4566 /usr/bin/time -v "diagnosis/perfgate-$variant" \
+              '-test.run=^TestPerfGate_DynamoDB_Stress$/^dynamodb-stress$/^BulkPutItem$' \
+              -test.count=1 -test.timeout=120s -test.v \
+              -test.cpuprofile="$output/client.cpu.pprof" -test.trace="$output/client.trace" \
+              > "$output/results.txt" 2>&1 || profile_status=$?
+            cat "/proc/$server_pid/stat" > "$output/server-after.stat"
+            bash .github/scripts/perfgate-environment.sh after >> "$output/environment.txt"
+            kill -TERM "$server_pid"
+            wait "$server_pid"
+            trap - EXIT
+            printf '%s\n' "$profile_status" > "$output/test-exit-status.txt"
+            cat "$output/results.txt"
+            if [[ "$profile_status" != 0 ]]; then diagnostic_status="$profile_status"; fi
           done
-          test "$ready" = 1
-          bash .github/scripts/perfgate-environment.sh before > diagnosis/environment.txt
-          cat "/proc/$server_pid/stat" > diagnosis/server-before.stat
-          profile_status=0
-          PERFGATE_ENDPOINT=http://localhost:4566 /usr/bin/time -v diagnosis/perfgate \
-            '-test.run=^TestPerfGate_DynamoDB_Stress$/^dynamodb-stress$/^BulkPutItem$' \
-            -test.count=1 -test.timeout=120s -test.v \
-            -test.cpuprofile=diagnosis/client.cpu.pprof -test.trace=diagnosis/client.trace \
-            > diagnosis/results.txt 2>&1 || profile_status=$?
-          cat "/proc/$server_pid/stat" > diagnosis/server-after.stat
-          bash .github/scripts/perfgate-environment.sh after >> diagnosis/environment.txt
-          kill -TERM "$server_pid"
-          wait "$server_pid"
-          trap - EXIT
-          printf '%s\n' "$profile_status" > diagnosis/test-exit-status.txt
-          cat diagnosis/results.txt
-          exit "$profile_status"
+          exit "$diagnostic_status"
       - name: Summarize profiles
         if: always()
         shell: bash
         run: |
-          go tool pprof -top -nodecount=80 diagnosis/gateway diagnosis/server.cpu.pprof > diagnosis/server-top.txt
-          go tool pprof -top -cum -nodecount=80 diagnosis/gateway diagnosis/server.cpu.pprof > diagnosis/server-cumulative.txt
-          go tool pprof -top -nodecount=80 diagnosis/perfgate diagnosis/client.cpu.pprof > diagnosis/client-top.txt
-          go tool pprof -top -cum -nodecount=80 diagnosis/perfgate diagnosis/client.cpu.pprof > diagnosis/client-cumulative.txt
-          for kind in net sync sched syscall; do
-            go tool trace -pprof="$kind" diagnosis/client.trace > "diagnosis/client-$kind.pprof"
-            go tool pprof -top "diagnosis/client-$kind.pprof" > "diagnosis/client-$kind.txt"
+          for variant in baseline coalesced; do
+            output="diagnosis/$variant"
+            go tool pprof -top -nodecount=80 diagnosis/gateway "$output/server.cpu.pprof" > "$output/server-top.txt"
+            go tool pprof -top -cum -nodecount=80 diagnosis/gateway "$output/server.cpu.pprof" > "$output/server-cumulative.txt"
+            go tool pprof -top -nodecount=80 "diagnosis/perfgate-$variant" "$output/client.cpu.pprof" > "$output/client-top.txt"
+            go tool pprof -top -cum -nodecount=80 "diagnosis/perfgate-$variant" "$output/client.cpu.pprof" > "$output/client-cumulative.txt"
+            for kind in net sync sched syscall; do
+              go tool trace -pprof="$kind" "$output/client.trace" > "$output/client-$kind.pprof"
+              go tool pprof -top "$output/client-$kind.pprof" > "$output/client-$kind.txt"
+            done
           done
       - uses: actions/upload-artifact@v4
         if: always()

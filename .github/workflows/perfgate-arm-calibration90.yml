@@ -1,0 +1,60 @@
+name: Bounded native ARM64 calibration 90
+on:
+  push:
+    branches: [codex/perfgate-arm-calibration90]
+
+permissions:
+  contents: read
+
+jobs:
+  calibration:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        execution: [1, 2, 3]
+    env:
+      GOPRIVATE: github.com/Viridian-Inc/cloudmock
+      GONOSUMCHECK: github.com/Viridian-Inc/cloudmock
+      GOFLAGS: -mod=mod
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build gateway before sampling
+        run: go build -o gateway ./cmd/gateway/
+      - name: Start unchanged test-mode gateway
+        shell: bash
+        run: |
+          CLOUDMOCK_TEST_MODE=true CLOUDMOCK_PROFILE=full ./gateway > gateway.log 2>&1 &
+          echo "$!" > gateway.pid
+          ready=0
+          for i in {1..60}; do
+            if curl --fail --silent http://localhost:4566/_cloudmock/health; then ready=1; break; fi
+            kill -0 "$(cat gateway.pid)"
+            sleep 1
+          done
+          test "$ready" = 1
+      - name: Record performance environment before
+        run: bash .github/scripts/perfgate-environment.sh before >> perfgate-environment.txt
+      - name: Run unchanged performance gate once
+        shell: bash
+        env:
+          PERFGATE_ENDPOINT: http://localhost:4566
+        run: |
+          gate_status=0
+          go test ./benchmarks/ -tags perfgate -timeout 120s -v 2>&1 | tee perfgate-results.txt || gate_status=$?
+          exit "$gate_status"
+      - name: Record performance environment after
+        if: always()
+        run: bash .github/scripts/perfgate-environment.sh after >> perfgate-environment.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arm64-calibration-${{ matrix.execution }}
+          path: |
+            perfgate-results.txt
+            perfgate-environment.txt
+            gateway.log

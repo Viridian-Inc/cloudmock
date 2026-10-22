@@ -190,7 +190,9 @@ exit "$CM_PERFGATE_STATUS"
 				t.Fatal(err)
 			}
 			gotArgs := strings.Split(strings.TrimSuffix(string(captured), "\x00"), "\x00")
-			wantArgs := []string{"test", "./benchmarks/", "-tags", "perfgate", "-timeout", "120s", "-v"}
+			// The external gateway and runner load are not Go test cache inputs.
+			// Force execution so a previous successful run cannot satisfy this gate.
+			wantArgs := []string{"test", "./benchmarks/", "-tags", "perfgate", "-count=1", "-timeout", "120s", "-v"}
 			if !reflect.DeepEqual(gotArgs, wantArgs) {
 				t.Errorf("benchmark arguments changed: got %q want %q", gotArgs, wantArgs)
 			}

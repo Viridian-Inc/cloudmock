@@ -2,6 +2,7 @@ package memory
 
 import (
 	"context"
+	"maps"
 
 	"github.com/Viridian-Inc/cloudmock/pkg/dataplane"
 	"github.com/Viridian-Inc/cloudmock/pkg/gateway"
@@ -56,8 +57,24 @@ func (s *RequestStore) GetByID(_ context.Context, id string) (*dataplane.Request
 	return &de, nil
 }
 
-// Write adds a request entry to the log.
+// Write adds a request entry to the log. Nonempty typed scope IDs override their
+// legacy headers; empty IDs fall back to the corresponding header values.
+// Headers are copied so normalization cannot mutate the caller's entry.
 func (s *RequestStore) Write(_ context.Context, entry dataplane.RequestEntry) error {
+	headers := maps.Clone(entry.RequestHeaders)
+	if headers == nil && (entry.TenantID != "" || entry.OrgID != "" || entry.UserID != "") {
+		headers = make(map[string]string, 3)
+	}
+	if entry.TenantID != "" {
+		headers["X-Tenant-Id"] = entry.TenantID
+	}
+	if entry.OrgID != "" {
+		headers["X-Enterprise-Id"] = entry.OrgID
+	}
+	if entry.UserID != "" {
+		headers["X-User-Id"] = entry.UserID
+	}
+
 	ge := gateway.RequestEntry{
 		ID:             entry.ID,
 		TraceID:        entry.TraceID,
@@ -75,7 +92,7 @@ func (s *RequestStore) Write(_ context.Context, entry dataplane.RequestEntry) er
 		Level:          entry.Level,
 		MemAllocKB:     int64(entry.MemAllocKB),
 		Goroutines:     entry.Goroutines,
-		RequestHeaders: entry.RequestHeaders,
+		RequestHeaders: headers,
 		RequestBody:    entry.RequestBody,
 		ResponseBody:   entry.ResponseBody,
 	}
@@ -84,6 +101,7 @@ func (s *RequestStore) Write(_ context.Context, entry dataplane.RequestEntry) er
 }
 
 // convertRequestEntry converts a gateway.RequestEntry to a dataplane.RequestEntry.
+// Copy headers so readers cannot alter the log's stored scope metadata.
 func convertRequestEntry(e gateway.RequestEntry) dataplane.RequestEntry {
 	return dataplane.RequestEntry{
 		ID:             e.ID,
@@ -102,7 +120,7 @@ func convertRequestEntry(e gateway.RequestEntry) dataplane.RequestEntry {
 		Level:          e.Level,
 		MemAllocKB:     float64(e.MemAllocKB),
 		Goroutines:     e.Goroutines,
-		RequestHeaders: e.RequestHeaders,
+		RequestHeaders: maps.Clone(e.RequestHeaders),
 		RequestBody:    e.RequestBody,
 		ResponseBody:   e.ResponseBody,
 		TenantID:       e.RequestHeaders["X-Tenant-Id"],

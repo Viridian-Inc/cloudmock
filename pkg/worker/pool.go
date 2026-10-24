@@ -41,6 +41,10 @@ func (p *Pool) ScheduleInterval(name string, interval time.Duration, fn func()) 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if p.ctx.Err() != nil {
+		return func() {}
+	}
+
 	// Cancel any existing worker with the same name.
 	if cancel, ok := p.workers[name]; ok {
 		cancel()
@@ -52,13 +56,13 @@ func (p *Pool) ScheduleInterval(name string, interval time.Duration, fn func()) 
 	go func() {
 		// In instant mode, fire once immediately.
 		if !p.lcCfg.Enabled() {
-			fn()
+			invokeIfActive(wCtx, fn)
 			return
 		}
 
 		effective := p.lcCfg.EffectiveDelay(interval)
 		if effective <= 0 {
-			fn()
+			invokeIfActive(wCtx, fn)
 			return
 		}
 
@@ -66,14 +70,18 @@ func (p *Pool) ScheduleInterval(name string, interval time.Duration, fn func()) 
 		defer ticker.Stop()
 
 		// Fire once immediately, then on interval.
-		fn()
+		if !invokeIfActive(wCtx, fn) {
+			return
+		}
 
 		for {
 			select {
 			case <-wCtx.Done():
 				return
 			case <-ticker.C:
-				fn()
+				if !invokeIfActive(wCtx, fn) {
+					return
+				}
 			}
 		}
 	}()
@@ -87,6 +95,10 @@ func (p *Pool) ScheduleOnce(name string, delay time.Duration, fn func()) func() 
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
+	if p.ctx.Err() != nil {
+		return func() {}
+	}
+
 	if cancel, ok := p.workers[name]; ok {
 		cancel()
 	}
@@ -97,7 +109,7 @@ func (p *Pool) ScheduleOnce(name string, delay time.Duration, fn func()) func() 
 	go func() {
 		effective := p.lcCfg.EffectiveDelay(delay)
 		if effective <= 0 {
-			fn()
+			invokeIfActive(wCtx, fn)
 			return
 		}
 
@@ -108,11 +120,21 @@ func (p *Pool) ScheduleOnce(name string, delay time.Duration, fn func()) func() 
 		case <-wCtx.Done():
 			return
 		case <-timer.C:
-			fn()
+			invokeIfActive(wCtx, fn)
 		}
 	}()
 
 	return wCancel
+}
+
+// invokeIfActive admits a callback only while its worker context is active.
+// Cancellation does not wait for a callback already admitted to finish.
+func invokeIfActive(ctx context.Context, fn func()) bool {
+	if ctx.Err() != nil {
+		return false
+	}
+	fn()
+	return true
 }
 
 // Cancel stops a specific named worker.
@@ -125,7 +147,8 @@ func (p *Pool) Cancel(name string) {
 	}
 }
 
-// Shutdown stops all workers and prevents new ones from being scheduled.
+// Shutdown cancels all workers and prevents new ones from being scheduled.
+// It does not wait for callbacks already admitted for execution to finish.
 func (p *Pool) Shutdown() {
 	p.cancel()
 }

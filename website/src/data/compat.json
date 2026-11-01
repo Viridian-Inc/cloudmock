@@ -1,7 +1,7 @@
 {
-  "generated_at": "2026-10-31T08:31:34Z",
+  "generated_at": "2026-11-01T09:23:09Z",
   "cloudmock_version": "",
-  "source_sha": "e6d1f8b96a79408c4c69fcdc3fbf976f56051228",
+  "source_sha": "900128ff55d55b22df0921ef6efb626d5280f7ae",
   "total_ops": 226,
   "passed": 180,
   "failed": 46,

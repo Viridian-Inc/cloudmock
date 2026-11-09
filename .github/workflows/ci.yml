@@ -66,7 +66,7 @@ jobs:
           PERFGATE_ENDPOINT: http://localhost:4566
         run: |
           gate_status=0
-          go test ./benchmarks/ -tags perfgate -timeout 120s -v 2>&1 | tee perfgate-results.txt || gate_status=$?
+          go test ./benchmarks/ -tags perfgate -count=1 -timeout 120s -v 2>&1 | tee perfgate-results.txt || gate_status=$?
           echo ""
           echo "=== Performance Gate Summary ==="
           grep -E "PASS|FAIL|p50=" perfgate-results.txt | tail -30 || :

@@ -4,7 +4,7 @@
 // These tests start CloudMock in-process, run key operations, and fail if
 // latency exceeds the thresholds defined in baseline.json.
 //
-// Run with: go test ./benchmarks/ -tags perfgate -timeout 120s -v
+// Run with: go test ./benchmarks/ -tags perfgate -count=1 -timeout 120s -v
 package benchmarks
 
 import (

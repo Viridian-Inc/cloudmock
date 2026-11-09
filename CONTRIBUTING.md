@@ -55,6 +55,11 @@ The CI performance gate fails when its benchmark command fails, including test
 errors, compilation errors, and timeouts. The `perfgate-results` artifact retains
 the command's output for diagnosis even when the gate fails.
 
+The gate uses `go test ./benchmarks/ -tags perfgate -count=1 -timeout 120s -v`
+to execute fresh measurements on every run. Go's test-result cache does not track
+the external gateway's state or the runner's current load, so a cached success
+cannot validate the current performance gate. Build and module caches remain enabled.
+
 The results include the ten measured samples in execution order and the benchmark
 client's Go/runtime settings. A separate `perfgate-environment` artifact records
 timestamped CPU, cgroup, load, and gateway-process snapshots before and after the
